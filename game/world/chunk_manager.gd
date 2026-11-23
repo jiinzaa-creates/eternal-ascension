@@ -200,6 +200,18 @@ func _spawn_resources(chunk) -> void:
 		if on_resource_spawned.is_valid():
 			on_resource_spawned.call(herb)
 
+	for entry in chunk.pois:
+		var poi_id := String(entry["id"])
+		if delta != null and delta.is_spent(chunk.coord, poi_id, today):
+			continue
+		var site := Interactable.new()
+		site.setup_poi(poi_id, String(entry["kind"]), chunk.coord)
+		resource_parent.add_child(site)
+		site.global_position = origin + (entry["pos"] as Vector2)
+		chunk.interactables.append(site)
+		if on_resource_spawned.is_valid():
+			on_resource_spawned.call(site)
+
 
 func _free_chunk(coord: Vector2i) -> void:
 	if not chunks.has(coord):
@@ -291,6 +303,7 @@ class ProvinceChunk:
 	var palette: Array = []
 	var features: Array = []
 	var herbs: Array = []
+	var pois: Array = []
 	var props: Array = []
 	var interactables: Array = []
 
@@ -304,6 +317,7 @@ class ProvinceChunk:
 		palette = incoming if not incoming.is_empty() else PALETTES.duplicate()
 		features = payload.get("features", [])
 		herbs = payload.get("herbs", [])
+		pois = payload.get("pois", [])
 
 
 	func _draw() -> void:

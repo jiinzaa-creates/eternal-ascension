@@ -644,12 +644,7 @@ func _use_interactable(node: Interactable) -> void:
 		Interactable.Kind.HERB:
 			if node.used:
 				return
-			node.used = true
-			if node.chunk_owned:
-				# Streamed resources persist per chunk, not in the unique-node list.
-				world_delta.mark_spent(node.chunk_coord, node.id, Clock.day)
-			elif not used_interactables.has(node.id):
-				used_interactables.append(node.id)
+			_mark_spent(node)
 			var herb := _make_herb()
 			player.inventory.append(herb)
 			Bus.item_picked.emit(herb)
@@ -702,14 +697,42 @@ func _use_interactable(node: Interactable) -> void:
 			_open_shop()
 		Interactable.Kind.INN:
 			_rest_at_inn()
+		Interactable.Kind.RUIN:
+			if node.used:
+				return
+			_loot(node, 5, "ruin cache", 1)
+			_award_discovery(node, 40)
+		Interactable.Kind.MINE:
+			if node.used:
+				return
+			_mark_spent(node)
+			player.pick_up(_make_ore())
+			Bus.toast.emit("Mined spirit ore from the vein.")
+			_award_discovery(node, 25)
+		Interactable.Kind.DEPOSIT:
+			if node.used:
+				return
+			_mark_spent(node)
+			Game.spirit_stones += 25
+			Bus.player_stats_changed.emit()
+			Bus.toast.emit("Gathered 25 spirit stones from the deposit.")
+			_award_discovery(node, 15)
 
 
-## One-shot loot shared by chests and containers. The item is generated from the
-## node's stable id, so looting the same crate after a reload gives the same item.
-func _loot(node: Interactable, ilvl: int, verb: String, forced_rarity: int = 0) -> void:
+## Spends a node: streamed resources record a chunk delta with their own regrow
+## window, unique world nodes go into the saved one-shot list.
+func _mark_spent(node: Interactable) -> void:
 	node.used = true
-	if not used_interactables.has(node.id):
+	if node.chunk_owned:
+		world_delta.mark_spent(node.chunk_coord, node.id, Clock.day, node.regrow_days)
+	elif not used_interactables.has(node.id):
 		used_interactables.append(node.id)
+
+
+## One-shot loot shared by chests, containers and ruins. The item is generated
+## from the node's stable id, so looting it again after a reload is impossible.
+func _loot(node: Interactable, ilvl: int, verb: String, forced_rarity: int = 0) -> void:
+	_mark_spent(node)
 	var generator := ItemGen.new(DB, Rng)
 	var item := generator.generate(maxi(1, ilvl), hash(node.id), ground_items.size(), forced_rarity)
 	if item.is_empty():
@@ -723,6 +746,31 @@ func _loot(node: Interactable, ilvl: int, verb: String, forced_rarity: int = 0) 
 func cultivation_restore() -> void:
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
 	Bus.cultivation_changed.emit()
+
+
+## First visit to a site pays once, ever: `Game.discovered` is saved with the run.
+func _award_discovery(node: Interactable, reward: int) -> void:
+	if not Game.discover(node.id):
+		return
+	Game.spirit_stones += reward
+	Bus.toast.emit("Discovery — %s (+%d spirit stones)." % [node.label, reward])
+
+
+func _make_ore() -> Dictionary:
+	return {
+		"id": "item.ore.spirit.%d" % player.inventory.size(),
+		"name": "Spirit Ore",
+		"base_name": "Spirit Ore",
+		"slot": "material",
+		"ilvl": 2,
+		"rarity": 1,
+		"rarity_name": "Refined",
+		"implicit": "Forging ingredient",
+		"base_damage": 0.0,
+		"armor": 0.0,
+		"mods": [],
+		"value": 22,
+	}
 
 
 func _make_herb() -> Dictionary:

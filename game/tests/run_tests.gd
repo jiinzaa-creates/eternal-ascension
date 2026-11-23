@@ -27,6 +27,7 @@ func _ready() -> void:
 	_continent_tests()
 	_biome_tests()
 	_economy_tests()
+	_location_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -433,9 +434,14 @@ func _chunk_delta_tests() -> void:
 	check(spawned.size() > 0, "chunk resources stream in as interactables (%d)" % spawned.size())
 	check(spawned.size() == manager.resource_count(), "the manager counts its own resources")
 
-	var herb: Interactable = spawned[0] as Interactable
-	check(herb.chunk_owned, "streamed resources know they belong to a chunk")
-	check(herb.id.begins_with("herb.chunk."), "streamed resource ids are namespaced")
+	var herb: Interactable = null
+	for node in spawned:
+		if String((node as Interactable).id).begins_with("herb.chunk."):
+			herb = node as Interactable
+			break
+	check(herb != null, "chunk herbs stream in among the other resources")
+	check(herb != null and herb.chunk_owned, "streamed resources know they belong to a chunk")
+	check(herb != null and herb.id.begins_with("herb.chunk."), "streamed resource ids are namespaced")
 	check(herb.can_interact(), "a fresh streamed herb can be gathered")
 
 	var before := manager.resource_count()
@@ -674,6 +680,68 @@ func _economy_tests() -> void:
 	for item in restored.stock:
 		restored_ids.append(String(item["id"]))
 	check(restored_ids != ids_a, "the next day's stock differs")
+
+
+# -------------------------------------------------------------- locations ----
+
+func _location_tests() -> void:
+	print("[locations] overworld sites, discovery windows and permanence")
+	check(ChunkGen.POI_KINDS.size() == 3, "three kinds of overworld site")
+
+	var total := 0
+	var kinds := {}
+	var unique_ids := {}
+	var outside := 0
+	for x in range(0, 8):
+		for y in range(0, 8):
+			var payload := ChunkGen.payload_for(Vector2i(x, y), 5150)
+			for poi in payload["pois"]:
+				total += 1
+				kinds[String(poi["kind"])] = true
+				unique_ids[String(poi["id"])] = true
+				var pos: Vector2 = poi["pos"]
+				if pos.x < 0.0 or pos.y < 0.0 or pos.x > ChunkGen.SIZE or pos.y > ChunkGen.SIZE:
+					outside += 1
+	check(total > 0, "the province contains overworld sites (%d over 64 chunks)" % total)
+	check(kinds.size() >= 2, "site kinds vary (%d)" % kinds.size())
+	check(unique_ids.size() == total, "site ids are unique")
+	check(outside == 0, "sites stay inside their chunk")
+
+	var first: Array = ChunkGen.payload_for(Vector2i(3, 3), 5150)["pois"]
+	var again: Array = ChunkGen.payload_for(Vector2i(3, 3), 5150)["pois"]
+	check(first.size() == again.size(), "site placement is deterministic")
+	if not first.is_empty():
+		check(String(first[0]["id"]) == String(again[0]["id"]), "the same chunk yields the same site")
+
+	var delta := WorldDelta.new()
+	var coord := Vector2i(2, 2)
+	delta.mark_spent(coord, "poi.mine.2.2", 10, 10)
+	check(delta.is_spent(coord, "poi.mine.2.2", 19), "a mine stays mined inside its window")
+	check(not delta.is_spent(coord, "poi.mine.2.2", 20), "a mine refills after ten days")
+	delta.mark_spent(coord, "poi.ruin.2.2", 10, WorldDelta.PERMANENT)
+	check(delta.is_spent(coord, "poi.ruin.2.2", 900), "a searched ruin stays searched")
+	delta.mark_spent(coord, "herb.chunk.2.2.0", 10)
+	check(delta.prune(coord, 14) == 1, "pruning removes only expired entries")
+	check(delta.is_spent(coord, "poi.ruin.2.2", 14), "permanent sites survive pruning")
+	check(delta.is_spent(coord, "poi.mine.2.2", 14), "living windows survive pruning")
+
+	var legacy := WorldDelta.from_dict({"2,2": {"herb.old": 10}})
+	check(legacy.is_spent(coord, "herb.old", 12), "legacy day-only deltas still read")
+	check(not legacy.is_spent(coord, "herb.old", 13), "legacy deltas keep the herb regrow window")
+
+	check(Interactable.poi_regrow("ruin") == WorldDelta.PERMANENT, "ruins are permanent")
+	check(Interactable.poi_regrow("mine") > Interactable.poi_regrow("deposit"), "mines take longer than deposits")
+
+	for kind_name in ChunkGen.POI_KINDS:
+		var site := Interactable.new()
+		site.setup_poi("poi.%s.1.1" % kind_name, String(kind_name), Vector2i(1, 1))
+		check(site.chunk_owned, "%s sites are chunk-owned" % kind_name)
+		check(site.can_interact(), "%s sites can be searched" % kind_name)
+		check(site.display_label() != "", "%s sites are labelled" % kind_name)
+		check(site.regrow_days == Interactable.poi_regrow(String(kind_name)), "%s sites carry their regrow window" % kind_name)
+		site.used = true
+		check(not site.can_interact(), "a spent %s site is not offered" % kind_name)
+		site.free()
 
 
 # -------------------------------------------------------------------- npc ----

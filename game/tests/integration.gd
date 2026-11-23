@@ -571,6 +571,57 @@ func _run() -> void:
 	await frames(2)
 	main.chunks.settle()
 
+	# --- world locations: ruins, mines and deposits --------------------------
+	await frames(2)
+	main.chunks.settle()
+	var poi: Interactable = null
+	for node in main.interactables:
+		if not is_instance_valid(node) or not node is Interactable:
+			continue
+		if node.kind in [Interactable.Kind.RUIN, Interactable.Kind.MINE, Interactable.Kind.DEPOSIT]:
+			poi = node as Interactable
+			break
+	check(poi != null, "the overworld contains ruins, mines or deposits")
+	var poi_id := ""
+	var poi_window := 0
+	var poi_coord := Vector2i.ZERO
+	if poi != null:
+		poi_id = poi.id
+		poi_window = poi.regrow_days
+		poi_coord = poi.chunk_coord
+		var stones_before_site: int = Game.spirit_stones
+		player.global_position = poi.global_position
+		main._use_interactable(poi)
+		check(not poi.can_interact(), "a searched site is spent")
+		check(main.world_delta.is_spent(poi_coord, poi_id, Clock.day), "a searched site records a chunk delta")
+		check(Game.discovered.has(poi_id), "a first visit is a discovery")
+		check(Game.spirit_stones > stones_before_site, "a discovery pays spirit stones")
+		var kept_stones: int = Game.spirit_stones
+		main._award_discovery(poi, 99)
+		check(Game.spirit_stones == kept_stones, "a discovery is rewarded only once")
+
+		main._save(93)
+		main._load_game(93)
+		await frames(2)
+		main.chunks.settle()
+		check(Game.discovered.has(poi_id), "discoveries survive save and load")
+		check(main.world_delta.is_spent(poi_coord, poi_id, Clock.day), "a searched site stays spent after loading")
+
+		var step: int = mini(poi_window, 5000)
+		Clock.day += step
+		player.global_position = Vector2(12200, 12200)
+		await frames(2)
+		main.chunks.settle()
+		player.global_position = home
+		await frames(2)
+		main.chunks.settle()
+		var back: Interactable = _find_interactable(main.interactables, poi_id)
+		if poi_window == WorldDelta.PERMANENT:
+			check(back == null, "a searched ruin never comes back")
+		else:
+			check(back != null, "a mine or deposit refills after its window")
+		Clock.day -= step
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

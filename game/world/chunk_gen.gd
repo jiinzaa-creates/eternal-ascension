@@ -21,6 +21,11 @@ const DEFAULT_FEATURES := {"tuft": 74, "bush": 10, "rock": 9, "tree": 7}
 const DEFAULT_PALETTE: Array[Color] = [
 	Color("#152218"), Color("#182619"), Color("#12201a"), Color("#1a241b"),
 ]
+## Overworld sites: one possible per chunk, weighted by kind.
+const POI_CHANCE := 0.5
+const POI_KINDS := ["ruin", "mine", "deposit"]
+const POI_WEIGHTS := [3, 3, 4]
+
 const DEFAULT_RESOURCES := [
 	{"name": "Spirit Herb", "weight": 6},
 	{"name": "Azure Grass", "weight": 3},
@@ -83,9 +88,27 @@ static func payload_for(coord: Vector2i, seed_value: int, biome_defs: Dictionary
 		"signature": signature_for(coord, seed_value),
 		"features": features,
 		"herbs": herbs,
+		"pois": _pois_for(coord, seed_value),
 		"biome": biome_id,
 		"palette": _palette_for(def),
 	}
+
+
+## At most one overworld site per chunk, from its own stream so adding sites
+## cannot reshuffle decorations or herbs of an existing seed.
+static func _pois_for(coord: Vector2i, seed_value: int) -> Array:
+	var pr := Rng.stream_from(seed_value, "chunk_poi", coord.x * 31 + coord.y, 0)
+	var pois: Array = []
+	if pr.randf() >= POI_CHANCE:
+		return pois
+	var index := Rng.pick_weighted(POI_WEIGHTS, pr)
+	var kind := String(POI_KINDS[maxi(0, index)])
+	pois.append({
+		"id": "poi.%s.%d.%d" % [kind, coord.x, coord.y],
+		"kind": kind,
+		"pos": Vector2(pr.randf_range(120.0, SIZE - 120.0), pr.randf_range(120.0, SIZE - 120.0)),
+	})
+	return pois
 
 
 static func _palette_for(def: Dictionary) -> Array:

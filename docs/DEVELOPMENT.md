@@ -45,6 +45,21 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## World locations
+
+- Overworld sites (ruins, ore veins, deposits) are generated per chunk by `ChunkGen._pois_for` from
+  their own RNG stream, so adding sites cannot reshuffle decorations or herbs of an existing seed.
+  One site per chunk at most, id `poi.<kind>.<cx>.<cy>`.
+- **Every chunk resource carries its own regrow window.** `WorldDelta` entries are
+  `{day, window}`; `mark_spent(..., window_days)` chooses it and `is_spent`/`prune` read it per
+  entry. Herbs use 3 days, deposits 7, veins 10, and ruins `WorldDelta.PERMANENT`.
+  Never hard-code a single regrow constant again: pass the window with the spend.
+- `WorldDelta.from_dict` still accepts the earliest day-only format, so pre-M13 saves load.
+- Discovery is `Game.discover(id)` (saved with the run) and pays spirit stones exactly once per
+  site instance. Do not pay again on regrow — regrown sites are ordinary resources.
+- New site kinds need four places: the `Interactable.Kind` value, `poi_kind`/`poi_label`/
+  `poi_regrow` mappings, a `_draw` branch, and a handler in `Main._use_interactable`.
+
 ## Settlement services and economy
 
 - **One value curve**: `ItemGen` already stamps `value` (base × rarity × ilvl). `Economy` only derives

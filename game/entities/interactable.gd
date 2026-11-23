@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -26,6 +26,8 @@ var examine_text := ""
 ## with their chunk and persist their spent state through a WorldDelta.
 var chunk_owned := false
 var chunk_coord := Vector2i.ZERO
+## Days until a spent chunk resource returns; ruins use `WorldDelta.PERMANENT`.
+var regrow_days: int = WorldDelta.HERB_REGROW_DAYS
 var _pulse := 0.0
 
 
@@ -60,12 +62,54 @@ func setup_chunk_herb(id_value: String, label_value: String, coord: Vector2i) ->
 	setup(Kind.HERB, id_value, label_value)
 	chunk_owned = true
 	chunk_coord = coord
+	regrow_days = WorldDelta.HERB_REGROW_DAYS
+
+
+## Overworld sites: data kind name -> node kind, label and regrow window.
+static func poi_kind(kind_name: String) -> int:
+	match kind_name:
+		"ruin":
+			return Kind.RUIN
+		"mine":
+			return Kind.MINE
+		"deposit":
+			return Kind.DEPOSIT
+	return Kind.EXAMINE
+
+
+static func poi_label(kind_name: String) -> String:
+	match kind_name:
+		"ruin":
+			return "Collapsed ruin — search"
+		"mine":
+			return "Spirit ore vein — mine"
+		"deposit":
+			return "Spirit stone deposit — gather"
+	return "Strange site — examine"
+
+
+static func poi_regrow(kind_name: String) -> int:
+	match kind_name:
+		"ruin":
+			return WorldDelta.PERMANENT
+		"mine":
+			return 10
+		"deposit":
+			return 7
+	return WorldDelta.HERB_REGROW_DAYS
+
+
+func setup_poi(id_value: String, kind_name: String, coord: Vector2i) -> void:
+	setup(poi_kind(kind_name), id_value, poi_label(kind_name))
+	chunk_owned = true
+	chunk_coord = coord
+	regrow_days = poi_regrow(kind_name)
 
 
 ## Whether the prompt should offer this node right now.
 func can_interact() -> bool:
 	match kind:
-		Kind.HERB, Kind.CONTAINER, Kind.MANUAL, Kind.CHEST:
+		Kind.HERB, Kind.CONTAINER, Kind.MANUAL, Kind.CHEST, Kind.RUIN, Kind.MINE, Kind.DEPOSIT:
 			return not used
 		_:
 			return true
@@ -158,6 +202,29 @@ func _draw() -> void:
 			draw_rect(Rect2(-22, -14, 44, 6), Color("#6a5638"))
 			draw_circle(Vector2(0, -26), 5.0, Color("#ffd9a0", 0.5 + pulse * 0.4))
 			draw_line(Vector2(0, -21), Vector2(0, -14), Color("#6a5638"), 2.0)
+		Kind.RUIN:
+			# Broken wall: two standing stones and fallen rubble between them.
+			draw_rect(Rect2(-22, -18, 10, 22), Color("#3f4440"))
+			draw_rect(Rect2(10, -14, 10, 18), Color("#3f4440"))
+			draw_rect(Rect2(-14, -4, 10, 6), Color("#4a504a"))
+			draw_rect(Rect2(4, 0, 8, 5), Color("#4a504a"))
+			if used:
+				draw_line(Vector2(-16, 2), Vector2(16, 2), Color("#2a2e2a"), 1.5)
+		Kind.MINE:
+			# Cave mouth in a rock face with a heap of ore at the entrance.
+			draw_rect(Rect2(-20, -22, 40, 26), Color("#33383a"))
+			draw_circle(Vector2(0, -4), 11.0, Color("#0d1112"))
+			draw_circle(Vector2(-8, 0), 3.0, Color("#5a5a48"))
+			draw_circle(Vector2(7, 1), 3.5, Color("#6a6a50"))
+		Kind.DEPOSIT:
+			# A cluster of pale spirit crystals.
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(-10, 4), Vector2(-4, -14), Vector2(2, 4),
+			]), Color("#9fe0c0", 0.75))
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(0, 4), Vector2(7, -20), Vector2(13, 4),
+			]), Color("#c8f0e0", 0.8))
+			draw_circle(Vector2(4, -6), 9.0, Color("#bff0d8", 0.18 + pulse * 0.12))
 
 
 func display_label_short() -> String:
