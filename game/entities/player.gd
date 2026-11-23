@@ -146,6 +146,17 @@ func rebuild_stats() -> void:
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
 		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()),
 		TechniqueCombat.buff_mods(active_buffs))
+	# Condition is applied after the pipeline has summed every source, so a
+	# rebuild can never compound it: a broken piece simply contributes nothing.
+	for slot in Items.DURABLE_SLOTS:
+		var worn_value: Variant = equipment.get(slot, {})
+		if typeof(worn_value) != TYPE_DICTIONARY:
+			continue
+		var worn: Dictionary = worn_value
+		if worn.is_empty() or not Items.is_broken(worn):
+			continue
+		var key := "weapon_damage" if slot == "weapon" else "armor"
+		stats.flat_stats[key] = float(stats.flat_stats.get(key, 0.0)) * Items.BROKEN_MULT
 	poise.set_maximum(Combat.poise_capacity(cultivation.realm, stats.get_attr("str")))
 	_recalc_vitals()
 
@@ -798,6 +809,8 @@ func _strike() -> void:
 	var is_light := bool(attack.get("light", false))
 	var tech_id := String(attack.get("id", ""))
 	var strike := _resolve_strike(attack)
+	if kind != "buff" and kind != "movement":
+		_wear("weapon", Items.WEAR_PER_STRIKE)
 	if not is_light:
 		add_technique_xp(tech_id, Mastery.XP_PER_HIT)
 	var box: Dictionary = attack.get("hitbox", {})
@@ -967,6 +980,8 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 	var final := Damage.resolve(raw, stats.physical_resist() * 100.0, 1.0)
 	hp = maxf(0.0, hp - final)
 	_hurt_flash = 0.18
+	if final > 0.0:
+		_wear("armor", Items.WEAR_PER_HIT)
 	if guard_broke:
 		poise.break_guard(poise_damage * Defense.GUARD_BREAK_MULT)
 		_knock += Combat.knock_impulse(from.direction_to(global_position), knock_force, true)
@@ -1237,20 +1252,76 @@ func environment_bonus() -> float:
 	return Climate.cultivation_bonus(Weather.current) * maxf(0.0, Game.biome_density)
 
 
+## Every item enters through the schema: malformed items are refused rather
+## than stored, stackables merge into an existing stack, and equipment is
+## auto-worn when it is at least as good as what is already in the slot.
 func pick_up(item: Dictionary) -> void:
-	inventory.append(item)
-	var slot := String(item.get("slot", ""))
-	if slot == "weapon" or slot == "armor" or slot == "ring" or slot == "talisman":
+	var normalised := Items.normalize_item(item)
+	if not Items.is_valid_item(normalised):
+		return
+	inventory = Items.add_to_inventory(inventory, normalised)
+	var slot := String(normalised.get("slot", ""))
+	if Items.is_equipment(slot):
 		var current: Dictionary = equipment.get(slot, {})
-		if current.is_empty() or int(item.get("ilvl", 1)) >= int(current.get("ilvl", 1)):
-			equipment[slot] = item
+		if current.is_empty() or int(normalised.get("ilvl", 1)) >= int(current.get("ilvl", 1)):
+			equipment[slot] = normalised
 			if slot == "weapon":
 				# A new weapon opens its own chain; the old one's cursor is meaningless.
 				_combo_index = -1
 				_combo_elapsed = 100.0
 			rebuild_stats()
-	Bus.item_picked.emit(item)
+	Bus.item_picked.emit(normalised)
 	Bus.player_stats_changed.emit()
+
+
+## Wears one equipped piece and keeps the copy in the satchel in step. The stat
+## pipeline is rebuilt only when the piece actually breaks, so a swing does not
+## pay for a full recalculation.
+func _wear(slot: String, amount: float) -> void:
+	var worn_value: Variant = equipment.get(slot, {})
+	if typeof(worn_value) != TYPE_DICTIONARY:
+		return
+	var worn: Dictionary = worn_value
+	if worn.is_empty() or not Items.has_durability(worn):
+		return
+	var was_broken := Items.is_broken(worn)
+	var updated := Items.wear(worn, amount)
+	equipment[slot] = updated
+	for i in inventory.size():
+		var entry: Dictionary = inventory[i]
+		if String(entry.get("id", "")) == String(updated.get("id", "")) and String(entry.get("slot", "")) == slot:
+			inventory[i] = updated
+	if not was_broken and Items.is_broken(updated):
+		rebuild_stats()
+		Bus.toast.emit("Your %s breaks." % String(updated.get("name", slot)))
+
+
+## Condition of an equipped slot, 1.0 when nothing durable is worn there.
+func gear_condition(slot: String) -> float:
+	var worn_value: Variant = equipment.get(slot, {})
+	if typeof(worn_value) != TYPE_DICTIONARY:
+		return 1.0
+	var worn: Dictionary = worn_value
+	if worn.is_empty() or not Items.has_durability(worn):
+		return 1.0
+	return Items.durability_ratio(worn)
+
+
+## Mends every worn piece. Returns the stones spent, so the caller decides what
+## it can afford before calling.
+func repair_gear() -> int:
+	var cost := Items.repair_cost(equipment)
+	for slot in Items.DURABLE_SLOTS:
+		var worn_value: Variant = equipment.get(slot, {})
+		if typeof(worn_value) != TYPE_DICTIONARY:
+			continue
+		var worn: Dictionary = worn_value
+		if worn.is_empty() or not Items.has_durability(worn):
+			continue
+		equipment[slot] = Items.repair(worn)
+	rebuild_stats()
+	Bus.player_stats_changed.emit()
+	return cost
 
 
 func _draw() -> void:
@@ -1317,9 +1388,6 @@ func _draw() -> void:
 
 
 func to_dict() -> Dictionary:
-	var equipped := {}
-	for slot in equipment.keys():
-		equipped[slot] = equipment[slot]
 	return {
 		"display_name": display_name,
 		"appearance": appearance.to_dict(),
@@ -1331,8 +1399,8 @@ func to_dict() -> Dictionary:
 		"cultivation": cultivation.to_dict(),
 		"passives": passives.duplicate(),
 		"enlightenments": enlightenments.duplicate(),
-		"inventory": inventory,
-		"equipment": equipped,
+		"inventory": Items.inventory_to_save(inventory),
+		"equipment": Items.equipment_to_save(equipment),
 		"technique_ids": technique_ids,
 		"selected_technique": selected_technique,
 		"bars": bars.duplicate(),
@@ -1360,8 +1428,10 @@ func from_dict(data: Dictionary) -> void:
 		var insight_id := String(id_value)
 		if not Enlightenments.find(insight_id).is_empty() and not enlightenments.has(insight_id):
 			enlightenments.append(insight_id)
-	inventory = data.get("inventory", []).duplicate(true)
-	equipment = data.get("equipment", {}).duplicate(true)
+	# Saves written by an older build have neither stacks nor durability; the
+	# canonical pass fills both and drops anything that is not a real item.
+	inventory = Items.normalize_inventory(data.get("inventory", []))
+	equipment = Items.normalize_equipment(data.get("equipment", {}))
 	var ids: Array = data.get("technique_ids", [])
 	if not ids.is_empty():
 		technique_ids = ids.duplicate()

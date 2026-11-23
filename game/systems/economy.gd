@@ -21,6 +21,12 @@ static func sell_price(item: Dictionary) -> int:
 	return maxi(MIN_SELL, int(floor(float(item.get("value", 1)) * SELL_RATE)))
 
 
+## What a merchant pays for a whole stack. One stack is sold as a stack, not one
+## unit at a time, so the price has to scale with what is actually handed over.
+static func sell_value(item: Dictionary) -> int:
+	return sell_price(item) * maxi(1, int(item.get("count", 1)))
+
+
 static func rest_cost() -> int:
 	return REST_COST
 

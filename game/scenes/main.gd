@@ -692,8 +692,8 @@ func _show_shop(mode: String) -> void:
 		for i in range(_sell_base, player.inventory.size()):
 			var item: Dictionary = player.inventory[i]
 			rows.append({
-				"name": String(item.get("name", "?")),
-				"price": Economy.sell_price(item),
+				"name": Items.label(item),
+				"price": Economy.sell_value(item),
 				"color": ItemGen.RARITY_COLORS[int(item.get("rarity", 0))],
 			})
 	shop_panel.setup(mode, "Azure Cloud Market — Merchant", rows, Game.spirit_stones)
@@ -718,7 +718,8 @@ func _sell_index(index: int) -> void:
 	if index < 0 or index >= player.inventory.size():
 		return
 	var item: Dictionary = player.inventory[index]
-	var price := Economy.sell_price(item)
+	# A stack is sold whole, so the price is the whole stack's.
+	var price := Economy.sell_value(item)
 	player.inventory.remove_at(index)
 	# Selling worn gear must not leave the stat pipeline holding a ghost.
 	var slot := String(item.get("slot", ""))
@@ -728,21 +729,31 @@ func _sell_index(index: int) -> void:
 		player.rebuild_stats()
 	Game.spirit_stones += price
 	Bus.player_stats_changed.emit()
-	Bus.toast.emit("Sold %s for %d spirit stones." % [String(item.get("name", "item")), price])
+	Bus.toast.emit("Sold %s for %d spirit stones." % [Items.label(item), price])
 	_show_shop("sell")
 
 
+## The inn restores the body and, if the purse allows, mends worn gear too. A
+## rest the player cannot afford is refused whole: no partial healing.
 func _rest_at_inn() -> void:
 	var cost := Economy.rest_cost()
 	if not Economy.can_afford(Game.spirit_stones, cost):
 		Bus.toast.emit("A night at the inn costs %d spirit stones. You have %d." % [cost, Game.spirit_stones])
 		return
+	var repair := Items.repair_cost(player.equipment)
+	var mend := repair > 0 and Economy.can_afford(Game.spirit_stones - cost, repair)
 	Game.spirit_stones -= cost
+	if mend:
+		Game.spirit_stones -= repair
+		player.repair_gear()
 	player.hp = player.hp_max
 	cultivation_restore()
 	Clock.advance(8.0)
 	Bus.player_stats_changed.emit()
-	Bus.toast.emit("You sleep for eight hours and wake restored. (-%d stones)" % cost)
+	var message := "You sleep for eight hours and wake restored. (-%d stones)" % cost
+	if mend:
+		message += " The innkeeper mends your gear. (-%d stones)" % repair
+	Bus.toast.emit(message)
 
 
 # ---------------------------------------------------------- simulation ----

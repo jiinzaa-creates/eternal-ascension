@@ -766,6 +766,40 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Any new combat feel belongs in these pure layers with unit checks, plus one scene-level check that the
   node exists and a real blow produces the effect.
 
+## Items, durability and stacks
+
+- **One canonical record.** `Items.normalize_item()` is the only shape an item is allowed to have:
+  a fixed key order, a stable `item.*` id, a known slot, a clamped rarity/level/value, normalised
+  mods, a `count` of at least one and durability only for weapons and armour. Unknown fields are
+  dropped; a record without a stable id cannot exist. Every route into a player's possession
+  (`pick_up`, a save, a load, a shop) goes through it, so two equal items are byte-identical.
+- **Stable ids are enforced, not assumed.** `is_stable_id()` requires an `item.` prefix with at
+  least one non-empty segment, and `is_valid_item()` calls it. A save references items by id; an
+  item that cannot be referenced is not an item.
+- **Durability** is deliberately blunt. Weapons hold 300 points, armour 400; a weapon loses one per
+  swing and armour loses one per damaging blow (`Items.WEAR_PER_STRIKE` / `WEAR_PER_HIT`). A worn
+  piece still works. A **broken** piece still occupies its slot but multiplies its contribution by
+  `Items.BROKEN_MULT` (zero). That multiplication happens in `Player.rebuild_stats()` *after* the
+  stat pipeline has summed every source, so a rebuild can never compound it and a broken piece can
+  never be half-counted. `_wear()` keeps the equipped copy and the satchel copy in step by id and
+  rebuilds only when a piece actually breaks.
+- **Repair** is stones: `Items.repair_cost()` charges per missing point, weighted by rarity, and
+  `Player.repair_gear()` restores every durable slot. The inn pays it out of the same rest visit when
+  the purse covers rest plus repair; a player who cannot afford the rest is refused whole rather than
+  half-healed.
+- **Stacks** only exist for materials (20) and consumables (10). `stack_key()` is
+  `slot|base|name`, so two rolls of the same ore merge and two swords never do. `add_to_inventory()`
+  fills existing stacks, spills into new ones, and returns a new array; `normalize_inventory()`
+  sanitises and merges on load. Selling sells a whole stack, so `Economy.sell_value()` scales the
+  unit price by `count`; the HUD labels a stack `Name xN` and the satchel counts items and kinds.
+- **Serialization guarantee.** The save form *is* the canonical form (`Items.to_save()`), and
+  `Items.from_save()` refuses anything that is not an item. Schema 2 introduced counts and
+  durability; `Save._migrate()` normalises schema-1 player inventory and equipment on load, so the
+  player loader only ever sees the current shape. `Player.to_dict()` writes canonical arrays/maps and
+  `Player.from_dict()` normalises, merges and drops invalid entries rather than trusting the file.
+- Adding a new item field means adding it to `Items.FIELDS` and normalising it; that single change
+  covers generation, pickup, shops, saves and loads.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.
@@ -809,7 +843,7 @@ game/
               biomes, enemy_archetypes, spirit_beasts, bosses)
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, animator,
               camera_rig, lighting, display_policy, technique_combat, enemy_ai, beasts, boss,
-              hitstop, status, sfx
+              items, hitstop, status, sfx
   entities/   player, dummy, npc, interactable, projectile, spell_zone, summon
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud, world_map, shop_panel, travel_panel, skill_bar_panel, damage_numbers,

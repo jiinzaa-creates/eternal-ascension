@@ -173,28 +173,31 @@ func _run() -> void:
 	check(main.merchant.stock.size() > 0, "the merchant has stock")
 
 	var stones_before: int = Game.spirit_stones
-	var bag_before: int = player.inventory.size()
+	var bag_before: int = Items.total_count(player.inventory)
 	var price: int = Economy.buy_price(main.merchant.stock[0])
 	main._buy_index(0)
 	check(Game.spirit_stones == stones_before - price, "buying deducts the price")
-	check(player.inventory.size() == bag_before + 1, "buying adds the item")
+	check(Items.total_count(player.inventory) == bag_before + 1, "buying adds the item")
 	var stock_after: int = main.merchant.stock.size()
 	main._buy_index(0)
 	check(main.merchant.stock.size() == stock_after - 1, "each purchase removes one item")
 
 	Game.spirit_stones = 0
-	var blocked_before: int = player.inventory.size()
+	var blocked_before: int = Items.total_count(player.inventory)
 	main._buy_index(0)
-	check(player.inventory.size() == blocked_before, "an unaffordable purchase changes nothing")
+	check(Items.total_count(player.inventory) == blocked_before, "an unaffordable purchase changes nothing")
 
 	main._show_shop("sell")
 	check(main.shop_panel.mode == "sell", "the shop switches to selling")
 	var sell_stones: int = Game.spirit_stones
 	var sell_index: int = player.inventory.size() - 1
-	var sell_expected := Economy.sell_price(player.inventory[sell_index])
+	var sell_entry: Dictionary = player.inventory[sell_index]
+	var sell_expected := Economy.sell_value(sell_entry)
+	var sell_count := int(sell_entry.get("count", 1))
+	var bag_at_sale: int = Items.total_count(player.inventory)
 	main._sell_index(sell_index)
-	check(Game.spirit_stones == sell_stones + sell_expected, "selling pays the sell price")
-	check(player.inventory.size() == sell_index, "selling removes the item")
+	check(Game.spirit_stones == sell_stones + sell_expected, "selling pays for the whole stack")
+	check(Items.total_count(player.inventory) == bag_at_sale - sell_count, "selling removes the stack")
 	main._close_shop()
 	check(not main.shop_open and not main.shop_panel.visible, "the shop closes")
 	check(player.is_physics_processing(), "closing the shop restores the player")
@@ -214,8 +217,8 @@ func _run() -> void:
 	# The purchase record travels with the save.
 	Game.spirit_stones = 300
 	main._open_shop()
+	var bought_id := String(main.merchant.stock[0].get("id", ""))
 	main._buy_index(0)
-	var bought_id := String(player.inventory[player.inventory.size() - 1].get("id", ""))
 	main._close_shop()
 	main._save(94)
 	main._load_game(94)
@@ -380,9 +383,9 @@ func _run() -> void:
 	if main.ground_items.size() > 0:
 		var entry: Dictionary = main.ground_items[0]
 		player.global_position = Vector2(float(entry["x"]), float(entry["y"]))
-		var inventory_before := player.inventory.size()
+		var inventory_before := Items.total_count(player.inventory)
 		main._try_pickup()
-		check(player.inventory.size() == inventory_before + 1, "dropped loot can be picked up")
+		check(Items.total_count(player.inventory) == inventory_before + 1, "dropped loot can be picked up")
 
 	var herbs := 0
 	for node in main.interactables:
@@ -2290,17 +2293,104 @@ func _run() -> void:
 	Bus.boss_phase_changed.disconnect(m36_recorder)
 
 	var m36_stones := Game.spirit_stones
-	var m36_inventory := player.inventory.size()
+	var m36_inventory := Items.total_count(player.inventory)
 	m36_warden.take_hit(1000000.0, Vector2.ZERO, 0.0, 1.0)
 	await frames(2)
 	check(main.bosses_slain.has("boss.tomb_warden"), "the warden's fall is recorded by id")
 	check(Game.spirit_stones >= m36_stones + 400, "the warden pays its stones")
-	check(player.inventory.size() > m36_inventory, "the warden's reward is taken")
+	check(Items.total_count(player.inventory) > m36_inventory, "the warden's reward is taken")
 
 	main._save(87)
 	var m36_saved := Save.load_game(87)
 	var m36_slain: Variant = m36_saved.get("bosses_slain", {})
 	check(typeof(m36_slain) == TYPE_DICTIONARY and (m36_slain as Dictionary).has("boss.tomb_warden"), "a save records the fallen warden")
+
+	# --- item architecture: stacks, condition and canonical saves --------------
+	player.statuses.clear()
+	player.hp = player.hp_max
+	player._iframes = 0.0
+	player.poise.reset()
+	Game.hitstop.clear()
+	await frames(2)
+
+	var m38_ore_a := Items.normalize_item({"id": "item.m38.ore.1", "slot": "material", "name": "Spirit Ore", "base": "ore.spirit", "value": 20})
+	var m38_ore_b := Items.normalize_item({"id": "item.m38.ore.2", "slot": "material", "name": "Spirit Ore", "base": "ore.spirit", "value": 20})
+	var m38_kinds_before: int = player.inventory.size()
+	player.pick_up(m38_ore_a)
+	player.pick_up(m38_ore_b)
+	var m38_ore_count := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("base", "")) == "ore.spirit":
+			m38_ore_count = int((entry as Dictionary).get("count", 1))
+	check(m38_ore_count == 2, "two identical materials share one stack")
+	check(player.inventory.size() <= m38_kinds_before + 1, "the second pickup does not add a second entry")
+
+	var m38_weapon := Items.normalize_item({
+		"id": "item.m38.weapon", "slot": "weapon", "name": "Test Jian", "base": "base.sword.iron_jian",
+		"base_name": "Iron Jian", "weapon_type": "sword", "base_damage": 8.0, "ilvl": 1, "rarity": 0, "value": 12,
+	})
+	var m38_armor := Items.normalize_item({
+		"id": "item.m38.armor", "slot": "armor", "name": "Test Robe", "base": "base.robe.cloud_silk",
+		"base_name": "Cloud Silk Robe", "armor": 5.0, "ilvl": 1, "rarity": 0, "value": 12,
+	})
+	player.equipment["weapon"] = m38_weapon
+	player.equipment["armor"] = m38_armor
+	player.inventory = Items.add_to_inventory(player.inventory, m38_weapon)
+	player.inventory = Items.add_to_inventory(player.inventory, m38_armor)
+	player.rebuild_stats()
+
+	var m38_before_wear := Items.durability_of(m38_weapon)
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._facing = Vector2.RIGHT
+	player._current_attack = DB.technique("tech.sword.azure_cleave")
+	player._strike()
+	var m38_worn_weapon: Dictionary = player.equipment["weapon"]
+	check(approx(Items.durability_of(m38_worn_weapon), m38_before_wear - Items.WEAR_PER_STRIKE), "a strike wears the weapon")
+	Game.hitstop.clear()
+
+	var m38_before_hit := Items.durability_of(m38_armor)
+	var m38_hp_before := player.hp
+	player.take_hit(5.0, player.global_position + Vector2(30, 0), false)
+	var m38_worn_armor: Dictionary = player.equipment["armor"]
+	check(player.hp < m38_hp_before, "the armoured body still takes the blow")
+	check(approx(Items.durability_of(m38_worn_armor), m38_before_hit - Items.WEAR_PER_HIT), "taking a blow wears the armour")
+
+	# One point left, then a swing: the last wear breaks it and the pipeline drops
+	# its contribution immediately.
+	player.equipment["weapon"] = Items.wear(m38_weapon, Items.max_durability("weapon") - 1.0)
+	player.rebuild_stats()
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._current_attack = DB.technique("tech.sword.azure_cleave")
+	player._strike()
+	var m38_broken_weapon: Dictionary = player.equipment["weapon"]
+	check(Items.is_broken(m38_broken_weapon), "the last point of wear breaks the weapon")
+	check(approx(player.stats.weapon_damage(), 0.0), "a broken weapon contributes no damage")
+	check(approx(player.weapon_damage(), 0.0), "the reported weapon damage is zero too")
+	Game.hitstop.clear()
+
+	var m38_repair_cost := Items.repair_cost(player.equipment)
+	check(m38_repair_cost > 0, "broken gear has a repair price")
+	player.repair_gear()
+	var m38_repaired_weapon: Dictionary = player.equipment["weapon"]
+	check(not Items.is_broken(m38_repaired_weapon), "repair restores the weapon")
+	check(player.stats.weapon_damage() > 0.0, "a repaired weapon fights again")
+
+	player.equipment["weapon"] = Items.wear(m38_repaired_weapon, 1.0)
+	player.rebuild_stats()
+	main._save(89)
+	var m38_saved := Save.load_game(89)
+	var m38_saved_player: Dictionary = m38_saved.get("player", {})
+	var m38_saved_equipment: Dictionary = m38_saved_player.get("equipment", {})
+	var m38_saved_weapon: Dictionary = m38_saved_equipment.get("weapon", {})
+	check(approx(Items.durability_of(m38_saved_weapon), Items.max_durability("weapon") - 1.0), "a save keeps the weapon's exact condition")
+	var m38_saved_inventory: Array = m38_saved_player.get("inventory", [])
+	var m38_saved_ore := 0
+	for entry in m38_saved_inventory:
+		if String((entry as Dictionary).get("base", "")) == "ore.spirit":
+			m38_saved_ore = int((entry as Dictionary).get("count", 1))
+	check(m38_saved_ore == 2, "a save keeps a stack's count")
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

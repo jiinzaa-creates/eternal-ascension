@@ -37,6 +37,7 @@ func _ready() -> void:
 	_technique_combat_tests()
 	_skill_bar_tests()
 	_enemy_ai_tests()
+	_item_architecture_tests()
 	_boss_and_beast_tests()
 	_combat_polish_tests()
 	_rng_tests()
@@ -3237,6 +3238,131 @@ func _enemy_ai_tests() -> void:
 	check(bolt.faction == "player", "a projectile defaults to the player's side")
 	check(bolt.origin == Vector2.ZERO, "a projectile records its origin")
 	bolt.free()
+
+
+# ------------------------------------------------------ item architecture ----
+
+func _item_for(id_value: String, slot: String, name_value: String, extra: Dictionary = {}) -> Dictionary:
+	var raw := {
+		"id": id_value, "slot": slot, "name": name_value, "base_name": name_value,
+		"base": "base.test", "value": 10,
+	}
+	raw.merge(extra, true)
+	return Items.normalize_item(raw)
+
+
+func _item_architecture_tests() -> void:
+	print("[items] schema, durability, stacks and save form")
+
+	var blank := Items.normalize_item({})
+	check(blank.get("count") == 1 and blank.get("rarity") == 0, "a blank record fills safe defaults")
+	check(not Items.is_valid_item(blank), "a record without an id is not an item")
+	var sword := _item_for("item.test.1", "weapon", "Iron Jian", {"rarity": 9, "ilvl": 0, "value": -5, "junk": 1})
+	check(int(sword["rarity"]) == ItemGen.RARITY_NAMES.size() - 1, "rarity is clamped to the table")
+	check(String(sword["rarity_name"]) == ItemGen.RARITY_NAMES[ItemGen.RARITY_NAMES.size() - 1], "the rarity name follows the clamped value")
+	check(int(sword["ilvl"]) == 1 and int(sword["value"]) == 0, "level and value are clamped")
+	check(not sword.has("junk"), "unknown fields are dropped")
+	check(Items.is_valid_item(sword), "a normalised weapon is a real item")
+	check(Items.is_stable_id("item.test.1") and Items.is_stable_id("item.core.beast.moonfang.3"), "item ids with segments are stable")
+	check(not Items.is_stable_id("item") and not Items.is_stable_id("item."), "a bare prefix is not an id")
+	check(not Items.is_stable_id("loot.1.2"), "an id must be an item id")
+	check(not Items.is_valid_item(_item_for("item.test.2", "hat", "Odd Hat")), "an unknown slot is not an item")
+	check(not Items.is_valid_item(_item_for("", "material", "Nameless")), "an anonymous record is not an item")
+
+	var modded := Items.normalize_item({"id": "item.test.3", "slot": "ring", "name": "Jade Ring", "mods": [
+		{"id": "prefix.azure", "stat": "qi_regen_flat", "value": 1.5, "text": "+1.5 Qi", "junk": true},
+		"junk",
+	]})
+	var mods: Array = modded["mods"]
+	check(mods.size() == 1, "malformed mods are dropped")
+	check(String((mods[0] as Dictionary)["stat"]) == "qi_regen_flat" and not (mods[0] as Dictionary).has("junk"), "a mod is reduced to its schema")
+
+	var material := _item_for("item.test.4", "material", "Spirit Ore", {"base": "ore.spirit"})
+	var potion := _item_for("item.test.5", "consumable", "Qi Pill")
+	check(not material.has("durability") and not potion.has("durability"), "only weapons and armour carry durability")
+	check(approx(Items.max_durability("weapon"), 300.0) and approx(Items.max_durability("armor"), 400.0), "durable slots have their own maximum")
+	check(approx(Items.durability_of(sword), 300.0), "a fresh weapon arrives at full durability")
+
+	var worn := Items.wear(sword, 60.0)
+	check(approx(Items.durability_of(worn), 240.0), "a blow wears the weapon by its amount")
+	check(approx(Items.durability_ratio(worn), 0.8), "condition is the ratio of what is left")
+	check(approx(Items.condition_mult(worn), 1.0), "a worn weapon still works")
+	check(approx(Items.durability_of(sword), 300.0), "wearing never mutates the original")
+	var broken := Items.wear(worn, 9999.0)
+	check(approx(Items.durability_of(broken), 0.0), "durability cannot go below zero")
+	check(Items.is_broken(broken) and approx(Items.condition_mult(broken), 0.0), "a broken weapon contributes nothing")
+	var mended := Items.repair(broken)
+	check(approx(Items.durability_of(mended), 300.0) and not Items.is_broken(mended), "repair restores the full maximum")
+	check(approx(Items.durability_of(Items.wear(material, 5.0)), 0.0) and not Items.is_broken(material), "a material cannot wear")
+
+	var gear := {"weapon": worn, "armor": Items.wear(_item_for("item.test.6", "armor", "Cloud Robe"), 200.0), "ring": modded}
+	var cost := Items.repair_cost(gear)
+	check(cost > 0, "worn gear costs stones to mend")
+	check(Items.repair_cost({"weapon": sword, "ring": modded}) == 0, "undamaged gear costs nothing")
+	var rare_cost := Items.repair_cost({"weapon": Items.wear(_item_for("item.test.7", "weapon", "Saber", {"rarity": 3}), 60.0)})
+	var plain_cost := Items.repair_cost({"weapon": Items.wear(_item_for("item.test.8", "weapon", "Saber"), 60.0)})
+	check(rare_cost > plain_cost, "treasure gear costs more to mend")
+	check(Items.repair_cost({}) == 0, "an empty body has nothing to mend")
+
+	check(Items.stack_limit(material) == 20 and Items.stack_limit(potion) == 10, "materials and consumables have stack limits")
+	check(Items.stack_limit(sword) == 1 and Items.stack_key(sword) == "", "equipment never stacks")
+	var ore := _item_for("item.test.9", "material", "Spirit Ore", {"base": "ore.spirit"})
+	check(Items.can_stack(material, ore) and not Items.can_stack(material, sword), "only the same kind of thing stacks")
+	var other_ore := _item_for("item.test.10", "material", "Spirit Ore", {"base": "ore.spirit"})
+	check(Items.stack_key(material) == Items.stack_key(other_ore), "the stack key ignores the instance id")
+	var bag: Array = Items.add_to_inventory([], material)
+	check(bag.size() == 1 and int(bag[0]["count"]) == 1, "the first pickup starts a stack")
+	bag = Items.add_to_inventory(bag, other_ore)
+	check(bag.size() == 1 and int(bag[0]["count"]) == 2, "a matching pickup joins the stack")
+	var filled := material.duplicate(true)
+	filled["count"] = 20
+	var full_bag := Items.add_to_inventory([filled], other_ore)
+	check(full_bag.size() == 2 and int(full_bag[1]["count"]) == 1, "a full stack spills into a new one")
+	var mixed := Items.add_to_inventory(Items.add_to_inventory([], sword), _item_for("item.test.11", "weapon", "Iron Jian"))
+	check(mixed.size() == 2, "two swords are two entries")
+	var messy: Array = Items.normalize_inventory([material, other_ore, sword, "junk", {"id": "item.bad.1"}])
+	check(messy.size() == 2, "loading merges stacks and drops malformed entries")
+	check(Items.total_count(messy) == 3, "total count adds the stack sizes")
+	var bag_entry: Dictionary = bag[0]
+	check(Items.label(bag_entry) == "Spirit Ore x2" and Items.label(sword) == "Iron Jian", "a stack is labelled with its count")
+
+	var saved := Items.to_save(broken)
+	var round_trip := Items.from_save(JSON.parse_string(JSON.stringify(saved)))
+	check(round_trip == saved, "an item survives JSON unchanged")
+	check(Items.to_save(saved) == saved, "the save form is canonical")
+	check(Items.from_save("junk").is_empty() and Items.from_save({"id": "item.x.1"}).is_empty(), "malformed saved items are refused")
+	var legacy_weapon := Items.from_save({"id": "item.legacy.1", "slot": "weapon", "name": "Old Jian", "value": 4})
+	check(approx(Items.durability_of(legacy_weapon), 300.0), "a legacy weapon loads undamaged")
+	check(int(legacy_weapon["count"]) == 1, "a legacy item loads as a single unit")
+	var loaded_gear := Items.normalize_equipment({"weapon": saved, "ring": saved, "junk": 1})
+	check(loaded_gear.size() == 1 and loaded_gear.has("weapon"), "equipment drops a piece in the wrong slot")
+	check(Items.inventory_to_save([material, other_ore]).size() == 1, "saving merges duplicate stacks")
+
+	check(Economy.sell_value(filled) == Economy.sell_price(filled) * 20, "a stack sells for its whole count")
+	check(Economy.sell_value(sword) == Economy.sell_price(sword), "a single item sells at its unit price")
+
+	var legacy_save := {
+		"schema": 1,
+		"player": {
+			"inventory": [{"id": "item.legacy.2", "slot": "material", "name": "Spirit Ore", "value": 3}],
+			"equipment": {"weapon": {"id": "item.legacy.3", "slot": "weapon", "name": "Iron Jian", "value": 12}},
+		},
+	}
+	var migrated := Save._migrate(legacy_save, 1)
+	check(int(migrated.get("schema", -1)) == Save.CURRENT_SCHEMA, "a schema-1 save migrates to the current schema")
+	var migrated_player: Dictionary = migrated["player"]
+	var migrated_inventory: Array = migrated_player["inventory"]
+	check(migrated_inventory.size() == 1 and int(migrated_inventory[0]["count"]) == 1, "migration gives a legacy material a count")
+	var migrated_equipment: Dictionary = migrated_player["equipment"]
+	var migrated_weapon: Dictionary = migrated_equipment["weapon"]
+	check(approx(Items.durability_of(migrated_weapon), 300.0), "migration gives a legacy weapon durability")
+
+	var bases_ok := true
+	for base in DB.bases:
+		var slot := String(base.get("slot", ""))
+		if not Items.is_known_slot(slot):
+			bases_ok = false
+	check(bases_ok, "every item base declares a known slot")
 
 
 # ---------------------------------------------------- beasts and bosses ----

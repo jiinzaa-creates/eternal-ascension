@@ -270,9 +270,24 @@ func draw_world_panel(player: Player) -> void:
 	if weapon.is_empty():
 		_text(Vector2(x, y), "Weapon: unarmed · %s" % category, 12, MUTED)
 	else:
-		_text(Vector2(x, y), "%s · %s" % [String(weapon.get("name", "?")), category], 12, Color(ItemGen.RARITY_COLORS[int(weapon.get("rarity", 0))]))
+		var condition := Items.durability_ratio(weapon)
+		var weapon_label := "%s · %s" % [String(weapon.get("name", "?")), category]
+		if condition <= 0.0:
+			weapon_label += " · BROKEN"
+		elif condition < 0.999:
+			weapon_label += " · %d%%" % roundi(condition * 100.0)
+		var weapon_color := Color(ItemGen.RARITY_COLORS[int(weapon.get("rarity", 0))])
+		if condition <= 0.0:
+			weapon_color = Color("#d06060")
+		_text(Vector2(x, y), weapon_label, 12, weapon_color)
 	y += 18.0
-	_text(Vector2(x, y), "Weapon dmg %d   Armor %d" % [int(player.weapon_damage()), int(player.armor())], 12, MUTED)
+	var armor_condition := player.gear_condition("armor")
+	var armor_note := ""
+	if armor_condition <= 0.0:
+		armor_note = "   ARMOUR BROKEN"
+	elif armor_condition < 0.999:
+		armor_note = "   armour %d%%" % roundi(armor_condition * 100.0)
+	_text(Vector2(x, y), "Weapon dmg %d   Armor %d%s" % [int(player.weapon_damage()), int(player.armor()), armor_note], 12, Color("#d06060") if armor_condition <= 0.0 else MUTED)
 	y += 18.0
 	var next_move := player.next_move_name()
 	if next_move != "":
@@ -384,12 +399,14 @@ func draw_inventory(player: Player) -> void:
 	var w := size.x
 	var y := 290.0
 	draw_rect(Rect2(w - 316.0 - 12.0, y - 22.0, 316.0, 170.0), PANEL_BG)
-	_text(Vector2(w - 316.0, y), "Satchel  (%d items)" % player.inventory.size(), 13, INK)
+	_text(Vector2(w - 316.0, y), "Satchel  (%d items, %d kinds)" % [Items.total_count(player.inventory), player.inventory.size()], 13, INK)
 	y += 20.0
 	var recent: Array = player.inventory.slice(maxi(0, player.inventory.size() - 6))
 	for item in recent:
 		var color := Color(ItemGen.RARITY_COLORS[int(item.get("rarity", 0))])
-		_text(Vector2(w - 316.0, y), String(item.get("name", "?")), 12, color)
+		if Items.is_broken(item):
+			color = Color("#d06060")
+		_text(Vector2(w - 316.0, y), Items.label(item), 12, color)
 		y += 17.0
 	if player.inventory.is_empty():
 		_text(Vector2(w - 316.0, y), "Empty. Kill something.", 12, MUTED)

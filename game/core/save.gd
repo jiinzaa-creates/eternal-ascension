@@ -10,7 +10,9 @@ extends Node
 ##   4. Versioning    (schema number + migration chain), so old saves keep loading.
 
 const SAVE_DIR := "user://saves/"
-const CURRENT_SCHEMA := 1
+## Schema 2 introduced canonical item records: stacks carry a count and weapons
+## and armour carry durability. Older saves are normalised on load.
+const CURRENT_SCHEMA := 2
 const BACKUP_COUNT := 3
 
 
@@ -122,7 +124,16 @@ func _migrate(data: Dictionary, from_schema: int) -> Dictionary:
 	var version := from_schema
 	if version < 1:
 		version = 1
-	# if version < 2: data["new_field"] = default; version = 2
+	if version < 2:
+		# Items written before schema 2 have neither a count nor durability.
+		# Normalising them here means the player loader only ever sees the
+		# current shape, whichever release wrote the file.
+		var player_value: Variant = data.get("player", {})
+		if typeof(player_value) == TYPE_DICTIONARY:
+			var player_data: Dictionary = player_value
+			player_data["inventory"] = Items.normalize_inventory(player_data.get("inventory", []))
+			player_data["equipment"] = Items.normalize_equipment(player_data.get("equipment", {}))
+		version = 2
 	data["schema"] = CURRENT_SCHEMA
 	data["migrated_from"] = from_schema
 	return data
