@@ -342,6 +342,31 @@ func _run() -> void:
 	check(_toasts.size() > toasts_before, "examining produces a description")
 	check(inspectable.can_interact(), "examination is repeatable")
 
+	# --- climate: seasons, weather and their effects --------------------------
+	check(Weather.current.has("kind"), "the weather system resolved a sky")
+	check(Climate.KINDS.has(Weather.kind()), "the live weather is a known kind")
+	check(not Weather.label().is_empty(), "the HUD has a season and weather label")
+	check(Weather.label().contains(Weather.season_name()), "the weather label names the season")
+	check(approx(player.environment_bonus(), Climate.cultivation_bonus(Weather.current), 0.0001), "cultivation reads the live weather")
+
+	var expected_light: Color = Climate.lighting_modulate(Clock.ambient_for_hour(Clock.hour), Weather.current)
+	if Weather.flash_strength() == 0.0:
+		check(main.lighting.color.is_equal_approx(expected_light), "the world light carries the weather")
+	else:
+		check(main.lighting.color.r >= expected_light.r, "a storm flash brightens the weather light")
+
+	var day_before: int = Clock.day
+	var hour_before: float = Clock.hour
+	Clock.day = 91
+	Clock.hour = 3.0
+	await frames(2)
+	check(Weather.season_name() == "Winter", "reaching day ninety-one brings winter")
+	check(int(Weather.current["day"]) == 91, "the weather follows the clock")
+	Clock.day = day_before
+	Clock.hour = hour_before
+	await frames(2)
+	check(Weather.season_name() == Climate.season_name(Climate.season_for_day(day_before)), "restoring the clock restores the season")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

@@ -45,6 +45,20 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Climate
+
+- `Climate` is pure static data and functions; `Weather` (autoload) is the only stateful half.
+- **Weather is not saved.** The day is cut into six-hour blocks and the block's weather is a
+  pure function of `(world_seed, day, block)` via `Rng.stream("weather", ...)`. Reloading the
+  same save at the same hour therefore produces the same sky, and no schema bump was needed.
+- Seasons are 30 days each, four per year, derived from `Clock.day`; the per-season weight table
+  is what makes it snow in winter and storm in summer. Do not branch on season anywhere else.
+- Weather changes two gameplay-visible things only: `Climate.cultivation_bonus` (via
+  `Player.environment_bonus`) and the ambient light in `WorldLighting`. Anything else that reads
+  weather should go through `Climate` too, so it stays testable without a scene.
+- `Weather` recomputes only when the day or block changes, and emits `changed` when the sky turns;
+  the HUD reads `Weather.label()` and `Weather.current` directly, as it does with `Clock`.
+
 ## Interaction
 
 - `Interactable` carries the kind: herb, shrine, portal, chest, altar, door, container, manual,

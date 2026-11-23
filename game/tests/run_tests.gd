@@ -32,6 +32,7 @@ func _ready() -> void:
 	_controller_tests()
 	_animation_tests()
 	_interaction_tests()
+	_climate_tests()
 	_npc_tests()
 	_quest_tests()
 	_hidden_realm_tests()
@@ -847,3 +848,86 @@ func _interaction_tests() -> void:
 	door.free()
 	stele.free()
 	building.free()
+
+
+# ----------------------------------------------------------------- climate ----
+
+func _climate_tests() -> void:
+	print("[climate] seasons, weather determinism and effects")
+	check(Climate.SEASON_DAYS == 30, "a season is thirty days")
+	check(Climate.season_for_day(1) == Climate.Season.SPRING, "day one is spring")
+	check(Climate.season_for_day(30) == Climate.Season.SPRING, "spring runs to day thirty")
+	check(Climate.season_for_day(31) == Climate.Season.SUMMER, "summer follows spring")
+	check(Climate.season_for_day(61) == Climate.Season.AUTUMN, "autumn follows summer")
+	check(Climate.season_for_day(91) == Climate.Season.WINTER, "winter follows autumn")
+	check(Climate.season_for_day(121) == Climate.Season.SPRING, "seasons cycle in the second year")
+	check(Climate.season_for_day(0) == Climate.Season.SPRING, "day zero is treated as day one")
+	check(Climate.season_name(Climate.Season.WINTER) == "Winter", "seasons have names")
+
+	check(Climate.block_for_hour(0.0) == 0, "midnight opens the first block")
+	check(Climate.block_for_hour(5.9) == 0, "the first block holds until six")
+	check(Climate.block_for_hour(6.0) == 1, "six starts the second block")
+	check(Climate.block_for_hour(23.9) == 3, "the last block ends at midnight")
+
+	var a := Climate.weather_for(3, 9.0)
+	var b := Climate.weather_for(3, 9.0)
+	check(String(a["kind"]) == String(b["kind"]), "the same hour gives the same weather")
+	check(approx(float(a["intensity"]), float(b["intensity"])), "the same hour gives the same intensity")
+	check(Climate.KINDS.has(String(a["kind"])), "weather kinds come from the known list")
+	check(int(a["season"]) == Climate.season_for_day(3), "weather reports its season")
+	check(String(Climate.weather_for(3, 8.0)["kind"]) == String(Climate.weather_for(3, 9.5)["kind"]), "weather holds inside a six-hour block")
+
+	var spring := {}
+	for day in range(1, 31):
+		for block in 4:
+			spring[String(Climate.weather_for(day, block * 6.0)["kind"])] = true
+	check(spring.size() >= 4, "a month of spring brings %d kinds of weather" % spring.size())
+
+	var winter := {}
+	for day in range(91, 121):
+		for block in 4:
+			winter[String(Climate.weather_for(day, block * 6.0)["kind"])] = true
+	check(not winter.has("storm"), "winter never storms")
+	check(not winter.has("rain"), "winter precipitation falls as snow")
+	check(winter.has("snow"), "winter brings snow")
+
+	var saved_seed: int = Rng.world_seed
+	var first := ""
+	var second := ""
+	for day in range(1, 15):
+		first += String(Climate.weather_for(day, 0.0)["kind"])
+	Rng.set_world_seed(saved_seed + 17)
+	for day in range(1, 15):
+		second += String(Climate.weather_for(day, 0.0)["kind"])
+	Rng.set_world_seed(saved_seed)
+	check(first != second, "a different world seed gives different weather")
+
+	check(approx(Climate.cultivation_bonus({"kind": "clear", "intensity": 0.0}), 1.0), "clear weather leaves cultivation alone")
+	check(approx(Climate.cultivation_bonus({"kind": "rain", "intensity": 1.0}), 0.9), "full rain thins the Qi")
+	check(Climate.cultivation_bonus({"kind": "storm", "intensity": 1.0}) > 1.0, "storms charge the air")
+	check(approx(Climate.cultivation_bonus({"kind": "rain", "intensity": 0.0}), 1.0), "a mild sky has no effect")
+
+	var white := Color(1, 1, 1)
+	check(Climate.lighting_modulate(white, {"kind": "clear", "intensity": 1.0}) == white, "clear weather keeps the ambient tint")
+	var storm_light := Climate.lighting_modulate(white, {"kind": "storm", "intensity": 1.0})
+	check(storm_light.r < 0.7 and storm_light.b > storm_light.r, "storms darken and cool the light")
+	check(Climate.lighting_modulate(white, {"kind": "snow", "intensity": 1.0}).b > 0.9, "snow light stays bright")
+
+	check(Climate.flash_strength("clear", 1.0) == 0.0, "only storms flash")
+	check(Climate.flash_strength("storm", 0.0) == 1.0, "a storm flash starts at full strength")
+	check(Climate.flash_strength("storm", 3.0) == 0.0, "flashes are brief")
+
+	var saved_day: int = Clock.day
+	var saved_hour: float = Clock.hour
+	Clock.paused = true
+	Clock.day = 91
+	Clock.hour = 3.0
+	Weather.refresh(true)
+	check(Weather.season() == Climate.Season.WINTER, "the weather autoload reads the calendar")
+	check(Weather.season_name() == "Winter", "the weather autoload names the season")
+	check(Weather.label().contains("Winter") and Weather.label().contains(Weather.kind().capitalize()), "the weather label names season and sky")
+	check(int(Weather.current["day"]) == 91, "the weather autoload tracks the day")
+	Clock.day = saved_day
+	Clock.hour = saved_hour
+	Clock.paused = false
+	Weather.refresh(true)

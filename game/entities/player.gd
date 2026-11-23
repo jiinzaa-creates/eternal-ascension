@@ -391,8 +391,9 @@ func cultivation_changed() -> void:
 
 
 func environment_bonus() -> float:
-	# Spirit-qi density will come from the region the player stands in.
-	return 1.0
+	# Weather is the environment's first real input: rain thins the Qi, storms
+	# charge it, snow slows it. Regional spirit-density will join this later.
+	return Climate.cultivation_bonus(Weather.current)
 
 
 func pick_up(item: Dictionary) -> void:

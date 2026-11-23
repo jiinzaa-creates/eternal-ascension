@@ -54,6 +54,7 @@ func _ready() -> void:
 	_spawn_player()
 	_build_hud()
 	Bus.enemy_died.connect(_on_enemy_died)
+	Weather.changed.connect(_on_weather_changed)
 	Bus.toast.emit("A new path opens. Assign your attributes, then press ENTER.")
 
 
@@ -669,6 +670,12 @@ func _try_pickup() -> void:
 	ground_items.remove_at(best_index)
 	player.pick_up(picked["item"])
 	Bus.toast.emit("Picked up %s." % String(picked["item"].get("name", "item")))
+
+
+func _on_weather_changed(weather: Dictionary) -> void:
+	if player == null or phase == "creation":
+		return
+	Bus.toast.emit("The weather turns: %s." % String(weather.get("kind", "clear")).capitalize())
 
 
 func _on_enemy_died(at: Vector2, ilvl: int) -> void:

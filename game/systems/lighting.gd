@@ -27,7 +27,11 @@ func _process(_delta: float) -> void:
 
 ## Re-applies the ambient tint and light energy for the current hour.
 func refresh() -> void:
-	color = Clock.ambient_for_hour(Clock.hour)
+	var ambient := Climate.lighting_modulate(Clock.ambient_for_hour(Clock.hour), Weather.current)
+	var flash := Weather.flash_strength()
+	if flash > 0.0:
+		ambient = ambient.lightened(flash * 0.35)
+	color = ambient
 	var energy := light_energy_for_hour(Clock.hour)
 	var live: Array = []
 	for light in lights:

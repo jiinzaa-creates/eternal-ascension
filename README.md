@@ -94,6 +94,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Deterministic item generation: 4 rarities, tiered prefixes/suffixes, stable IDs, auto-equip.
 - Equipment and passives feed real combat stats through `StatBlock`.
 - Seamless streaming over a 12×12-chunk province with deterministic chunk regeneration.
+- Weather and seasons: four 30-day seasons, six weather kinds drawn from a per-season table, deterministic weather per six-hour block of a given seed, weather-driven ambient light and storm flashes, and a cultivation rate that rain thins and storms charge.
 - Interaction: doors that open a building's interior, one-shot containers with deterministic loot, technique manuals, and repeatable examination of scenery.
 - Procedural animation: nine clips (idle, walk, run, sprint, attack, dodge, hurt, meditate, dead) with bob, lean, squash and limb swing on the player, NPCs and enemies.
 - Attack animation is driven by the same startup/active/recovery frame data as the hit window, so the strike pose cannot drift off the damaging frame.
@@ -113,7 +114,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 ## Not implemented yet
 
 Character appearance and backgrounds (all characters are still code-drawn shapes, now
-animated procedurally); weather and seasons; fast travel and maps; physiques; method-specific cultivation
+animated procedurally); fast travel and maps; physiques; method-specific cultivation
 loops; mastery and manuals; alchemy, forging, professions and economy; NPC goals, memory,
 relationships, parties and independent progression; the twelve sects and faction politics;
 additional hidden-realm templates; dynamic world events; the main narrative and endgame;
