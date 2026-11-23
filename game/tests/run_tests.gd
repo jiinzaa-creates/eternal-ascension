@@ -34,6 +34,7 @@ func _ready() -> void:
 	_combat_arch_tests()
 	_weapon_tests()
 	_defense_tests()
+	_technique_combat_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1583,6 +1584,104 @@ func _defense_tests() -> void:
 	var strong_stats := StatBlock.new(strong)
 	check(Defense.reflected_poise(strong_stats) > Defense.reflected_poise(defense_stats), "strength makes the riposte heavier")
 	check(Defense.label("parry") != Defense.label("block") and Defense.label("broken") == "BROKEN", "the HUD labels each stance")
+
+
+# --------------------------------------------------- technique combat ----
+
+func _technique_combat_tests() -> void:
+	print("[technique combat] kinds, projectiles, spells, summons, buffs and steps")
+	check(TechniqueCombat.KINDS.size() == 6, "six technique deliveries are declared")
+	check(TechniqueCombat.kind_of({}) == "melee", "a technique with no kind is a melee art")
+	check(TechniqueCombat.kind_of({"kind": "projectile"}) == "projectile", "a declared kind is read")
+	check(TechniqueCombat.kind_of({"kind": "bogus"}) == "melee", "an unknown kind falls back to melee")
+	for kind in TechniqueCombat.KINDS:
+		check(TechniqueCombat.is_valid_kind(kind), "%s is a real delivery" % kind)
+		check(TechniqueCombat.kind_label(kind) != "", "%s is labelled for the HUD" % kind)
+	check(TechniqueCombat.is_ranged("projectile") and TechniqueCombat.is_ranged("spell") \
+		and TechniqueCombat.is_ranged("summon"), "bolts, spells and summons strike at a distance")
+	check(not TechniqueCombat.is_ranged("melee") and not TechniqueCombat.is_ranged("buff") \
+		and not TechniqueCombat.is_ranged("movement"), "melee, buffs and steps are not ranged strikes")
+	check(TechniqueCombat.uses_hitbox("melee") and not TechniqueCombat.uses_hitbox("spell"), "only melee reads a hitbox")
+
+	var kinds_seen := {}
+	for tech in DB.techniques:
+		var tech_kind := TechniqueCombat.kind_of(tech)
+		kinds_seen[tech_kind] = true
+		check(TechniqueCombat.is_valid_kind(tech_kind), "%s has a valid kind" % tech.get("id", "?"))
+		if tech_kind == "buff":
+			check(not TechniqueCombat.buff_entry(tech).is_empty(), "buff %s can be applied" % tech.get("id", "?"))
+		elif tech_kind == "projectile":
+			check(float(TechniqueCombat.projectile_of(tech)["range"]) > 0.0, "projectile %s reaches" % tech.get("id", "?"))
+		elif tech_kind == "movement":
+			check(float(TechniqueCombat.movement_of(tech)["distance"]) > 0.0, "movement %s moves" % tech.get("id", "?"))
+	for kind in TechniqueCombat.KINDS:
+		check(kinds_seen.has(kind), "content ships a %s technique" % kind)
+	check(String(DB.technique("tech.sword.piercing_thrust").get("kind", "")) == "projectile", "a sword thrust carries sword Qi")
+	check(String(DB.technique("tech.formation.sealing_array").get("kind", "")) == "spell", "a formation art is a spell")
+	check(String(DB.technique("tech.body.golden_bell").get("kind", "")) == "buff", "a body art is a buff")
+	check(String(DB.technique("tech.step.cloud_step").get("kind", "")) == "movement", "cloud step is a movement art")
+
+	var shot := TechniqueCombat.projectile_of({"kind": "projectile",
+		"projectile": {"speed": 600.0, "radius": 12.0, "range": 300.0, "pierce": 2}})
+	check(approx(float(shot["speed"]), 600.0) and approx(float(shot["range"]), 300.0), "a projectile reads its own data")
+	check(approx(TechniqueCombat.flight_time(shot, 300.0), 0.5), "flight time follows speed")
+	check(approx(TechniqueCombat.flight_time(shot, 600.0), 0.5), "travel is clamped at the projectile's range")
+	check(TechniqueCombat.projectile_reaches(shot, 300.0), "a body at the edge is reached")
+	check(not TechniqueCombat.projectile_reaches(shot, 301.0), "a body past the range is not")
+	check(TechniqueCombat.max_hits(shot) == 3, "pierce adds bodies to a bolt")
+	var plain_shot := TechniqueCombat.projectile_of({})
+	check(float(plain_shot["speed"]) > 0.0, "missing projectile data keeps its defaults")
+	check(TechniqueCombat.max_hits(plain_shot) == 1, "a plain bolt stops at one body")
+	check(float(TechniqueCombat.projectile_of({"projectile": {"speed": 0.0}})["speed"]) >= 1.0, "a zero speed is floored")
+
+	var area := TechniqueCombat.spell_of({"kind": "spell",
+		"spell": {"range": 200.0, "radius": 70.0, "delay": 0.4}})
+	check(TechniqueCombat.spell_center(Vector2(10, 10), Vector2.RIGHT, area) == Vector2(210, 10), "a spell opens ahead of the caster")
+	check(TechniqueCombat.spell_center(Vector2.ZERO, Vector2.ZERO, area) == Vector2(200, 0), "a caster with no aim opens it to the right")
+	check(approx(float(TechniqueCombat.spell_area(area)["radius"]), 70.0), "a spell's area is its own radius")
+	check(approx(float(TechniqueCombat.spell_area(area)["angle"]), 360.0), "a spell area is a full circle")
+	check(Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, TechniqueCombat.spell_area(area), Vector2(-60, 0)), "a spell strikes behind its own centre")
+	check(float(TechniqueCombat.spell_of({"spell": {"delay": -1.0}})["delay"]) >= 0.0, "a negative telegraph is floored")
+
+	var pack := TechniqueCombat.summon_of({"kind": "summon",
+		"summon": {"count": 3, "duration": 5.0, "damage_mult": 0.25}})
+	check(int(pack["count"]) == 3 and approx(float(pack["duration"]), 5.0), "a summon art brings its pack and its life")
+	check(TechniqueCombat.summon_offsets(3).size() == 3, "the pack is spread around the caster")
+	check(TechniqueCombat.summon_offsets(0).size() == 1, "an empty pack still brings one beast")
+	check((TechniqueCombat.summon_offsets(4)[1] as Vector2).length() > 0.0, "summons do not all appear on one point")
+	check(approx(TechniqueCombat.summon_damage(100.0, pack), 25.0), "each summon carries its share")
+	check(approx(TechniqueCombat.summon_damage(100.0, TechniqueCombat.summon_of({})), 40.0), "the default share is a fraction of the blow")
+	check(float(TechniqueCombat.summon_of({"summon": {"count": 0, "duration": 0.0}})["duration"]) > 0.0, "a summon always has a life")
+
+	var bell := DB.technique("tech.body.golden_bell")
+	var entry := TechniqueCombat.buff_entry(bell)
+	check(not entry.is_empty(), "a body art produces a live buff")
+	check(float(entry.get("duration", 0.0)) > 0.0 and (entry["mods"] as Array).size() >= 2, "a buff carries its duration and mods")
+	check(TechniqueCombat.buff_entry(DB.technique("tech.sword.azure_cleave")).is_empty(), "a melee art is not a buff")
+	var live := TechniqueCombat.apply_buff([], bell)
+	check(live.size() == 1, "casting a body art applies it once")
+	live = TechniqueCombat.apply_buff(live, bell)
+	check(live.size() == 1, "recasting refreshes instead of stacking")
+	var buff_mods := TechniqueCombat.buff_mods(live)
+	check(buff_mods.size() == (entry["mods"] as Array).size(), "the pipeline receives every mod")
+	var buffed := StatBlock.new(Attributes.new())
+	buffed.rebuild({}, [], 1, 1.0)
+	var bare_armour := buffed.armor()
+	buffed.rebuild({}, [], 1, 1.0, "", [], [], [], 0.0, buff_mods)
+	check(buffed.armor() > bare_armour, "a body art's armour enters the one stat pipeline")
+	check(approx(buffed.armor(), bare_armour + 30.0), "the mod is applied exactly once")
+	live = TechniqueCombat.tick_buffs(live, 0.5)
+	check(live.size() == 1 and float(live[0]["remaining"]) < float(entry["duration"]), "a buff counts down")
+	check(TechniqueCombat.tick_buffs(live, 100.0).is_empty(), "a buff expires")
+	check(TechniqueCombat.buff_labels(TechniqueCombat.apply_buff([], bell)).size() == 1, "the HUD can name a live art")
+
+	var step := TechniqueCombat.movement_of({"kind": "movement",
+		"movement": {"distance": 120.0, "iframes": 0.2}})
+	check(TechniqueCombat.step_destination(Vector2.ZERO, Vector2.UP, step) == Vector2(0, -120), "a movement art carries the body along the aim")
+	check(TechniqueCombat.step_destination(Vector2.ZERO, Vector2.ZERO, step) == Vector2(120, 0), "a body with no aim still steps")
+	check(TechniqueCombat.step_destination(Vector2(5, 5), Vector2.LEFT, step) == Vector2(-115, 5), "the step is relative to where the body stands")
+	check(approx(float(TechniqueCombat.movement_of({})["distance"]), float(TechniqueCombat.MOVEMENT_DEFAULTS["distance"])), "missing movement data keeps its default")
+	check(float(TechniqueCombat.movement_of({"movement": {"distance": -50.0}})["distance"]) >= 0.0, "a negative step is floored")
 
 
 # -------------------------------------------------------------- aging ----

@@ -184,7 +184,7 @@ func draw_world_panel(player: Player) -> void:
 	var w := size.x
 	var x := w - 316.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 176.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 194.0), PANEL_BG)
 	_text(Vector2(x, y), "%s   %s   %s" % [Clock.label(), Weather.label(), host.current_biome_name()], 13, MUTED)
 	y += 18.0
 	_text(Vector2(x, y), "%s   Kills %d   Karma %d" % [player.display_name, Game.kills, Game.karma], 12, MUTED)
@@ -217,6 +217,14 @@ func draw_world_panel(player: Player) -> void:
 	elif stance == "block":
 		stance_color = Color("#9fd0ff")
 	_text(Vector2(x, y), "Guard: %s   (hold CTRL / MMB)" % Defense.label(stance), 11, stance_color)
+	y += 18.0
+	# Live body arts read from the same entries the stat pipeline is fed, so the
+	# HUD cannot show a buff that is not in the numbers.
+	var buffs: Array = player.active_buff_labels()
+	if buffs.is_empty():
+		_text(Vector2(x, y), "Body art: none", 11, MUTED)
+	else:
+		_text(Vector2(x, y), "Body art: " + ", ".join(buffs), 11, Color("#e0c070"))
 
 
 ## Compass to the chosen waypoint, with the distance to it.
@@ -255,7 +263,7 @@ func draw_techniques(player: Player) -> void:
 	var y := size.y - 96.0
 	var slot_size := Vector2(112.0, 46.0)
 	draw_rect(Rect2(x - 12.0, y - 24.0, slot_size.x * 6.0 + 24.0, 92.0), PANEL_BG)
-	_text(Vector2(x, y - 8.0), "Technique Bar  (1-6 select · LMB execute · RMB weapon chain)", 12, MUTED)
+	_text(Vector2(x, y - 8.0), "Technique Bar  (1-6 select · Q cycle · LMB execute · RMB weapon chain)", 12, MUTED)
 	y += 2.0
 	for i in mini(6, player.technique_ids.size()):
 		var tech: Dictionary = DB.technique(String(player.technique_ids[i]))
@@ -269,6 +277,13 @@ func draw_techniques(player: Player) -> void:
 		var cost := float(tech.get("qi_cost", 0.0))
 		var affordable := player.cultivation.qi >= cost
 		_text(rect.position + Vector2(8.0, 33.0), "Qi %d" % int(cost), 11, Color("#7fd3e0") if affordable else Color("#c05858"))
+	# The selected art's delivery and the rest of the known list. Past six arts
+	# the bar cannot draw every slot, so this line names what is actually held.
+	var selected_tech := player.current_technique()
+	var held := "%s · %s" % [String(selected_tech.get("name", "—")), TechniqueCombat.kind_label(player.current_technique_kind())]
+	if player.technique_ids.size() > 6:
+		held += "   (Q cycles all %d)" % player.technique_ids.size()
+	_text(Vector2(x, y + 62.0), held, 10, ACCENT)
 
 
 func draw_inventory(player: Player) -> void:
@@ -336,7 +351,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · Q cycle · M map · F5 save · F9 load · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

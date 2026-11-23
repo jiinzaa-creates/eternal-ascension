@@ -42,6 +42,9 @@ var selected_technique: int = 0
 var technique_xp: Dictionary = {}
 ## Technique id -> times watched for observation-based learning.
 var observed: Dictionary = {}
+## Live body-art buffs: [{id, name, duration, remaining, mods}]. Their mods enter
+## the one stat pipeline while they last. Transient, so never saved.
+var active_buffs: Array = []
 
 var hp: float = 100.0
 var hp_max: float = 100.0
@@ -69,6 +72,7 @@ var _guard_held := false
 var _guard_time := 0.0
 var _guard_broken := 0.0
 var _parry_flash := 0.0
+var _step_flash := 0.0
 var _meditating := false
 ## Seconds of "recent combat" left; the Sword Heart method feeds on it.
 var _combat_timer := 0.0
@@ -131,7 +135,8 @@ func dormant_passives() -> Array:
 func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
-		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()))
+		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()),
+		TechniqueCombat.buff_mods(active_buffs))
 	poise.set_maximum(Combat.poise_capacity(cultivation.realm, stats.get_attr("str")))
 	_recalc_vitals()
 
@@ -290,6 +295,7 @@ func observe_technique(id: String) -> Dictionary:
 
 func _process(delta: float) -> void:
 	_arc_flash = maxf(0.0, _arc_flash - delta)
+	_step_flash = maxf(0.0, _step_flash - delta)
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)
 	if _iframes > 0.0 and int(Time.get_ticks_msec() / 60.0) % 2 == 0:
 		modulate.a = 0.55
@@ -431,6 +437,17 @@ func _tick_timers(delta: float) -> void:
 	_iframes = maxf(0.0, _iframes - delta)
 	_guard_broken = maxf(0.0, _guard_broken - delta)
 	_parry_flash = maxf(0.0, _parry_flash - delta)
+	# A body art expires exactly like a stance: the clock runs, the pipeline is
+	# rebuilt once at the end, and nothing about it is written to a save.
+	if not active_buffs.is_empty():
+		var living := TechniqueCombat.tick_buffs(active_buffs, delta)
+		if living.size() != active_buffs.size():
+			active_buffs = living
+			rebuild_stats()
+			Bus.toast.emit("Your body art fades.")
+			Bus.player_stats_changed.emit()
+		else:
+			active_buffs = living
 	if _guard_held:
 		_guard_time += delta
 	poise.tick(delta)
@@ -477,6 +494,23 @@ func current_technique() -> Dictionary:
 		return {}
 	var index := clampi(selected_technique, 0, technique_ids.size() - 1)
 	return DB.technique(String(technique_ids[index]))
+
+
+func current_technique_kind() -> String:
+	return TechniqueCombat.kind_of(current_technique())
+
+
+## Q brings the next known technique to hand. The bar draws six slots; once more
+## than six arts are known, cycling is how the rest stay reachable.
+func cycle_technique() -> String:
+	if technique_ids.is_empty():
+		return ""
+	selected_technique = (clampi(selected_technique, 0, technique_ids.size() - 1) + 1) % technique_ids.size()
+	return String(current_technique().get("name", ""))
+
+
+func active_buff_labels() -> Array:
+	return TechniqueCombat.buff_labels(active_buffs)
 
 
 ## The equipped weapon's category. Unarmed is a real moveset, not a fallback.
@@ -569,19 +603,14 @@ func try_light_attack() -> bool:
 	return true
 
 
-func _strike() -> void:
-	var attack := _current_attack
-	if attack.is_empty():
-		return
-	var box: Dictionary = attack.get("hitbox", {})
-	var radius := float(box.get("radius", 70.0))
-	var arc := deg_to_rad(float(box.get("angle", 120.0)))
-	var is_light := bool(attack.get("light", false))
-
+## Resolve the blow first, then hand it to the technique's delivery. Every kind
+## carries the same numbers, so a spell or a summon cannot quietly skip crit,
+## poise, penetration or lifesteal.
+func _resolve_strike(attack: Dictionary) -> Dictionary:
 	_attack_counter += 1
+	var is_light := bool(attack.get("light", false))
 	var crit_roll := float(Rng.roll_float("crit", Game.kills * 1000 + _attack_counter, cultivation.realm))
 	var is_crit := crit_roll < stats.crit_chance()
-
 	var tech_id := String(attack.get("id", ""))
 	var raw := 0.0
 	if is_light:
@@ -589,26 +618,110 @@ func _strike() -> void:
 	else:
 		raw = Damage.technique_damage(attack, stats, stats.weapon_damage(),
 			Mastery.damage_mult(mastery_tier(tech_id)))
-		add_technique_xp(tech_id, Mastery.XP_PER_HIT)
 	if is_crit:
 		raw *= stats.crit_multiplier()
-	var poise_hit := Damage.poise_damage(attack, stats)
-	var knock := Damage.knockback(attack, stats)
-	var lifesteal := float(attack.get("lifesteal", 0.0)) + stats.lifesteal()
+	return {
+		"amount": raw,
+		"crit": is_crit,
+		"power": float(cultivation.realm),
+		"poise": Damage.poise_damage(attack, stats),
+		"knock": Damage.knockback(attack, stats),
+		"penetration": stats.penetration_fraction(),
+		"lifesteal": float(attack.get("lifesteal", 0.0)) + stats.lifesteal(),
+	}
 
+
+func _strike() -> void:
+	var attack := _current_attack
+	if attack.is_empty():
+		return
+	var kind := TechniqueCombat.kind_of(attack)
+	var is_light := bool(attack.get("light", false))
+	var tech_id := String(attack.get("id", ""))
+	var strike := _resolve_strike(attack)
+	if not is_light:
+		add_technique_xp(tech_id, Mastery.XP_PER_HIT)
+	var box: Dictionary = attack.get("hitbox", {})
 	_combat_timer = 6.0
 	_arc_flash = 0.13
-	_arc_radius = radius
-	_arc_angle = arc
+	_arc_radius = float(box.get("radius", 70.0))
+	_arc_angle = deg_to_rad(float(box.get("angle", 120.0)))
+	var tint := Color(String(attack.get("color", "#7fd3e0")))
+	match kind:
+		"projectile":
+			var bolt_spec := TechniqueCombat.projectile_of(attack)
+			var bolt := Projectile.new()
+			bolt.setup(_facing, bolt_spec, strike, tint)
+			_spawn_effect(bolt, global_position)
+		"spell":
+			var zone_spec := TechniqueCombat.spell_of(attack)
+			var zone := SpellZone.new()
+			zone.setup(zone_spec, strike, tint)
+			_spawn_effect(zone, TechniqueCombat.spell_center(global_position, _facing, zone_spec))
+		"summon":
+			var pack_spec := TechniqueCombat.summon_of(attack)
+			for offset in TechniqueCombat.summon_offsets(int(pack_spec["count"])):
+				var beast := Summon.new()
+				beast.setup(pack_spec, strike, tint, String(attack.get("name", "Spirit Beast")))
+				_spawn_effect(beast, global_position + (offset as Vector2))
+		"buff":
+			_apply_buff(attack)
+			_arc_radius = RADIUS + 20.0
+			_arc_angle = TAU
+			_arc_flash = 0.3
+		"movement":
+			_slide_step(attack)
+			_arc_flash = 0.0
+		_:
+			_resolve_melee(attack, strike)
 
+
+func _resolve_melee(attack: Dictionary, strike: Dictionary) -> void:
+	var box: Dictionary = attack.get("hitbox", {})
+	var lifesteal := float(strike.get("lifesteal", 0.0))
 	for enemy in Combat.targets(global_position, _facing, box, get_tree().get_nodes_in_group("enemy"), RADIUS):
-		var final := Damage.resolve(raw, 0.0, float(cultivation.realm))
+		var final := Damage.resolve(float(strike["amount"]), 0.0, float(strike["power"]))
 		if enemy.has_method("take_hit"):
-			enemy.take_hit(final, _facing.normalized() * knock, poise_hit, stats.penetration_fraction())
+			enemy.take_hit(final, _facing.normalized() * float(strike["knock"]),
+				float(strike["poise"]), float(strike["penetration"]))
 		Bus.damage_dealt.emit(final, enemy)
 		if lifesteal > 0.0:
 			heal(final * lifesteal)
 			break
+
+
+## Effects join the World layer so they Y-sort and are freed with it. Position is
+## written after parenting so it is a world coordinate even if the parent moves.
+func _spawn_effect(node: Node2D, at: Vector2) -> void:
+	var parent := get_parent()
+	if parent == null:
+		node.queue_free()
+		return
+	parent.add_child(node)
+	node.global_position = at
+
+
+## A body art: its mods enter the stat pipeline for its duration. Recasting
+## refreshes the clock; a buff can never be stacked into a permanent stat.
+func _apply_buff(attack: Dictionary) -> void:
+	var entry := TechniqueCombat.buff_entry(attack)
+	if entry.is_empty():
+		return
+	active_buffs = TechniqueCombat.apply_buff(active_buffs, attack)
+	rebuild_stats()
+	Bus.toast.emit("%s holds for %ds." % [String(entry["name"]), int(round(float(entry["duration"])))])
+	Bus.player_stats_changed.emit()
+
+
+## A movement art: the body is carried along the aim with its own i-frames.
+func _slide_step(attack: Dictionary) -> void:
+	var spec := TechniqueCombat.movement_of(attack)
+	var dir := _aim_dir()
+	_facing = dir
+	global_position = TechniqueCombat.step_destination(global_position, dir, spec)
+	_iframes = maxf(_iframes, float(spec.get("iframes", 0.0)))
+	_knock = Vector2.ZERO
+	_step_flash = 0.28
 
 
 func weapon_damage() -> float:
@@ -700,6 +813,9 @@ func heal(amount: float) -> void:
 
 func _die() -> void:
 	Bus.toast.emit("Your body fails. You wake at the edge of the clearing, weaker.")
+	if not active_buffs.is_empty():
+		active_buffs.clear()
+		rebuild_stats()
 	cultivation.qi = 0.0
 	hp = hp_max * 0.5
 	global_position = spawn_point
@@ -988,6 +1104,8 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, RADIUS + 15.0, guard_base - guard_half, guard_base + guard_half, 24, guard_color, 3.0)
 	if _parry_flash > 0.0:
 		draw_arc(Vector2.ZERO, RADIUS + 21.0, 0.0, TAU, 32, Color("#fff3c0", 0.8), 2.0)
+	if _step_flash > 0.0:
+		draw_arc(Vector2.ZERO, RADIUS + 8.0, 0.0, TAU, 24, Color("#b8e8ff", 0.6), 2.0)
 
 
 func to_dict() -> Dictionary:

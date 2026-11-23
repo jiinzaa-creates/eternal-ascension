@@ -584,6 +584,39 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Any new defensive rule belongs in `Defense` (or `Poise` for the meter) with checks in `run_tests`, and
   a scene-level check in `integration.gd` before it is called working.
 
+## Technique combat
+
+- A technique declares a `kind` in `data/techniques.json`. `TechniqueCombat` is pure and owns every
+  kind rule; the player only dispatches. **The default is `melee`**, so a technique written before the
+  key existed behaves exactly as it did, and no save migration is needed.
+- The kinds and their payload keys (the key is the kind's own name):
+  - `melee` — `hitbox` (`radius`, `angle`), resolved on the active frame, the original path.
+  - `projectile` — `projectile: {speed, radius, range, pierce}`. `Projectile` travels its own reach,
+    touches each body once, stops after `pierce + 1` bodies and frees itself at `range`.
+  - `spell` — `spell: {range, radius, delay}`. `SpellZone` opens at `spell_center()` (straight along
+    the caster's aim), telegraphs for `delay`, then resolves once over its circle.
+  - `summon` — `summon: {count, duration, speed, reach, interval, damage_mult}`. `Summon`s appear on
+    a ring around the caster, seek the nearest enemy, and each carries `damage_mult` of the blow.
+  - `buff` — `buff: {duration, mods}`. The live entry's mods are passed to `StatBlock.rebuild()` as
+    its `transient_mods` (last argument, default empty), i.e. the one stat pipeline. Recasting
+    refreshes the clock instead of stacking; buffs are transient and never saved.
+  - `movement` — `movement: {distance, iframes}`. The body is carried along the aim and gains the
+    art's own brief i-frames. It is still a technique: it costs Qi, follows the frame machine and
+    sets the same cooldown.
+- One resolved blow: `Player._resolve_strike()` computes amount, crit, poise, knockback, penetration
+  and lifesteal once; melee, projectile, spell and summon all deliver those same numbers through
+  `take_hit`. Never add a parallel damage path for a new delivery.
+- `DB.validate` checks every kind's payload (`_validate_technique_kind`): a projectile without speed
+  or range, a buff with no mods or an unknown stat, a summon with no count, or a movement art that
+  does not move is a content error, not a silent no-op.
+- Effects (`Projectile`, `SpellZone`, `Summon`) join the world layer and add themselves to the
+  `projectile`, `spell_zone` and `summon` groups so a scene test can assert they exist and expire.
+- Input: `Q` (`cycle_bar`) walks the whole known technique list, because the bar draws six slots and
+  the roster is now larger. Do not treat cycling as a substitute for M34's bars; it only guarantees
+  that an art learned after the bar is full stays reachable.
+- Any new technique rule belongs in `TechniqueCombat` with checks in `run_tests`, plus a scene-level
+  check in `integration.gd` before it is called working.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.
@@ -625,8 +658,8 @@ game/
   core/       bus, rng, db, clock, log, settings, save, game (autoloads)
   data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs)
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, animator,
-              camera_rig, lighting, display_policy
-  entities/   player, dummy, npc, interactable
+              camera_rig, lighting, display_policy, technique_combat
+  entities/   player, dummy, npc, interactable, projectile, spell_zone, summon
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud
   scenes/     main

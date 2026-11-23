@@ -353,6 +353,7 @@ func validate() -> Array:
 				problems.append("technique %s missing frame '%s'" % [t.get("id", "?"), key])
 		if String(t.get("id", "")) == "":
 			problems.append("technique without id")
+		_validate_technique_kind(t, problems)
 
 	if weapon_types.size() < 4:
 		problems.append("expected at least 4 weapon categories, found %d" % weapon_types.size())
@@ -508,6 +509,59 @@ func validate() -> Array:
 				seen[full] = true
 
 	return problems
+
+
+## A technique's delivery declares its own payload. `melee` is the default, so
+## old data validates without change; every other kind must carry the dictionary
+## its entities read, or it would silently perform as an empty melee blow.
+func _validate_technique_kind(technique: Dictionary, problems: Array) -> void:
+	var technique_id := String(technique.get("id", "?"))
+	var kind := String(technique.get("kind", TechniqueCombat.DEFAULT_KIND))
+	if not TechniqueCombat.is_valid_kind(kind):
+		problems.append("technique %s has unknown kind '%s'" % [technique_id, kind])
+		return
+	if kind == "melee":
+		var box: Dictionary = technique.get("hitbox", {})
+		if float(box.get("radius", 0.0)) <= 0.0 or float(box.get("angle", 0.0)) <= 0.0:
+			problems.append("melee technique %s has no hitbox" % technique_id)
+		return
+	var payload: Variant = technique.get(kind, {})
+	if typeof(payload) != TYPE_DICTIONARY:
+		problems.append("technique %s is %s but has no '%s' payload" % [technique_id, kind, kind])
+		return
+	var data: Dictionary = payload
+	match kind:
+		"projectile":
+			if float(data.get("speed", 0.0)) <= 0.0 or float(data.get("range", 0.0)) <= 0.0:
+				problems.append("projectile technique %s has no speed or range" % technique_id)
+			if float(data.get("radius", 0.0)) <= 0.0:
+				problems.append("projectile technique %s has no radius" % technique_id)
+			if int(data.get("pierce", 0)) < 0:
+				problems.append("projectile technique %s has negative pierce" % technique_id)
+		"spell":
+			if float(data.get("radius", 0.0)) <= 0.0 or float(data.get("range", 0.0)) < 0.0:
+				problems.append("spell technique %s has no radius or range" % technique_id)
+			if float(data.get("delay", 0.0)) < 0.0:
+				problems.append("spell technique %s has a negative delay" % technique_id)
+		"summon":
+			if int(data.get("count", 0)) < 1 or float(data.get("duration", 0.0)) <= 0.0:
+				problems.append("summon technique %s has no count or duration" % technique_id)
+			if float(data.get("interval", 0.0)) <= 0.0 or float(data.get("damage_mult", 0.0)) <= 0.0:
+				problems.append("summon technique %s has an invalid interval or share" % technique_id)
+		"buff":
+			var buff_mods: Array = data.get("mods", [])
+			if float(data.get("duration", 0.0)) <= 0.0 or buff_mods.is_empty():
+				problems.append("buff technique %s has no duration or mods" % technique_id)
+			for mod in buff_mods:
+				if typeof(mod) != TYPE_DICTIONARY:
+					problems.append("buff technique %s has a malformed mod" % technique_id)
+					continue
+				var stat := String((mod as Dictionary).get("stat", ""))
+				if not (Attributes.KEYS.has(stat) or StatBlock.PERCENT_STATS.has(stat) or StatBlock.FLAT_STATS.has(stat)):
+					problems.append("buff technique %s uses unknown stat %s" % [technique_id, stat])
+		"movement":
+			if float(data.get("distance", 0.0)) <= 0.0:
+				problems.append("movement technique %s does not move" % technique_id)
 
 
 func counts() -> Dictionary:

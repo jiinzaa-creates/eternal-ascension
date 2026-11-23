@@ -60,6 +60,13 @@ func frames(count: int) -> void:
 		await get_tree().physics_frame
 
 
+## Select a technique by stable id, granting it if the scenario needs it.
+func _tech_index(player: Player, id: String) -> int:
+	if not player.technique_ids.has(id):
+		player.learn_technique(id)
+	return player.technique_ids.find(id)
+
+
 func _run() -> void:
 	var scene: PackedScene = load("res://scenes/main.tscn")
 	main = scene.instantiate()
@@ -1557,6 +1564,172 @@ func _run() -> void:
 	player._cooldown = 0.0
 	player._combo_index = -1
 	player._combo_elapsed = 100.0
+	player.hp = player.hp_max
+	player.poise.reset()
+
+	# --- technique kinds: projectile, spell, summon, buff and movement ---------
+	# One shared frame machine and one damage path; only the delivery changes.
+	player._attack_state = "idle"
+	player._attack_timer = 0.0
+	player._attack_phase_total = 0.0
+	player._current_attack = {}
+	player._cooldown = 0.0
+	player._dodge_cooldown = 0.0
+	player._dodge_timer = 0.0
+	player._iframes = 0.0
+	player._knock = Vector2.ZERO
+	player._guard_held = false
+	player._guard_time = 0.0
+	player._guard_broken = 0.0
+	player.hp = player.hp_max
+	player.poise.reset()
+	player._facing = strike_dir
+	player.cultivation.qi = 500.0
+	player.active_buffs.clear()
+	player.rebuild_stats()
+	# The camera keeps easing, so the mouse's world point (and therefore the aim)
+	# drifts between scenarios. Read the aim fresh before each cast and lay the
+	# target along the direction the blow will actually take.
+	var aim_now: Vector2 = player._aim_dir()
+
+	var bolt_mark := Dummy.new()
+	bolt_mark.ilvl = 1
+	bolt_mark.aggressive = false
+	main.add_child(bolt_mark)
+	bolt_mark.hp_max = 60000.0
+	bolt_mark.hp = 60000.0
+	bolt_mark.global_position = player.global_position + aim_now * 220.0
+	var far_mark := Dummy.new()
+	far_mark.ilvl = 1
+	far_mark.aggressive = false
+	main.add_child(far_mark)
+	far_mark.hp_max = 60000.0
+	far_mark.hp = 60000.0
+	far_mark.global_position = player.global_position + aim_now * 760.0
+
+	player.selected_technique = _tech_index(player, "tech.sword.piercing_thrust")
+	check(player.current_technique_kind() == "projectile", "the selected art is a projectile")
+	var bolt_hp_before: float = bolt_mark.hp
+	var far_hp_before: float = far_mark.hp
+	var bolt_qi_before: float = player.cultivation.qi
+	player.try_attack()
+	check(player._attack_state == "startup", "a projectile art winds up on the shared frame machine")
+	check(player.cultivation.qi < bolt_qi_before, "a ranged art spends Qi on cast")
+	await frames(60)
+	check(bolt_mark.hp < bolt_hp_before, "a projectile art strikes a body downrange")
+	check(approx(far_mark.hp, far_hp_before), "a projectile does not reach past its range")
+	check(get_tree().get_nodes_in_group("projectile").is_empty(), "a bolt dies at its range")
+
+	var array_id := "tech.formation.sealing_array"
+	player.selected_technique = _tech_index(player, array_id)
+	aim_now = player._aim_dir()
+	var array_spec := TechniqueCombat.spell_of(DB.technique(array_id))
+	var array_point := TechniqueCombat.spell_center(player.global_position, aim_now, array_spec)
+	var array_mark := Dummy.new()
+	array_mark.ilvl = 1
+	array_mark.aggressive = false
+	main.add_child(array_mark)
+	array_mark.hp_max = 60000.0
+	array_mark.hp = 60000.0
+	array_mark.global_position = array_point + Vector2(0, 24)
+	var outside_mark := Dummy.new()
+	outside_mark.ilvl = 1
+	outside_mark.aggressive = false
+	main.add_child(outside_mark)
+	outside_mark.hp_max = 60000.0
+	outside_mark.hp = 60000.0
+	outside_mark.global_position = player.global_position - aim_now * 260.0
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	var array_hp_before: float = array_mark.hp
+	var outside_hp_before: float = outside_mark.hp
+	player.try_attack()
+	await frames(80)
+	check(player.current_technique_kind() == "spell", "the selected art is a spell")
+	check(array_mark.hp < array_hp_before, "a spell blooms where it was cast")
+	check(approx(outside_mark.hp, outside_hp_before), "a spell only strikes its own area")
+
+	var pack_id := "tech.beast.nine_stampede"
+	player.selected_technique = _tech_index(player, pack_id)
+	var pack_mark := Dummy.new()
+	pack_mark.ilvl = 1
+	pack_mark.aggressive = false
+	main.add_child(pack_mark)
+	pack_mark.hp_max = 60000.0
+	pack_mark.hp = 60000.0
+	pack_mark.global_position = player.global_position + aim_now * 110.0
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player.try_attack()
+	await frames(35)
+	check(player.current_technique_kind() == "summon", "the selected art is a summon")
+	check(get_tree().get_nodes_in_group("summon").size() >= 3, "a summon art calls its pack")
+	var pack_hp_before: float = pack_mark.hp
+	await frames(70)
+	check(pack_mark.hp < pack_hp_before, "a summoned beast strikes an enemy")
+	for beast in get_tree().get_nodes_in_group("summon"):
+		beast.lifetime = 0.001
+	await frames(4)
+	check(get_tree().get_nodes_in_group("summon").is_empty(), "a summon fades when its time ends")
+
+	player.selected_technique = _tech_index(player, "tech.body.golden_bell")
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player.active_buffs.clear()
+	player.rebuild_stats()
+	var armour_without: float = player.stats.armor()
+	player.try_attack()
+	await frames(30)
+	check(player.current_technique_kind() == "buff", "the selected art is a body art")
+	check(player.active_buffs.size() == 1, "a body art is applied")
+	check(player.stats.armor() > armour_without, "a body art raises the stat it declares")
+	player.active_buffs[0]["remaining"] = 0.02
+	await frames(4)
+	check(player.active_buffs.is_empty(), "a body art expires")
+	check(approx(player.stats.armor(), armour_without), "its stat leaves with it")
+
+	player.selected_technique = _tech_index(player, "tech.step.cloud_step")
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._iframes = 0.0
+	player._knock = Vector2.ZERO
+	var step_from: Vector2 = player.global_position
+	player.try_attack()
+	await frames(6)
+	check(player.current_technique_kind() == "movement", "the selected art is a movement art")
+	check(player.global_position.distance_to(step_from) > 100.0, "a movement art carries the body along the aim")
+	check(player._iframes > 0.0, "a movement art carries its own i-frames")
+
+	player.selected_technique = _tech_index(player, "tech.sword.azure_cleave")
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	var melee_mark := Dummy.new()
+	melee_mark.ilvl = 1
+	melee_mark.aggressive = false
+	main.add_child(melee_mark)
+	melee_mark.hp_max = 60000.0
+	melee_mark.hp = 60000.0
+	melee_mark.global_position = player.global_position + player._aim_dir() * 40.0
+	var melee_hp_before: float = melee_mark.hp
+	player.try_attack()
+	await frames(30)
+	check(melee_mark.hp < melee_hp_before, "a melee art still resolves its own hitbox")
+
+	player.selected_technique = 0
+	var cycled_name := player.cycle_technique()
+	check(player.selected_technique == 1 and cycled_name != "", "Q brings the next known art to hand")
+	player.selected_technique = player.technique_ids.size() - 1
+	player.cycle_technique()
+	check(player.selected_technique == 0, "cycling wraps back to the first art")
+
+	for mark in [bolt_mark, far_mark, array_mark, outside_mark, pack_mark, melee_mark]:
+		if is_instance_valid(mark):
+			mark.queue_free()
+	await frames(2)
+	player._attack_state = "idle"
+	player._attack_timer = 0.0
+	player._cooldown = 0.0
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
 	player.hp = player.hp_max
 	player.poise.reset()
 

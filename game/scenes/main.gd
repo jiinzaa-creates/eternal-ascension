@@ -563,6 +563,13 @@ func _process(delta: float) -> void:
 		if Input.is_action_just_pressed("skill_%d" % (i + 1)):
 			player.selected_technique = i
 			Bus.cultivation_changed.emit()
+	# The bar draws six slots; Q walks the whole known list so an art learned
+	# later is never stranded off the bar.
+	if Input.is_action_just_pressed("cycle_bar"):
+		var cycled := player.cycle_technique()
+		if cycled != "":
+			Bus.toast.emit("Technique: %s (%s)." % [cycled, TechniqueCombat.kind_label(player.current_technique_kind())])
+		Bus.cultivation_changed.emit()
 
 	if Input.is_action_just_pressed("interact"):
 		_try_interact()

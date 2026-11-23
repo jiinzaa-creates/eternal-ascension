@@ -28,6 +28,7 @@ an inheritance, and a crash-safe save system.
 | Realm breakthrough (at peak, full Qi) | G |
 | Interact / talk / pick up | E |
 | Select technique (slots 1–6) | 1 – 6 |
+| Cycle every known technique | Q |
 | Quick save / quick load | F5 / F9 |
 | Zoom camera in / out | Mouse wheel, `=` / `-` |
 | Creation: origin / robe / hair / skin / presentation | TAB / Z / X / C / N |
@@ -51,7 +52,9 @@ On the creation screen: **1–6** allocate a point to STR / DEX / AGI / INT / WI
    the sect hall and starts *The Azure Cloud Invitation*: talk, slay 3 beasts, gather 2 spirit
    herbs, attune at the shrine, return. Reward: a technique, a passive, spirit stones.
 3. **Fight** — enemies telegraph, then strike. Your weapon's own moveset chains on right-click,
-   techniques spend Qi on left-click, and poise, stagger, knockback, dodge i-frames all apply.
+   techniques spend Qi on left-click and come in six deliveries: melee arcs, travelling sword-Qi
+   bolts, telegraphed area spells, summoned beasts, timed body arts and movement steps. Poise,
+   stagger, knockback and dodge i-frames apply to all of them.
    Hold guard to meet a blow: the opening moments parry it for free, and a held block spends Qi until
    the reserve fails and the ward breaks. Kills drop generated items you can pick up and auto-equip.
 4. **Cultivate** — meditate to gather Qi, advance through 10 sublevels, then face a
@@ -112,7 +115,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Enlightenment: understanding accrues from real play — meditating with a method, every kill, surviving a tribulation, breaking through — and fills a comprehension meter. A full meter rolls a deterministic, weighted epiphany among insights you qualify for (by realm and practised method); an insight is permanent and adds its mods to the one stat pipeline, with thirteen in `data/enlightenments.json` from Still Water Clarity to Primordial Glimpse. The meter and learned insights are shown on the HUD and saved.
 - Playable tribulations: pressing G at the peak starts the realm's own heavenly trial — a telegraphed, staggered bolt pattern in a bounded circle. Dodge bolts to survive each wave (i-frames work, armour and evasion do not), earn a perfect-wave composure bonus of up to +12% on the breakthrough roll, or fall inside the circle and take the failure fallout without a roll. Eleven data-driven trials (`data/tribulations.json`) run from a three-wave meridian test to the seven-wave primordial sky, each with its own colour, bolt count, pacing, scatter and damage. Saves are refused mid-trial; loading abandons it.
 - Breakthrough preparation and method tribulations: a scorched tribulation ground beside the shrine banks up to three preparations (60 stones each) which raise the roll by 6% apiece, lighten Heaven by 10% and soften failure's wound and corruption — all spent by the attempt, win or lose. Each of the seven methods reshapes the tribulation itself: sword intent needs recent combat, dual cultivation needs a partner, the celestial path needs night, a conditioned body trades a heavier heaven for gentler failure, and the Blood Sea lends chance while making failure bite harder.
-- 8 techniques with startup/active/recovery frames, arc hitboxes, Qi costs, poise, knockback, scaling.
+- Technique combat: six deliveries share one frame machine, one Qi cost and one damage path — melee arcs, projectiles that pierce and die at their range, spells that telegraph and bloom at a point ahead of the caster, summons that hunt for a duration and carry a share of the blow, timed body arts whose mods enter the one stat pipeline, and movement steps with their own i-frames. Eleven techniques live in `data/techniques.json` — Piercing Thrust carries sword Qi, the Ninefold Sealing Array is a spell, Nine Beast Stampede calls a pack, Golden Bell Cover is a body art and Cloud Step is a movement art — `TechniqueCombat` is pure, `DB.validate` checks each kind's payload, and Q cycles every known art so one learned after the six-slot bar is full is never stranded.
 - Deterministic item generation: 4 rarities, tiered prefixes/suffixes, stable IDs, auto-equip.
 - Equipment and passives feed real combat stats through `StatBlock`.
 - Seamless streaming over a 12×12-chunk province: pure payload generation on worker threads, nodes built on the main thread, and a deterministic seed identity for every chunk.

@@ -64,7 +64,7 @@ func reset() -> void:
 ## player equips something, gains a passive, or advances a realm.
 func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float,
 		physique_id: String = "", meridian_mods: Array = [], realm_ability_mods: Array = [],
-		enlightenment_mods: Array = [], aging: float = 0.0) -> void:
+		enlightenment_mods: Array = [], aging: float = 0.0, transient_mods: Array = []) -> void:
 	reset()
 	aging_penalty = clampf(aging, 0.0, 0.9)
 	realm = realm_number
@@ -107,6 +107,11 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 	var synergy: Array = Passives.synergy_mods(passive_ids)
 	if not synergy.is_empty():
 		apply_mods(synergy, "synergy")
+
+	# Timed body arts (technique buffs) ride the same pipeline while they live.
+	# The caller owns their clocks; the pipeline only sums their mods.
+	if not transient_mods.is_empty():
+		apply_mods(transient_mods, "body art")
 
 
 func apply_mods(mods: Array, source_name: String = "") -> void:
