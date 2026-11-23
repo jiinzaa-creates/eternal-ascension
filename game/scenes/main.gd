@@ -31,6 +31,8 @@ var realm_cleared := false
 var inheritance_taken := false
 var portal_position := Vector2.ZERO
 var used_interactables: Array = []
+## Per-chunk state the seed cannot reproduce: harvested resources and their day.
+var world_delta := WorldDelta.new()
 
 var _allocation_spent := 0
 var _allocation_history: Array = []
@@ -76,9 +78,17 @@ func _build_world() -> void:
 	chunks.name = "Province"
 	chunks.z_index = -20
 	world.add_child(chunks)
+	# Payloads generate on worker threads; nodes are still built here.
+	chunks.threaded = true
+	chunks.delta = world_delta
+	chunks.set_resource_parent(world)
+	chunks.on_resource_spawned = func(node: Interactable) -> void: interactables.append(node)
+	chunks.on_resource_freed = func(node: Interactable) -> void: interactables.erase(node)
 	chunks.configure(Game.world_seed)
 	chunks.set_prop_parent(world)
 	chunks.stream_around(SPAWN)
+	# The first frame must show ground, not a hole: wait for the initial ring.
+	chunks.settle()
 
 	settlement = Settlement.new()
 	settlement.name = "AzureCloudMarket"
@@ -308,6 +318,7 @@ func _process(delta: float) -> void:
 		return
 	# The province is hidden inside a realm: streaming there would load chunks
 	# for tomb coordinates and spawn props under the tomb floor.
+	chunks.today = Clock.day
 	if realm_instance == null:
 		chunks.stream_around(player.global_position)
 	if phase == "creation":
@@ -468,7 +479,10 @@ func _use_interactable(node: Interactable) -> void:
 			if node.used:
 				return
 			node.used = true
-			if not used_interactables.has(node.id):
+			if node.chunk_owned:
+				# Streamed resources persist per chunk, not in the unique-node list.
+				world_delta.mark_spent(node.chunk_coord, node.id, Clock.day)
+			elif not used_interactables.has(node.id):
 				used_interactables.append(node.id)
 			var herb := _make_herb()
 			player.inventory.append(herb)
@@ -704,6 +718,7 @@ func _save(slot: int) -> void:
 		"ground_items": ground_items,
 		"quests": quests.to_dict(),
 		"used_interactables": used_interactables.duplicate(),
+		"chunk_deltas": world_delta.to_dict(),
 		"realm_seed": realm_seed,
 		"realm_cleared": realm_cleared,
 		"inheritance_taken": inheritance_taken,
@@ -736,9 +751,14 @@ func _load_game(slot: int) -> void:
 	realm_seed = int(data.get("realm_seed", 0))
 	realm_cleared = bool(data.get("realm_cleared", false))
 	inheritance_taken = bool(data.get("inheritance_taken", false))
+	world_delta = WorldDelta.from_dict(data.get("chunk_deltas", {}))
+	chunks.delta = world_delta
 	for node in interactables:
 		if used_interactables.has(node.id):
 			node.used = true
+	# Rebuild the province so loaded deltas decide which resources exist.
+	chunks.today = Clock.day
+	chunks.resync(player.global_position)
 	phase = "play"
 	Log.info("scene", "loaded slot %d" % slot)
 	Bus.toast.emit("Loaded slot %d." % slot)

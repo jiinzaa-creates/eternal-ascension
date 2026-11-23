@@ -22,6 +22,10 @@ var building: Building = null
 var manual_technique := ""
 ## Examination only: what the player reads.
 var examine_text := ""
+## Streamed resources: which chunk owns this node. Chunk-owned nodes are freed
+## with their chunk and persist their spent state through a WorldDelta.
+var chunk_owned := false
+var chunk_coord := Vector2i.ZERO
 var _pulse := 0.0
 
 
@@ -50,6 +54,12 @@ func setup_manual(id_value: String, label_value: String, technique_id: String) -
 func setup_examine(id_value: String, label_value: String, text: String) -> void:
 	setup(Kind.EXAMINE, id_value, label_value)
 	examine_text = text
+
+
+func setup_chunk_herb(id_value: String, label_value: String, coord: Vector2i) -> void:
+	setup(Kind.HERB, id_value, label_value)
+	chunk_owned = true
+	chunk_coord = coord
 
 
 ## Whether the prompt should offer this node right now.

@@ -45,6 +45,24 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Streaming
+
+- Generation is split in two: `ChunkGen.payload_for(coord, seed)` returns **plain data only**
+  (features, resources, signature) and may run on any thread; `ChunkManager` creates every node,
+  on the main thread, when the payload arrives. Never create nodes, touch the scene tree or read
+  autoload state from `ChunkGen` or from any other worker body.
+- Threading is opt-in (`ChunkManager.threaded`); unit tests leave it off so streaming is
+  synchronous and assertions read top-to-bottom. The running game turns it on and calls
+  `settle()` at boot so the first frame has ground.
+- Chunks own their resources (herbs). When a chunk is freed its resources are freed and the owner
+  is told through `on_resource_freed`, so nothing keeps a dangling node in `main.interactables`.
+- Resource state lives in `WorldDelta`, keyed by `"cx,cy"` and then by stable resource id. It is
+  saved as `chunk_deltas`; missing entries mean "pristine", which is why old saves need no
+  migration.
+- **Regrowth is background simulation without a loop**: nothing ticks off-screen. A resource is
+  spent only while `today - spent_day < HERB_REGROW_DAYS`, and expired entries are pruned when
+  the chunk streams in. Do not add per-frame simulation for unloaded chunks.
+
 ## Climate
 
 - `Climate` is pure static data and functions; `Weather` (autoload) is the only stateful half.

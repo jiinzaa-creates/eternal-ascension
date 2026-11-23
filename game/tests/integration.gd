@@ -34,6 +34,13 @@ func check(condition: bool, label: String) -> void:
 		push_error("FAIL: " + label)
 
 
+func _find_interactable(nodes: Array, id: String) -> Interactable:
+	for node in nodes:
+		if is_instance_valid(node) and node is Interactable and node.id == id:
+			return node as Interactable
+	return null
+
+
 func _record_toast(text: String) -> void:
 	_toasts.append(text)
 
@@ -90,6 +97,7 @@ func _run() -> void:
 	var start_chunk: Vector2i = main.chunks.world_to_chunk(player.global_position)
 	player.global_position += Vector2(2400, 0)
 	await frames(2)
+	main.chunks.settle()
 	check(main.chunks.world_to_chunk(player.global_position) != start_chunk, "walking streams a different part of the province")
 	check(main.chunks.chunk_count() == 25, "streaming stays bounded while travelling")
 	# --- rendering: camera, sorting, occlusion, lighting, scaling ------------
@@ -120,7 +128,9 @@ func _run() -> void:
 	check(main.lighting != null, "the world has a lighting rig")
 	Clock.hour = 23.0
 	await frames(2)
-	check(main.lighting.color == Clock.ambient_for_hour(23.0), "ambient light follows the clock")
+	var night_tint: Color = Climate.lighting_modulate(Clock.ambient_for_hour(23.0), Weather.current)
+	check(main.lighting.color == night_tint or (Weather.flash_strength() > 0.0 and main.lighting.color.r >= night_tint.r), "ambient light follows the clock and weather")
+	check(main.lighting.color.b > main.lighting.color.r, "night light stays cool")
 	check(main.lighting.lights.size() >= 2, "shrine and rift lights exist")
 	var dimmest := 1.0
 	for light in main.lighting.lights:
@@ -366,6 +376,79 @@ func _run() -> void:
 	Clock.hour = hour_before
 	await frames(2)
 	check(Weather.season_name() == Climate.season_name(Climate.season_for_day(day_before)), "restoring the clock restores the season")
+
+	# --- streaming: chunk deltas, regrowth and threaded generation -----------
+	await frames(2)
+	main.chunks.settle()
+	check(main.chunks.threaded, "chunk payloads generate on worker threads")
+	check(main.world_delta != null, "the run owns a chunk delta store")
+
+	var chunk_herb: Interactable = null
+	for node in main.interactables:
+		if is_instance_valid(node) and node is Interactable and node.chunk_owned:
+			chunk_herb = node as Interactable
+			break
+	check(chunk_herb != null, "streamed chunks grow herbs (%d resources)" % main.chunks.resource_count())
+	check(chunk_herb == null or chunk_herb.id.begins_with("herb.chunk."), "streamed herb ids are namespaced")
+
+	var herb_id: String = chunk_herb.id
+	var herb_coord: Vector2i = chunk_herb.chunk_coord
+	var home: Vector2 = player.global_position
+	player.global_position = chunk_herb.global_position
+	main._use_interactable(chunk_herb)
+	check(chunk_herb.used, "a streamed herb can be gathered")
+	check(main.world_delta.is_spent(herb_coord, herb_id, Clock.day), "gathering records a chunk delta")
+
+	# Leave the ring entirely, then return: the chunk regenerates from the seed.
+	player.global_position = Vector2(12200, 12200)
+	await frames(2)
+	main.chunks.settle()
+	check(main.chunks.chunk_count() < 25, "the province edge streams fewer chunks (%d)" % main.chunks.chunk_count())
+	player.global_position = home
+	await frames(2)
+	main.chunks.settle()
+	check(_find_interactable(main.interactables, herb_id) == null, "a harvested herb does not stream back in")
+
+	var stale := 0
+	for node in main.interactables:
+		if not is_instance_valid(node):
+			stale += 1
+	check(stale == 0, "freed chunk resources leave the interactable list")
+
+	var day_before_chunks: int = Clock.day
+	Clock.day = day_before_chunks + WorldDelta.HERB_REGROW_DAYS
+	player.global_position = Vector2(12200, 12200)
+	await frames(2)
+	main.chunks.settle()
+	player.global_position = home
+	await frames(2)
+	main.chunks.settle()
+	var regrown: Interactable = _find_interactable(main.interactables, herb_id)
+	check(regrown != null, "a harvested herb returns after its regrow window")
+	check(regrown == null or regrown.can_interact(), "a regrown herb can be gathered again")
+	Clock.day = day_before_chunks
+
+	# Deltas belong to the run, so they travel through a save.
+	var kept: Interactable = null
+	for node in main.interactables:
+		if is_instance_valid(node) and node is Interactable and node.chunk_owned and node.can_interact():
+			kept = node as Interactable
+			break
+	check(kept != null, "another streamed herb is available to keep")
+	if kept != null:
+		player.global_position = kept.global_position
+		var kept_id: String = kept.id
+		var kept_coord: Vector2i = kept.chunk_coord
+		main._use_interactable(kept)
+		main._save(95)
+		main._load_game(95)
+		await frames(2)
+		main.chunks.settle()
+		check(main.world_delta.is_spent(kept_coord, kept_id, Clock.day), "chunk deltas survive save and load")
+		check(_find_interactable(main.interactables, kept_id) == null, "a harvested herb stays gone after loading")
+	player.global_position = home
+	await frames(2)
+	main.chunks.settle()
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

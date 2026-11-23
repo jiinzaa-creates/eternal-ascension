@@ -14,7 +14,8 @@ func set_world_seed(value: int) -> void:
 
 
 ## Mixes two integers into a well-distributed 64-bit value (splitmix-style).
-func mix(a: int, b: int) -> int:
+## Static so worker threads can use it without touching autoload state.
+static func mix_values(a: int, b: int) -> int:
 	var h: int = a ^ (b + 0x9E3779B1)
 	h = (h ^ (h >> 30)) * -4658895280553007687
 	h = (h ^ (h >> 27)) * -7723592293110705685
@@ -22,11 +23,21 @@ func mix(a: int, b: int) -> int:
 	return h
 
 
-## Returns an independent RNG stream. Same arguments always produce the same sequence.
-func stream(domain: String, key: int = 0, counter: int = 0) -> RandomNumberGenerator:
+func mix(a: int, b: int) -> int:
+	return mix_values(a, b)
+
+
+## Returns an independent RNG stream for an explicit seed. Same arguments always
+## produce the same sequence; thread-safe because it reads no shared state.
+static func stream_from(seed_value: int, domain: String, key: int = 0, counter: int = 0) -> RandomNumberGenerator:
 	var r := RandomNumberGenerator.new()
-	r.seed = mix(world_seed, mix(hash(domain), mix(key, counter)))
+	r.seed = mix_values(seed_value, mix_values(hash(domain), mix_values(key, counter)))
 	return r
+
+
+## Returns an independent RNG stream for the current world seed.
+func stream(domain: String, key: int = 0, counter: int = 0) -> RandomNumberGenerator:
+	return stream_from(world_seed, domain, key, counter)
 
 
 ## Convenience: roll one float in [0, 1) from a named stream.

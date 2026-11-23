@@ -23,6 +23,7 @@ func _ready() -> void:
 	_cultivation_tests()
 	_combat_tests()
 	_world_tests()
+	_chunk_delta_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -361,6 +362,100 @@ func _world_tests() -> void:
 	manager.queue_free()
 	second.queue_free()
 	other_seed.queue_free()
+
+
+# ---------------------------------------------------------- chunk payloads ----
+
+func _chunk_delta_tests() -> void:
+	print("[chunks] pure payloads, deltas and background regrowth")
+	check(ChunkManager.ProvinceChunk.FEATURES == ChunkGen.FEATURES, "payload generator and chunk agree on the feature count")
+
+	var coord := Vector2i(4, 7)
+	var payload := ChunkGen.payload_for(coord, 4242)
+	check(int(payload["signature"]) == ChunkGen.signature_for(coord, 4242), "the payload carries its signature")
+	check((payload["features"] as Array).size() == ChunkGen.FEATURES, "a payload holds every decoration")
+
+	var again := ChunkGen.payload_for(coord, 4242)
+	check(String(again["features"][0]["kind"]) == String(payload["features"][0]["kind"]), "payload generation is deterministic")
+	check((again["features"][0]["pos"] as Vector2).is_equal_approx(payload["features"][0]["pos"] as Vector2), "feature positions are deterministic")
+	check(int(ChunkGen.payload_for(coord, 4243)["signature"]) != int(payload["signature"]), "a different seed changes the chunk")
+
+	var static_stream := Rng.stream_from(Rng.world_seed, "chunk", 7, 0)
+	var instance_stream := Rng.stream("chunk", 7, 0)
+	check(approx(static_stream.randf(), instance_stream.randf()), "the explicit-seed stream matches the autoload stream")
+
+	var herb_total := 0
+	var herb_ids := {}
+	var herb_names := {}
+	for cx in range(0, 6):
+		for cy in range(0, 6):
+			for entry in ChunkGen.payload_for(Vector2i(cx, cy), 4242)["herbs"]:
+				herb_total += 1
+				herb_ids[String(entry["id"])] = true
+				herb_names[String(entry["label"])] = true
+	check(herb_total > 0, "the province grows resources somewhere (%d herbs)" % herb_total)
+	check(herb_ids.size() == herb_total, "every chunk resource has a unique id")
+	check(herb_names.size() >= 2, "chunk resources vary in name (%d names)" % herb_names.size())
+
+	var delta := WorldDelta.new()
+	var id := "herb.chunk.4.7.0"
+	check(not delta.is_spent(coord, id, 10), "nothing is spent in a fresh delta")
+	delta.mark_spent(coord, id, 10)
+	check(delta.is_spent(coord, id, 10), "a harvested resource is spent the same day")
+	check(delta.is_spent(coord, id, 12), "a harvested resource stays spent inside its window")
+	check(not delta.is_spent(coord, id, 13), "a harvested resource regrows after the window")
+	check(not delta.is_spent(Vector2i(4, 8), id, 10), "deltas are per chunk")
+	check(delta.total_entries() == 1 and delta.chunk_count() == 1, "a delta counts chunks and entries")
+	check(delta.prune(coord, 12) == 0, "pruning keeps living entries")
+	check(delta.prune(coord, 13) == 1, "pruning drops regrown entries")
+	check(delta.total_entries() == 0 and delta.chunk_count() == 0, "an emptied delta forgets its chunk")
+
+	delta.mark_spent(coord, id, 20)
+	var restored := WorldDelta.from_dict(JSON.parse_string(JSON.stringify(delta.to_dict())) as Dictionary)
+	check(restored.is_spent(coord, id, 21), "chunk deltas survive a JSON round trip")
+	check(not restored.is_spent(coord, id, 23), "the regrow window survives the round trip")
+
+	var holder := Node2D.new()
+	add_child(holder)
+	var manager := ChunkManager.new()
+	add_child(manager)
+	manager.set_resource_parent(holder)
+	var spawned: Array = []
+	manager.on_resource_spawned = func(node: Interactable) -> void: spawned.append(node)
+	manager.configure(4242)
+	manager.set_delta(WorldDelta.new())
+	manager.today = 5
+	manager.stream_around(Vector2(5632, 5632))
+	check(manager.chunk_count() == 25, "chunks still stream synchronously when threading is off")
+	check(spawned.size() > 0, "chunk resources stream in as interactables (%d)" % spawned.size())
+	check(spawned.size() == manager.resource_count(), "the manager counts its own resources")
+
+	var herb: Interactable = spawned[0] as Interactable
+	check(herb.chunk_owned, "streamed resources know they belong to a chunk")
+	check(herb.id.begins_with("herb.chunk."), "streamed resource ids are namespaced")
+	check(herb.can_interact(), "a fresh streamed herb can be gathered")
+
+	var before := manager.resource_count()
+	manager.delta.mark_spent(herb.chunk_coord, herb.id, manager.today)
+	manager.resync(Vector2(5632, 5632))
+	check(manager.resource_count() == before - 1, "a resynced chunk honours its delta")
+	check(manager.delta.is_spent(herb.chunk_coord, herb.id, manager.today), "the delta survives a resync")
+	manager.today += WorldDelta.HERB_REGROW_DAYS
+	manager.resync(Vector2(5632, 5632))
+	check(manager.resource_count() == before, "the resource returns once the regrow window passes")
+	check(not manager.delta.is_spent(herb.chunk_coord, herb.id, manager.today), "a regrown resource is no longer spent")
+	manager.queue_free()
+	holder.queue_free()
+
+	var threaded_manager := ChunkManager.new()
+	add_child(threaded_manager)
+	threaded_manager.threaded = true
+	threaded_manager.configure(4242)
+	threaded_manager.stream_around(Vector2(5632, 5632))
+	threaded_manager.settle()
+	check(threaded_manager.chunk_count() == 25, "worker threads fill the ring too (%d)" % threaded_manager.chunk_count())
+	check(threaded_manager.signature_at(Vector2i(5, 5)) == ChunkGen.signature_for(Vector2i(5, 5), 4242), "threaded chunks match the pure generator")
+	threaded_manager.queue_free()
 
 
 # -------------------------------------------------------------------- npc ----
