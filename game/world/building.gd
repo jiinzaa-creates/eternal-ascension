@@ -13,6 +13,8 @@ var footprint := Rect2()
 var wall_color := Color("#3a4a3e")
 var roof_color := Color("#4f6a55")
 var location := ""
+## Set when a door on this building is open: the interior stays visible.
+var interior_open := false
 var _alpha := 1.0
 
 
@@ -34,13 +36,31 @@ func world_footprint() -> Rect2:
 	return Rect2(global_position + footprint.position, footprint.size)
 
 
+func set_interior_open(value: bool) -> void:
+	interior_open = value
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
-	var player := Game.player as Node2D
-	var target := 1.0
-	if player != null and is_instance_valid(player):
-		target = Occluder.alpha_for(player.global_position, world_footprint(), roof_height())
+	var target := occlusion_target_for_player()
 	_alpha = lerpf(_alpha, target, clampf(delta * FADE_SPEED, 0.0, 1.0))
 	modulate.a = _alpha
+
+
+## Alpha for an arbitrary position. An open interior never occludes.
+func occlusion_target(player_pos: Vector2) -> float:
+	if interior_open:
+		return Occluder.MIN_ALPHA
+	return Occluder.alpha_for(player_pos, world_footprint(), roof_height())
+
+
+func occlusion_target_for_player() -> float:
+	if interior_open:
+		return Occluder.MIN_ALPHA
+	var player := Game.player as Node2D
+	if player == null or not is_instance_valid(player):
+		return 1.0
+	return occlusion_target(player.global_position)
 
 
 func _draw() -> void:
@@ -54,5 +74,5 @@ func _draw() -> void:
 	draw_colored_polygon(roof, roof_color)
 	draw_rect(
 		Rect2(footprint.position + Vector2(size.x * 0.45, size.y * 0.5), Vector2(size.x * 0.1, size.y * 0.5)),
-		Color("#20261f")
+		Color("#120e0a") if interior_open else Color("#20261f")
 	)

@@ -66,6 +66,13 @@ func set_buildings_visible(value: bool) -> void:
 			building.set_process(value)
 
 
+func building_for(location_id: String) -> Building:
+	for building in buildings:
+		if is_instance_valid(building) and building.location == location_id:
+			return building
+	return null
+
+
 func _draw() -> void:
 	# Ground apron
 	draw_circle(Vector2.ZERO, 560.0, Color("#1d2a20", 0.55))

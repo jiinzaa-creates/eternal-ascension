@@ -94,6 +94,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Deterministic item generation: 4 rarities, tiered prefixes/suffixes, stable IDs, auto-equip.
 - Equipment and passives feed real combat stats through `StatBlock`.
 - Seamless streaming over a 12×12-chunk province with deterministic chunk regeneration.
+- Interaction: doors that open a building's interior, one-shot containers with deterministic loot, technique manuals, and repeatable examination of scenery.
 - Procedural animation: nine clips (idle, walk, run, sprint, attack, dodge, hurt, meditate, dead) with bob, lean, squash and limb swing on the player, NPCs and enemies.
 - Attack animation is driven by the same startup/active/recovery frame data as the hit window, so the strike pose cannot drift off the damaging frame.
 - Acceleration-based movement (2 400 u/s² accelerating, 3 000 braking), so turns plant instead of snapping.

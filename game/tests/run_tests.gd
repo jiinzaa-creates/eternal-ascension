@@ -31,6 +31,7 @@ func _ready() -> void:
 	_motion_tests()
 	_controller_tests()
 	_animation_tests()
+	_interaction_tests()
 	_npc_tests()
 	_quest_tests()
 	_hidden_realm_tests()
@@ -784,3 +785,65 @@ func _animation_tests() -> void:
 	check(approx(Animator.attack_swing("recovery", 1.0), 0.0), "recovery returns to neutral")
 	check(absf(Animator.attack_swing("active", 2.0)) <= 1.0, "swing is clamped at the ends")
 	check(approx(Animator.attack_swing("idle", 0.5), 0.0), "a non-attack phase has no swing")
+
+
+# ------------------------------------------------------------- interaction ----
+
+func _interaction_tests() -> void:
+	print("[interaction] kinds, prompts and one-shot state")
+	var herb := Interactable.new()
+	herb.setup(Interactable.Kind.HERB, "herb.test", "Spirit Herb")
+	check(herb.can_interact(), "a fresh herb can be gathered")
+	herb.used = true
+	check(not herb.can_interact(), "a picked herb is no longer offered")
+	check(herb.display_label() == "Picked clean", "a picked herb reads as picked clean")
+
+	var chest := Interactable.new()
+	chest.setup(Interactable.Kind.CHEST, "chest.test", "Sealed Chest")
+	chest.used = true
+	check(not chest.can_interact(), "a looted chest stops offering a prompt")
+
+	var container := Interactable.new()
+	container.setup_container("crate.test", "Market crate", 77)
+	check(container.kind == Interactable.Kind.CONTAINER, "containers have their own kind")
+	check(container.can_interact(), "a container offers a search")
+	check(container.item_seed == 77, "a container keeps its loot seed")
+	container.used = true
+	check(not container.can_interact(), "a searched container is spent")
+	check(container.display_label().contains("Searched"), "a searched container says so")
+
+	var manual := Interactable.new()
+	manual.setup_manual("manual.test", "Forbidden manual", "tech.blood.crimson_moon")
+	check(manual.kind == Interactable.Kind.MANUAL, "manuals have their own kind")
+	check(manual.manual_technique == "tech.blood.crimson_moon", "a manual carries its technique id")
+	check(not DB.technique(manual.manual_technique).is_empty(), "manual techniques exist in the database")
+	check(bool(DB.technique(manual.manual_technique).get("hidden", false)), "the manual teaches a hidden technique")
+	manual.used = true
+	check(not manual.can_interact(), "a studied manual is spent")
+
+	var door := Interactable.new()
+	door.setup_door("door.test", "Sect Hall door", null)
+	check(door.can_interact(), "a door always offers a prompt")
+	check(door.display_label().contains("open"), "a closed door offers to open")
+	door.open = true
+	check(door.display_label().contains("close"), "an open door offers to close")
+	check(door.can_interact(), "an open door can still be closed")
+
+	var stele := Interactable.new()
+	stele.setup_examine("stele.test", "Stele", "The stele is worn.")
+	check(stele.examine_text == "The stele is worn.", "examination keeps its text")
+	check(stele.can_interact(), "examination is repeatable")
+
+	var building := Building.new()
+	building.setup(Vector2(100, 100), Vector2(160, 90), Color.WHITE, Color.GRAY, "test_hall")
+	check(approx(building.occlusion_target(Vector2(180, 700)), 1.0), "a closed building is opaque from below")
+	building.set_interior_open(true)
+	check(approx(building.occlusion_target(Vector2(180, 700)), Occluder.MIN_ALPHA), "an open interior stays transparent from any angle")
+
+	herb.free()
+	chest.free()
+	container.free()
+	manual.free()
+	door.free()
+	stele.free()
+	building.free()

@@ -10,11 +10,13 @@ extends Node
 var _pass := 0
 var _fail := 0
 var _failures: Array = []
+var _toasts: Array = []
 var main: Node2D
 
 
 func _ready() -> void:
 	print("=== Eternal Ascension — integration test ===")
+	Bus.toast.connect(_record_toast)
 	await _run()
 	print("-----------------------------------------------")
 	print("RESULT: PASS %d / FAIL %d" % [_pass, _fail])
@@ -30,6 +32,10 @@ func check(condition: bool, label: String) -> void:
 		_fail += 1
 		_failures.append(label)
 		push_error("FAIL: " + label)
+
+
+func _record_toast(text: String) -> void:
+	_toasts.append(text)
 
 
 func approx(a: float, b: float, eps: float = 0.001) -> bool:
@@ -287,6 +293,55 @@ func _run() -> void:
 	check(main.chunks.props[0].visible, "streamed props return with the overworld")
 	check(main.camera_rig.limit_right == int(ChunkManager.world_bounds().end.x), "camera bounds return to the province")
 
+	# --- interaction: doors, containers, manuals, examination ----------------
+	var container: Interactable = null
+	var manual_node: Interactable = null
+	var door: Interactable = null
+	var inspectable: Interactable = null
+	for node in main.interactables:
+		match node.kind:
+			Interactable.Kind.CONTAINER:
+				if container == null:
+					container = node
+			Interactable.Kind.MANUAL:
+				manual_node = node
+			Interactable.Kind.DOOR:
+				if door == null:
+					door = node
+			Interactable.Kind.EXAMINE:
+				if inspectable == null:
+					inspectable = node
+	check(container != null, "the settlement has containers")
+	check(manual_node != null, "the settlement has a manual")
+	check(door != null, "the settlement has doors")
+	check(inspectable != null, "the settlement has examinable objects")
+	check(main.interactables.size() >= 16, "the interaction set grew to %d nodes" % main.interactables.size())
+
+	var loot_before: int = main.ground_items.size()
+	main._use_interactable(container)
+	check(main.ground_items.size() == loot_before + 1, "searching a container drops loot")
+	check(container.used and not container.can_interact(), "a searched container is spent")
+	main._use_interactable(container)
+	check(main.ground_items.size() == loot_before + 1, "a container cannot be looted twice")
+
+	check(not manual_node.used, "the manual starts unread")
+	main._use_interactable(manual_node)
+	check(player.technique_ids.has("tech.blood.crimson_moon"), "reading a manual teaches its technique")
+	check(manual_node.used and not manual_node.can_interact(), "a studied manual is spent")
+
+	check(not door.open, "doors start closed")
+	var door_building: Building = door.building
+	main._use_interactable(door)
+	check(door.open, "a door opens")
+	check(door_building.interior_open, "an open door exposes the interior")
+	main._use_interactable(door)
+	check(not door.open and not door_building.interior_open, "a door closes again")
+
+	var toasts_before: int = _toasts.size()
+	main._use_interactable(inspectable)
+	check(_toasts.size() > toasts_before, "examining produces a description")
+	check(inspectable.can_interact(), "examination is repeatable")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
@@ -307,6 +362,8 @@ func _run() -> void:
 	check(main.quests.completed, "quick load restores quest completion")
 	check(main.inheritance_taken, "quick load restores the inheritance")
 	check(Game.spirit_stones == saved_stones, "quick load restores spirit stones")
+	check(container.used, "a searched container stays spent after loading")
+	check(player.technique_ids.has("tech.blood.crimson_moon"), "a manual's technique survives a reload")
 	Save.delete_slot(96)
 
 	main.queue_free()

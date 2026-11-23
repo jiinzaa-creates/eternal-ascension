@@ -45,6 +45,21 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Interaction
+
+- `Interactable` carries the kind: herb, shrine, portal, chest, altar, door, container, manual,
+  examine. Kind-specific data lives on small setup helpers (`setup_door`, `setup_container`,
+  `setup_manual`, `setup_examine`) rather than in a loose dictionary.
+- **`can_interact()` is the single rule** the prompt and the handler share. A spent node must
+  return false; a node that still offers feedback (altar, shrine, door, examination) returns true.
+- One-shot nodes (herb, chest, container, manual) record their stable id in `used_interactables`,
+  which is saved and re-applied on load. Because ids are strings this needs no schema bump.
+- Doors toggle `Building.interior_open`, which forces that building's roof transparent so the
+  interior reads as entered. Door open/closed state is **session-only**: persisting it would require
+  a save-schema bump, so do not add it silently.
+- Container loot is generated from `hash(stable id)`, so the same crate yields the same item after
+  a reload rather than rerolling.
+
 ## Animation
 
 - There are no sprite sheets: animation is a **pose**. `Animator` picks a clip from

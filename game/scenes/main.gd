@@ -202,6 +202,53 @@ func _spawn_interactables() -> void:
 	lighting.add_light(world, shrine.position, Color("#ffd9a0"), 220.0, 0.9)
 	lighting.add_light(world, portal.position, Color("#b48cff"), 260.0, 1.0)
 
+	# A door for every building, at the doorway the building draws.
+	for spec in Settlement.BUILDINGS:
+		var location := String(spec["location"])
+		var building := settlement.building_for(location)
+		if building == null:
+			continue
+		var door := Interactable.new()
+		door.setup_door("door.%s" % location, "%s door" % location.capitalize(), building)
+		door.position = building.global_position + Vector2(0, (spec["size"] as Vector2).y * 0.5 + 8.0)
+		world.add_child(door)
+		interactables.append(door)
+
+	# Containers: one-shot loot, deterministic from their stable id.
+	var crate_spots := [
+		["crate.market.0", "Market crate", "market", Vector2(-58, 44)],
+		["crate.tavern.0", "Tavern crate", "tavern", Vector2(52, 48)],
+		["crate.dorms.0", "Dormitory chest", "dorms", Vector2(0, 54)],
+	]
+	for spot in crate_spots:
+		var crate := Interactable.new()
+		crate.setup_container(String(spot[0]), String(spot[1]), hash(String(spot[0])))
+		crate.position = settlement.position_for(String(spot[2])) + (spot[3] as Vector2)
+		world.add_child(crate)
+		interactables.append(crate)
+
+	# A manual teaches a technique that is otherwise hidden from character start.
+	var manual := Interactable.new()
+	manual.setup_manual("manual.crimson_moon", "Forbidden manual — Crimson Moon Devour", "tech.blood.crimson_moon")
+	manual.position = settlement.position_for("sect_hall") + Vector2(-46, 12)
+	world.add_child(manual)
+	interactables.append(manual)
+
+	# Examination: scenery that rewards looking, repeatable and inconsumable.
+	var stele := Interactable.new()
+	stele.setup_examine("stele.azure", "Azure Cloud stele",
+		"The stele reads: the sect was founded on a promise to teach the rootless. The lower names are worn away.")
+	stele.position = settlement.position_for("shrine") + Vector2(64, 18)
+	world.add_child(stele)
+	interactables.append(stele)
+
+	var board := Interactable.new()
+	board.setup_examine("board.market", "Market notice board",
+		"Notices: a bounty on marsh boars, a lost jade comb, and a warning not to enter the eastern rift.")
+	board.position = settlement.position_for("market") + Vector2(-96, -18)
+	world.add_child(board)
+	interactables.append(board)
+
 
 func _roll_root() -> int:
 	var weights: Array = []
@@ -363,7 +410,7 @@ func _nearest_interactable() -> Node:
 			best_dist = dist
 			best = npc
 	for node in _active_interactables():
-		if not is_instance_valid(node) or node.used and node.kind == Interactable.Kind.HERB:
+		if not is_instance_valid(node) or not node.can_interact():
 			continue
 		var dist: float = (node as Node2D).global_position.distance_to(player.global_position)
 		if dist < best_dist:
@@ -446,17 +493,46 @@ func _use_interactable(node: Interactable) -> void:
 		Interactable.Kind.CHEST:
 			if node.used:
 				return
-			node.used = true
-			if not used_interactables.has(node.id):
-				used_interactables.append(node.id)
-			var generator := ItemGen.new(DB, Rng)
-			var item := generator.generate(6, hash(node.id), ground_items.size(), 2)
-			if not item.is_empty():
-				ground_items.append({"x": node.global_position.x, "y": node.global_position.y + 30.0, "item": item})
-				Bus.item_dropped.emit(item, node.global_position)
-				Bus.toast.emit("The chest opens: %s" % String(item.get("name", "?")))
+			_loot(node, 6, "sealed chest", 2)
 		Interactable.Kind.ALTAR:
 			_claim_inheritance()
+		Interactable.Kind.DOOR:
+			node.open = not node.open
+			if node.building != null:
+				node.building.set_interior_open(node.open)
+			Bus.toast.emit("%s %s." % [node.label, "opens" if node.open else "closes"])
+		Interactable.Kind.CONTAINER:
+			if node.used:
+				return
+			_loot(node, maxi(2, player.cultivation.realm + 1), node.label.to_lower(), 0)
+		Interactable.Kind.MANUAL:
+			if node.used:
+				return
+			if player.learn_technique(node.manual_technique):
+				node.used = true
+				var tech: Dictionary = DB.technique(node.manual_technique)
+				Bus.toast.emit("You study the manual. Technique learned: %s." % String(tech.get("name", node.manual_technique)))
+				Bus.cultivation_changed.emit()
+			else:
+				Bus.toast.emit("You already know what this manual teaches.")
+		Interactable.Kind.EXAMINE:
+			Bus.toast.emit(node.examine_text)
+
+
+## One-shot loot shared by chests and containers. The item is generated from the
+## node's stable id, so looting the same crate after a reload gives the same item.
+func _loot(node: Interactable, ilvl: int, verb: String, forced_rarity: int = 0) -> void:
+	node.used = true
+	if not used_interactables.has(node.id):
+		used_interactables.append(node.id)
+	var generator := ItemGen.new(DB, Rng)
+	var item := generator.generate(maxi(1, ilvl), hash(node.id), ground_items.size(), forced_rarity)
+	if item.is_empty():
+		Bus.toast.emit("The %s is empty." % verb)
+		return
+	ground_items.append({"x": node.global_position.x, "y": node.global_position.y + 30.0, "item": item})
+	Bus.item_dropped.emit(item, node.global_position)
+	Bus.toast.emit("The %s holds %s." % [verb, String(item.get("name", "?"))])
 
 
 func cultivation_restore() -> void:
