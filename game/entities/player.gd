@@ -72,6 +72,9 @@ var _sprinting := false
 ## than every frame.
 var _was_wounded := false
 var _last_karma := 0
+## Guard meter shared with every enemy; a break staggers the body.
+var poise := Poise.new(40.0)
+var _knock := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -115,6 +118,7 @@ func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
 		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()))
+	poise.set_maximum(Combat.poise_capacity(cultivation.realm, stats.get_attr("str")))
 	_recalc_vitals()
 
 
@@ -328,6 +332,14 @@ func _attack_swing() -> float:
 func _physics_process(delta: float) -> void:
 	_tick_timers(delta)
 
+	# A broken guard overrides input: the body is carried by the blow until it
+	# recovers, which is what makes poise a real combat resource.
+	if poise.is_staggered():
+		_sprinting = false
+		velocity = _knock
+		move_and_slide()
+		return
+
 	if _meditating:
 		velocity = Vector2.ZERO
 		var gained := meditate_tick(delta)
@@ -391,6 +403,8 @@ func _tick_timers(delta: float) -> void:
 	_dodge_cooldown = maxf(0.0, _dodge_cooldown - delta)
 	_dodge_timer = maxf(0.0, _dodge_timer - delta)
 	_iframes = maxf(0.0, _iframes - delta)
+	poise.tick(delta)
+	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
 	_tick_attack(delta)
 
 
@@ -401,24 +415,19 @@ func _tick_attack(delta: float) -> void:
 	if _attack_timer > 0.0:
 		return
 	var frames: Dictionary = _current_technique.get("frames", {})
-	var speed := stats.attack_speed()
+	_attack_state = Combat.next_phase(_attack_state)
 	match _attack_state:
-		"startup":
-			_attack_state = "active"
-			_attack_timer = maxf(0.016, float(frames.get("active", 4)) / 60.0 / speed)
+		"active":
+			_attack_timer = Combat.phase_seconds(frames, "active", stats.attack_speed())
 			_attack_phase_total = _attack_timer
 			_strike()
-		"active":
-			_attack_state = "recovery"
-			var recovery := float(frames.get("recovery", 12)) / 60.0 / speed
-			recovery *= (1.0 - stats.recovery_reduction())
-			_attack_timer = maxf(0.02, recovery)
+		"recovery":
+			_attack_timer = Combat.phase_seconds(frames, "recovery", stats.attack_speed(),
+				stats.recovery_reduction())
 			_attack_phase_total = _attack_timer
 			var tech_id := String(_current_technique.get("id", ""))
 			_cooldown = float(_current_technique.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction()) \
 				* Mastery.cooldown_mult(mastery_tier(tech_id)) * Realms.technique_mult(cultivation.realm)
-		"recovery":
-			_attack_state = "idle"
 
 
 func current_technique() -> Dictionary:
@@ -447,7 +456,7 @@ func try_attack() -> void:
 	_current_technique = tech
 	_attack_state = "startup"
 	var frames: Dictionary = tech.get("frames", {})
-	_attack_timer = maxf(0.02, float(frames.get("startup", 9)) / 60.0 / stats.attack_speed())
+	_attack_timer = Combat.phase_seconds(frames, "startup", stats.attack_speed())
 	_attack_phase_total = _attack_timer
 	_facing = _aim_dir()
 	cultivation_changed()
@@ -480,15 +489,7 @@ func _strike() -> void:
 	_arc_radius = radius
 	_arc_angle = arc
 
-	for node in get_tree().get_nodes_in_group("enemy"):
-		var enemy := node as Node2D
-		if enemy == null:
-			continue
-		var to_enemy := enemy.global_position - global_position
-		if to_enemy.length() > radius + 14.0:
-			continue
-		if arc < TAU - 0.01 and absf(_facing.angle_to(to_enemy)) > arc * 0.5:
-			continue
+	for enemy in Combat.targets(global_position, _facing, box, get_tree().get_nodes_in_group("enemy"), RADIUS):
 		var final := Damage.resolve(raw, 0.0, float(cultivation.realm))
 		if enemy.has_method("take_hit"):
 			enemy.take_hit(final, _facing.normalized() * knock, poise, stats.penetration_fraction())
@@ -506,10 +507,14 @@ func armor() -> float:
 	return stats.armor()
 
 
-func take_hit(amount: float, _from: Vector2 = Vector2.ZERO, can_evade: bool = true) -> void:
+## `poise_damage` and `knock_force` come from the attacker's blow, so a heavy
+## strike can stagger and throw the body while a light one cannot.
+func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = true,
+		poise_damage: float = 0.0, knock_force: float = 0.0) -> void:
 	if _iframes > 0.0 or hp <= 0.0:
 		return
 	_combat_timer = 6.0
+	_meditating = false
 	if can_evade and stats.evasion_chance() > 0.0:
 		_evade_counter += 1
 		var roll := float(Rng.roll_float("evade", Game.kills * 977 + _evade_counter, cultivation.realm))
@@ -520,6 +525,14 @@ func take_hit(amount: float, _from: Vector2 = Vector2.ZERO, can_evade: bool = tr
 	var final := Damage.resolve(raw, stats.physical_resist() * 100.0, 1.0)
 	hp = maxf(0.0, hp - final)
 	_hurt_flash = 0.18
+	if poise_damage > 0.0:
+		var broke := poise.apply(poise_damage)
+		_knock += Combat.knock_impulse(from.direction_to(global_position), knock_force, broke)
+		if broke and Combat.interrupts(_attack_state):
+			_attack_state = "idle"
+			_attack_timer = 0.0
+			_attack_phase_total = 0.0
+			_current_technique = {}
 	Bus.player_stats_changed.emit()
 	if hp <= 0.0:
 		_die()
@@ -536,6 +549,9 @@ func _die() -> void:
 	hp = hp_max * 0.5
 	global_position = spawn_point
 	_iframes = 2.0
+	poise.reset()
+	_knock = Vector2.ZERO
+	_attack_state = "idle"
 	Bus.cultivation_changed.emit()
 	Bus.player_stats_changed.emit()
 

@@ -31,6 +31,7 @@ func _ready() -> void:
 	_tribulation_tests()
 	_enlightenment_tests()
 	_aging_tests()
+	_combat_arch_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1408,6 +1409,63 @@ func _enlightenment_tests() -> void:
 	var corrupt := Cultivation.new()
 	corrupt.from_dict({"enlightenment_meter": 500.0})
 	check(approx(corrupt.enlightenment_meter, Cultivation.ENLIGHTENMENT_GOAL), "a corrupt meter is clamped")
+
+
+# ------------------------------------------------------------- combat ----
+
+func _combat_arch_tests() -> void:
+	print("[combat] frame phases, hitboxes, poise, stagger and interruption")
+	check(Combat.next_phase("idle") == "idle", "idle stays idle")
+	check(Combat.next_phase("startup") == "active", "startup becomes active")
+	check(Combat.next_phase("active") == "recovery", "active becomes recovery")
+	check(Combat.next_phase("recovery") == "idle", "recovery returns to idle")
+	check(Combat.next_phase("bogus") == "idle", "an unknown phase falls back to idle")
+
+	var frames := {"startup": 12, "active": 4, "recovery": 18}
+	check(approx(Combat.phase_seconds(frames, "startup"), 0.2), "frame counts are 60ths of a second")
+	check(approx(Combat.phase_seconds(frames, "startup", 2.0), 0.1), "attack speed halves a phase")
+	check(approx(Combat.phase_seconds(frames, "recovery", 1.0, 0.5), 0.15), "recovery reduction applies only to recovery")
+	check(approx(Combat.phase_seconds(frames, "startup", 1.0, 0.8), 0.2), "recovery reduction does not touch startup")
+	check(Combat.phase_seconds(frames, "startup", 1000.0) >= Combat.ACTIVE_MINIMUM, "a phase never vanishes")
+
+	var arc := {"shape": "arc", "radius": 70.0, "angle": 90.0}
+	check(Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, arc, Vector2(40, 0)), "a target ahead is inside the arc")
+	check(not Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, arc, Vector2(-40, 0)), "a target behind is outside it")
+	check(Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, arc, Vector2(40, 30)), "just inside the half-angle is included")
+	check(not Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, arc, Vector2(0, 41)), "past the half-angle misses")
+	check(not Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, arc, Vector2(80, 0)), "reach limits the arc")
+	check(Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, arc, Vector2(80, 0), 14.0), "a body's radius extends reach")
+	check(Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, arc, Vector2.ZERO), "a target at the origin is struck")
+	var circle := {"shape": "circle", "radius": 40.0, "angle": 360.0}
+	check(Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, circle, Vector2(-30, 0)), "a full circle ignores facing")
+	check(not Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, circle, Vector2(-60, 0)), "a full circle still has reach")
+
+	var guard := Poise.new(50.0)
+	check(approx(guard.current, 50.0) and not guard.is_staggered(), "a fresh guard is full and steady")
+	check(not guard.apply(20.0), "a light blow does not break the guard")
+	check(approx(guard.current, 30.0), "poise is spent by the blow")
+	check(guard.apply(30.0) and guard.is_staggered(), "the blow that empties poise staggers")
+	check(approx(guard.stagger, 0.65), "stagger length follows the breaking blow")
+	check(approx(guard.current, guard.maximum), "a break refills the meter")
+	check(not guard.apply(50.0), "a staggered body cannot be staggered again")
+	guard.tick(guard.stagger)
+	check(not guard.is_staggered(), "stagger wears off with time")
+	var huge := Poise.new(10.0)
+	huge.apply(1000.0)
+	check(huge.stagger <= 0.9, "stagger is capped")
+	var tiny := Poise.new(10.0)
+	tiny.apply(10.0)
+	check(tiny.is_staggered() and tiny.stagger >= 0.35, "even a small break has a minimum stagger")
+
+	check(Combat.poise_capacity(1, 10) > 40.0, "a body has a poise capacity")
+	check(Combat.poise_capacity(12, 10) > Combat.poise_capacity(1, 10), "higher realms endure more")
+	check(Combat.poise_capacity(5, 40) > Combat.poise_capacity(5, 10), "strength adds poise")
+	check(approx(Combat.knock_impulse(Vector2.RIGHT, 100.0).length(), 12.0), "knockback scales from the blow")
+	check(Combat.knock_impulse(Vector2.RIGHT, 100.0, true).length() > Combat.knock_impulse(Vector2.RIGHT, 100.0).length(), "a broken guard flies further")
+	check(Combat.knock_impulse(Vector2.ZERO, 100.0) == Vector2.ZERO, "a blow from nowhere throws nothing")
+	check(Combat.interrupts("startup"), "startup can be interrupted")
+	check(not Combat.interrupts("active"), "an active swing is committed")
+	check(not Combat.interrupts("recovery") and not Combat.interrupts("idle"), "recovery and idle are not attacks to spoil")
 
 
 # -------------------------------------------------------------- aging ----

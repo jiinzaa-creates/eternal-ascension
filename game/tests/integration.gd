@@ -1354,6 +1354,44 @@ func _run() -> void:
 	player.hp = player.hp_max
 	player.rebuild_stats()
 
+	# --- combat architecture ---------------------------------------------------
+	player.poise.reset()
+	check(player.poise.maximum > 40.0, "a player body has a poise capacity from realm and strength")
+	check(not player.poise.is_staggered(), "a fresh guard is intact")
+	player.hp = player.hp_max
+	player._attack_state = "startup"
+	player._attack_timer = 0.5
+	player._attack_phase_total = 0.5
+	player.take_hit(1.0, player.global_position + Vector2(20, 0), false, 9999.0, 120.0)
+	check(player.poise.is_staggered(), "a breaking blow staggers the player")
+	check(player._attack_state == "idle", "a stagger interrupts an attack in startup")
+	check(player._knock.length() > 0.0, "a staggering blow throws the body")
+	player.poise.tick(2.0)
+	check(not player.poise.is_staggered(), "stagger wears off")
+	player._knock = Vector2.ZERO
+	player._iframes = 0.0
+	player.hp = player.hp_max
+	player.poise.reset()
+
+	var brawler := Dummy.new()
+	brawler.ilvl = 2
+	brawler.aggressive = false
+	main.add_child(brawler)
+	brawler.global_position = player.global_position + Vector2(30, 0)
+	# Remove evasion from the calculation so the blow is deterministic.
+	var dex_before := player.attrs.get_attr("dex")
+	player.attrs.add("dex", -dex_before)
+	player.rebuild_stats()
+	var hp_before_blow := player.hp
+	brawler._release_attack(player)
+	check(player.hp < hp_before_blow, "an enemy blow still damages the player")
+	check(player.poise.current < player.poise.maximum, "an enemy blow carries poise damage")
+	player.attrs.add("dex", dex_before)
+	player.rebuild_stats()
+	brawler.queue_free()
+	player.hp = player.hp_max
+	player.poise.reset()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

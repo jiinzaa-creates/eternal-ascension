@@ -10,8 +10,11 @@ const RADIUS := 13.0
 
 var hp := 70.0
 var hp_max := 70.0
-var poise := 40.0
-var poise_max := 40.0
+## Shared guard meter: the same rules the player lives by.
+var poise := Poise.new(40.0)
+## Poise this body's blow carries, and how hard it throws the target.
+var strike_poise := 10.0
+var knockback := 150.0
 var ilvl := 1
 var speed := 60.0
 var attack_range := 48.0
@@ -28,7 +31,6 @@ var _flash := 0.0
 var _knock := Vector2.ZERO
 var _windup := 0.0
 var _cooldown := 0.8
-var _stagger := 0.0
 var _dead := false
 
 
@@ -38,9 +40,10 @@ func _ready() -> void:
 	collision_mask = 1
 	hp_max = 70.0 + ilvl * 18.0
 	hp = hp_max
-	poise_max = 40.0 + ilvl * 6.0
-	poise = poise_max
+	poise.set_maximum(40.0 + ilvl * 6.0, true)
 	damage = 6.0 + ilvl * 2.0
+	strike_poise = 8.0 + float(ilvl) * 2.0
+	knockback = 140.0 + float(ilvl) * 10.0
 	armor_value = _armor_for_level()
 
 
@@ -57,9 +60,10 @@ func apply_biome_enemy(entry: Dictionary, realm: int) -> void:
 	ilvl = maxi(1, realm + int(entry.get("ilvl_bonus", 0)))
 	hp_max = (70.0 + ilvl * 18.0) * float(entry.get("hp_mult", 1.0))
 	hp = hp_max
-	poise_max = (40.0 + ilvl * 6.0) * float(entry.get("poise_mult", 1.0))
-	poise = poise_max
+	poise.set_maximum((40.0 + ilvl * 6.0) * float(entry.get("poise_mult", 1.0)), true)
 	damage = (6.0 + ilvl * 2.0) * float(entry.get("damage_mult", 1.0))
+	strike_poise = (8.0 + float(ilvl) * 2.0) * float(entry.get("damage_mult", 1.0))
+	knockback = 140.0 + float(ilvl) * 10.0
 	armor_value = _armor_for_level()
 	speed = float(entry.get("speed", speed))
 	body_color = Color(String(entry.get("color", "#a85050")))
@@ -70,16 +74,16 @@ func _physics_process(delta: float) -> void:
 	if _dead:
 		return
 	_flash = maxf(0.0, _flash - delta)
-	_stagger = maxf(0.0, _stagger - delta)
+	poise.tick(delta)
 	_cooldown = maxf(0.0, _cooldown - delta)
 	animator.update(delta, velocity.length() / maxf(1.0, speed), false,
-		_windup > 0.0, false, _stagger > 0.0, false, _dead)
+		_windup > 0.0, false, poise.is_staggered(), false, _dead)
 
 	var knock_step := 900.0 * delta
 	_knock = _knock.move_toward(Vector2.ZERO, knock_step)
 
 	var target := Game.player as Node2D
-	if _stagger > 0.0 or target == null:
+	if poise.is_staggered() or target == null:
 		velocity = _knock
 		move_and_slide()
 		queue_redraw()
@@ -114,10 +118,11 @@ func _release_attack(target: Node2D) -> void:
 	_cooldown = 1.4
 	if target == null:
 		return
-	if target.global_position.distance_to(global_position) > attack_range + 18.0:
+	var reach := {"shape": "circle", "radius": attack_range, "angle": 360.0}
+	if not Combat.in_hitbox(global_position, Vector2.RIGHT, reach, target.global_position, 18.0):
 		return
 	if target.has_method("take_hit"):
-		target.take_hit(damage, global_position)
+		target.take_hit(damage, global_position, true, strike_poise, knockback)
 
 
 ## `penetration` is the attacker's fraction of ignored armour (0..0.6).
@@ -126,12 +131,9 @@ func take_hit(amount: float, knock: Vector2, poise_damage: float, penetration: f
 		return
 	var effective_armor := armor_value * (1.0 - clampf(penetration, 0.0, 0.9))
 	hp -= Damage.mitigate_armor(amount, effective_armor)
-	poise -= poise_damage
 	_knock += knock * 0.12
 	_flash = 0.14
-	if poise <= 0.0:
-		poise = poise_max
-		_stagger = 0.55
+	if poise.apply(poise_damage):
 		_knock += knock * 0.2
 		_windup = 0.0
 	if hp <= 0.0:
@@ -153,7 +155,7 @@ func _draw() -> void:
 	var body := body_color
 	if _flash > 0.0:
 		body = Color("#ffffff")
-	if _stagger > 0.0:
+	if poise.is_staggered():
 		body = Color("#c8a050")
 	if _windup > 0.0:
 		body = Color("#e07040")

@@ -84,6 +84,27 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   `from_dict` clamps a corrupt realm into 1–12. A successful attempt returns the new realm's `unlocks`
   and `ability`; `Player` turns them into an "Realm art awakened" toast.
 
+## Combat architecture
+
+- **One rules layer, two sides.** `Combat` owns frame-phase progression, phase timing, hitbox geometry and
+  the interruption rule; `Poise` owns the stagger meter. The player and every enemy use both, so reach,
+  facing, poise and stagger cannot drift between the two sides of a blow.
+- **Frames.** `Combat.next_phase` is `idle → startup → active → recovery → idle`; `phase_seconds` converts a
+  technique's 60 Hz frame counts to seconds with attack speed, applies recovery reduction to recovery only,
+  and keeps a minimum so no phase vanishes at absurd speed. A strike resolves once, when startup ends.
+- **Hitboxes.** `Combat.in_hitbox` supports `arc` (reach plus facing half-angle, the default) and `circle`
+  (any angle of 360, used by enemy blows). Target radius extends reach, so a body is hit by its edge. All
+  damage dealers share the same geometry, and a target at the attacker's origin is always struck.
+- **Poise.** `Poise` is a guard meter; the blow that empties it staggers for `0.35 + poise_damage × 0.01`
+  seconds (clamped 0.35–0.9), refills the meter and cannot chain-stagger. Enemies read their capacity from
+  their level (`40 + 6·ilvl`); the player's comes from `Combat.poise_capacity(realm, STR)`. A staggered body
+  cannot act; knockback impulses (`Combat.knock_impulse`, ×0.12, ×0.2 on a break) carry it.
+- **Interruption.** Only startup is interruptible (`Combat.interrupts`): a stagger during a wind-up cancels
+  the attack before it lands (the Qi is already spent), while an active swing is committed. Any damage also
+  breaks meditation.
+- **Why it is testable.** Every rule is a pure static or a small `RefCounted`; the entities only own timers,
+  positions and the node tree, so the whole architecture runs headlessly without a viewport.
+
 ## Lifespan and aging
 
 - **Age is derived, never ticked.** `Game.born_day` is the only saved aging field; age is
