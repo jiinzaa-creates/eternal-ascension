@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Godot
+game/.godot/
+.godot/
+*.tmp
+.import/
+.env
+.env.*
+!.env.example
