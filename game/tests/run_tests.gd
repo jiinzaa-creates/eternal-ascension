@@ -27,6 +27,7 @@ func _ready() -> void:
 	_method_tests()
 	_qi_meridian_tests()
 	_realm_tests()
+	_breakthrough_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1049,6 +1050,146 @@ func _realm_tests() -> void:
 	var legacy := Cultivation.new()
 	legacy.from_dict({})
 	check(legacy.realm == 1 and legacy.sublevel == 1, "legacy saves start at the first stage")
+
+
+# --------------------------------------------------------- breakthroughs ----
+
+func _breakthrough_tests() -> void:
+	print("[breakthrough] preparation, method profiles and failure fallout")
+	var calm := {"recent_combat": false, "partner": false, "night": false, "blood_charge": 0.0}
+	var hot := {"recent_combat": true, "partner": true, "night": true, "blood_charge": 40.0}
+
+	var plain := Methods.breakthrough_profile("method.traditional", calm)
+	check(approx(float(plain["chance"]), 0.0) and approx(float(plain["tribulation"]), 1.0), "traditional cultivation is neutral")
+	check(approx(float(plain["harm"]), 1.0), "traditional failure costs the baseline")
+	check(String(plain["note"]) != "", "every profile explains itself")
+
+	var body := Methods.breakthrough_profile("method.body", calm)
+	check(float(body["chance"]) > 0.0, "a tempered body faces heaven better")
+	check(float(body["tribulation"]) > 1.0, "a tempered body draws a heavier heaven")
+	check(float(body["harm"]) < 1.0, "a tempered body takes failure better")
+
+	var sword_calm := Methods.breakthrough_profile("method.sword", calm)
+	var sword_hot := Methods.breakthrough_profile("method.sword", hot)
+	check(float(sword_hot["chance"]) > float(sword_calm["chance"]), "sword intent rewards recent combat")
+	check(float(sword_calm["chance"]) < 0.0, "a sword cultivator without a fight is punished")
+
+	var dual_alone := Methods.breakthrough_profile("method.dual", calm)
+	var dual_paired := Methods.breakthrough_profile("method.dual", hot)
+	check(float(dual_paired["chance"]) > float(dual_alone["chance"]), "dual cultivation needs a partner")
+	check(float(dual_alone["chance"]) < 0.0, "a lone dual practitioner is handicapped")
+
+	var heavenly_day := Methods.breakthrough_profile("method.heavenly", calm)
+	var heavenly_night := Methods.breakthrough_profile("method.heavenly", hot)
+	check(float(heavenly_night["chance"]) > float(heavenly_day["chance"]), "the night sky helps the celestial method")
+
+	var blood_dry := Methods.breakthrough_profile("method.blood", calm)
+	var blood_full := Methods.breakthrough_profile("method.blood", hot)
+	check(float(blood_full["chance"]) > float(blood_dry["chance"]), "blood charge helps the Blood Sea")
+	check(float(blood_full["harm"]) > 1.0 and float(blood_dry["harm"]) > 1.0, "the Blood Sea always makes failure worse")
+
+	var slaughter := Methods.breakthrough_profile("method.slaughter", calm)
+	check(float(slaughter["tribulation"]) > 1.0 and float(slaughter["harm"]) > 1.0, "slaughter draws a heavier, harsher heaven")
+
+	var unknown := Methods.breakthrough_profile("method.none", calm)
+	check(approx(float(unknown["chance"]), 0.0) and approx(float(unknown["tribulation"]), 1.0), "an unknown method is neutral")
+
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var cultivation := Cultivation.new()
+	cultivation.root_tier = 3
+	cultivation.sublevel = 10
+	check(cultivation.preparation == 0, "a fresh cultivator has no preparations")
+	var bare_chance := cultivation.estimated_chance(stats, 0, 0, calm)
+	var bare_trib := cultivation.tribulation_with(0, 0, calm)
+	var bare_harm := cultivation.failure_harm(calm)
+	check(cultivation.prepare(), "a preparation can be banked")
+	check(cultivation.prepare() and cultivation.prepare(), "preparations stack")
+	check(cultivation.preparation == Cultivation.MAX_PREPARATION, "preparations cap at three")
+	check(not cultivation.prepare(), "a full bank refuses more")
+	check(cultivation.estimated_chance(stats, 0, 0, calm) > bare_chance, "preparation raises the chance")
+	check(cultivation.tribulation_with(0, 0, calm) < bare_trib, "preparation lightens heaven")
+	check(cultivation.failure_harm(calm) < bare_harm, "preparation softens failure")
+	check(approx(cultivation.failure_harm(calm), 1.0 - Cultivation.PREP_HARM * 3.0), "preparation softens failure by its declared share")
+
+	var sword := Cultivation.new()
+	sword.root_tier = 3
+	sword.method_id = "method.sword"
+	sword.sublevel = 10
+	check(sword.estimated_chance(stats, 0, 0, hot) > sword.estimated_chance(stats, 0, 0, calm), "the live method changes the roll")
+	var paired := Cultivation.new()
+	paired.root_tier = 3
+	paired.method_id = "method.dual"
+	paired.sublevel = 10
+	check(paired.estimated_chance(stats, 0, 0, hot) > paired.estimated_chance(stats, 0, 0, calm), "a nearby partner changes the roll")
+
+	var attempt := Cultivation.new()
+	attempt.root_tier = 3
+	attempt.sublevel = 10
+	attempt.qi = attempt.qi_max(stats)
+	attempt.prepare()
+	attempt.prepare()
+	var predicted := attempt.estimated_chance(stats, 0, 0, calm)
+	var prepared_result := attempt.attempt_breakthrough(stats, Rng.stream("prep_test", 0, 0), 0, 0, calm)
+	check(approx(float(prepared_result["chance"]), predicted, 0.0001), "the attempt rolls the chance the HUD shows")
+	check(int(prepared_result["preparation"]) == 2, "the attempt reports what it spent")
+	check(attempt.preparation == 0, "preparation is consumed by the attempt")
+	check(String(prepared_result["method"]) == "method.traditional", "the attempt reports its method")
+
+	var deterministic_a := Cultivation.new()
+	deterministic_a.root_tier = 3
+	deterministic_a.sublevel = 10
+	deterministic_a.qi = deterministic_a.qi_max(stats)
+	var deterministic_b := Cultivation.new()
+	deterministic_b.root_tier = 3
+	deterministic_b.sublevel = 10
+	deterministic_b.qi = deterministic_b.qi_max(stats)
+	var roll_a := deterministic_a.attempt_breakthrough(stats, Rng.stream("bt_det", 3, 0), 0, 0, calm)
+	var roll_b := deterministic_b.attempt_breakthrough(stats, Rng.stream("bt_det", 3, 0), 0, 0, calm)
+	check(float(roll_a["roll"]) == float(roll_b["roll"]) and bool(roll_a["success"]) == bool(roll_b["success"]), "the same seed rolls the same tribulation")
+
+	var failed_bare := _probe_failed_breakthrough(0)
+	var failed_prepared := _probe_failed_breakthrough(3)
+	check(not failed_bare.is_empty() and not failed_prepared.is_empty(), "a failing roll can be found for comparison")
+	if not failed_bare.is_empty() and not failed_prepared.is_empty():
+		check(float(failed_prepared["hp_cost_ratio"]) < float(failed_bare["hp_cost_ratio"]), "preparation reduces the wound of failure")
+		check(float(failed_prepared["contamination"]) < float(failed_bare["contamination"]), "preparation reduces the corruption of failure")
+
+	var blood_failure := _probe_failed_breakthrough(0, "method.blood")
+	if not blood_failure.is_empty() and not failed_bare.is_empty():
+		check(float(blood_failure["hp_cost_ratio"]) > float(failed_bare["hp_cost_ratio"]), "the Blood Sea makes failure cost more")
+
+	cultivation.prepare()
+	var saved := cultivation.to_dict()
+	var restored := Cultivation.new()
+	restored.from_dict(saved)
+	check(restored.preparation == Cultivation.MAX_PREPARATION, "preparation survives a save")
+	var legacy := Cultivation.new()
+	legacy.from_dict({})
+	check(legacy.preparation == 0, "legacy saves have no preparation")
+	var corrupt := Cultivation.new()
+	corrupt.from_dict({"preparation": 99})
+	check(corrupt.preparation == Cultivation.MAX_PREPARATION, "a corrupt preparation is clamped")
+
+
+## Finds a seed whose breakthrough fails, so failure fallout can be compared
+## without depending on a lucky roll.
+func _probe_failed_breakthrough(prep: int, method_id: String = "method.traditional") -> Dictionary:
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	for seed_value in 200:
+		var cultivation := Cultivation.new()
+		cultivation.root_tier = 3
+		cultivation.method_id = method_id
+		cultivation.sublevel = 10
+		cultivation.qi = cultivation.qi_max(stats)
+		for i in prep:
+			cultivation.prepare()
+		var result := cultivation.attempt_breakthrough(stats, Rng.stream("fail_probe", seed_value, 0), 0, 0, {})
+		if not bool(result["success"]):
+			result["contamination"] = cultivation.contamination
+			return result
+	return {}
 
 
 func _rng_tests() -> void:

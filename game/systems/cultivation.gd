@@ -8,6 +8,13 @@ extends RefCounted
 ## Realm gaps are meant to be lethal. Within a realm, technique and timing decide.
 
 const SUBLEVELS := 10
+## Breakthrough preparation: banked at the tribulation ground, spent by the
+## attempt itself (win or lose), so it is a decision rather than a buff.
+const MAX_PREPARATION := 3
+const PREP_COST := 60
+const PREP_CHANCE := 0.06
+const PREP_TRIBULATION := 0.10
+const PREP_HARM := 0.15
 
 var realm: int = 1
 var sublevel: int = 1
@@ -28,6 +35,8 @@ var meridians: Array = []
 var contamination: float = 0.0
 var breakthrough_attempts: int = 0
 var failures: int = 0
+## Banked preparations for the next breakthrough, 0..MAX_PREPARATION.
+var preparation: int = 0
 
 
 func realm_data() -> Dictionary:
@@ -195,6 +204,40 @@ func tribulation_scale(kills: int = 0, karma: int = 0) -> float:
 	return clampf(scale, 0.0, 2.0)
 
 
+## Heaven's weight for this attempt: behaviour and realm, reshaped by the method
+## being practised and lightened by banked preparations.
+func tribulation_with(kills: int = 0, karma: int = 0, method_state: Dictionary = {}) -> float:
+	var profile := Methods.breakthrough_profile(method_id, method_state)
+	var scale := tribulation_scale(kills, karma) * float(profile.get("tribulation", 1.0))
+	return clampf(scale * (1.0 - PREP_TRIBULATION * float(preparation)), 0.0, 3.0)
+
+
+## The profile the next attempt will use. Exposed for the HUD and for tests.
+func method_breakthrough_profile(method_state: Dictionary = {}) -> Dictionary:
+	return Methods.breakthrough_profile(method_id, method_state)
+
+
+## What the next failure would cost, as a multiplier on the base fallout.
+func failure_harm(method_state: Dictionary = {}) -> float:
+	var profile := Methods.breakthrough_profile(method_id, method_state)
+	return float(profile.get("harm", 1.0)) * (1.0 - PREP_HARM * float(preparation))
+
+
+## The chance the HUD shows and the attempt rolls, from one formula.
+func estimated_chance(stats: StatBlock, kills: int = 0, karma: int = 0, method_state: Dictionary = {}) -> float:
+	var profile := Methods.breakthrough_profile(method_id, method_state)
+	var bonus := PREP_CHANCE * float(preparation) + float(profile.get("chance", 0.0))
+	return breakthrough_chance(stats, tribulation_with(kills, karma, method_state), bonus, 0.0)
+
+
+## Banks one preparation. Payment (stones) is the caller's responsibility.
+func prepare() -> bool:
+	if preparation >= MAX_PREPARATION:
+		return false
+	preparation += 1
+	return true
+
+
 func breakthrough_chance(stats: StatBlock, trib_scale: float, resources: float = 0.0, environment: float = 0.0) -> float:
 	var base := 0.62 - 0.055 * float(realm - 1)
 	var control := clampf(Attributes.soft(float(stats.get_attr("wis")), 30.0) / 30.0 * 0.35, 0.0, 0.35)
@@ -205,7 +248,8 @@ func breakthrough_chance(stats: StatBlock, trib_scale: float, resources: float =
 
 ## Attempts the realm breakthrough at peak. Always consumes Qi and always costs
 ## something: success wounds, failure injures and can regress a sublevel.
-func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, kills: int = 0, karma: int = 0) -> Dictionary:
+func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, kills: int = 0, karma: int = 0,
+		method_state: Dictionary = {}) -> Dictionary:
 	if not is_peak():
 		return {"success": false, "reason": "not_at_peak", "chance": 0.0, "roll": 0.0}
 	if not is_full(stats):
@@ -216,8 +260,15 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		return {"success": false, "reason": "apex", "chance": 0.0, "roll": 0.0,
 			"realm": realm, "sublevel": sublevel, "consequences": []}
 
-	var trib := tribulation_scale(kills, karma)
-	var chance := breakthrough_chance(stats, trib)
+	var profile := Methods.breakthrough_profile(method_id, method_state)
+	# Preparation is read first, then consumed by the attempt itself: a win does
+	# not refund it and a loss cannot be retried with the same bank.
+	var prep_used := preparation
+	var trib := tribulation_with(kills, karma, method_state)
+	var harm := failure_harm(method_state)
+	preparation = 0
+	var bonus := PREP_CHANCE * float(prep_used) + float(profile.get("chance", 0.0))
+	var chance := breakthrough_chance(stats, trib, bonus, 0.0)
 	var roll := generator.randf()
 	var success := roll < chance
 	var consequences: Array = []
@@ -234,13 +285,13 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		Bus.realm_advanced.emit(realm, sublevel)
 	else:
 		failures += 1
-		hp_cost = 0.35
+		hp_cost = clampf(0.35 * harm, 0.1, 0.6)
 		qi = 0.0
-		add_contamination(Meridians.DEVIATION_CONTAMINATION)
+		add_contamination(Meridians.DEVIATION_CONTAMINATION * harm)
 		consequences.append("qi_deviation")
 		if roll < chance * 0.35:
 			consequences.append("meridian_damage")
-		if roll < 0.08 and realm > 1:
+		if roll < 0.08 * (1.0 - 0.25 * float(prep_used)) and realm > 1:
 			consequences.append("realm_regression")
 			realm = maxi(1, realm - 1)
 			sublevel = maxi(1, SUBLEVELS - 2)
@@ -256,6 +307,9 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		"realm": realm,
 		"sublevel": sublevel,
 		"reason": "",
+		"preparation": prep_used,
+		"method": method_id,
+		"method_note": String(profile.get("note", "")),
 		"unlocks": Realms.unlocks_at(realm) if success else [],
 		"ability": Realms.ability_name(realm) if success else "",
 	}
@@ -291,6 +345,7 @@ func to_dict() -> Dictionary:
 		"contamination": contamination,
 		"breakthrough_attempts": breakthrough_attempts,
 		"failures": failures,
+		"preparation": preparation,
 	}
 
 
@@ -311,3 +366,4 @@ func from_dict(data: Dictionary) -> void:
 	contamination = clampf(float(data.get("contamination", 0.0)), 0.0, Meridians.MAX_CONTAMINATION)
 	breakthrough_attempts = int(data.get("breakthrough_attempts", 0))
 	failures = int(data.get("failures", 0))
+	preparation = clampi(int(data.get("preparation", 0)), 0, MAX_PREPARATION)

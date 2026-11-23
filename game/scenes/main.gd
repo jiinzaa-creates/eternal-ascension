@@ -238,6 +238,14 @@ func _spawn_interactables() -> void:
 	world.add_child(shrine)
 	interactables.append(shrine)
 
+	# The scorched circle where a peak cultivator banks preparations. Placed
+	# beside the shrine so the two tribulation-facing services sit together.
+	var tribulation_ground := Interactable.new()
+	tribulation_ground.setup_tribulation("tribulation.ground", "Tribulation ground")
+	tribulation_ground.position = settlement.position_for("shrine") + Vector2(72, 18)
+	world.add_child(tribulation_ground)
+	interactables.append(tribulation_ground)
+
 	for i in 3:
 		var herb := Interactable.new()
 		herb.setup(Interactable.Kind.HERB, "herb.%d" % i, "Spirit Herb")
@@ -954,6 +962,22 @@ func _open_meridian() -> void:
 	Bus.cultivation_changed.emit()
 
 
+## Bank one preparation for the next breakthrough. The attempt itself spends
+## it, win or lose, so this is a decision rather than a permanent buff.
+func _prepare_tribulation() -> void:
+	if player.cultivation.preparation >= Cultivation.MAX_PREPARATION:
+		Bus.toast.emit("Your body can hold no more preparation.")
+		return
+	if Game.spirit_stones < Cultivation.PREP_COST:
+		Bus.toast.emit("Preparation costs %d stones." % Cultivation.PREP_COST)
+		return
+	Game.spirit_stones -= Cultivation.PREP_COST
+	player.cultivation.prepare()
+	Bus.toast.emit("Prepared for tribulation. (%d/%d)" % [player.cultivation.preparation, Cultivation.MAX_PREPARATION])
+	Bus.player_stats_changed.emit()
+	Bus.cultivation_changed.emit()
+
+
 func _cycle_method() -> void:
 	var state := player.method_state()
 	var next_id := Methods.next(player.cultivation.method_id, state)
@@ -1091,6 +1115,8 @@ func _use_interactable(node: Interactable) -> void:
 			_cycle_method()
 		Interactable.Kind.MERIDIAN:
 			_open_meridian()
+		Interactable.Kind.TRIBULATION:
+			_prepare_tribulation()
 		Interactable.Kind.DEMONSTRATION:
 			var watched := player.observe_technique(node.demo_technique)
 			var demo: Dictionary = DB.technique(node.demo_technique)

@@ -71,6 +71,58 @@ static func meditation_multiplier(id: String, state: Dictionary) -> float:
 			return 1.0
 
 
+## How a method changes the tribulation itself. `chance` is added to the roll,
+## `tribulation` multiplies Heaven's weight, `harm` scales what failure costs.
+## Pure, like meditation_multiplier, so the whole matrix is testable without a
+## player: a sword cultivator between fights faces Heaven worse than a body
+## temperer, and a Blood Sea practitioner is helped and poisoned at once.
+static func breakthrough_profile(id: String, state: Dictionary) -> Dictionary:
+	var method := find(id)
+	var mechanic := String(method.get("mechanic", "qi_accumulation"))
+	var profile := {"chance": 0.0, "tribulation": 1.0, "harm": 1.0, "note": "steady circulation"}
+	match mechanic:
+		"physical_conditioning":
+			profile["chance"] = 0.04
+			profile["tribulation"] = 1.1
+			profile["harm"] = 0.75
+			profile["note"] = "a conditioned body endures"
+		"sword_intent":
+			if bool(state.get("recent_combat", false)):
+				profile["chance"] = 0.1
+				profile["note"] = "sword intent still sharp"
+			else:
+				profile["chance"] = -0.06
+				profile["note"] = "no edge without a fight"
+		"blood_essence":
+			if float(state.get("blood_charge", 0.0)) >= 20.0:
+				profile["chance"] = 0.05
+				profile["harm"] = 1.4
+				profile["note"] = "the sea lends and takes"
+			else:
+				profile["chance"] = -0.04
+				profile["harm"] = 1.2
+				profile["note"] = "the sea is dry"
+		"kills":
+			profile["tribulation"] = 1.15
+			profile["harm"] = 1.2
+			profile["note"] = "heaven counts the dead"
+		"partner":
+			if bool(state.get("partner", false)):
+				profile["chance"] = 0.08
+				profile["note"] = "two circulations share the weight"
+			else:
+				profile["chance"] = -0.05
+				profile["note"] = "a lone half-circulation"
+		"celestial":
+			if bool(state.get("night", false)):
+				profile["chance"] = 0.09
+				profile["note"] = "the stars answer"
+			else:
+				profile["chance"] = -0.05
+				profile["note"] = "the sky is closed"
+	return profile
+
+
 ## Insight is a long, slow bonus: at most +20% to the method's own multiplier.
 static func insight_bonus(insight: int) -> float:
 	return 1.0 + clampf(float(insight), 0.0, 100.0) * 0.002

@@ -1128,6 +1128,63 @@ func _run() -> void:
 	check(player.cultivation.stage_title().contains("Early"), "the saved sublevel band is derived again")
 	Save.delete_slot(90)
 
+	# --- breakthrough preparation and method mechanics ------------------------
+	var tribulation_ground: Interactable = _find_interactable(main.interactables, "tribulation.ground")
+	check(tribulation_ground != null, "a tribulation ground stands by the shrine")
+	player.cultivation.preparation = 0
+	var stones_for_prep: int = Game.spirit_stones
+	Game.spirit_stones = 0
+	main._use_interactable(tribulation_ground)
+	check(player.cultivation.preparation == 0, "preparation is refused without stones")
+	Game.spirit_stones = Cultivation.PREP_COST * 5
+	main._use_interactable(tribulation_ground)
+	main._use_interactable(tribulation_ground)
+	main._use_interactable(tribulation_ground)
+	check(player.cultivation.preparation == Cultivation.MAX_PREPARATION, "preparations stack to the cap")
+	main._use_interactable(tribulation_ground)
+	check(player.cultivation.preparation == Cultivation.MAX_PREPARATION, "the ground refuses beyond the cap")
+	check(Game.spirit_stones == Cultivation.PREP_COST * 2, "preparation costs its stones and no more")
+
+	player.cultivation.realm = 1
+	player.cultivation.sublevel = 10
+	player.cultivation.method_id = "method.sword"
+	player.rebuild_stats()
+	player._combat_timer = 0.0
+	var sword_calm: float = player.breakthrough_chance_estimate()
+	player._combat_timer = 6.0
+	var sword_hot: float = player.breakthrough_chance_estimate()
+	check(sword_hot > sword_calm, "sword intent changes the tribulation chance")
+	player.cultivation.method_id = "method.traditional"
+	player._combat_timer = 0.0
+
+	var prepared_chance: float = player.breakthrough_chance_estimate()
+	player.cultivation.preparation = 0
+	var bare_chance: float = player.breakthrough_chance_estimate()
+	player.cultivation.preparation = Cultivation.MAX_PREPARATION
+	check(prepared_chance > bare_chance, "banked preparation raises the predicted chance")
+
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player._attack_state = "idle"
+	player._meditating = false
+	var attempt_result: Dictionary = player.attempt_breakthrough()
+	check(int(attempt_result.get("preparation", 0)) == Cultivation.MAX_PREPARATION, "the attempt spends the banked preparation")
+	check(player.cultivation.preparation == 0, "the preparation is gone after the attempt")
+	check(String(attempt_result.get("method", "")) == "method.traditional", "the attempt reports the practising method")
+
+	player.cultivation.realm = 5
+	player.cultivation.sublevel = 3
+	player.cultivation.qi = 8.0
+	player.cultivation.preparation = 2
+	player.rebuild_stats()
+	main._save(91)
+	main._load_game(91)
+	await frames(2)
+	check(player.cultivation.preparation == 2, "preparation survives a save through the scene")
+	check(player.cultivation.realm == 5, "preparing does not change the realm")
+	player.cultivation.preparation = 0
+	Game.spirit_stones = stones_for_prep
+	Save.delete_slot(91)
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

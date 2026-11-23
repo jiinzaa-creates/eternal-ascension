@@ -576,7 +576,7 @@ func try_dodge(dir: Vector2) -> void:
 ## Attempts the realm breakthrough. Returns the result dictionary for the HUD.
 func attempt_breakthrough() -> Dictionary:
 	var r: RandomNumberGenerator = Rng.stream("breakthrough", cultivation.realm, cultivation.breakthrough_attempts)
-	var result := cultivation.attempt_breakthrough(stats, r, Game.kills, Game.karma)
+	var result := cultivation.attempt_breakthrough(stats, r, Game.kills, Game.karma, method_state())
 	if result.get("reason", "") != "":
 		var reason := String(result["reason"])
 		if reason == "not_at_peak":
@@ -587,6 +587,8 @@ func attempt_breakthrough() -> Dictionary:
 			Bus.toast.emit("The peak of the ladder. There is no realm above this one.")
 		return result
 	rebuild_stats()
+	var prep_used := int(result.get("preparation", 0))
+	var note := String(result.get("method_note", ""))
 	if bool(result.get("success", false)):
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("Breakthrough! You are now %s." % cultivation.stage_label())
@@ -595,10 +597,20 @@ func attempt_breakthrough() -> Dictionary:
 			Bus.toast.emit("Realm art awakened: %s." % ability_name)
 	else:
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
-		Bus.toast.emit("The tribulation breaks you. Qi deviation.")
+		Bus.toast.emit("The tribulation breaks you. Qi deviation. (%s)" % note)
+	if prep_used > 0:
+		Bus.toast.emit("%d preparation%s spent themselves in the attempt." % [prep_used, "" if prep_used == 1 else "s"])
 	rebuild_stats()
 	Bus.player_stats_changed.emit()
 	return result
+
+
+## The chance the HUD shows at the peak. Zero below the peak, where no attempt
+## is possible; otherwise the same formula the attempt will roll.
+func breakthrough_chance_estimate() -> float:
+	if not cultivation.is_peak() or cultivation.realm >= Realms.count():
+		return 0.0
+	return cultivation.estimated_chance(stats, Game.kills, Game.karma, method_state())
 
 
 func _recalc_vitals() -> void:

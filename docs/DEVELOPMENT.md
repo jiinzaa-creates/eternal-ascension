@@ -84,6 +84,30 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   `from_dict` clamps a corrupt realm into 1–12. A successful attempt returns the new realm's `unlocks`
   and `ability`; `Player` turns them into an "Realm art awakened" toast.
 
+## Breakthrough preparation and method tribulations
+
+- **One formula.** `Cultivation.estimated_chance()` is what the HUD shows and what `attempt_breakthrough`
+  rolls: `base + WIS control + INT insight + (0.06 · preparation) + method chance − tribulation · 0.35`,
+  clamped 0.02–0.97. `Cultivation.tribulation_with()` is
+  `(0.25 + 0.06·realm + 0.002·kills + 0.003·|karma|) · method tribulation · (1 − 0.10 · preparation)`.
+- **Preparation is a resource, not a buff.** The tribulation ground (`Kind.TRIBULATION`, id
+  `tribulation.ground`, beside the shrine) banks one preparation for `Cultivation.PREP_COST` (60 stones),
+  capped at `MAX_PREPARATION` (3). The attempt reads the bank and clears it **before** rolling, so a win
+  does not refund it and a loss cannot be retried on the same bank. Each preparation adds 6% chance,
+  removes 10% of Heaven's weight and 15% of failure's fallout. Saved as the optional `preparation` key;
+  corrupt values clamp to 0–3.
+- **Methods reshape Heaven** (`Methods.breakthrough_profile`, pure, like `meditation_multiplier`):
+  traditional neutral; body +4% chance, ×1.1 tribulation, ×0.75 harm; sword +10% with recent combat and
+  −6% without; blood +5% (and ×1.4 harm) with ≥20 charge, −4% (×1.2 harm) when dry; slaughter ×1.15
+  tribulation and ×1.2 harm; dual +8% with a partner, −5% alone; heavenly +9% at night, −5% by day. The
+  profile's `note` is shown on the HUD and in the failure toast.
+- **Failure fallout** now scales with the profile: hp `clamp(0.35 · harm, 0.1, 0.6)`, contamination
+  `DEVIATION_CONTAMINATION · harm`, and the realm-regression threshold `8% · (1 − 0.25 · preparation)`.
+  Success wounds still come from the tribulation scale alone.
+- The HUD adds a tribulation line only at a peak below realm 12: chance, banked preparation and the
+  method's note. `Player.attempt_breakthrough()` passes `method_state()` (recent combat, partner, night,
+  blood charge) so the live situation is what Heaven reads.
+
 ## Cultivation methods: fit, insight, switching
 
 - Seven methods share one meditation loop and differ only by **mechanic** (`Methods.meditation_multiplier`):

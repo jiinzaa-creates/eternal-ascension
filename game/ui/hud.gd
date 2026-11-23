@@ -80,7 +80,7 @@ func _draw() -> void:
 func draw_vitals(player: Player) -> void:
 	var x := 24.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 244.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 262.0), PANEL_BG)
 
 	_text(Vector2(x, y), player.cultivation.stage_title(), 19, ACCENT)
 	y += 20.0
@@ -136,6 +136,15 @@ func draw_vitals(player: Player) -> void:
 	_text(Vector2(x, y), "Realm art: %s   Unlocks: %d" % [
 		String(player.cultivation.realm_ability().get("name", "—")), player.cultivation.unlock_ids().size()
 	], 11, Color("#d8c898"))
+	# The tribulation line only appears where an attempt is possible, so the HUD
+	# never advertises a roll the player cannot make.
+	if player.cultivation.is_peak() and player.cultivation.realm < Realms.count():
+		y += 18.0
+		var chance := player.breakthrough_chance_estimate()
+		var note := String(player.cultivation.method_breakthrough_profile(player.method_state()).get("note", ""))
+		_text(Vector2(x, y), "Tribulation %d%%   Prep %d/%d   %s" % [
+			roundi(chance * 100.0), player.cultivation.preparation, Cultivation.MAX_PREPARATION, note
+		], 11, Color("#e0c880"))
 
 
 func draw_world_panel(player: Player) -> void:

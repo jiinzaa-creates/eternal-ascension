@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN, TRIBULATION }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -67,6 +67,10 @@ func setup_method(id_value: String, label_value: String) -> void:
 
 func setup_meridian_hall(id_value: String, label_value: String) -> void:
 	setup(Kind.MERIDIAN, id_value, label_value)
+
+
+func setup_tribulation(id_value: String, label_value: String) -> void:
+	setup(Kind.TRIBULATION, id_value, label_value)
 
 
 func setup_demonstration(id_value: String, label_value: String, technique_id: String) -> void:
@@ -147,6 +151,8 @@ func display_label() -> String:
 		return "%s — %d stones" % [label, Economy.rest_cost()]
 	if kind == Kind.METHOD:
 		return "%s — %d stones" % [label, Methods.SWITCH_COST]
+	if kind == Kind.TRIBULATION:
+		return "%s — prepare (%d stones)" % [label, Cultivation.PREP_COST]
 	return label
 
 
@@ -232,6 +238,12 @@ func _draw() -> void:
 				var flow := 0.35 + 0.35 * sin(_pulse * 2.0 + float(i))
 				draw_line(Vector2(-22.0 + float(i) * 8.0, -4.0), Vector2(-22.0 + float(i) * 8.0, -18.0 - float(i % 3) * 3.0),
 					Color("#8fd8e8", flow), 1.5)
+		Kind.TRIBULATION:
+			# A scorched stone circle: ground where heaven is invited on purpose.
+			draw_arc(Vector2.ZERO, 22.0, 0.0, TAU, 32, Color("#3a3f46"), 3.0)
+			draw_arc(Vector2.ZERO, 14.0, 0.0, TAU, 28, Color("#c8b070", 0.25 + pulse * 0.25), 1.5)
+			draw_line(Vector2(-9, 11), Vector2(2, -2), Color("#e0d090", 0.4 + pulse * 0.3), 2.0)
+			draw_line(Vector2(2, -2), Vector2(-1, -13), Color("#e0d090", 0.4 + pulse * 0.3), 2.0)
 		Kind.METHOD:
 			# A method stele: dark stone, carved channels, a slow inner light.
 			draw_rect(Rect2(-9, -30, 18, 38), Color("#2e2a34"))
