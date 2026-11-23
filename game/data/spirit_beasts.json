@@ -1,0 +1,64 @@
+{
+	"beasts": [
+		{
+			"id": "beast.moonfang",
+			"name": "Moonfang Wolf",
+			"archetype": "skirmisher",
+			"biomes": {"biome.verdant": 6, "biome.marsh": 4, "biome.frost": 2},
+			"ilvl_bonus": 1,
+			"hp_mult": 0.9,
+			"damage_mult": 1.05,
+			"speed": 88.0,
+			"color": "#8fa8cc",
+			"status": {"id": "bleed", "duration": 3.0, "magnitude": 2.5},
+			"core": {"name": "Moonfang Pelt", "value": 45},
+			"pack": true,
+			"desc": "A lean hunter that runs with the pack and opens a wound it can smell."
+		},
+		{
+			"id": "beast.stoneback",
+			"name": "Stoneback Boar",
+			"archetype": "sentinel",
+			"biomes": {"biome.verdant": 4, "biome.ashen": 5},
+			"ilvl_bonus": 1,
+			"hp_mult": 1.45,
+			"damage_mult": 1.15,
+			"speed": 56.0,
+			"color": "#9a8058",
+			"status": {"id": "bleed", "duration": 3.0, "magnitude": 3.0},
+			"core": {"name": "Stoneback Hide", "value": 60},
+			"pack": false,
+			"desc": "Armour on four legs. It charges what it cannot outrun, which is everything."
+		},
+		{
+			"id": "beast.thundercrane",
+			"name": "Thundercrane",
+			"archetype": "archer",
+			"biomes": {"biome.frost": 5, "biome.ashen": 3, "biome.marsh": 2},
+			"ilvl_bonus": 2,
+			"hp_mult": 0.8,
+			"damage_mult": 1.2,
+			"speed": 70.0,
+			"color": "#a8c8e8",
+			"status": {"id": "shock", "duration": 2.5, "magnitude": 0.15},
+			"core": {"name": "Thunder Plume", "value": 75},
+			"pack": false,
+			"desc": "It hunts at a distance, and its cry carries the charge of a storm."
+		},
+		{
+			"id": "beast.gloomserpent",
+			"name": "Gloom Serpent",
+			"archetype": "brawler",
+			"biomes": {"biome.marsh": 6, "biome.verdant": 2},
+			"ilvl_bonus": 2,
+			"hp_mult": 1.1,
+			"damage_mult": 1.1,
+			"speed": 64.0,
+			"color": "#6a9a88",
+			"status": {"id": "chill", "duration": 2.5, "magnitude": 0.22},
+			"core": {"name": "Gloom Venom Sac", "value": 55},
+			"pack": false,
+			"desc": "A cold thing in warm water. Its bite leaves the limbs slow and heavy."
+		}
+	]
+}

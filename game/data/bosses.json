@@ -1,0 +1,44 @@
+{
+	"bosses": [
+		{
+			"id": "boss.tomb_warden",
+			"name": "Warden of the Hollow Moon",
+			"archetype": "sentinel",
+			"color": "#b08ae0",
+			"hp_mult": 9.0,
+			"damage_mult": 1.7,
+			"poise_mult": 2.2,
+			"ilvl_bonus": 3,
+			"thresholds": [0.66, 0.33],
+			"phases": [
+				{
+					"name": "Hollow Guard",
+					"damage_mult": 1.0,
+					"speed_mult": 1.0,
+					"cooldown_mult": 1.0,
+					"status": {},
+					"adds": []
+				},
+				{
+					"name": "Moon's Wrath",
+					"damage_mult": 1.25,
+					"speed_mult": 1.15,
+					"cooldown_mult": 0.85,
+					"status": {"id": "shock", "duration": 2.5, "magnitude": 0.15},
+					"adds": ["beast.moonfang"]
+				},
+				{
+					"name": "Last Light",
+					"damage_mult": 1.5,
+					"speed_mult": 1.3,
+					"cooldown_mult": 0.7,
+					"status": {"id": "bleed", "duration": 3.0, "magnitude": 3.0},
+					"adds": ["beast.moonfang", "beast.gloomserpent"]
+				}
+			],
+			"reward": {"stones": 400, "rarity": 3, "title": "the Hollow Moon"},
+			"telegraph_color": "#c090ff",
+			"intro": "The warden rises from the altar's shadow, and the tomb holds its breath."
+		}
+	]
+}

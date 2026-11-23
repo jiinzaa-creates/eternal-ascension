@@ -16,6 +16,14 @@ signal tribulation_finished(result: Dictionary)
 signal enlightenment_gained(id: String)
 
 signal enemy_died(at: Vector2, ilvl: int)
+## A spirit beast fell. The scene root pays its core; the ordinary loot path
+## still runs through `enemy_died`.
+signal beast_slain(at: Vector2, species_id: String, ilvl: int)
+## A boss moved into a new health phase. The body announces, the scene decides.
+signal boss_phase_changed(boss: Node, index: int, phase_name: String)
+## A boss was killed, once. Rewards are paid here, keyed by a stable id so a
+## save can remember which wardens are already gone.
+signal boss_defeated(id: String, at: Vector2)
 signal damage_dealt(total: float, target: Node)
 ## A blow that actually connected. `tint` is the status it applied, "" if none.
 ## Every damage path reports this, so numbers and sound need no combat code.

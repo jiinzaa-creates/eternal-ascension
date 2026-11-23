@@ -90,6 +90,7 @@ func _draw() -> void:
 	draw_prompt()
 	draw_realm_banner()
 	draw_tribulation()
+	draw_boss()
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -190,6 +191,44 @@ func draw_vitals(player: Player) -> void:
 		_text(Vector2(x, y), "Tribulation %d%%   Prep %d/%d   %s" % [
 			roundi(chance * 100.0), player.cultivation.preparation, Cultivation.MAX_PREPARATION, note
 		], 11, Color("#e0c880"))
+
+
+## A boss gets one wide bar at the top of the screen, with its phase name and a
+## mark at every health threshold, so the fight's shape is readable without
+## opening anything.
+func draw_boss() -> void:
+	var body: Node = null
+	for node in get_tree().get_nodes_in_group("boss"):
+		if node is Node2D and is_instance_valid(node):
+			body = node
+			break
+	if body == null or Game.player == null:
+		return
+	var entry_value: Variant = body.get("boss_entry")
+	if typeof(entry_value) != TYPE_DICTIONARY:
+		return
+	var entry: Dictionary = entry_value
+	if entry.is_empty():
+		return
+	var at := (body as Node2D).global_position
+	if at.distance_to((Game.player as Node2D).global_position) > 1600.0:
+		return
+	var ratio := clampf(float(body.get("hp")) / maxf(1.0, float(body.get("hp_max"))), 0.0, 1.0)
+	var width := minf(560.0, size.x - 120.0)
+	var x := size.x * 0.5 - width * 0.5
+	var y := 58.0
+	draw_rect(Rect2(x - 10.0, y - 22.0, width + 20.0, 58.0), PANEL_BG)
+	_text(Vector2(x, y - 3.0), String(body.get("display_name")), 15, Color("#d8c8ff"))
+	var phase_label := Boss.phase_name(entry, int(body.get("boss_phase")))
+	_text(Vector2(x + width - _text_width(phase_label, 12), y - 3.0), phase_label, 12, MUTED)
+	var bar_y := y + 8.0
+	draw_rect(Rect2(x, bar_y, width, 12.0), Color("#000000", 0.55))
+	draw_rect(Rect2(x, bar_y, width * ratio, 12.0), Boss.bar_color(entry))
+	draw_rect(Rect2(x, bar_y, width, 12.0), Color("#3b3350"), false, 1.0)
+	for threshold in Boss.thresholds(entry):
+		var mark_x := x + width * (1.0 - float(threshold))
+		draw_line(Vector2(mark_x, bar_y), Vector2(mark_x, bar_y + 12.0), Color("#f0e0ff", 0.7), 1.5)
+	_text(Vector2(x, bar_y + 27.0), "%d / %d" % [int(body.get("hp")), int(body.get("hp_max"))], 11, MUTED)
 
 
 ## Live combat statuses, in their own colours, just above the skill bar. Kept out

@@ -23,6 +23,8 @@ var quests: Array = []
 var npc_data: Dictionary = {}
 var biomes: Array = []
 var enemy_archetypes: Array = []
+var spirit_beasts: Array = []
+var bosses: Array = []
 var origins: Array = []
 var physiques: Array = []
 var weapon_types: Array = []
@@ -55,6 +57,8 @@ func load_all() -> void:
 	npc_data = _read("npcs.json")
 	biomes = _read("biomes.json").get("biomes", [])
 	enemy_archetypes = _read("enemy_archetypes.json").get("archetypes", [])
+	spirit_beasts = _read("spirit_beasts.json").get("beasts", [])
+	bosses = _read("bosses.json").get("bosses", [])
 	origins = _read("origins.json").get("origins", [])
 	physiques = _read("physiques.json").get("physiques", [])
 	weapon_types = _read("weapons.json").get("weapon_types", [])
@@ -73,6 +77,8 @@ func load_all() -> void:
 	_index("quest", quests)
 	_index("biome", biomes)
 	_index("enemy_archetype", enemy_archetypes)
+	_index("spirit_beast", spirit_beasts)
+	_index("boss", bosses)
 	_index("origin", origins)
 	_index("physique", physiques)
 	_index("weapon_type", weapon_types)
@@ -162,6 +168,14 @@ func biome(id: String) -> Dictionary:
 ## settlement's npcs.json, while this reads the enemy behaviour table.
 func enemy_archetype(id: String) -> Dictionary:
 	return by_id("enemy_archetype", id)
+
+
+func spirit_beast(id: String) -> Dictionary:
+	return by_id("spirit_beast", id)
+
+
+func boss(id: String) -> Dictionary:
+	return by_id("boss", id)
 
 
 func origin(id: String) -> Dictionary:
@@ -524,6 +538,65 @@ func validate() -> Array:
 			if String(mod.get("stat", "")) == "":
 				problems.append("physique %s has a mod without a stat" % id)
 
+	if spirit_beasts.size() < 4:
+		problems.append("expected at least 4 spirit beast species, found %d" % spirit_beasts.size())
+	var beast_ids: Dictionary = {}
+	for entry in spirit_beasts:
+		var species := Beasts.profile(entry)
+		var species_id := String(species.get("id", ""))
+		if species_id == "" or species_id == "beast.unknown":
+			problems.append("spirit beast without id")
+			continue
+		if beast_ids.has(species_id):
+			problems.append("duplicate spirit beast id " + species_id)
+		beast_ids[species_id] = true
+		if String(species.get("name", "")) == "":
+			problems.append("spirit beast %s has no name" % species_id)
+		if not enemy_archetype_ids.has(String(species.get("archetype", ""))):
+			problems.append("spirit beast %s names unknown archetype %s" % [species_id, String(species.get("archetype", ""))])
+		var habitats: Dictionary = species.get("biomes", {})
+		if habitats.is_empty():
+			problems.append("spirit beast %s lives in no biome" % species_id)
+		for biome_id in habitats.keys():
+			if not has("biome", String(biome_id)):
+				problems.append("spirit beast %s names unknown biome %s" % [species_id, String(biome_id)])
+		_validate_status_payload(species.get("status", {}), "spirit beast %s" % species_id, problems)
+		if String((species.get("core", {}) as Dictionary).get("name", "")) == "":
+			problems.append("spirit beast %s leaves no core" % species_id)
+
+	if bosses.is_empty():
+		problems.append("expected at least one boss")
+	var boss_ids: Dictionary = {}
+	for entry in bosses:
+		var boss := Boss.profile(entry)
+		var boss_id := String(boss.get("id", ""))
+		if boss_id == "" or boss_id == "boss.unknown":
+			problems.append("boss without id")
+			continue
+		if boss_ids.has(boss_id):
+			problems.append("duplicate boss id " + boss_id)
+		boss_ids[boss_id] = true
+		if String(boss.get("name", "")) == "":
+			problems.append("boss %s has no name" % boss_id)
+		if not enemy_archetype_ids.has(String(boss.get("archetype", ""))):
+			problems.append("boss %s names unknown archetype %s" % [boss_id, String(boss.get("archetype", ""))])
+		var thresholds: Array = boss.get("thresholds", [])
+		var phases: Array = boss.get("phases", [])
+		if thresholds.is_empty():
+			problems.append("boss %s has no health phases" % boss_id)
+		if (entry.get("phases", []) as Array).size() < phases.size():
+			problems.append("boss %s declares %d phases for %d thresholds" % [boss_id, (entry.get("phases", []) as Array).size(), thresholds.size()])
+		for i in phases.size():
+			var phase_data: Dictionary = phases[i]
+			if String(phase_data.get("name", "")) == "":
+				problems.append("boss %s phase %d has no name" % [boss_id, i])
+			_validate_status_payload(phase_data.get("status", {}), "boss %s phase %d" % [boss_id, i], problems)
+			for add_id in phase_data.get("adds", []):
+				if not beast_ids.has(String(add_id)):
+					problems.append("boss %s phase %d summons unknown beast %s" % [boss_id, i, String(add_id)])
+		if int((boss.get("reward", {}) as Dictionary).get("stones", 0)) < 0:
+			problems.append("boss %s pays negative stones" % boss_id)
+
 	if origins.size() < 3:
 		problems.append("expected at least 3 character origins, found %d" % origins.size())
 	var origin_ids: Dictionary = {}
@@ -653,6 +726,8 @@ func counts() -> Dictionary:
 		"archetypes": archetypes().size(),
 		"biomes": biomes.size(),
 		"enemy_archetypes": enemy_archetypes.size(),
+		"spirit_beasts": spirit_beasts.size(),
+		"bosses": bosses.size(),
 		"origins": origins.size(),
 		"physiques": physiques.size(),
 		"weapon_types": weapon_types.size(),

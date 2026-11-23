@@ -37,6 +37,7 @@ func _ready() -> void:
 	_technique_combat_tests()
 	_skill_bar_tests()
 	_enemy_ai_tests()
+	_boss_and_beast_tests()
 	_combat_polish_tests()
 	_rng_tests()
 	_item_tests()
@@ -3236,6 +3237,118 @@ func _enemy_ai_tests() -> void:
 	check(bolt.faction == "player", "a projectile defaults to the player's side")
 	check(bolt.origin == Vector2.ZERO, "a projectile records its origin")
 	bolt.free()
+
+
+# ---------------------------------------------------- beasts and bosses ----
+
+func _boss_and_beast_tests() -> void:
+	print("[beasts] species, habitats and cores")
+
+	check(DB.spirit_beasts.size() == 4, "four spirit beast species ship")
+	check(int(DB.counts()["spirit_beasts"]) == 4, "the registry counts the species")
+	check(int(DB.counts()["bosses"]) >= 1, "the registry counts the bosses")
+	var beast_ids: Dictionary = {}
+	for entry in DB.spirit_beasts:
+		var species := Beasts.profile(entry)
+		var id := String(species["id"])
+		check(not beast_ids.has(id), "spirit beast id %s is unique" % id)
+		beast_ids[id] = true
+		check(Beasts.ARCHETYPES.has(String(species["archetype"])), "%s has a real archetype" % id)
+		check(not (species["biomes"] as Dictionary).is_empty(), "%s lives somewhere" % id)
+		check(String((species["core"] as Dictionary)["name"]) != "", "%s leaves a core" % id)
+		check(String(species["color"]).begins_with("#"), "%s has a colour" % id)
+	check(beast_ids.size() == 4, "every species id is distinct")
+	check(Beasts.is_valid_id(DB.spirit_beasts, "beast.moonfang"), "a known species is found")
+	check(not Beasts.is_valid_id(DB.spirit_beasts, "beast.nope"), "an unknown species is rejected")
+
+	var fallback := Beasts.profile({})
+	check(String(fallback["archetype"]) == "brawler", "a malformed species falls back to a brawler")
+	check(String((fallback["core"] as Dictionary)["name"]) == "Spirit Core", "a malformed species still has a core")
+	var bad_archetype := Beasts.profile({"archetype": "dragon"})
+	check(String(bad_archetype["archetype"]) == "brawler", "an unknown archetype is replaced")
+	var clamped := Beasts.profile({"speed": 0.0, "hp_mult": 0.0, "biomes": {"biome.verdant": 0, "biome.marsh": -2}})
+	check(float(clamped["speed"]) >= 10.0 and float(clamped["hp_mult"]) >= 0.2, "species numbers are clamped")
+	check((clamped["biomes"] as Dictionary).is_empty(), "non-positive habitat weights are dropped")
+
+	var marsh := Beasts.residents(DB.spirit_beasts, "biome.marsh")
+	check(marsh.size() >= 2, "the marsh has residents")
+	var marsh_ids: Array = []
+	for entry in marsh:
+		marsh_ids.append(String((entry as Dictionary)["species"]["id"]))
+	check(marsh_ids.has("beast.gloomserpent") and marsh_ids.has("beast.moonfang"), "the marsh lists its own species")
+	check(not marsh_ids.has("beast.stoneback"), "a species absent from a biome is not listed there")
+	check(Beasts.residents(DB.spirit_beasts, "biome.none").is_empty(), "an unknown biome has no beasts")
+	check(Beasts.roll(DB.spirit_beasts, "biome.none", Rng.stream("beast", 0, 0)).is_empty(), "no habitat means no roll")
+	check(Beasts.roll([], "biome.marsh", Rng.stream("beast", 0, 1)).is_empty(), "an empty table rolls nothing")
+
+	var first_roll := Beasts.roll(DB.spirit_beasts, "biome.marsh", Rng.stream("beast_probe", 9, 4))
+	var same_roll := Beasts.roll(DB.spirit_beasts, "biome.marsh", Rng.stream("beast_probe", 9, 4))
+	check(String(first_roll.get("id", "")) == String(same_roll.get("id", "")), "a beast roll is deterministic")
+	var seen_species: Dictionary = {}
+	for i in 40:
+		var rolled := Beasts.roll(DB.spirit_beasts, "biome.marsh", Rng.stream("beast_probe", 3, i))
+		seen_species[String(rolled.get("id", ""))] = true
+	check(not seen_species.has("beast.stoneback"), "a roll never leaves a species' habitat")
+	check(seen_species.size() >= 2, "a habitat roll reaches more than one species")
+
+	var stoneback := Beasts.profile(DB.spirit_beast("beast.stoneback"))
+	var as_enemy := Beasts.enemy_entry(stoneback)
+	check(String(as_enemy["archetype"]) == "sentinel", "a beast converts to an enemy entry")
+	check(float(as_enemy["hp_mult"]) > 1.0, "the species' numbers survive the conversion")
+	var core := Beasts.core_item(stoneback, 4, 12)
+	check(String(core["slot"]) == "material", "a core is a material")
+	check(String(core["name"]) == "Stoneback Hide", "a core keeps its species' name")
+	check(int(core["rarity"]) == 2 and int(core["ilvl"]) == 4, "a core carries its rarity and level")
+	check(String(core["id"]).begins_with("item.core.beast.stoneback"), "a core id names its species")
+	check(int(core["value"]) > 0, "a core is worth something")
+	check(Beasts.count(DB.spirit_beasts) == 4, "the species count is four")
+	check(Beasts.all([{}, "junk"]).size() == 1, "malformed entries are skipped")
+
+	print("[bosses] phases, adds and rewards")
+
+	var warden := Boss.profile(DB.boss("boss.tomb_warden"))
+	check(String(warden["id"]) == "boss.tomb_warden", "the tomb warden loads")
+	check(Boss.phase_count(warden) == 3, "the warden has three phases")
+	check((Boss.thresholds(warden) as Array).size() == 2, "the warden has two thresholds")
+	check(approx(float(Boss.thresholds(warden)[0]), 0.66), "the first threshold is read as data")
+	check(Boss.phase_index(1.0, warden) == 0, "a whole body is in the first phase")
+	check(Boss.phase_index(0.67, warden) == 0, "the first phase holds above its threshold")
+	check(Boss.phase_index(0.66, warden) == 1, "crossing a threshold enters the next phase")
+	check(Boss.phase_index(0.4, warden) == 1, "the middle phase covers the middle band")
+	check(Boss.phase_index(0.33, warden) == 2, "the last threshold enters the last phase")
+	check(Boss.phase_index(0.0, warden) == 2, "a dying body stays in the last phase")
+	check(Boss.phase_name(warden, 0) == "Hollow Guard", "the first phase is named")
+	check(Boss.phase_name(warden, 1) == "Moon's Wrath", "the second phase is named")
+	check(Boss.phase_name(warden, 2) == "Last Light", "the last phase is named")
+	check(approx(Boss.phase_mult(warden, 0, "damage_mult"), 1.0), "the first phase does not amplify")
+	check(approx(Boss.phase_mult(warden, 1, "damage_mult"), 1.25), "the second phase hits harder")
+	check(approx(Boss.phase_mult(warden, 2, "speed_mult"), 1.3), "the last phase moves faster")
+	check(approx(Boss.phase_mult(warden, 2, "cooldown_mult"), 0.7), "the last phase strikes sooner")
+	check(approx(Boss.phase_mult(warden, 9, "damage_mult"), Boss.phase_mult(warden, 2, "damage_mult")), "an out-of-range phase clamps to the last")
+	check(Boss.phase_status(warden, 0).is_empty(), "the first phase carries no status")
+	check(String(Boss.phase_status(warden, 1).get("id", "")) == "shock", "the second phase shocks")
+	check(String(Boss.phase_status(warden, 2).get("id", "")) == "bleed", "the last phase bleeds")
+	check(Boss.adds(warden, 0).is_empty(), "the first phase calls nothing")
+	check(Boss.adds(warden, 1).size() == 1, "the second phase calls one beast")
+	check(Boss.adds(warden, 2).size() == 2, "the last phase calls two")
+	check(Beasts.is_valid_id(DB.spirit_beasts, String(Boss.adds(warden, 2)[0])), "an add names a real species")
+	check(int(Boss.reward(warden)["stones"]) == 400, "the boss pays its stones")
+	check(int(Boss.reward(warden)["rarity"]) == 3, "the boss reward is treasure grade")
+	check(String(warden["name"]) == "Warden of the Hollow Moon", "the boss has a name")
+	check(Boss.bar_color(warden) != Boss.telegraph_color(warden), "the boss bar and telegraph differ")
+	check(String(Boss.label(warden, 1)).contains("Moon's Wrath"), "a boss label names its phase")
+
+	var custom := Boss.profile({"thresholds": [0.3, 0.8], "phases": [{"name": "A"}, {"name": "B"}]})
+	check(approx(float(Boss.thresholds(custom)[0]), 0.8), "thresholds sort from the top down")
+	check(Boss.phase_count(custom) == 3, "missing phases are padded to the threshold count")
+	check(Boss.phase_name(custom, 2) == "Phase 3", "a padded phase still has a name")
+	var duplicated := Boss.profile({"thresholds": [0.5, 0.5], "phases": [{"name": "A"}, {"name": "B"}]})
+	check((Boss.thresholds(duplicated) as Array).size() == 1, "duplicate thresholds collapse")
+	var extras := Boss.profile({"thresholds": [0.25], "phases": [{"name": "A"}, {"name": "B"}, {"name": "C"}]})
+	check(Boss.phase_count(extras) == 2, "extra phases are trimmed to the thresholds")
+	var blank := Boss.profile({})
+	check(Boss.phase_count(blank) == 2, "a malformed boss still gets one threshold two phases")
+	check(approx(Boss.phase_mult(blank, 0, "damage_mult"), 1.0), "a missing multiplier reads one")
 
 
 # -------------------------------------------------------- combat polish ----

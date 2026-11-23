@@ -25,6 +25,11 @@ var spawn_points: Array = []
 var entry_cell := Vector2i(0, 3)
 var altar_cell := Vector2i(4, 0)
 var cleared := false
+## Whether this visit puts the tomb's warden on guard. The scene root clears it
+## when the warden is already dead in this save.
+var spawn_warden := true
+## The warden body, for the altar gate and for the phase adds.
+var warden: Dummy = null
 ## Where entities are parented. The main scene points this at the Y-sorted world
 ## layer so realm enemies and chests sort against the player; standalone tests
 ## leave it null and entities stay children of the realm.
@@ -53,6 +58,7 @@ func generate(seed_value: int) -> void:
 	_build_hazards(r)
 	_build_interactables()
 	_spawn_enemies(r)
+	_spawn_warden()
 	queue_redraw()
 
 
@@ -221,6 +227,44 @@ func _spawn_enemies(r: RandomNumberGenerator) -> void:
 			var slot := (absi(cell.x) * 3 + absi(cell.y) * 5 + i) % ENEMY_ROSTER.size()
 			dummy.archetype = String(ENEMY_ROSTER[slot])
 			_attach(dummy)
+
+
+## The warden stands between the entry hall and the altar. It is placed before
+## the realm's other guards so its silhouette is never lost among them.
+func _spawn_warden() -> void:
+	if not spawn_warden:
+		return
+	var entry: Dictionary = DB.boss("boss.tomb_warden")
+	if entry.is_empty():
+		return
+	var body := Dummy.new()
+	body.ilvl = 2
+	body.global_position = cell_center(altar_cell) + Vector2(0, 130)
+	_attach(body)
+	body.become_boss(entry, 2)
+	warden = body
+
+
+## Whether the warden still holds the altar. A dead warden frees itself, so an
+## invalid reference and a body at zero health both count as gone.
+func has_warden() -> bool:
+	if warden == null or not is_instance_valid(warden):
+		return false
+	return float(warden.hp) > 0.0
+
+
+## Spawns one spirit beast of a species at a position, parented like the rest of
+## the realm's creatures so leaving the tomb frees it.
+func spawn_beast(species_id: String, at: Vector2, realm: int) -> Dummy:
+	var entry: Dictionary = DB.spirit_beast(species_id)
+	if entry.is_empty():
+		return null
+	var beast := Dummy.new()
+	beast.ilvl = 1
+	beast.global_position = at
+	_attach(beast)
+	beast.become_beast(entry, realm)
+	return beast
 
 
 func mark_cleared() -> void:

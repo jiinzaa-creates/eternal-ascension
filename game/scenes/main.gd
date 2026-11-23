@@ -9,6 +9,10 @@ const SPAWN := Vector2(5632, 5632)
 const FORMATION_POINTS := 6
 const WILD_DUMMY_TARGET := 4
 const RESPAWN_INTERVAL := 8.0
+## Share of wild spawns that are spirit beasts rather than humanoid cultivators.
+const BEAST_SHARE := 0.45
+## The tomb's warden. A save remembers this id once it has fallen.
+const WARDEN_ID := "boss.tomb_warden"
 
 var phase := "creation"  # creation | play | realm
 ## Character creation is two screens: formation points, then identity.
@@ -65,6 +69,9 @@ var tribulation_arena: TribulationArena = null
 var realm_seed := 0
 var realm_cleared := false
 var inheritance_taken := false
+## Bosses already killed this save, by stable id. The tomb's warden is only
+## spawned when its id is absent, which is what makes a cleared tomb stay clear.
+var bosses_slain: Dictionary = {}
 var portal_position := Vector2.ZERO
 var used_interactables: Array = []
 ## Per-chunk state the seed cannot reproduce: harvested resources and their day.
@@ -96,6 +103,9 @@ func _ready() -> void:
 	_build_hud()
 	_build_feedback()
 	Bus.enemy_died.connect(_on_enemy_died)
+	Bus.beast_slain.connect(_on_beast_slain)
+	Bus.boss_phase_changed.connect(_on_boss_phase_changed)
+	Bus.boss_defeated.connect(_on_boss_defeated)
 	Bus.tribulation_finished.connect(_on_tribulation_finished)
 	Weather.changed.connect(_on_weather_changed)
 	Bus.toast.emit("A new path opens. Assign your attributes, then press ENTER.")
@@ -621,8 +631,15 @@ func _spawn_wild_dummy() -> void:
 	world.add_child(dummy)
 	# The biome at the spawn point decides which creature turns up, not a global table.
 	var biome: Dictionary = DB.biome(Biome.for_chunk(chunks.world_to_chunk(spawn), Game.world_seed))
-	var enemy := Biome.pick_enemy(biome, r)
-	dummy.apply_biome_enemy(enemy, player.cultivation.realm)
+	# Two streams: whether a beast turns up is decided by its own stream, so the
+	# weighted species roll below cannot shift when the share is tuned.
+	var share: RandomNumberGenerator = Rng.stream("wild_beast", Game.kills + 1, _wild_dummy_count())
+	var species := Beasts.roll(DB.spirit_beasts, String(biome.get("id", "")), r)
+	if not species.is_empty() and share.randf() < BEAST_SHARE:
+		dummy.become_beast(species, player.cultivation.realm)
+	else:
+		var enemy := Biome.pick_enemy(biome, r)
+		dummy.apply_biome_enemy(enemy, player.cultivation.realm)
 
 
 func current_biome_name() -> String:
@@ -1544,7 +1561,18 @@ func _grant_reward() -> void:
 	Bus.player_stats_changed.emit()
 
 
+## The altar is guarded, not merely hidden. This is the whole gate: no claim
+## while the warden stands, whatever the player has cleared elsewhere.
+func _warden_blocks_altar() -> bool:
+	if realm_instance == null or not is_instance_valid(realm_instance):
+		return false
+	return realm_instance.has_warden()
+
+
 func _claim_inheritance() -> void:
+	if _warden_blocks_altar():
+		Bus.toast.emit("The warden still holds the altar. It must fall first.")
+		return
 	if inheritance_taken:
 		Bus.toast.emit("The altar is cold. Someone already took what it held.")
 		return
@@ -1595,6 +1623,8 @@ func _enter_realm() -> void:
 	realm_instance.name = "HiddenRealm"
 	realm_instance.entity_parent = world
 	world.add_child(realm_instance)
+	# A warden already killed in this save stays dead: the tomb remembers.
+	realm_instance.spawn_warden = not bosses_slain.has(WARDEN_ID)
 	realm_instance.generate(realm_seed)
 	if realm_cleared:
 		realm_instance.mark_cleared()
@@ -1605,6 +1635,9 @@ func _enter_realm() -> void:
 	camera_rig.reset_smoothing()
 	lighting.add_light(realm_instance, realm_instance.altar_position(), Color("#c9b6ff"), 320.0, 1.0)
 	Bus.toast.emit("The rift closes behind you. The tomb does not want you here.")
+	if realm_instance.has_warden():
+		var ward: Dictionary = Boss.profile(DB.boss(WARDEN_ID))
+		Bus.toast.emit(String(ward.get("intro", "Something old rises in the dark.")))
 
 
 func _exit_realm() -> void:
@@ -1648,6 +1681,69 @@ func _on_weather_changed(weather: Dictionary) -> void:
 	Bus.toast.emit("The weather turns: %s." % String(weather.get("kind", "clear")).capitalize())
 
 
+func _boss_entry_of(boss: Node) -> Dictionary:
+	if boss == null:
+		return {}
+	var value: Variant = boss.get("boss_entry")
+	return value if typeof(value) == TYPE_DICTIONARY else {}
+
+
+## A spirit beast leaves a core wherever it fell. The ordinary loot roll still
+## happens through `enemy_died`; this is the part that is particular to beasts.
+func _on_beast_slain(at: Vector2, species_id: String, ilvl: int) -> void:
+	var entry: Dictionary = DB.spirit_beast(species_id)
+	if entry.is_empty() or player == null:
+		return
+	var species := Beasts.profile(entry)
+	var core := Beasts.core_item(species, ilvl, ground_items.size())
+	ground_items.append({"x": at.x - 18.0, "y": at.y + 10.0, "item": core})
+	Bus.item_dropped.emit(core, at)
+	Bus.toast.emit("The %s leaves a %s." % [String(species.get("name", "beast")), String(core.get("name", "core"))])
+
+
+## A phase change is announced by the body. The scene answers with the phase's
+## adds, spawned through the realm so leaving the tomb frees them too.
+func _on_boss_phase_changed(boss: Node, index: int, phase_name: String) -> void:
+	if realm_instance == null or not is_instance_valid(realm_instance) or boss == null:
+		return
+	var entry := _boss_entry_of(boss)
+	if entry.is_empty():
+		return
+	Bus.toast.emit("%s: %s." % [String(boss.get("display_name")), phase_name])
+	var ids: Array = Boss.adds(entry, index)
+	if ids.is_empty():
+		return
+	var anchor := (boss as Node2D).global_position
+	for i in ids.size():
+		var angle := TAU * float(i) / float(ids.size())
+		var at := anchor + Vector2(cos(angle), sin(angle)) * 120.0
+		realm_instance.spawn_beast(String(ids[i]), at, 2)
+
+
+## Paid once per stable boss id. The reward is the boss' own, not the ordinary
+## loot roll: stones and one guaranteed piece at the declared rarity.
+func _on_boss_defeated(id: String, _at: Vector2) -> void:
+	bosses_slain[id] = true
+	var entry: Dictionary = Boss.profile(DB.boss(id))
+	if entry.is_empty() or player == null:
+		return
+	var reward: Dictionary = Boss.reward(entry)
+	var name := String(entry.get("name", id))
+	Game.spirit_stones += int(reward.get("stones", 0))
+	var generator := ItemGen.new(DB, Rng)
+	var item := generator.generate(
+		maxi(1, player.cultivation.realm + int(entry.get("ilvl_bonus", 0))),
+		Game.kills + 7000,
+		ground_items.size(),
+		int(reward.get("rarity", ItemGen.RARITY_NAMES.size() - 1)))
+	if item.is_empty():
+		Bus.toast.emit("%s falls. The altar is open." % name)
+	else:
+		player.pick_up(item)
+		Bus.toast.emit("%s falls. You take the %s." % [name, String(item.get("name", "spoils"))])
+	Bus.player_stats_changed.emit()
+
+
 func _on_enemy_died(at: Vector2, ilvl: int) -> void:
 	if player != null:
 		player.on_kill(ilvl)
@@ -1689,6 +1785,7 @@ func _save(slot: int) -> void:
 		"realm_seed": realm_seed,
 		"realm_cleared": realm_cleared,
 		"inheritance_taken": inheritance_taken,
+		"bosses_slain": bosses_slain.duplicate(),
 	}
 	if Save.save_game(slot, data):
 		Log.info("scene", "saved slot %d" % slot)
@@ -1738,6 +1835,8 @@ func _load_game(slot: int) -> void:
 	realm_seed = int(data.get("realm_seed", 0))
 	realm_cleared = bool(data.get("realm_cleared", false))
 	inheritance_taken = bool(data.get("inheritance_taken", false))
+	var slain: Variant = data.get("bosses_slain", {})
+	bosses_slain = (slain as Dictionary).duplicate() if typeof(slain) == TYPE_DICTIONARY else {}
 	world_delta = WorldDelta.from_dict(data.get("chunk_deltas", {}))
 	chunks.delta = world_delta
 	merchant.from_dict(data.get("shop", {}))

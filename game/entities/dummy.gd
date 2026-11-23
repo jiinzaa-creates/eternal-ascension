@@ -41,6 +41,19 @@ var body_color := Color("#a85050")
 ## complete profile derived from `data/enemy_archetypes.json`.
 var archetype := "brawler"
 var profile: Dictionary = {}
+## True for a spirit beast. The species id names the core it leaves behind.
+var is_beast := false
+var species_id := ""
+## True for a boss: phases, a wider body and a reward paid once.
+var is_boss := false
+var boss_id := ""
+var boss_entry: Dictionary = {}
+var boss_phase := 0
+## Boss multipliers are applied when the numbers are derived, never compounded
+## into the live stats, so switching phase cannot stack.
+var boss_hp_mult := 1.0
+var boss_damage_mult := 1.0
+var boss_poise_mult := 1.0
 ## Where this body belongs. Patrolling, returning and healing all use it.
 var home := Vector2.ZERO
 ## The current state reported to the world, for the HUD and for tests.
@@ -91,12 +104,12 @@ func _recompute_stats() -> void:
 	var hp_mult := float(_entry.get("hp_mult", 1.0))
 	var dmg_mult := float(_entry.get("damage_mult", 1.0))
 	var spawn_speed := float(_entry.get("speed", 60.0))
-	hp_max = (70.0 + ilvl * 18.0) * hp_mult * float(profile.get("hp_mult", 1.0))
+	hp_max = (70.0 + ilvl * 18.0) * hp_mult * float(profile.get("hp_mult", 1.0)) * boss_hp_mult
 	hp = hp_max
 	poise.set_maximum(
-		(40.0 + ilvl * 6.0) * float(_entry.get("poise_mult", 1.0)) * float(profile.get("poise_mult", 1.0)),
+		(40.0 + ilvl * 6.0) * float(_entry.get("poise_mult", 1.0)) * float(profile.get("poise_mult", 1.0)) * boss_poise_mult,
 		true)
-	damage = (6.0 + ilvl * 2.0) * dmg_mult * float(profile.get("damage_mult", 1.0))
+	damage = (6.0 + ilvl * 2.0) * dmg_mult * float(profile.get("damage_mult", 1.0)) * boss_damage_mult
 	strike_poise = (8.0 + float(ilvl) * 2.0) * dmg_mult * float(profile.get("poise_mult", 1.0))
 	knockback = 140.0 + float(ilvl) * 10.0
 	armor_value = 8.0 + float(ilvl) * 5.0
@@ -115,6 +128,70 @@ func apply_biome_enemy(entry: Dictionary, realm: int) -> void:
 	ilvl = maxi(1, realm + int(entry.get("ilvl_bonus", 0)))
 	body_color = Color(String(entry.get("color", "#a85050")))
 	set_archetype(String(entry.get("archetype", "brawler")))
+
+
+## Turns this body into a spirit beast of a species from
+## `data/spirit_beasts.json`. The species supplies its numbers and habitat; the
+## behaviour still comes from its archetype, so a wolf circles and a boar holds.
+func become_beast(species: Dictionary, realm: int) -> void:
+	var normalised := Beasts.profile(species)
+	is_beast = true
+	species_id = String(normalised.get("id", ""))
+	apply_biome_enemy(Beasts.enemy_entry(normalised), realm)
+	queue_redraw()
+
+
+## Turns this body into a boss: a longer bar, a phase table and a reward. The
+## body only announces phase changes; the scene root is what spawns adds and
+## pays the kill, so a boss in a test never needs a scene.
+func become_boss(entry: Dictionary, realm: int) -> void:
+	boss_entry = Boss.profile(entry)
+	if boss_entry.is_empty():
+		return
+	is_boss = true
+	boss_id = String(boss_entry.get("id", ""))
+	boss_phase = 0
+	boss_hp_mult = float(boss_entry.get("hp_mult", 1.0))
+	boss_damage_mult = float(boss_entry.get("damage_mult", 1.0))
+	boss_poise_mult = float(boss_entry.get("poise_mult", 1.0))
+	ilvl = maxi(1, realm + int(boss_entry.get("ilvl_bonus", 0)))
+	display_name = String(boss_entry.get("name", display_name))
+	body_color = Color(String(boss_entry.get("color", "#b08ae0")))
+	set_archetype(String(boss_entry.get("archetype", "sentinel")))
+	add_to_group("boss")
+	queue_redraw()
+
+
+## The current phase's multiplier. A non-boss, or a boss with no table yet,
+## reads 1.0 so every call site can stay unconditional.
+func _phase_mult(key: String) -> float:
+	if not is_boss or boss_entry.is_empty():
+		return 1.0
+	return Boss.phase_mult(boss_entry, boss_phase, key)
+
+
+## A boss' later phases carry their own status on the blow; everything else
+## keeps its archetype payload.
+func _strike_status() -> Dictionary:
+	if is_boss and not boss_entry.is_empty():
+		var phase_status := Boss.phase_status(boss_entry, boss_phase)
+		if not phase_status.is_empty():
+			return phase_status
+	return profile.get("status", {})
+
+
+## Called after each status tick. A phase is entered once, announced once, and
+## only ever moves forward with lost health.
+func _update_boss_phase() -> void:
+	if not is_boss or boss_entry.is_empty() or _dead:
+		return
+	var index := Boss.phase_index(hp / maxf(1.0, hp_max), boss_entry)
+	if index == boss_phase:
+		return
+	boss_phase = index
+	_flash = 0.35
+	Bus.boss_phase_changed.emit(self, index, Boss.phase_name(boss_entry, index))
+	queue_redraw()
 
 
 ## Switches the behaviour profile and rebuilds every derived number.
@@ -137,6 +214,8 @@ func _physics_process(delta: float) -> void:
 	_tick_statuses(delta)
 	if _dead:
 		return
+	if is_boss:
+		_update_boss_phase()
 	_alert = maxf(0.0, _alert - delta)
 	poise.tick(delta)
 	_cooldown = maxf(0.0, _cooldown - delta)
@@ -266,7 +345,7 @@ func _physics_process(delta: float) -> void:
 		else:
 			_facing = intent.normalized()
 
-	var move_speed := speed * Status.speed_multiplier(statuses)
+	var move_speed := speed * Status.speed_multiplier(statuses) * _phase_mult("speed_mult")
 	var steer := intent.normalized() * move_speed if intent.length_squared() > 0.0001 else Vector2.ZERO
 	steer += EnemyAI.separation(global_position, _ally_positions(), EnemyAI.SEPARATION_RADIUS) * speed * 0.8
 	velocity = steer + _knock
@@ -331,23 +410,24 @@ func _ally_positions() -> Array:
 
 
 func _release_attack(target: Node2D) -> void:
-	_cooldown = EnemyAI.cooldown_time(profile)
+	_cooldown = EnemyAI.cooldown_time(profile) * _phase_mult("cooldown_mult")
 	_strikes += 1
-	var status_payload: Dictionary = profile.get("status", {})
+	var status_payload := _strike_status()
+	var outgoing := damage * _phase_mult("damage_mult")
 	if target != null:
 		if EnemyAI.is_ranged(profile):
-			_fire_bolt(target)
+			_fire_bolt(target, outgoing)
 		else:
 			var box := EnemyAI.strike_hitbox(profile)
 			if Combat.in_hitbox(global_position, _facing, box, target.global_position, 18.0):
 				var dealt := 0.0
 				if target.has_method("take_hit"):
-					dealt = float(target.take_hit(damage, global_position, true, strike_poise,
+					dealt = float(target.take_hit(outgoing, global_position, true, strike_poise,
 						knockback, self, status_payload))
 				if dealt > 0.0:
 					Bus.damage_dealt.emit(dealt, target)
 					Bus.hit_landed.emit(target, dealt, false, Status.id_of(status_payload))
-					Game.hitstop.punch(dealt, false, damage >= 10.0)
+					Game.hitstop.punch(dealt, false, outgoing >= 10.0)
 	var after := int(profile.get("retreat_after", 0))
 	if after > 0 and _strikes >= after:
 		retreat_left = float(profile.get("retreat_time", 0.0))
@@ -358,14 +438,14 @@ func _release_attack(target: Node2D) -> void:
 ## A Qi bolt shares `Projectile` with the player's arts, but belongs to the other
 ## side: it scans the `player` group and lands through the player's own
 ## `take_hit`, so a raised guard or a parry meets it exactly like a melee blow.
-func _fire_bolt(target: Node2D) -> void:
+func _fire_bolt(target: Node2D, amount: float) -> void:
 	var spec: Dictionary = (profile.get("projectile", {}) as Dictionary).duplicate(true)
 	var dir := global_position.direction_to(target.global_position)
 	if dir.length_squared() < 0.0001:
 		dir = _facing
 	var strike := {
-		"amount": damage, "power": 1.0, "poise": strike_poise, "knock": knockback,
-		"critical": false, "heavy": damage >= 10.0, "status": profile.get("status", {}),
+		"amount": amount, "power": 1.0, "poise": strike_poise, "knock": knockback,
+		"critical": false, "heavy": amount >= 10.0, "status": _strike_status(),
 	}
 	var bolt := Projectile.new()
 	bolt.faction = "enemy"
@@ -443,13 +523,22 @@ func _die() -> void:
 	_dead = true
 	state = "dead"
 	statuses.clear()
+	if is_boss and boss_id != "":
+		Bus.boss_defeated.emit(boss_id, global_position)
+	elif is_beast and species_id != "":
+		Bus.beast_slain.emit(global_position, species_id, ilvl)
 	Game.register_kill()
 	Bus.enemy_died.emit(global_position, ilvl)
 	queue_free()
 
 
 func _draw() -> void:
-	draw_circle(Vector2(0, 6), RADIUS * 0.9, Color(0, 0, 0, 0.28))
+	var radius := RADIUS * (1.7 if is_boss else 1.0)
+	draw_circle(Vector2(0, 6), radius * 0.9, Color(0, 0, 0, 0.28))
+	if is_boss:
+		var ring := Boss.bar_color(boss_entry)
+		draw_arc(Vector2.ZERO, radius + 9.0, 0.0, TAU, 32, Color(ring, 0.45), 2.0)
+		draw_arc(Vector2.ZERO, radius + 15.0, 0.0, TAU, 32, Color(ring, 0.18), 5.0)
 	var body := body_color
 	if _flash > 0.0:
 		body = Color("#ffffff")
@@ -461,9 +550,9 @@ func _draw() -> void:
 	var pose := Animator.pose(animator.state, animator.time, 0.0)
 	draw_set_transform(pose["bob"], float(pose["lean"]), pose["squash"])
 	draw_colored_polygon(PackedVector2Array([
-		Vector2(0, -RADIUS), Vector2(RADIUS, 0), Vector2(0, RADIUS), Vector2(-RADIUS, 0),
+		Vector2(0, -radius), Vector2(radius, 0), Vector2(0, radius), Vector2(-radius, 0),
 	]), body)
-	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 24, Color("#2a1c1c"), 2.0)
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, Color("#2a1c1c"), 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	if _windup > 0.0:
@@ -483,8 +572,14 @@ func _draw() -> void:
 		draw_circle(Vector2(0, -RADIUS - 20), 2.5, Color("#ffd070"))
 
 	var ratio := clampf(hp / hp_max, 0.0, 1.0)
-	draw_rect(Rect2(-18, -RADIUS - 12, 36, 4), Color("#241a1a"))
-	draw_rect(Rect2(-18, -RADIUS - 12, 36 * ratio, 4), Color("#d05050"))
+	var bar_w := 56.0 if is_boss else 36.0
+	var bar_y := -RADIUS - (24.0 if is_boss else 12.0)
+	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w, 4), Color("#241a1a"))
+	draw_rect(Rect2(-bar_w * 0.5, bar_y, bar_w * ratio, 4), Color("#d05050"))
+	if is_boss:
+		for threshold in Boss.thresholds(boss_entry):
+			var mark_x := -bar_w * 0.5 + bar_w * (1.0 - float(threshold))
+			draw_line(Vector2(mark_x, bar_y - 2.0), Vector2(mark_x, bar_y + 6.0), Color("#f0e0ff", 0.7), 1.0)
 	# Live statuses read at a glance as coloured marks above the bar.
 	var dot_x := -18.0
 	for entry in statuses:
@@ -493,5 +588,5 @@ func _draw() -> void:
 		var status_id := String((entry as Dictionary).get("id", ""))
 		if not Status.is_valid(status_id):
 			continue
-		draw_circle(Vector2(dot_x + 3.0, -RADIUS - 18), 2.5, Status.color(status_id))
+		draw_circle(Vector2(dot_x + 3.0, bar_y - 6.0), 2.5, Status.color(status_id))
 		dot_x += 9.0

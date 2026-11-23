@@ -684,6 +684,46 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Any new archetype rule belongs in `EnemyAI` with checks in `run_tests`, plus a scene-level check in
   `integration.gd` before it is called working.
 
+## Spirit beasts and bosses
+
+- **A beast is a species, not a new body.** `Beasts` reads `data/spirit_beasts.json` and normalises each
+  entry exactly the way `EnemyAI.profile()` normalises an archetype: id, name, an archetype chosen from
+  the same four, a habitat map, level offset, health/damage multipliers, speed, colour, the status its
+  bite carries, the core it drops and a `pack` flag. `Dummy.become_beast(species, realm)` converts the
+  species into the same entry shape `apply_biome_enemy()` already took, so a wolf and a wild cultivator
+  go through one stat path; the behaviour is still the archetype's (a wolf circles and retreats, a boar
+  holds its short leash, a crane keeps its firing band).
+- **Habitat is the spawn table.** A species' `biomes` map is `{biome_id: weight}`; a biome that is not
+  listed never spawns it, and `Beasts.roll()` makes exactly one `Rng.pick_weighted()` call, so a given
+  `(world_seed, domain, key, counter)` always produces the same beast. `DB.validate` rejects an unknown
+  biome, an unknown archetype, an empty habitat, a missing core and a malformed status.
+- Wild spawns are 45% beasts: the yes/no comes from a separate `wild_beast` stream and the species from
+  the existing `wild_dummy` stream, so tuning the share cannot reshuffle which humanoid or beast a seed
+  produces.
+- A beast leaves a **core** — `slot: "material"`, rarity 2, no affixes, worth its species' value —
+  dropped at its feet through `Bus.beast_slain` and drawn from the species, not from `ItemGen`. The
+  ordinary kill still pays through `enemy_died`, so quests and normal loot are unchanged.
+- **A boss is a body with a phase table.** `Boss` reads `data/bosses.json`: thresholds in descending
+  fractions of maximum health, exactly one more phase than thresholds, each phase's damage/speed/cooldown
+  multipliers, its status and the species it calls. `phase_index()` is pure and reads at or below a
+  threshold, so a body at 66% is already in the second phase. `Dummy.become_boss()` stores the table and
+  the body reads `_phase_mult()` at use time; the live `damage`/`speed` values are never mutated, which is
+  why a phase cannot compound when health hovers on a threshold.
+- The body only **announces** a phase change (`Bus.boss_phase_changed`). The scene root spawns that
+  phase's adds through the realm and toasts the phase name; a boss in a unit test needs no scene at all.
+  Adds are ordinary beasts, parented like the realm's guards, so leaving the tomb frees them.
+- **Death is paid once by stable id.** `Bus.boss_defeated(id, at)` is handled in `main.gd`, which adds
+  the boss' stones, generates one guaranteed item at its declared rarity and records the id in
+  `bosses_slain`. That dictionary is a new optional save key (legacy saves load `{}`), and the tomb only
+  spawns its warden when the id is absent — a cleared tomb stays clear across a save.
+- The warden guards the inheritance altar: `main._warden_blocks_altar()` refuses the claim while
+  `HiddenRealm.has_warden()` is true. This is the whole gate; there is no second rule anywhere.
+- The HUD draws one wide boss bar with the phase name and a mark at every threshold, scanning the
+  `boss` group. A boss also scales its body by 1.7× in `_draw` and marks its bar, so it reads as one at
+  a glance without touching collision or reach.
+- Add a species or a boss in data and validate it; the only code that may need touching is the boss id
+  the tomb looks for (`main.WARDEN_ID`) and, for a new gate, the guard function beside the altar.
+
 ## Combat polish
 
 - **Hitstop** (`Hitstop`) is a real-time timer, not `Engine.time_scale` and not
@@ -766,9 +806,10 @@ working system. Reports must list unverified items as unverified.
 game/
   core/       bus, rng, db, clock, log, settings, save, game (autoloads)
   data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs,
-              biomes, enemy_archetypes)
+              biomes, enemy_archetypes, spirit_beasts, bosses)
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, animator,
-              camera_rig, lighting, display_policy, technique_combat, enemy_ai, hitstop, status, sfx
+              camera_rig, lighting, display_policy, technique_combat, enemy_ai, beasts, boss,
+              hitstop, status, sfx
   entities/   player, dummy, npc, interactable, projectile, spell_zone, summon
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud, world_map, shop_panel, travel_panel, skill_bar_panel, damage_numbers,

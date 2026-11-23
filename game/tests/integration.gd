@@ -429,6 +429,20 @@ func _run() -> void:
 	check(exit_node.get_parent() == main.world, "realm interactables sort with the world")
 	check(main.realm_instance.all_rooms_reachable(), "every room of the generated realm is reachable")
 
+	# The altar is gated by the tomb's warden. Claiming must fail while it lives,
+	# and the kill must be remembered so a later visit is not gated again.
+	check(main.realm_instance.has_warden(), "the tomb posts a warden before the altar")
+	var warden: Dummy = main.realm_instance.warden
+	check(warden.is_boss and warden.boss_id == "boss.tomb_warden", "the warden is a boss body")
+	player.global_position = altar.global_position
+	main._try_interact()
+	check(not main.inheritance_taken, "the altar refuses while the warden lives")
+	Game.hitstop.clear()
+	warden.take_hit(1000000.0, Vector2.ZERO, 0.0, 1.0)
+	await frames(2)
+	check(not main.realm_instance.has_warden(), "the warden falls to a killing blow")
+	check(main.bosses_slain.has("boss.tomb_warden"), "the boss kill is remembered by id")
+
 	var physique_at_altar: String = player.physique_id
 	player.global_position = altar.global_position
 	main._try_interact()
@@ -1402,6 +1416,9 @@ func _run() -> void:
 	var dex_before := player.attrs.get_attr("dex")
 	player.attrs.add("dex", -dex_before)
 	player.rebuild_stats()
+	# Gear can carry evasion of its own, and a slip would decide this check.
+	player.stats.add_pct["evasion"] = 0.0
+	player.stats.flat_attrs["agi"] = 0.0
 	var hp_before_blow := player.hp
 	brawler._release_attack(player)
 	check(player.hp < hp_before_blow, "an enemy blow still damages the player")
@@ -1428,6 +1445,10 @@ func _run() -> void:
 	var guard_dex := player.attrs.get_attr("dex")
 	player.attrs.add("dex", -guard_dex)
 	player.rebuild_stats()
+	# Gear from an earlier reward can add evasion, which would turn this parry
+	# into a slip. Zero both sources so the stance is what is being tested.
+	player.stats.add_pct["evasion"] = 0.0
+	player.stats.flat_attrs["agi"] = 0.0
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
 
 	check(player.guard_state() == "none", "a lowered guard is no stance")
@@ -1686,9 +1707,12 @@ func _run() -> void:
 	var pack_hp_before: float = pack_mark.hp
 	await frames(70)
 	check(pack_mark.hp < pack_hp_before, "a summoned beast strikes an enemy")
+	# A summon's clock stops during an impact freeze, and its own last blows can
+	# start one; allow a frame or two past the hitstop cap for it to fade.
+	Game.hitstop.clear()
 	for beast in get_tree().get_nodes_in_group("summon"):
 		beast.lifetime = 0.001
-	await frames(4)
+	await frames(10)
 	check(get_tree().get_nodes_in_group("summon").is_empty(), "a summon fades when its time ends")
 
 	player.selected_technique = _tech_index(player, "tech.body.golden_bell")
@@ -2206,6 +2230,77 @@ func _run() -> void:
 	player._knock = Vector2.ZERO
 	player.statuses.clear()
 	Game.hitstop.clear()
+
+	# --- spirit beasts ---------------------------------------------------------
+	player.global_position = main.settlement.position_for("plaza") + Vector2(0, 1700)
+	player.hp = player.hp_max
+	player.poise.reset()
+	player.statuses.clear()
+	player._knock = Vector2.ZERO
+	Game.hitstop.clear()
+	await frames(2)
+
+	var m36_species := Beasts.profile(DB.spirit_beast("beast.stoneback"))
+	var m36_beast := Dummy.new()
+	m36_beast.ilvl = 1
+	m36_beast.global_position = player.global_position + Vector2(-160, 0)
+	main.world.add_child(m36_beast)
+	m36_beast.become_beast(m36_species, player.cultivation.realm)
+	check(m36_beast.is_beast and m36_beast.species_id == "beast.stoneback", "a body can become a species' beast")
+	check(m36_beast.display_name == "Stoneback Boar", "the beast wears its species' name")
+	check(String(m36_beast.profile.get("id", "")) == "sentinel", "the beast fights with its species' archetype")
+	check(m36_beast.hp_max > 0.0, "the beast derives its numbers from the species")
+	m36_beast.aggressive = false
+	var m36_core_before: int = main.ground_items.size()
+	m36_beast.take_hit(1000000.0, Vector2.ZERO, 0.0, 1.0)
+	await frames(2)
+	var m36_core_found := false
+	for entry in main.ground_items:
+		var dropped: Dictionary = entry.get("item", {})
+		if String(dropped.get("base_name", "")) == "Stoneback Hide":
+			m36_core_found = true
+	check(main.ground_items.size() >= m36_core_before + 2, "a beast drops its core as well as ordinary loot")
+	check(m36_core_found, "the core is the species' own")
+
+	# --- the warden: phases, adds and reward -----------------------------------
+	var m36_warden := Dummy.new()
+	m36_warden.ilvl = 2
+	m36_warden.global_position = player.global_position + Vector2(0, 520)
+	main.world.add_child(m36_warden)
+	m36_warden.become_boss(DB.boss("boss.tomb_warden"), 2)
+	m36_warden.hp_max = 1000.0
+	m36_warden.hp = 1000.0
+	check(m36_warden.is_boss and m36_warden.boss_id == "boss.tomb_warden", "a body can become the warden")
+	check(m36_warden.is_in_group("boss"), "a boss joins the boss group")
+	var m36_phases: Array = []
+	var m36_recorder := func(_b: Node, index: int, phase_name: String) -> void:
+		m36_phases.append([index, phase_name])
+	Bus.boss_phase_changed.connect(m36_recorder)
+	await frames(2)
+	check(m36_warden.boss_phase == 0, "a whole warden starts in its first phase")
+	m36_warden.hp = 600.0
+	await frames(2)
+	check(m36_warden.boss_phase == 1, "losing a third moves the warden to its second phase")
+	m36_warden.hp = 200.0
+	await frames(2)
+	check(m36_warden.boss_phase == 2, "losing another third moves it to its last")
+	check(approx(m36_warden._phase_mult("damage_mult"), 1.5), "the last phase scales the warden's blows")
+	check(m36_phases.size() == 2, "each phase change is announced once")
+	check(String((m36_phases[0] as Array)[1]) == "Moon's Wrath", "the announced phase is named")
+	Bus.boss_phase_changed.disconnect(m36_recorder)
+
+	var m36_stones := Game.spirit_stones
+	var m36_inventory := player.inventory.size()
+	m36_warden.take_hit(1000000.0, Vector2.ZERO, 0.0, 1.0)
+	await frames(2)
+	check(main.bosses_slain.has("boss.tomb_warden"), "the warden's fall is recorded by id")
+	check(Game.spirit_stones >= m36_stones + 400, "the warden pays its stones")
+	check(player.inventory.size() > m36_inventory, "the warden's reward is taken")
+
+	main._save(87)
+	var m36_saved := Save.load_game(87)
+	var m36_slain: Variant = m36_saved.get("bosses_slain", {})
+	check(typeof(m36_slain) == TYPE_DICTIONARY and (m36_slain as Dictionary).has("boss.tomb_warden"), "a save records the fallen warden")
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
