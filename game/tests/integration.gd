@@ -1061,6 +1061,7 @@ func _run() -> void:
 	player._meditating = false
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._dodge_cooldown = 0.0
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
 	player.try_attack()
@@ -1089,6 +1090,7 @@ func _run() -> void:
 	check(String(player.cultivation.realm_ability().get("name", "")) == "Dantian", "the current realm art is named")
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._dodge_cooldown = 0.0
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
 	player.try_attack()
@@ -1102,6 +1104,7 @@ func _run() -> void:
 	player.selected_technique = player.technique_ids.find("tech.sword.azure_cleave")
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player.cultivation.realm = 4
 	player.rebuild_stats()
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
@@ -1113,6 +1116,7 @@ func _run() -> void:
 
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player.cultivation.realm = 5
 	player.rebuild_stats()
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
@@ -1509,6 +1513,7 @@ func _run() -> void:
 	sparring.global_position = player.global_position + strike_dir * 42.0
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._combo_index = -1
 	player._combo_elapsed = 100.0
 	var qi_before_strike := player.cultivation.qi
@@ -1521,6 +1526,7 @@ func _run() -> void:
 
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._combo_elapsed = 0.05
 	var second_move := String((Weapons.moves("sword") as Array)[1].get("name", ""))
 	check(player.next_move_name() == second_move, "an in-time press previews the second strike")
@@ -1529,6 +1535,7 @@ func _run() -> void:
 	await frames(20)
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._combo_elapsed = 100.0
 	player.try_light_attack()
 	check(player._combo_index == 0, "a late press restarts the chain")
@@ -1536,6 +1543,7 @@ func _run() -> void:
 
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player.equipment["weapon"] = {
 		"id": "item.test.rod", "base": "base.staff.azure_rod", "weapon_type": "staff",
 		"name": "Test Azure Rod", "slot": "weapon", "ilvl": 3, "rarity": 2,
@@ -1562,6 +1570,7 @@ func _run() -> void:
 	check(Weapons.moves(player.weapon_type_id()).size() >= 2, "bare hands have a real chain")
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._combo_index = -1
 	player._combo_elapsed = 100.0
 	player.hp = player.hp_max
@@ -1574,6 +1583,7 @@ func _run() -> void:
 	player._attack_phase_total = 0.0
 	player._current_attack = {}
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._dodge_cooldown = 0.0
 	player._dodge_timer = 0.0
 	player._iframes = 0.0
@@ -1641,6 +1651,7 @@ func _run() -> void:
 	outside_mark.global_position = player.global_position - aim_now * 260.0
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	var array_hp_before: float = array_mark.hp
 	var outside_hp_before: float = outside_mark.hp
 	player.try_attack()
@@ -1660,6 +1671,7 @@ func _run() -> void:
 	pack_mark.global_position = player.global_position + aim_now * 110.0
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player.try_attack()
 	await frames(35)
 	check(player.current_technique_kind() == "summon", "the selected art is a summon")
@@ -1675,6 +1687,7 @@ func _run() -> void:
 	player.selected_technique = _tech_index(player, "tech.body.golden_bell")
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player.active_buffs.clear()
 	player.rebuild_stats()
 	var armour_without: float = player.stats.armor()
@@ -1691,6 +1704,7 @@ func _run() -> void:
 	player.selected_technique = _tech_index(player, "tech.step.cloud_step")
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player._iframes = 0.0
 	player._knock = Vector2.ZERO
 	var step_from: Vector2 = player.global_position
@@ -1703,6 +1717,7 @@ func _run() -> void:
 	player.selected_technique = _tech_index(player, "tech.sword.azure_cleave")
 	player._attack_state = "idle"
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	var melee_mark := Dummy.new()
 	melee_mark.ilvl = 1
 	melee_mark.aggressive = false
@@ -1722,6 +1737,116 @@ func _run() -> void:
 	player.cycle_technique()
 	check(player.selected_technique == 0, "cycling wraps back to the first art")
 
+	# --- skill bars ----------------------------------------------------------
+	check(main.skill_bar_panel != null, "the scene owns a bar arrangement panel")
+	check(not main.skill_bar_panel.visible, "the arrangement panel starts closed")
+	main.toggle_bars()
+	check(main.bars_open and main.skill_bar_panel.visible, "B opens the bar arrangement panel")
+	check(not player.is_physics_processing(), "the arrangement panel freezes the player")
+	main.toggle_bars()
+	check(not main.bars_open and player.is_physics_processing(), "closing the panel restores the player")
+
+	check(player.bars.size() == SkillBar.SLOT_COUNT, "the player carries eighteen bar slots")
+	check(String(player.bars[0]) == String(player.technique_ids[0]), "the default layout starts from the known kit")
+	player.set_active_bar(0)
+	check(player.select_bar_slot(0), "key one selects the first art on the bar")
+	check(String(player.current_technique().get("id", "")) == String(player.technique_ids[0]), "the selected art is the slot's art")
+
+	var bar_two_slot := SkillBar.index_of(1, 2)
+	var bar_two_art := "tech.step.cloud_step"
+	_tech_index(player, bar_two_art)
+	check(player.assign_slot(bar_two_slot, bar_two_art), "a known art can be placed on the second bar")
+	check(player.slot_for(bar_two_art) == bar_two_slot, "the bar reports the art's slot")
+	check(not player.assign_slot(3, "tech.bogus"), "an unknown art cannot be placed on a bar")
+	check(main._switch_bar(1) == 1 and player.active_bar == 1, "the bar switches forward")
+	check(player.select_bar_slot(2), "the placed art is selectable from its bar")
+	check(String(player.current_technique().get("id", "")) == bar_two_art, "the second bar hands over its own art")
+	check(not player.select_bar_slot(5), "an empty slot refuses selection")
+	check(main._switch_bar(-1) == 0, "the bar switches backward and wraps")
+
+	check(player.assign_slot(0, bar_two_art), "an art can be moved between bars")
+	check(player.slot_for(bar_two_art) == 0, "moving an art clears its old slot")
+	check(String(player.bars[bar_two_slot]) == "", "the vacated slot is empty")
+	check(player.move_slot(0, 5), "drag and drop swaps two slots")
+	check(String(player.bars[5]) == bar_two_art, "the dragged art lands where it was dropped")
+	check(not player.move_slot(5, 99), "dropping on a slot outside the layout does nothing")
+	check(player.clear_slot(5), "right-click clears a slot")
+	check(String(player.bars[5]) == "", "the cleared slot is empty")
+	check(not player.clear_slot(5), "clearing an empty slot does nothing")
+	player.bars[17] = "tech.bogus"
+	player.reconcile_bars()
+	check(not player.bars.has("tech.bogus"), "a corrupted layout is pruned to known arts")
+	check(player.bars.size() == SkillBar.SLOT_COUNT, "reconciling keeps eighteen slots")
+
+	# --- per-art cooldowns ---------------------------------------------------
+	player.assign_slot(0, "tech.step.cloud_step")
+	player.assign_slot(1, "tech.sword.azure_cleave")
+	var cd_art := "tech.sword.azure_cleave"
+	var other_art := "tech.sword.piercing_thrust"
+	player.selected_technique = _tech_index(player, cd_art)
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	check(player.cooldown_left(cd_art) == 0.0, "a fresh art has no cooldown")
+	player.try_attack()
+	# Read the timer on the frame it starts: a headless run simulates frames
+	# faster than the art's own cooldown would last a fixed number of waits.
+	var cooldown_seen := 0.0
+	for i in 60:
+		await get_tree().physics_frame
+		cooldown_seen = player.cooldown_left(cd_art)
+		if cooldown_seen > 0.0:
+			break
+	check(cooldown_seen > 0.0, "finishing an art starts its own cooldown")
+	check(player.slot_cooldown_ratio(player.slot_for(cd_art)) > 0.0, "the slot reports its cooldown for the HUD")
+	check(player.cooldown_left(cd_art) <= player.technique_cooldown(cd_art) + 0.001, "the running timer never exceeds its full length")
+	player.selected_technique = _tech_index(player, other_art)
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	check(player.cooldown_left(other_art) == 0.0, "one art's cooldown leaves the others ready")
+	check(player.cooldown_left(cd_art) > 0.0, "the first art is still gathering")
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player.try_attack()
+	check(player._attack_state != "idle", "a ready art can follow a cooling one")
+	await frames(40)
+	# The same art, still cooling, must refuse the press and spend nothing.
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
+	player.tech_cooldowns[cd_art] = 5.0
+	player.selected_technique = _tech_index(player, cd_art)
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	var qi_before_gate: float = player.cultivation.qi
+	player.try_attack()
+	check(player._attack_state == "idle", "an art that is still gathering refuses the press")
+	check(approx(player.cultivation.qi, qi_before_gate), "a refused press spends no Qi")
+	player.tech_cooldowns.clear()
+	check(player.technique_cooldown(cd_art) > 0.0, "the cooldown length is derived from mastery, gear and realm")
+
+	# --- the layout survives a save, and a pre-M34 save derives one ----------
+	player.set_active_bar(2)
+	player.assign_slot(SkillBar.index_of(2, 0), "tech.sword.azure_cleave")
+	var legacy_state: Dictionary = player.to_dict()
+	legacy_state.erase("bars")
+	legacy_state.erase("active_bar")
+	player.from_dict(legacy_state)
+	check(player.bars.size() == SkillBar.SLOT_COUNT and String(player.bars[0]) != "", "a pre-M34 save derives a bar layout")
+	check(player.active_bar == 0, "a pre-M34 save starts on the first bar")
+
+	player.set_active_bar(2)
+	player.assign_slot(SkillBar.index_of(2, 0), "tech.sword.azure_cleave")
+	Save.delete_slot(97)
+	main._save(97)
+	player.set_active_bar(0)
+	player.bars = SkillBar.default_layout(player.technique_ids)
+	main._load_game(97)
+	await frames(2)
+	check(player.active_bar == 2, "the active bar survives a save")
+	check(String(player.bars[SkillBar.index_of(2, 0)]) == "tech.sword.azure_cleave", "the bar layout survives a save")
+	check(player.cooldown_left("tech.sword.azure_cleave") == 0.0, "cooldowns are transient and never saved")
+	Save.delete_slot(97)
+
 	for mark in [bolt_mark, far_mark, array_mark, outside_mark, pack_mark, melee_mark]:
 		if is_instance_valid(mark):
 			mark.queue_free()
@@ -1729,6 +1854,7 @@ func _run() -> void:
 	player._attack_state = "idle"
 	player._attack_timer = 0.0
 	player._cooldown = 0.0
+	player.tech_cooldowns.clear()
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
 	player.hp = player.hp_max
 	player.poise.reset()

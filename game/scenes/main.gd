@@ -37,6 +37,10 @@ var _sell_base := 0
 var travel_panel: TravelPanel
 var travel_open := false
 var travel_index := 0
+## Skill bar arrangement overlay. It freezes play like the map, so a drag can
+## never be mistaken for an attack.
+var skill_bar_panel: SkillBarPanel
+var bars_open := false
 var waypoint_name := ""
 var waypoint_position := Vector2.ZERO
 ## Discovered sites, recorded with a position so they stay travel destinations
@@ -166,6 +170,8 @@ func _build_hud() -> void:
 	layer.add_child(shop_panel)
 	travel_panel = TravelPanel.new()
 	layer.add_child(travel_panel)
+	skill_bar_panel = SkillBarPanel.new()
+	layer.add_child(skill_bar_panel)
 
 
 func _spawn_npcs() -> void:
@@ -523,7 +529,7 @@ func _process(delta: float) -> void:
 			DB.biome(Biome.for_chunk(chunks.world_to_chunk(player.global_position), Game.world_seed)))
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
-	if (world_map != null and world_map.visible) or shop_open or travel_open:
+	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open:
 		return
 
 	_simulate_npcs()
@@ -559,10 +565,13 @@ func _process(delta: float) -> void:
 					_hazard_accum = 0.0
 		return
 
-	for i in mini(6, player.technique_ids.size()):
+	for i in SkillBar.SLOTS_PER_BAR:
 		if Input.is_action_just_pressed("skill_%d" % (i + 1)):
-			player.selected_technique = i
-			Bus.cultivation_changed.emit()
+			_select_bar_slot(i)
+	if Input.is_action_just_pressed("bar_next"):
+		_switch_bar(1)
+	elif Input.is_action_just_pressed("bar_prev"):
+		_switch_bar(-1)
 	# The bar draws six slots; Q walks the whole known list so an art learned
 	# later is never stranded off the bar.
 	if Input.is_action_just_pressed("cycle_bar"):
@@ -837,6 +846,57 @@ func _set_waypoint(index: int) -> void:
 	Bus.toast.emit("Waypoint set: %s." % waypoint_name)
 
 
+## 1-6 on the active bar. An empty slot says so instead of silently doing
+## nothing, and points at the arrangement panel.
+func _select_bar_slot(slot: int) -> bool:
+	if player == null:
+		return false
+	if not player.select_bar_slot(slot):
+		Bus.toast.emit("Bar %s, slot %d is empty. (B arranges the bars)" % [
+			SkillBar.bar_label(player.active_bar), slot + 1])
+		return false
+	Bus.cultivation_changed.emit()
+	return true
+
+
+func _switch_bar(step: int) -> int:
+	if player == null:
+		return 0
+	var bar := player.cycle_bar(step)
+	Bus.toast.emit("Skill bar %s." % SkillBar.bar_label(bar))
+	Bus.cultivation_changed.emit()
+	return bar
+
+
+func toggle_bars() -> void:
+	if bars_open:
+		_close_bars()
+		return
+	if player == null or phase == "creation" or String(phase) == "ended":
+		return
+	# The overlays are mutually exclusive: one screen at a time owns the mouse.
+	if shop_open or travel_open:
+		return
+	if world_map != null and world_map.visible:
+		toggle_map()
+	bars_open = true
+	if skill_bar_panel != null:
+		skill_bar_panel.open(player)
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_bars() -> void:
+	if not bars_open:
+		return
+	bars_open = false
+	if skill_bar_panel != null:
+		skill_bar_panel.close()
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
 func toggle_map() -> void:
 	if world_map == null or player == null or phase == "creation":
 		return
@@ -903,6 +963,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 		return
 
+	if bars_open:
+		if event.is_action_pressed("open_bars") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_bars()
+		return
+
 	if travel_open:
 		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
 			_close_travel()
@@ -922,6 +988,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("open_travel"):
 		_open_travel()
+		return
+
+	if event.is_action_pressed("open_bars"):
+		toggle_bars()
 		return
 
 	if shop_open:
@@ -1625,6 +1695,7 @@ func _load_game(slot: int) -> void:
 		realm_instance = null
 		_set_overworld_active(true)
 
+	_close_bars()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	player.from_dict(data.get("player", {}))

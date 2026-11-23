@@ -38,6 +38,12 @@ var inventory: Array = []
 var equipment: Dictionary = {}
 var technique_ids: Array = []
 var selected_technique: int = 0
+## Three bars of six slots. A layout, never a curriculum: it can only hold arts
+## the body knows, so a slot never promises a technique that cannot be cast.
+var bars: Array = []
+var active_bar: int = 0
+## Technique id -> seconds left of its own cooldown. Transient, never saved.
+var tech_cooldowns: Dictionary = {}
 ## Technique id -> mastery xp. Everything else about mastery is derived.
 var technique_xp: Dictionary = {}
 ## Technique id -> times watched for observation-based learning.
@@ -106,6 +112,7 @@ func _ready() -> void:
 	for tech in DB.techniques:
 		if not bool(tech.get("hidden", false)):
 			technique_ids.append(String(tech.get("id", "")))
+	bars = SkillBar.default_layout(technique_ids)
 	spawn_point = global_position
 	rebuild_stats()
 	hp = hp_max
@@ -432,6 +439,18 @@ func _aim_dir() -> Vector2:
 func _tick_timers(delta: float) -> void:
 	_combat_timer = maxf(0.0, _combat_timer - delta)
 	_cooldown = maxf(0.0, _cooldown - delta)
+	# Each art gathers on its own clock, so a bar can show one slot recovering
+	# while the next is ready.
+	if not tech_cooldowns.is_empty():
+		var expired: Array = []
+		for id in tech_cooldowns.keys():
+			var left := maxf(0.0, float(tech_cooldowns[id]) - delta)
+			if left <= 0.0:
+				expired.append(id)
+			else:
+				tech_cooldowns[id] = left
+		for id in expired:
+			tech_cooldowns.erase(id)
 	_dodge_cooldown = maxf(0.0, _dodge_cooldown - delta)
 	_dodge_timer = maxf(0.0, _dodge_timer - delta)
 	_iframes = maxf(0.0, _iframes - delta)
@@ -479,8 +498,10 @@ func _tick_attack(delta: float) -> void:
 				_cooldown = float(_current_attack.get("cooldown", 0.06))
 			else:
 				var tech_id := String(_current_attack.get("id", ""))
-				_cooldown = float(_current_attack.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction()) \
-					* Mastery.cooldown_mult(mastery_tier(tech_id)) * Realms.technique_mult(cultivation.realm)
+				# A short shared pause keeps two techniques from blurring into one
+				# press; the art's own cooldown is tracked per technique.
+				_cooldown = SkillBar.SWING_PAUSE
+				_start_technique_cooldown(tech_id)
 
 
 ## Phase speed for the running attack. A weapon category's own speed multiplier
@@ -500,12 +521,129 @@ func current_technique_kind() -> String:
 	return TechniqueCombat.kind_of(current_technique())
 
 
-## Q brings the next known technique to hand. The bar draws six slots; once more
-## than six arts are known, cycling is how the rest stay reachable.
+## A technique's own cooldown after mastery, gear and realm weave. The gate and
+## the HUD both read this one function, so a slot can never show a timer the
+## body does not honour.
+func technique_cooldown(tech_id: String) -> float:
+	var tech := DB.technique(tech_id)
+	if tech.is_empty():
+		return 0.0
+	return float(tech.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction()) \
+		* Mastery.cooldown_mult(mastery_tier(tech_id)) * Realms.technique_mult(cultivation.realm)
+
+
+func cooldown_left(tech_id: String) -> float:
+	return maxf(0.0, float(tech_cooldowns.get(tech_id, 0.0)))
+
+
+func _start_technique_cooldown(tech_id: String) -> void:
+	if tech_id == "" or DB.technique(tech_id).is_empty():
+		return
+	var full := technique_cooldown(tech_id)
+	if full > 0.0:
+		tech_cooldowns[tech_id] = full
+
+
+func slot_cooldown_left(index: int) -> float:
+	var tech_id := bar_slot(index)
+	return 0.0 if tech_id == "" else cooldown_left(tech_id)
+
+
+func slot_cooldown_ratio(index: int) -> float:
+	var tech_id := bar_slot(index)
+	if tech_id == "":
+		return 0.0
+	return SkillBar.cooldown_ratio(cooldown_left(tech_id), technique_cooldown(tech_id))
+
+
+## Keep the saved layout honest: drop arts the body no longer knows and close
+## duplicates. Empty slots stay empty, because they are an arrangement.
+func reconcile_bars() -> void:
+	bars = SkillBar.reconcile(bars, technique_ids)
+	active_bar = clampi(active_bar, 0, SkillBar.BAR_COUNT - 1)
+	selected_technique = clampi(selected_technique, 0, maxi(0, technique_ids.size() - 1))
+
+
+func bar_slot(index: int) -> String:
+	return SkillBar.slot_tech(bars, index)
+
+
+func active_bar_slots() -> Array:
+	var slots: Array = []
+	for i in SkillBar.SLOTS_PER_BAR:
+		slots.append(bar_slot(SkillBar.index_of(active_bar, i)))
+	return slots
+
+
+func set_active_bar(bar: int) -> int:
+	active_bar = clampi(bar, 0, SkillBar.BAR_COUNT - 1)
+	return active_bar
+
+
+func cycle_bar(step: int) -> int:
+	active_bar = SkillBar.wrap_bar(active_bar, step)
+	return active_bar
+
+
+## 1-6 within the active bar. Returns false when the slot holds nothing.
+func select_slot(index: int) -> bool:
+	var tech_id := bar_slot(index)
+	if tech_id == "" or not technique_ids.has(tech_id):
+		return false
+	selected_technique = technique_ids.find(tech_id)
+	return true
+
+
+func select_bar_slot(slot: int) -> bool:
+	return select_slot(SkillBar.index_of(active_bar, slot))
+
+
+## Place a known art, moving it out of any slot it already held.
+func assign_slot(index: int, tech_id: String) -> bool:
+	if index < 0 or index >= SkillBar.SLOT_COUNT:
+		return false
+	if tech_id != "" and not technique_ids.has(tech_id):
+		return false
+	bars = SkillBar.assign(bars, index, tech_id)
+	return true
+
+
+func move_slot(from_index: int, to_index: int) -> bool:
+	if from_index < 0 or to_index < 0 or from_index >= SkillBar.SLOT_COUNT or to_index >= SkillBar.SLOT_COUNT:
+		return false
+	if bar_slot(from_index) == "":
+		return false
+	bars = SkillBar.swap(bars, from_index, to_index)
+	return true
+
+
+func clear_slot(index: int) -> bool:
+	if index < 0 or index >= SkillBar.SLOT_COUNT or bar_slot(index) == "":
+		return false
+	bars = SkillBar.assign(bars, index, "")
+	return true
+
+
+func slot_for(tech_id: String) -> int:
+	return SkillBar.find_slot(bars, tech_id)
+
+
+## Known arts sitting on no bar; the HUD and the arrangement panel list them.
+func known_off_bar() -> Array:
+	return SkillBar.unplaced(technique_ids, bars)
+
+
+## Q brings the next known technique to hand. The bars hold eighteen slots, so
+## cycling is how an art that sits on no bar, or was learned after every slot
+## was full, stays reachable.
 func cycle_technique() -> String:
 	if technique_ids.is_empty():
 		return ""
 	selected_technique = (clampi(selected_technique, 0, technique_ids.size() - 1) + 1) % technique_ids.size()
+	# Follow the art across bars, so the HUD shows the bar it actually sits on.
+	var slot := slot_for(String(current_technique().get("id", "")))
+	if slot >= 0:
+		active_bar = SkillBar.bar_of(slot)
 	return String(current_technique().get("name", ""))
 
 
@@ -558,6 +696,8 @@ func try_attack() -> void:
 	if tech.is_empty():
 		return
 	var tech_id := String(tech.get("id", ""))
+	if cooldown_left(tech_id) > 0.0:
+		return
 	var cost := float(tech.get("qi_cost", 0.0)) * Mastery.qi_mult(mastery_tier(tech_id)) \
 		* Realms.technique_mult(cultivation.realm)
 	if cultivation.qi < cost:
@@ -1127,6 +1267,8 @@ func to_dict() -> Dictionary:
 		"equipment": equipped,
 		"technique_ids": technique_ids,
 		"selected_technique": selected_technique,
+		"bars": bars.duplicate(),
+		"active_bar": active_bar,
 		"technique_xp": technique_xp.duplicate(),
 		"observed": observed.duplicate(),
 	}
@@ -1155,9 +1297,18 @@ func from_dict(data: Dictionary) -> void:
 	var ids: Array = data.get("technique_ids", [])
 	if not ids.is_empty():
 		technique_ids = ids.duplicate()
-	selected_technique = int(data.get("selected_technique", 0))
+	selected_technique = clampi(int(data.get("selected_technique", 0)), 0, maxi(0, technique_ids.size() - 1))
 	technique_xp = data.get("technique_xp", {}).duplicate()
 	observed = data.get("observed", {}).duplicate()
+	# A pre-M34 save has no layout: derive one from the known kit. A corrupt
+	# layout is pruned to known, unique arts rather than trusted.
+	var saved_bars: Array = data.get("bars", [])
+	if saved_bars.is_empty():
+		bars = SkillBar.default_layout(technique_ids)
+	else:
+		bars = SkillBar.reconcile(saved_bars, technique_ids)
+	active_bar = clampi(int(data.get("active_bar", 0)), 0, SkillBar.BAR_COUNT - 1)
+	tech_cooldowns.clear()
 	rebuild_stats()
 	hp = float(data.get("hp", hp_max))
 	spawn_point = global_position

@@ -45,6 +45,17 @@ func _text_width(text: String, font_size: int) -> float:
 	return _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
 
+## Trim a label to the space a slot actually has, so a long art name cannot
+## bleed into the next slot.
+func _fit(text: String, font_size: int, max_width: float) -> String:
+	if _text_width(text, font_size) <= max_width:
+		return text
+	var cut := text
+	while cut.length() > 1 and _text_width(cut + "..", font_size) > max_width:
+		cut = cut.substr(0, cut.length() - 1)
+	return cut + ".."
+
+
 func _bar(pos: Vector2, bar_size: Vector2, ratio: float, color: Color, label: String) -> void:
 	draw_rect(Rect2(pos, bar_size), Color("#000000", 0.55))
 	draw_rect(Rect2(pos, Vector2(bar_size.x * clampf(ratio, 0.0, 1.0), bar_size.y)), color)
@@ -258,32 +269,52 @@ func draw_quest(player: Player) -> void:
 		_text(Vector2(w - 316.0, y + float(i) * 18.0), lines[i], 12, color)
 
 
+## The active bar only: six slots, each with its art's own cooldown sweep.
+## Occupancy of the other two bars and any art off the bars are named on the
+## line beneath, so the readout never hides a known technique.
 func draw_techniques(player: Player) -> void:
 	var x := 24.0
 	var y := size.y - 96.0
 	var slot_size := Vector2(112.0, 46.0)
 	draw_rect(Rect2(x - 12.0, y - 24.0, slot_size.x * 6.0 + 24.0, 92.0), PANEL_BG)
-	_text(Vector2(x, y - 8.0), "Technique Bar  (1-6 select · Q cycle · LMB execute · RMB weapon chain)", 12, MUTED)
+	_text(Vector2(x, y - 8.0), "Skill bar %s/%s  (1-6 select · [ ] bar · B arrange · Q cycle · LMB execute)" % [
+		SkillBar.bar_label(player.active_bar), SkillBar.bar_label(SkillBar.BAR_COUNT - 1)], 11, MUTED)
 	y += 2.0
-	for i in mini(6, player.technique_ids.size()):
-		var tech: Dictionary = DB.technique(String(player.technique_ids[i]))
+	var slots := player.active_bar_slots()
+	for i in slots.size():
+		var index := SkillBar.index_of(player.active_bar, i)
 		var rect := Rect2(Vector2(x + float(i) * (slot_size.x + 6.0), y), slot_size)
-		var selected := i == player.selected_technique
+		var tech_id := String(slots[i])
+		var selected := tech_id != "" and tech_id == String(player.current_technique().get("id", ""))
 		draw_rect(rect, Color("#182229", 0.9) if not selected else Color("#24343d", 0.95))
 		draw_rect(rect, Color("#7fd3e0") if selected else Color("#2b343a"), false, 2.0 if selected else 1.0)
-		_text(rect.position + Vector2(8.0, 17.0), "%d  %s" % [i + 1, String(tech.get("name", "?"))], 10, INK)
-		var tier := player.mastery_tier(String(player.technique_ids[i]))
-		_text(rect.position + Vector2(8.0, 31.0), Mastery.label(tier), 9, MUTED)
-		var cost := float(tech.get("qi_cost", 0.0))
+		_text(rect.position + Vector2(7.0, 15.0), "%d" % (i + 1), 10, MUTED)
+		if tech_id == "":
+			_text(rect.position + Vector2(24.0, 16.0), "empty", 10, Color("#42515a"))
+			continue
+		var tech: Dictionary = DB.technique(tech_id)
+		_text(rect.position + Vector2(24.0, 16.0), _fit(String(tech.get("name", "?")), 10, rect.size.x - 30.0), 10, INK)
+		var tier := player.mastery_tier(tech_id)
+		_text(rect.position + Vector2(7.0, 29.0), Mastery.label(tier), 9, MUTED)
+		var cost := float(tech.get("qi_cost", 0.0)) * Mastery.qi_mult(tier) * Realms.technique_mult(player.cultivation.realm)
 		var affordable := player.cultivation.qi >= cost
-		_text(rect.position + Vector2(8.0, 33.0), "Qi %d" % int(cost), 11, Color("#7fd3e0") if affordable else Color("#c05858"))
-	# The selected art's delivery and the rest of the known list. Past six arts
-	# the bar cannot draw every slot, so this line names what is actually held.
-	var selected_tech := player.current_technique()
-	var held := "%s · %s" % [String(selected_tech.get("name", "—")), TechniqueCombat.kind_label(player.current_technique_kind())]
-	if player.technique_ids.size() > 6:
-		held += "   (Q cycles all %d)" % player.technique_ids.size()
-	_text(Vector2(x, y + 62.0), held, 10, ACCENT)
+		_text(rect.position + Vector2(7.0, 42.0), "Qi %d" % int(round(cost)), 10, Color("#7fd3e0") if affordable else Color("#c05858"))
+		var left := player.slot_cooldown_left(index)
+		if left > 0.0:
+			draw_rect(Rect2(rect.position, Vector2(rect.size.x, rect.size.y * player.slot_cooldown_ratio(index))), Color("#05090b", 0.62))
+			_text(rect.position + Vector2(rect.size.x - 34.0, 42.0), SkillBar.cooldown_text(left), 10, Color("#ffd07f"))
+	# Occupancy of all three bars, then what is actually held.
+	var tabs: Array[String] = []
+	for bar in SkillBar.BAR_COUNT:
+		tabs.append("%s%s %d/%d" % [">" if bar == player.active_bar else " ", SkillBar.bar_label(bar),
+			SkillBar.bar_filled(player.bars, bar), SkillBar.SLOTS_PER_BAR])
+	var held := "%s · %s" % [String(player.current_technique().get("name", "—")),
+		TechniqueCombat.kind_label(player.current_technique_kind())]
+	var off_bar: Array = player.known_off_bar()
+	var line := "   ".join(tabs) + "      Held: " + held
+	if not off_bar.is_empty():
+		line += "   (+%d off-bar · B)" % off_bar.size()
+	_text(Vector2(x, y + 62.0), _fit(line, 10, slot_size.x * 6.0), 10, ACCENT)
 
 
 func draw_inventory(player: Player) -> void:
@@ -351,7 +382,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · Q cycle · M map · F5 save · F9 load · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · M map · F5 save · F9 load · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

@@ -611,11 +611,36 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   does not move is a content error, not a silent no-op.
 - Effects (`Projectile`, `SpellZone`, `Summon`) join the world layer and add themselves to the
   `projectile`, `spell_zone` and `summon` groups so a scene test can assert they exist and expire.
-- Input: `Q` (`cycle_bar`) walks the whole known technique list, because the bar draws six slots and
-  the roster is now larger. Do not treat cycling as a substitute for M34's bars; it only guarantees
-  that an art learned after the bar is full stays reachable.
+- Input: `Q` (`cycle_bar`) walks the whole known technique list, because the bars hold eighteen slots
+  and a learned art belongs to no bar until it is placed. Cycling follows the art onto its bar, so the
+  HUD shows the bar the selected art actually sits on.
 - Any new technique rule belongs in `TechniqueCombat` with checks in `run_tests`, plus a scene-level
   check in `integration.gd` before it is called working.
+
+## Skill bars
+
+- `SkillBar` is pure and owns the whole layout model: three bars of six, `default_layout()` (known
+  arts in learned order), `reconcile()` (drop unknown ids and duplicates, keep deliberate gaps),
+  `assign()` (one art, one slot — placing an art empties any slot it already held), `swap()` (drag and
+  drop), `unplaced()`, `wrap_bar()` and the cooldown helpers. It never mutates its input array.
+- The player owns the state: `bars` (18 technique ids), `active_bar`, and `tech_cooldowns`
+  (technique id → seconds left). Cooldowns are **transient and never saved**; they are cleared on load.
+- Cooldowns are per technique. Finishing a technique sets `_cooldown = SkillBar.SWING_PAUSE` (a short
+  shared pause so two presses cannot blur) and starts that art's own `technique_cooldown()`, which is
+  the same formula as before (mastery × gear CDR × realm weaving). `try_attack()` refuses an art
+  whose own timer is running; a different ready art can follow it. The HUD reads
+  `slot_cooldown_left()` / `slot_cooldown_ratio()`, so a slot can never display a timer the gate does
+  not honour.
+- Keys: 1–6 select within the active bar (`select_bar_slot`), `[` / `]` (`bar_prev` / `bar_next`)
+  switch and wrap (`cycle_bar`), `B` (`open_bars`) toggles the arrangement panel. An empty slot emits a
+  toast naming the bar and slot instead of failing silently.
+- `SkillBarPanel` is the only editor and the run is frozen while it is open (like the map and travel
+  overlay), so a drag cannot become an attack. It turns mouse positions into slot indices and calls the
+  player's `assign_slot` / `move_slot` / `clear_slot` / `select_slot`; all rules stay in `SkillBar` and
+  the player, which is what the headless suites exercise.
+- Save compatibility: `bars` and `active_bar` are optional keys. A save without them (pre-M34) gets
+  `default_layout(technique_ids)`; a corrupt or over-long layout is reconciled to known, unique arts.
+  No schema bump and no migration step are needed.
 
 ## Save compatibility
 
