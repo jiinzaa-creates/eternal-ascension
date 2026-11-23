@@ -19,6 +19,8 @@ const DODGE_SPEED := 520.0
 const ACCELERATION := 2400.0
 const DECELERATION := 3000.0
 const AIM_DEADZONE := 0.25
+## A raised ward is walked behind, not run behind.
+const GUARD_MOVE_MULT := 0.45
 
 var display_name := "Wanderer"
 ## Code-drawn looks: robe, hair and skin palettes plus a presentation line.
@@ -61,6 +63,12 @@ var _cooldown := 0.0
 var _dodge_timer := 0.0
 var _dodge_cooldown := 0.0
 var _iframes := 0.0
+## Guard stance: held means the ward is up, guard_time feeds the parry window,
+## and guard_broken counts down the seconds before it can be raised again.
+var _guard_held := false
+var _guard_time := 0.0
+var _guard_broken := 0.0
+var _parry_flash := 0.0
 var _meditating := false
 ## Seconds of "recent combat" left; the Sword Heart method feeds on it.
 var _combat_timer := 0.0
@@ -373,6 +381,13 @@ func _physics_process(delta: float) -> void:
 		try_attack()
 	if Input.is_action_just_pressed("light_attack"):
 		try_light_attack()
+	# The ward is a hold, not a press: it rises on the first held frame and drops
+	# the moment the key is released, so the stance never sticks.
+	var wants_guard := Input.is_action_pressed("block")
+	if wants_guard and not _guard_held and _attack_state == "idle":
+		set_guard(true)
+	elif not wants_guard:
+		set_guard(false)
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
 	if Input.is_action_just_pressed("meditate"):
@@ -383,10 +398,13 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var speed := stats.move_speed()
-	_sprinting = Input.is_action_pressed("sprint") and input_dir != Vector2.ZERO and _attack_state == "idle"
+	_sprinting = Input.is_action_pressed("sprint") and input_dir != Vector2.ZERO \
+		and _attack_state == "idle" and not is_guarding()
 	speed = Motion.sprint_speed(speed, _sprinting)
 	if _attack_state != "idle":
 		speed *= 0.45
+	if is_guarding():
+		speed *= GUARD_MOVE_MULT
 	var desired := input_dir.normalized() * speed
 	velocity = Motion.approach(velocity, desired, ACCELERATION, DECELERATION, delta)
 	if input_dir != Vector2.ZERO:
@@ -411,6 +429,10 @@ func _tick_timers(delta: float) -> void:
 	_dodge_cooldown = maxf(0.0, _dodge_cooldown - delta)
 	_dodge_timer = maxf(0.0, _dodge_timer - delta)
 	_iframes = maxf(0.0, _iframes - delta)
+	_guard_broken = maxf(0.0, _guard_broken - delta)
+	_parry_flash = maxf(0.0, _parry_flash - delta)
+	if _guard_held:
+		_guard_time += delta
 	poise.tick(delta)
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
 	_combo_elapsed += delta
@@ -493,7 +515,7 @@ func next_move_name() -> String:
 
 
 func try_attack() -> void:
-	if _attack_state != "idle" or _cooldown > 0.0:
+	if _attack_state != "idle" or _cooldown > 0.0 or is_guarding():
 		return
 	if _meditating:
 		toggle_meditation()
@@ -524,7 +546,7 @@ func try_attack() -> void:
 ## Light strikes and techniques share the frame machine but never the same press,
 ## so a weapon is a real alternative to spending Qi.
 func try_light_attack() -> bool:
-	if _attack_state != "idle" or _cooldown > 0.0 or _dodge_timer > 0.0:
+	if _attack_state != "idle" or _cooldown > 0.0 or _dodge_timer > 0.0 or is_guarding():
 		return false
 	if _meditating:
 		toggle_meditation()
@@ -598,9 +620,10 @@ func armor() -> float:
 
 
 ## `poise_damage` and `knock_force` come from the attacker's blow, so a heavy
-## strike can stagger and throw the body while a light one cannot.
+## strike can stagger and throw the body while a light one cannot. `attacker` is
+## optional and only used by a parry, which throws the blow back at its source.
 func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = true,
-		poise_damage: float = 0.0, knock_force: float = 0.0) -> void:
+		poise_damage: float = 0.0, knock_force: float = 0.0, attacker: Node = null) -> void:
 	if _iframes > 0.0 or hp <= 0.0:
 		return
 	_combat_timer = 6.0
@@ -611,11 +634,53 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 		if stats.evades(roll):
 			Bus.toast.emit("You slip aside.")
 			return
-	var raw := Damage.mitigate_armor(amount, stats.armor())
+
+	# Guarding only meets real blows head-on: a hazard with no poise behind it, or
+	# anything arriving from behind the ward, goes through untouched.
+	var state := guard_state()
+	# The ward is measured against where the blow comes FROM, not where it is
+	# travelling: a player facing right is covered by an attacker on his right.
+	var facing_blow := poise_damage > 0.0 and Defense.covers(_facing, global_position.direction_to(from))
+	if facing_blow and state == "parry":
+		_parry_flash = 0.25
+		Bus.toast.emit("Parried.")
+		if attacker != null and is_instance_valid(attacker) and attacker.has_method("stagger"):
+			attacker.stagger(Defense.reflected_poise(stats))
+		Bus.player_stats_changed.emit()
+		return
+
+	var absorbed := false
+	var guard_broke := false
+	var amount_mult := 1.0
+	if facing_blow and state == "block":
+		if Defense.can_pay(cultivation.qi, amount):
+			absorbed = true
+			cultivation.qi = maxf(0.0, cultivation.qi - Defense.qi_cost(amount, state))
+			amount_mult = Defense.damage_multiplier("block")
+			Bus.cultivation_changed.emit()
+		else:
+			# The ward cannot pay, so it fails. The blow lands with interest and
+			# the body is staggered whatever poise it had left.
+			guard_broke = true
+			_guard_broken = Defense.BREAK_RECOVERY
+			_guard_held = false
+			_guard_time = 0.0
+			cultivation.qi = 0.0
+			amount_mult = Defense.damage_multiplier("broken")
+			knock_force *= Defense.GUARD_BREAK_MULT
+			Bus.toast.emit("Your guard breaks.")
+			Bus.cultivation_changed.emit()
+	elif facing_blow and state == "broken":
+		amount_mult = Defense.damage_multiplier("broken")
+
+	var raw := Damage.mitigate_armor(amount * amount_mult, stats.armor())
 	var final := Damage.resolve(raw, stats.physical_resist() * 100.0, 1.0)
 	hp = maxf(0.0, hp - final)
 	_hurt_flash = 0.18
-	if poise_damage > 0.0:
+	if guard_broke:
+		poise.break_guard(poise_damage * Defense.GUARD_BREAK_MULT)
+		_knock += Combat.knock_impulse(from.direction_to(global_position), knock_force, true)
+	elif not absorbed and poise_damage > 0.0:
 		var broke := poise.apply(poise_damage)
 		_knock += Combat.knock_impulse(from.direction_to(global_position), knock_force, broke)
 		if broke and Combat.interrupts(_attack_state):
@@ -690,7 +755,7 @@ func on_kill(ilvl: int = 1) -> void:
 
 
 func toggle_meditation() -> void:
-	if _attack_state != "idle":
+	if _attack_state != "idle" or is_guarding():
 		return
 	_meditating = not _meditating
 	if _meditating:
@@ -709,6 +774,9 @@ func is_sprinting() -> bool:
 func try_dodge(dir: Vector2) -> void:
 	if _dodge_cooldown > 0.0 or _dodge_timer > 0.0:
 		return
+	# A roll abandons the ward: movement is not a shield.
+	_guard_held = false
+	_guard_time = 0.0
 	# Dash cancel is a Foundation Establishment unlock: before it, a committed
 	# swing cannot be abandoned. The spent Qi is never refunded either way.
 	if _attack_state != "idle":
@@ -726,6 +794,36 @@ func try_dodge(dir: Vector2) -> void:
 	_dodge_timer = 0.18
 	_dodge_cooldown = 1.2
 	_iframes = 0.16 + float(stats.dodge_bonus_frames()) / 60.0
+
+
+## The live guard stance: none, parry, block or broken.
+func guard_state() -> String:
+	return Defense.state_for(_guard_held, _guard_time, _guard_broken)
+
+
+func is_guarding() -> bool:
+	return Defense.is_guarding(guard_state())
+
+
+func is_guard_broken() -> bool:
+	return _guard_broken > 0.0
+
+
+## Raises or lowers the ward. A broken guard, a swing, a dodge, meditation, a
+## stagger or an empty body all refuse to raise it. Returns whether it is held.
+func set_guard(held: bool) -> bool:
+	if not held:
+		_guard_held = false
+		_guard_time = 0.0
+		return false
+	if _guard_held:
+		return true
+	if _guard_broken > 0.0 or _meditating or _dodge_timer > 0.0 or poise.is_staggered() \
+			or _attack_state != "idle" or hp <= 0.0:
+		return false
+	_guard_held = true
+	_guard_time = 0.0
+	return true
 
 
 ## Attempts the realm breakthrough. Returns the result dictionary for the HUD.
@@ -876,6 +974,20 @@ func _draw() -> void:
 		var base := _facing.angle()
 		var half := _arc_angle * 0.5
 		draw_arc(Vector2.ZERO, _arc_radius, base - half, base + half, 28, Color("#ffffff", 0.8), 6.0)
+
+	# The ward is drawn where it actually covers: a frontal arc, never a bubble.
+	var stance := guard_state()
+	if stance != "none":
+		var guard_base := _facing.angle()
+		var guard_half := deg_to_rad(Defense.GUARD_ARC) * 0.5
+		var guard_color := Color("#9fd0ff", 0.55)
+		if stance == "parry":
+			guard_color = Color("#ffe08a", 0.85)
+		elif stance == "broken":
+			guard_color = Color("#e06060", 0.7)
+		draw_arc(Vector2.ZERO, RADIUS + 15.0, guard_base - guard_half, guard_base + guard_half, 24, guard_color, 3.0)
+	if _parry_flash > 0.0:
+		draw_arc(Vector2.ZERO, RADIUS + 21.0, 0.0, TAU, 32, Color("#fff3c0", 0.8), 2.0)
 
 
 func to_dict() -> Dictionary:

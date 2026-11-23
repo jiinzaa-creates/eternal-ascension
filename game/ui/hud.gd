@@ -184,7 +184,7 @@ func draw_world_panel(player: Player) -> void:
 	var w := size.x
 	var x := w - 316.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 158.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 176.0), PANEL_BG)
 	_text(Vector2(x, y), "%s   %s   %s" % [Clock.label(), Weather.label(), host.current_biome_name()], 13, MUTED)
 	y += 18.0
 	_text(Vector2(x, y), "%s   Kills %d   Karma %d" % [player.display_name, Game.kills, Game.karma], 12, MUTED)
@@ -205,6 +205,18 @@ func draw_world_panel(player: Player) -> void:
 		_text(Vector2(x, y), "Next strike: %s  (%d/%d)" % [
 			next_move, player.next_combo_step() + 1, Weapons.moves(player.weapon_type_id()).size()
 		], 11, MUTED)
+	y += 18.0
+	# Guard reads straight from the stance the damage path uses, so the HUD can
+	# never promise a ward the body is not holding.
+	var stance := player.guard_state()
+	var stance_color := MUTED
+	if stance == "parry":
+		stance_color = Color("#ffe08a")
+	elif stance == "broken":
+		stance_color = Color("#e07070")
+	elif stance == "block":
+		stance_color = Color("#9fd0ff")
+	_text(Vector2(x, y), "Guard: %s   (hold CTRL / MMB)" % Defense.label(stance), 11, stance_color)
 
 
 ## Compass to the chosen waypoint, with the distance to it.
@@ -324,11 +336,11 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))
-	var pad := "Gamepad: left stick move · right stick aim · X attack · A dodge · B interact · Y meditate · RB sprint · LB shop · DPAD travel/waypoint"
+	var pad := "Gamepad: left stick move · right stick aim · X attack · LS click guard · A dodge · B interact · Y meditate · RB sprint · LB shop · DPAD travel/waypoint"
 	_text(Vector2(24.0, size.y - 60.0), pad, 11, Color("#6b7b84"))
 
 

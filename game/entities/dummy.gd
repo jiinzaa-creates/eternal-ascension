@@ -122,7 +122,18 @@ func _release_attack(target: Node2D) -> void:
 	if not Combat.in_hitbox(global_position, Vector2.RIGHT, reach, target.global_position, 18.0):
 		return
 	if target.has_method("take_hit"):
-		target.take_hit(damage, global_position, true, strike_poise, knockback)
+		target.take_hit(damage, global_position, true, strike_poise, knockback, self)
+
+
+## A parry turns the blow back on its source. The wind-up is spoiled and the
+## guard meter takes the reflected force, so a parry is a real opening.
+func stagger(poise_damage: float) -> void:
+	if _dead:
+		return
+	poise.apply(maxf(0.0, poise_damage))
+	_windup = 0.0
+	_cooldown = maxf(_cooldown, 0.35)
+	queue_redraw()
 
 
 ## `penetration` is the attacker's fraction of ignored armour (0..0.6).

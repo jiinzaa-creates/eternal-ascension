@@ -13,6 +13,7 @@ const KEY_BINDINGS := {
 	"sprint": [KEY_SHIFT],
 	"attack": [],
 	"dodge": [KEY_SPACE],
+	"block": [KEY_CTRL],
 	"meditate": [KEY_F],
 	"interact": [KEY_E],
 	"breakthrough": [KEY_G],
@@ -48,6 +49,7 @@ const KEY_BINDINGS := {
 const MOUSE_BINDINGS := {
 	"attack": [MOUSE_BUTTON_LEFT],
 	"light_attack": [MOUSE_BUTTON_RIGHT],
+	"block": [MOUSE_BUTTON_MIDDLE],
 }
 
 ## Gamepad axes. Each entry is [axis, direction]; `Input.get_vector` combines the
@@ -76,6 +78,7 @@ const JOY_BUTTON_BINDINGS := {
 	"travel_waypoint": [JOY_BUTTON_DPAD_LEFT],
 	"creation_origin": [JOY_BUTTON_RIGHT_SHOULDER],
 	"light_attack": [JOY_BUTTON_DPAD_RIGHT],
+	"block": [JOY_BUTTON_LEFT_STICK],
 }
 
 ## Content toggles. Captivity is a moral/legal simulation, not an inventory system,

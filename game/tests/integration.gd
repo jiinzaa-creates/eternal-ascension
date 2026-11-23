@@ -1394,6 +1394,91 @@ func _run() -> void:
 	player.hp = player.hp_max
 	player.poise.reset()
 
+	# --- defense: guard, parry and guard break ---------------------------------
+	player._iframes = 0.0
+	player._dodge_timer = 0.0
+	player._attack_state = "idle"
+	player._attack_timer = 0.0
+	player._guard_broken = 0.0
+	player._guard_held = false
+	player._guard_time = 0.0
+	player._knock = Vector2.ZERO
+	player.poise.reset()
+	player.hp = player.hp_max
+	player._facing = Vector2.RIGHT
+	# No evasion: a guard test must not be decided by a fortunate slip.
+	var guard_dex := player.attrs.get_attr("dex")
+	player.attrs.add("dex", -guard_dex)
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+
+	check(player.guard_state() == "none", "a lowered guard is no stance")
+	check(player.set_guard(true), "a guard can be raised out of combat")
+	check(player.guard_state() == "parry", "a fresh guard opens the parry window")
+	check(player.is_guarding(), "a held guard guards")
+
+	var guard_dummy := Dummy.new()
+	guard_dummy.ilvl = 1
+	guard_dummy.aggressive = false
+	main.add_child(guard_dummy)
+	guard_dummy.global_position = player.global_position + Vector2(30, 0)
+	var parry_hp := player.hp
+	var parry_qi := player.cultivation.qi
+	var parry_poise: float = guard_dummy.poise.current
+	guard_dummy._release_attack(player)
+	check(approx(player.hp, parry_hp), "a parry turns the blow aside")
+	check(approx(player.cultivation.qi, parry_qi), "a parry costs no Qi")
+	check(guard_dummy.poise.current < parry_poise or guard_dummy.poise.is_staggered(), "a parry throws the force back")
+	check(guard_dummy._windup <= 0.0, "a parry spoils the attacker's wind-up")
+
+	player._guard_held = true
+	player._guard_time = Defense.PARRY_WINDOW + 0.1
+	player.hp = player.hp_max
+	player.poise.reset()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	var block_qi := player.cultivation.qi
+	var block_hp := player.hp
+	player.take_hit(40.0, player.global_position + Vector2(30, 0), false, 12.0, 120.0)
+	var blocked_loss: float = block_hp - player.hp
+	check(blocked_loss > 0.0 and blocked_loss < 40.0, "a blocked blow hurts far less")
+	check(player.cultivation.qi < block_qi, "a block spends Qi")
+	check(approx(player.poise.current, player.poise.maximum), "a block spends Qi instead of poise")
+
+	player.poise.reset()
+	player._guard_held = true
+	player._guard_time = Defense.PARRY_WINDOW + 0.1
+	player.hp = player.hp_max
+	var open_hp := player.hp
+	player.take_hit(40.0, player.global_position + Vector2(-30, 0), false, 12.0, 120.0)
+	check(open_hp - player.hp > blocked_loss, "a blow from behind ignores the guard")
+
+	player.poise.reset()
+	player.cultivation.qi = 0.0
+	player._guard_broken = 0.0
+	check(player.set_guard(true), "a guard can be raised again after a block")
+	player._guard_time = Defense.PARRY_WINDOW + 0.1
+	player.hp = player.hp_max
+	var break_hp := player.hp
+	player.take_hit(40.0, player.global_position + Vector2(30, 0), false, 12.0, 120.0)
+	check(player.is_guard_broken(), "an unpaid block breaks the guard")
+	check(player.guard_state() == "broken", "the broken stance is reported")
+	check(player.poise.is_staggered(), "a guard break staggers the body")
+	check(break_hp - player.hp > blocked_loss, "a broken guard takes more than a held one")
+	check(approx(player.cultivation.qi, 0.0), "the failed ward drains the reserve")
+	check(not player.set_guard(true), "a broken guard cannot be raised")
+
+	player.poise.tick(3.0)
+	player._guard_broken = 0.0
+	player._guard_held = false
+	player._guard_time = 0.0
+	player._knock = Vector2.ZERO
+	player.attrs.add("dex", guard_dex)
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player.hp = player.hp_max
+	player.poise.reset()
+	guard_dummy.queue_free()
+
 	# --- weapon framework ------------------------------------------------------
 	player.equipment["weapon"] = {
 		"id": "item.test.jian", "base": "base.sword.iron_jian", "weapon_type": "sword",

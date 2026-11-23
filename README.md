@@ -22,6 +22,7 @@ an inheritance, and a crash-safe save system.
 | Weapon strike (chain) | Right mouse |
 | Attack with selected technique | Left mouse |
 | Aim | Mouse or right stick |
+| Guard / parry (hold) | Ctrl (or middle mouse) |
 | Dodge (i-frames) | Space |
 | Meditate / cultivate | F |
 | Realm breakthrough (at peak, full Qi) | G |
@@ -36,8 +37,8 @@ an inheritance, and a crash-safe save system.
 | Toggle help | F1 |
 
 Gamepad: left stick moves, right stick aims, **X** performs the selected technique, **D-pad
-right** strikes with the equipped weapon, **A** dodges, **B** interacts, **Y** meditates, **RB**
-sprints, **D-pad up** attempts a breakthrough.
+right** strikes with the equipped weapon, **LS click** guards, **A** dodges, **B** interacts, **Y**
+meditates, **RB** sprints, **D-pad up** attempts a breakthrough.
 
 On the creation screen: **1–6** allocate a point to STR / DEX / AGI / INT / WIS / CHA,
 **Backspace** refunds the last point, **R** rerolls your spiritual root, **Enter** begins.
@@ -50,7 +51,9 @@ On the creation screen: **1–6** allocate a point to STR / DEX / AGI / INT / WI
    the sect hall and starts *The Azure Cloud Invitation*: talk, slay 3 beasts, gather 2 spirit
    herbs, attune at the shrine, return. Reward: a technique, a passive, spirit stones.
 3. **Fight** — enemies telegraph, then strike. Your weapon's own moveset chains on right-click,
-   techniques spend Qi on left-click, and poise, stagger, knockback, dodge i-frames all apply. Kills drop generated items you can pick up and auto-equip.
+   techniques spend Qi on left-click, and poise, stagger, knockback, dodge i-frames all apply.
+   Hold guard to meet a blow: the opening moments parry it for free, and a held block spends Qi until
+   the reserve fails and the ward breaks. Kills drop generated items you can pick up and auto-equip.
 4. **Cultivate** — meditate to gather Qi, advance through 10 sublevels, then face a
    breakthrough at the peak. Failure causes Qi deviation, meridian damage, or regression.
 5. **The Rift** — east of the market, a portal opens the *Tomb of the Hollow Moon*, a seeded
@@ -98,6 +101,12 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - 12 realms × 10 sublevels as one data-driven ladder: every sublevel raises Qi capacity (1 → 4.15×, banded Early/Middle/Late/Peak), every realm is a multiplier with cumulative unlocks and one realm art, breakthroughs scale with behaviour and their failures cost something, and the twelfth realm is a guarded apex.
 - Realm arts and unlocks: each realm declares what it opens (Qi Sense, Dash Cancel, Meridian Opening, Technique Weaving, Flight, …) and one art whose mods feed the stat pipeline; dash cancel (realm 2) really lets a dodge abandon a swing, and technique weaving (realm 5) really cuts Qi cost and cooldown by 10%.
 - Weapon framework: every weapon category — sword, saber, staff, whip and bare hands — owns its own light-attack moveset. Each category carries its own chain of strikes (frame data, arc, damage multiplier, poise and knockback), its own reach, speed and weight, and a chain window; the equipped weapon picks the moveset, chains advance and wrap while the window is open, and a weapon strike costs no Qi while techniques stay on their own press. Weapon categories load from `data/weapons.json`, generated weapons carry their category, and old items resolve through their base id to the same moveset.
+- Defense: hold guard for a frontal ward. Its first moments are a parry window that turns a blow aside
+  for free and throws the force back at the attacker; past it, a block spends Qi per absorbed blow while
+  armour and resistances still soften the rest. Guard only covers the front, never a hazard or a
+  tribulation bolt, and an unpaid block breaks instead: the blow lands harder, poise is emptied, the
+  reserve is lost and the ward cannot be raised again for a moment. A raised guard cannot attack or
+  sprint, and a dodge drops it.
 - Combat architecture: one shared rules layer (`Combat` + `Poise`) for both the player and every enemy — 60 Hz frame phases with attack-speed timing, arc or full-circle hitbox geometry that honours facing, reach and body radius, poise meters that stagger on the breaking blow, knockback impulses, and interruption of a wind-up but not a committed swing. The player now has poise and stagger of his own, and enemy blows carry poise and knockback; a stagger cancels meditation and can cancel an attack in startup.
 - Lifespan and aging: the body has an age read from the world calendar (one year every 24 days of play). Past 60% of its realm's lifespan it enters middle age, old age and fading years; STR, DEX and AGI decline up to 35% while WIS, INT and CHA are spared, with a one-time warning at each stage. At the lifespan the run ends with a quiet summary screen (ENTER begins a new life), an ended run cannot be saved, and a dead save loads back into that screen. Realm 12 is ageless.
 - Enlightenment: understanding accrues from real play — meditating with a method, every kill, surviving a tribulation, breaking through — and fills a comprehension meter. A full meter rolls a deterministic, weighted epiphany among insights you qualify for (by realm and practised method); an insight is permanent and adds its mods to the one stat pipeline, with thirteen in `data/enlightenments.json` from Still Water Clarity to Primordial Glimpse. The meter and learned insights are shown on the HUD and saved.

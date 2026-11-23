@@ -42,6 +42,18 @@ func apply(poise_damage: float) -> bool:
 	return true
 
 
+## A guard break staggers whatever is left in the meter: the ward failed, so the
+## body is carried by the blow even if its poise was nearly full. Returns false
+## when the body is already staggering, because a stagger never chains.
+func break_guard(poise_damage := 0.0) -> bool:
+	if stagger > 0.0:
+		return false
+	breaks += 1
+	stagger = stagger_for(maxf(35.0, poise_damage))
+	current = maximum
+	return true
+
+
 ## Stagger length grows with the force of the breaking blow, within limits.
 static func stagger_for(poise_damage: float) -> float:
 	return clampf(0.35 + maxf(0.0, poise_damage) * 0.01, 0.35, 0.9)

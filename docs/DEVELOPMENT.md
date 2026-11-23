@@ -558,6 +558,32 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Any new mechanic here belongs in `Weapons` with checks in `run_tests`, and a scene-level check
   in `integration.gd` before it is called working.
 
+## Defense
+
+- **Guarding is a stance, not an ability.** `Defense` is pure: it maps
+  `(holding, elapsed, broken)` to `none | parry | block | broken`, decides whether a blow is inside the
+  ward's `GUARD_ARC` (140°, facing only), what the blow costs and what it leaves behind. `Player` owns
+  only the timers and calls it from `take_hit`, so the HUD and the damage path cannot disagree.
+- **Parry is the opening of the stance**, not a separate key: the first `PARRY_WINDOW` (0.22 s) of a held
+  guard turns a frontal blow aside for free and throws `Defense.reflected_poise(stats)` back at the
+  attacker. `Dummy.stagger()` spoils its wind-up and spends its poise meter, so a parry is a real turn.
+  `take_hit(..., attacker)` is the only new argument on the damage path and defaults to `null`.
+- **Blocking spends Qi, not poise.** `qi_cost = 3 + 0.8 × raw`; armour and resistances still apply to the
+  `BLOCK_DAMAGE_MULT` (35%) that gets through. A block that cannot be paid for is not half-blocked: it
+  **breaks** — `Poise.break_guard()` staggers whatever meter was left, the blow lands at
+  `GUARD_BREAK_MULT` (125%) with extra knockback, all Qi is lost and the ward cannot be raised for
+  `BREAK_RECOVERY` (1.6 s).
+- **Only real blows are guardable.** A hazard (`can_evade = false`, no poise behind it), a tribulation
+  bolt (`take_tribulation_damage`), or anything arriving outside the arc goes through untouched. A blow
+  with no origin is never covered, which is why `Defense.covers` rejects a zero vector.
+- **What it costs in play:** a raised guard cannot attack, meditate or sprint, and it walks at 45%
+  speed; dodging drops the ward, and a stagger refuses to raise it. Nothing here is saved — a stance is
+  transient, so there is no schema bump.
+- Inputs: `block` is `CTRL` / middle mouse / gamepad left-stick click (`core/settings.gd`). Keep the
+  guard on a hold; do not turn it into a toggle, because the parry window is defined by when it rose.
+- Any new defensive rule belongs in `Defense` (or `Poise` for the meter) with checks in `run_tests`, and
+  a scene-level check in `integration.gd` before it is called working.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.

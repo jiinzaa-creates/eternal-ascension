@@ -33,6 +33,7 @@ func _ready() -> void:
 	_aging_tests()
 	_combat_arch_tests()
 	_weapon_tests()
+	_defense_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1528,6 +1529,60 @@ func _weapon_tests() -> void:
 	var blade := generator.generate(20, 501, 0, 3, "weapon")
 	check(String(blade.get("weapon_type", "")) != "", "a generated weapon carries its category")
 	check(not Weapons.find(Weapons.type_id_for(blade)).is_empty(), "a generated weapon resolves to a real moveset")
+
+
+# ------------------------------------------------------------- defense ----
+
+func _defense_tests() -> void:
+	print("[defense] guard stance, parry window, guard break")
+	check(Defense.state_for(false, 0.0, 0.0) == "none", "a lowered guard is no stance")
+	check(Defense.state_for(true, 0.0, 0.0) == "parry", "a fresh guard opens the parry window")
+	check(Defense.state_for(true, Defense.PARRY_WINDOW, 0.0) == "parry", "the window includes its last moment")
+	check(Defense.state_for(true, Defense.PARRY_WINDOW + 0.01, 0.0) == "block", "past the window the guard is a plain block")
+	check(Defense.state_for(true, 0.0, 0.5) == "broken", "a broken guard overrides the stance")
+	check(Defense.state_for(false, 0.0, 0.5) == "broken", "a broken guard stays broken while it recovers")
+	check(Defense.is_guarding("parry") and Defense.is_guarding("block"), "the live stances guard")
+	check(not Defense.is_guarding("broken") and not Defense.is_guarding("none"), "broken and lowered do not guard")
+
+	check(Defense.covers(Vector2.RIGHT, Vector2.RIGHT), "a blow from the front is covered")
+	check(Defense.covers(Vector2.RIGHT, Vector2(1, 1).normalized()), "a diagonal in front is covered")
+	check(not Defense.covers(Vector2.RIGHT, Vector2.LEFT), "a blow from behind is not covered")
+	check(not Defense.covers(Vector2.RIGHT, Vector2(-1, 1).normalized()), "a rear diagonal is not covered")
+	check(Defense.covers(Vector2.RIGHT, Vector2(0, 1), 360.0), "a full ward covers every side")
+	check(not Defense.covers(Vector2.ZERO, Vector2.RIGHT), "a body with no facing guards nothing")
+	check(not Defense.covers(Vector2.RIGHT, Vector2.ZERO), "a blow from nowhere is not blockable")
+
+	check(approx(Defense.damage_multiplier("parry"), 0.0), "a parry takes no damage")
+	check(approx(Defense.damage_multiplier("block"), Defense.BLOCK_DAMAGE_MULT), "a block takes a fraction")
+	check(approx(Defense.damage_multiplier("broken"), Defense.GUARD_BREAK_MULT), "a broken guard takes extra")
+	check(approx(Defense.damage_multiplier("none"), 1.0), "an unguarded blow takes full damage")
+	check(Defense.BLOCK_DAMAGE_MULT < 1.0 and Defense.GUARD_BREAK_MULT > 1.0, "blocking and breaking sit on opposite sides of one")
+	check(approx(Defense.poise_multiplier("block"), 0.0), "a block spends Qi, not poise")
+	check(approx(Defense.poise_multiplier("parry"), 0.0), "a parry spends nothing")
+	check(approx(Defense.poise_multiplier("none"), 1.0), "an unguarded blow still spends poise")
+	check(Defense.poise_multiplier("broken") > 1.0, "a broken guard staggers harder")
+
+	check(approx(Defense.qi_cost(20.0, "parry"), 0.0), "a parry is free")
+	check(approx(Defense.qi_cost(20.0, "block"), Defense.QI_BASE_COST + 20.0 * Defense.QI_PER_DAMAGE), "a block is paid per point of blow")
+	check(Defense.qi_cost(40.0, "block") > Defense.qi_cost(20.0, "block"), "heavier blows cost more Qi")
+	check(approx(Defense.qi_cost(-5.0, "block"), Defense.QI_BASE_COST), "a negative blow still costs the floor")
+	check(Defense.can_pay(1000.0, 20.0), "a full reserve pays for a blow")
+	check(not Defense.can_pay(0.0, 20.0), "an empty reserve cannot")
+	check(not Defense.can_pay(Defense.QI_BASE_COST + 20.0 * Defense.QI_PER_DAMAGE - 0.5, 20.0), "an almost-sufficient reserve still breaks")
+
+	var guard := Poise.new(60.0)
+	check(guard.break_guard(10.0) and guard.is_staggered(), "a guard break staggers whatever poise is left")
+	check(guard.stagger >= 0.7, "a guard break is a long stagger")
+	check(approx(guard.current, guard.maximum), "a broken guard refills")
+	check(not guard.break_guard(10.0), "an already staggered body cannot break twice")
+
+	var defense_stats := StatBlock.new(Attributes.new())
+	check(Defense.reflected_poise(defense_stats) > 0.0, "a parry throws poise back")
+	var strong := Attributes.new()
+	strong.add("str", 40)
+	var strong_stats := StatBlock.new(strong)
+	check(Defense.reflected_poise(strong_stats) > Defense.reflected_poise(defense_stats), "strength makes the riposte heavier")
+	check(Defense.label("parry") != Defense.label("block") and Defense.label("broken") == "BROKEN", "the HUD labels each stance")
 
 
 # -------------------------------------------------------------- aging ----
