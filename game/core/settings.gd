@@ -37,6 +37,11 @@ const KEY_BINDINGS := {
 	"accept": [KEY_ENTER],
 	"reroll": [KEY_R],
 	"undo_point": [KEY_BACKSPACE],
+	"creation_origin": [KEY_TAB],
+	"creation_robe": [KEY_Z],
+	"creation_hair": [KEY_X],
+	"creation_skin": [KEY_C],
+	"creation_presentation": [KEY_N],
 }
 
 const MOUSE_BINDINGS := {
@@ -67,6 +72,7 @@ const JOY_BUTTON_BINDINGS := {
 	"shop_mode": [JOY_BUTTON_LEFT_SHOULDER],
 	"open_travel": [JOY_BUTTON_DPAD_DOWN],
 	"travel_waypoint": [JOY_BUTTON_DPAD_LEFT],
+	"creation_origin": [JOY_BUTTON_RIGHT_SHOULDER],
 }
 
 ## Content toggles. Captivity is a moral/legal simulation, not an inventory system,

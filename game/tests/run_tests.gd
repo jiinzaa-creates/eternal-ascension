@@ -30,6 +30,7 @@ func _ready() -> void:
 	_location_tests()
 	_travel_tests()
 	_simulation_tests()
+	_origin_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -835,6 +836,62 @@ func _simulation_tests() -> void:
 	check(npc.current_activity != "", "an NPC without a home does not crash when snapping")
 	npc.free()
 	settlement.free()
+
+
+# -------------------------------------------------------------- origins ----
+
+func _origin_tests() -> void:
+	print("[origins] circumstances, references and appearance")
+	check(DB.origins.size() >= 4, "at least four origins are defined (%d)" % DB.origins.size())
+	var seen := {}
+	for entry in DB.origins:
+		var fx := Origin.effects(entry)
+		var id := String(fx["id"])
+		check(id != "", "every origin has an id")
+		seen[id] = true
+		check(String(fx["name"]) != "", "%s has a name" % id)
+		check(String(fx["blurb"]) != "" and String(fx["condition"]) != "", "%s has circumstances" % id)
+		check(int(fx["stones"]) >= 0 and int(fx["stones"]) <= Origin.MAX_STONES, "%s keeps its purse sane" % id)
+		check(DB.has("method", String(fx["method_id"])), "%s names a real method" % id)
+		if String(fx["passive"]) != "":
+			check(DB.has("passive", String(fx["passive"])), "%s names a real passive" % id)
+		check(Origin.summary(entry).begins_with(String(fx["name"])), "%s summarises itself" % id)
+	check(seen.size() == DB.origins.size(), "origin ids are unique")
+
+	check(String(DB.origin("origin.fallen_clan").get("name", "")) == "Fallen Clan Heir", "origins are indexed by id")
+	check(DB.origin("origin.missing").is_empty(), "an unknown origin is empty")
+
+	var first := String((DB.origins[0] as Dictionary).get("id", ""))
+	var second := Origin.next(DB.origins, first, 1)
+	check(second != first, "cycling moves to another origin")
+	check(Origin.next(DB.origins, second, -1) == first, "cycling back returns to the first")
+	check(Origin.next(DB.origins, "origin.none", 1) == second, "an unknown current origin starts from the first")
+	var last_id := String((DB.origins[DB.origins.size() - 1] as Dictionary).get("id", ""))
+	check(Origin.next(DB.origins, last_id, 1) == first, "the origin list wraps")
+
+	var appearance := Appearance.new()
+	check(appearance.robe_color() == Color(Appearance.ROBES[0]), "the default robe is the first palette entry")
+	check(appearance.pronouns() == Appearance.PRESENTATIONS[0], "the default presentation is the first entry")
+	appearance.cycle("robe")
+	check(appearance.robe == 1 and appearance.robe_color() == Color(Appearance.ROBES[1]), "cycling changes the robe")
+	appearance.cycle("robe", -1)
+	check(appearance.robe == 0, "cycling backwards returns")
+	appearance.cycle("robe", -1)
+	check(appearance.robe == Appearance.ROBES.size() - 1, "the palette wraps backwards")
+	appearance.cycle("hair")
+	appearance.cycle("skin")
+	appearance.cycle("presentation")
+	check(appearance.hair == 1 and appearance.skin == 1 and appearance.presentation == 1, "hair, skin and presentation cycle")
+	check(appearance.label() != "", "appearance labels itself")
+
+	var saved := appearance.to_dict()
+	var restored := Appearance.new()
+	restored.from_dict(saved)
+	check(restored.to_dict() == saved, "appearance round-trips through a save")
+	var crazy := Appearance.new()
+	crazy.from_dict({"robe": 999, "hair": -4, "skin": 40, "presentation": -1})
+	check(crazy.robe == Appearance.ROBES.size() - 1, "a wild robe index is clamped")
+	check(crazy.hair == 0 and crazy.skin == Appearance.SKINS.size() - 1 and crazy.presentation == 0, "other appearance fields clamp too")
 
 
 # -------------------------------------------------------------------- npc ----

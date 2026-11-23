@@ -1,0 +1,40 @@
+{
+  "origins": [
+    {
+      "id": "origin.sect_orphan",
+      "name": "Sect Orphan",
+      "blurb": "Raised on the sect's rice and its rules. You own nothing but a place in the dormitory.",
+      "stones": 40,
+      "method_id": "method.traditional",
+      "passive": "",
+      "condition": "Fed, housed and owed: the sect expects repayment."
+    },
+    {
+      "id": "origin.merchant_child",
+      "name": "Merchant's Child",
+      "blurb": "Ledgers, weights and the smell of salt. You arrive with coin and very little patience.",
+      "stones": 180,
+      "method_id": "method.traditional",
+      "passive": "passive.spiritual_perception",
+      "condition": "Rich enough to buy your first year, not your second."
+    },
+    {
+      "id": "origin.hunters_child",
+      "name": "Hunter's Child",
+      "blurb": "You grew up reading tracks instead of manuals, and the wilds never frightened you.",
+      "stones": 60,
+      "method_id": "method.body",
+      "passive": "passive.beast_taming_instinct",
+      "condition": "Your body is tempered; your meridians are not."
+    },
+    {
+      "id": "origin.fallen_clan",
+      "name": "Fallen Clan Heir",
+      "blurb": "Your family name used to open doors. Now it closes them.",
+      "stones": 0,
+      "method_id": "method.sword",
+      "passive": "passive.sword_heart",
+      "condition": "Proud, trained, and without a single spirit stone."
+    }
+  ]
+}

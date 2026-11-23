@@ -45,6 +45,22 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Character creation
+
+- Two screens, one flag: `main.creation_stage` 0 is formation points, 1 is identity. ENTER advances,
+  BACKSPACE goes back, and only stage 1 starts the run.
+- Origins are content (`data/origins.json`) and small on purpose: a purse, a starting method and at
+  most one passive. A background that decided the build would make formation points pointless.
+  `Origin.effects` clamps stones and `DB.validate` checks every method/passive reference.
+- `_apply_origin()` runs **once**, from `_begin_run()`; a loaded save already holds the effects, so
+  loading must never re-apply them. This is why origin is not applied in `Game.from_dict`.
+- Appearance is palette indices (`Appearance`), never colours in the save: reordering a palette would
+  silently restyle every existing character, so append only. Out-of-range indices are clamped.
+- The player draws robe, skin and hair from `appearance`; hurt and i-frame tints still override the
+  robe, so state always reads over cosmetics.
+- Presentation is currently a pronoun line (`she/her`, `he/him`, `they/them`) and is cosmetic by
+  design. Nothing gates on it.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

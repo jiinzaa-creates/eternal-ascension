@@ -11,6 +11,8 @@ const WILD_DUMMY_TARGET := 4
 const RESPAWN_INTERVAL := 8.0
 
 var phase := "creation"  # creation | play | realm
+## Character creation is two screens: formation points, then identity.
+var creation_stage := 0
 var player: Player
 var hud: Hud
 var chunks: ChunkManager
@@ -351,11 +353,40 @@ func refund_attribute() -> bool:
 
 
 func _begin_run() -> void:
+	_apply_origin()
 	phase = "play"
 	player.rebuild_stats()
 	player.hp = player.hp_max
 	player.spawn_point = settlement.position_for("plaza")
 	Bus.toast.emit("Azure Cloud Market. Elder Bai waits by the sect hall.")
+
+
+func creation_origins() -> Array:
+	return DB.origins
+
+
+func selected_origin() -> Dictionary:
+	var origin: Dictionary = DB.origin(Game.origin_id)
+	if origin.is_empty() and not DB.origins.is_empty():
+		return DB.origins[0]
+	return origin
+
+
+## Starting circumstances: a purse, a starting method and at most one passive.
+## Applied once when the run begins; a loaded save already contains the result.
+func _apply_origin() -> void:
+	var origin: Dictionary = DB.origin(Game.origin_id)
+	if origin.is_empty():
+		return
+	var fx := Origin.effects(origin)
+	Game.spirit_stones += int(fx["stones"])
+	var method_id := String(fx["method_id"])
+	if method_id != "" and DB.has("method", method_id):
+		player.cultivation.method_id = method_id
+	var passive := String(fx["passive"])
+	if passive != "":
+		player.add_passive(passive)
+	Bus.toast.emit("Origin — %s. %s" % [String(fx["name"]), String(fx["condition"])])
 
 
 # --------------------------------------------------------------- loop ----
@@ -685,18 +716,43 @@ func toggle_map() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if phase == "creation":
 		if event.is_action_pressed("accept"):
-			_begin_run()
-		elif event.is_action_pressed("reroll"):
+			if creation_stage == 0:
+				creation_stage = 1
+			else:
+				_begin_run()
+			return
+		if event.is_action_pressed("undo_point"):
+			if creation_stage == 1:
+				creation_stage = 0
+			else:
+				refund_attribute()
+			return
+		if event.is_action_pressed("reroll"):
 			player.cultivation.root_tier = _roll_root()
 			player.rebuild_stats()
 			Bus.cultivation_changed.emit()
 			Bus.toast.emit("Your root shifts.")
-		elif event.is_action_pressed("undo_point"):
-			refund_attribute()
-		else:
+			return
+		if event.is_action_pressed("creation_origin"):
+			Game.origin_id = Origin.next(DB.origins, Game.origin_id, 1)
+			return
+		if event.is_action_pressed("creation_robe"):
+			player.appearance.cycle("robe")
+			return
+		if event.is_action_pressed("creation_hair"):
+			player.appearance.cycle("hair")
+			return
+		if event.is_action_pressed("creation_skin"):
+			player.appearance.cycle("skin")
+			return
+		if event.is_action_pressed("creation_presentation"):
+			player.appearance.cycle("presentation")
+			return
+		if creation_stage == 0:
 			for i in Attributes.KEYS.size():
 				if event.is_action_pressed("skill_%d" % (i + 1)):
 					allocate_attribute(Attributes.KEYS[i])
+					return
 		return
 
 	if travel_open:

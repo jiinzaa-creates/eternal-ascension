@@ -19,6 +19,7 @@ var passives: Array = []
 var quests: Array = []
 var npc_data: Dictionary = {}
 var biomes: Array = []
+var origins: Array = []
 
 var _by_id: Dictionary = {}
 
@@ -44,6 +45,7 @@ func load_all() -> void:
 	quests = _read("quests.json").get("quests", [])
 	npc_data = _read("npcs.json")
 	biomes = _read("biomes.json").get("biomes", [])
+	origins = _read("origins.json").get("origins", [])
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -55,6 +57,7 @@ func load_all() -> void:
 	_index("passive", passives)
 	_index("quest", quests)
 	_index("biome", biomes)
+	_index("origin", origins)
 
 
 func _read(file: String) -> Dictionary:
@@ -123,6 +126,10 @@ func quest(id: String) -> Dictionary:
 
 func biome(id: String) -> Dictionary:
 	return by_id("biome", id)
+
+
+func origin(id: String) -> Dictionary:
+	return by_id("origin", id)
 
 
 ## Snapshot of every biome by id. Passed to worker threads, so it is detached
@@ -251,6 +258,28 @@ func validate() -> Array:
 			if String(enemy.get("name", "")) == "":
 				problems.append("biome %s has an unnamed enemy" % id)
 
+	if origins.size() < 3:
+		problems.append("expected at least 3 character origins, found %d" % origins.size())
+	var origin_ids: Dictionary = {}
+	for o in origins:
+		var id := String(o.get("id", ""))
+		if id == "":
+			problems.append("origin without id")
+			continue
+		if origin_ids.has(id):
+			problems.append("duplicate origin id " + id)
+		origin_ids[id] = true
+		if String(o.get("name", "")) == "":
+			problems.append("origin %s has no name" % id)
+		if int(o.get("stones", 0)) < 0 or int(o.get("stones", 0)) > Origin.MAX_STONES:
+			problems.append("origin %s gives %d stones (max %d)" % [id, int(o.get("stones", 0)), Origin.MAX_STONES])
+		var method := String(o.get("method_id", ""))
+		if method != "" and not has("method", method):
+			problems.append("origin %s references unknown method %s" % [id, method])
+		var passive := String(o.get("passive", ""))
+		if passive != "" and not has("passive", passive):
+			problems.append("origin %s references unknown passive %s" % [id, passive])
+
 	# Duplicate IDs across the whole registry would corrupt save references.
 	var seen: Dictionary = {}
 	for kind in ["realm", "root", "method", "technique", "base", "prefix", "suffix", "passive", "quest"]:
@@ -278,4 +307,5 @@ func counts() -> Dictionary:
 		"quests": quests.size(),
 		"archetypes": archetypes().size(),
 		"biomes": biomes.size(),
+		"origins": origins.size(),
 	}

@@ -22,6 +22,8 @@ const DECELERATION := 3000.0
 const AIM_DEADZONE := 0.25
 
 var display_name := "Wanderer"
+## Code-drawn looks: robe, hair and skin palettes plus a presentation line.
+var appearance := Appearance.new()
 var attrs: Attributes
 var stats: StatBlock
 var cultivation: Cultivation
@@ -421,7 +423,7 @@ func _draw() -> void:
 			var alpha := 0.3 - float(i) * 0.08
 			draw_arc(Vector2.ZERO, RADIUS + 10.0 + float(i) * 9.0, 0.0, TAU, 32, Color("#9fe0c0", alpha), 1.5)
 
-	var body := Color("#dbe4ea")
+	var body := appearance.robe_color()
 	if _hurt_flash > 0.0:
 		body = Color("#ff8080")
 	elif _iframes > 0.0:
@@ -443,6 +445,9 @@ func _draw() -> void:
 	draw_line(Vector2(4, -3), Vector2(4.0 + swing * 3.0 + attack * 5.0, -9.0 - attack * 6.0), limb, 2.5)
 	draw_circle(Vector2.ZERO, RADIUS, body)
 	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 28, Color("#232b31"), 2.0)
+	# Head and hair sit inside the silhouette, so appearance reads from above.
+	draw_circle(Vector2(0, -3), 6.0, appearance.skin_color())
+	draw_arc(Vector2(0, -3), 6.5, PI, TAU, 16, appearance.hair_color(), 3.0)
 	draw_line(Vector2.ZERO, _facing * (RADIUS + 7.0 + attack * 6.0), Color("#7fd3e0"), 3.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
@@ -458,6 +463,7 @@ func to_dict() -> Dictionary:
 		equipped[slot] = equipment[slot]
 	return {
 		"display_name": display_name,
+		"appearance": appearance.to_dict(),
 		"position": [global_position.x, global_position.y],
 		"hp": hp,
 		"hp_max": hp_max,
@@ -473,6 +479,7 @@ func to_dict() -> Dictionary:
 
 func from_dict(data: Dictionary) -> void:
 	display_name = String(data.get("display_name", display_name))
+	appearance.from_dict(data.get("appearance", {}))
 	var pos: Array = data.get("position", [global_position.x, global_position.y])
 	global_position = Vector2(float(pos[0]), float(pos[1]))
 	attrs.from_dict(data.get("attrs", {}))

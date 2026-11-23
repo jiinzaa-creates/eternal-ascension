@@ -9,6 +9,9 @@ var kills: int = 0
 var karma: int = 0
 var spirit_stones: int = 0
 var discovered: Dictionary = {}
+## Origin chosen at creation. Applied once, at the start of a run; loading a save
+## never re-applies it, because the effects are already in the save.
+var origin_id: String = ""
 var play_time: float = 0.0
 var running: bool = false
 
@@ -25,6 +28,7 @@ func new_run(seed_value: int = 0) -> void:
 	karma = 0
 	spirit_stones = 0
 	discovered.clear()
+	origin_id = "origin.sect_orphan"
 	play_time = 0.0
 	running = true
 
@@ -51,6 +55,7 @@ func to_dict() -> Dictionary:
 		"karma": karma,
 		"spirit_stones": spirit_stones,
 		"discovered": discovered.duplicate(),
+		"origin": origin_id,
 		"play_time": play_time,
 	}
 
@@ -62,4 +67,5 @@ func from_dict(data: Dictionary) -> void:
 	karma = int(data.get("karma", 0))
 	spirit_stones = int(data.get("spirit_stones", 0))
 	discovered = data.get("discovered", {}).duplicate()
+	origin_id = String(data.get("origin", ""))
 	play_time = float(data.get("play_time", 0.0))

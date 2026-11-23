@@ -247,7 +247,11 @@ func draw_creation(player: Player) -> void:
 	y += 26.0
 	var sub := "The heavens do not choose you. Begin anyway."
 	_text(Vector2(cx - _text_width(sub, 13) * 0.5, y), sub, 13, MUTED)
-	y += 38.0
+	y += 40.0
+
+	if int(host.creation_stage) == 1:
+		_draw_creation_identity(player, cx, y)
+		return
 
 	var name_line := "Wanderer: %s" % player.display_name
 	_text(Vector2(cx - _text_width(name_line, 17) * 0.5, y), name_line, 17, INK)
@@ -283,7 +287,7 @@ func draw_creation(player: Player) -> void:
 		_text(Vector2(x + 118.0, line_y), _attribute_note(key), 11, MUTED)
 	y += 26.0 * 3.0 + 26.0
 
-	var hint := "1-6 add a point      BACKSPACE refund      R reroll root      ENTER begin your path"
+	var hint := "1-6 add a point      BACKSPACE refund      R reroll root      ENTER continue"
 	_text(Vector2(cx - _text_width(hint, 14) * 0.5, y), hint, 14, INK)
 	y += 34.0
 
@@ -292,6 +296,57 @@ func draw_creation(player: Player) -> void:
 		techs.append(String(DB.technique(String(id)).get("name", id)))
 	var tech_line := "Starting techniques: " + ", ".join(techs)
 	_text(Vector2(cx - _text_width(tech_line, 11) * 0.5, y), tech_line, 11, MUTED)
+
+
+## Second creation screen: who the cultivator was before the formation points.
+func _draw_creation_identity(player: Player, cx: float, y: float) -> void:
+	var heading := "WHO WALKS THE PATH?"
+	_text(Vector2(cx - _text_width(heading, 20) * 0.5, y), heading, 20, ACCENT)
+	y += 26.0
+	var name_line := "Wanderer: %s" % player.display_name
+	_text(Vector2(cx - _text_width(name_line, 15) * 0.5, y), name_line, 15, INK)
+	y += 30.0
+
+	var origin: Dictionary = host.selected_origin()
+	var origins: Array = host.creation_origins()
+	var left := cx - 300.0
+	for i in origins.size():
+		var entry: Dictionary = origins[i]
+		var selected := String(entry.get("id", "")) == String(origin.get("id", ""))
+		var label := "%s %s" % [">" if selected else " ", String(entry.get("name", "?"))]
+		_text(Vector2(left, y + float(i) * 22.0), label, 14, ACCENT if selected else MUTED)
+	y += float(maxi(1, origins.size())) * 22.0 + 12.0
+
+	if not origin.is_empty():
+		var fx := Origin.effects(origin)
+		_text(Vector2(left, y), String(fx["blurb"]), 12, MUTED)
+		y += 18.0
+		_text(Vector2(left, y), Origin.summary(origin), 12, Color("#d8c070"))
+		y += 18.0
+		_text(Vector2(left, y), String(fx["condition"]), 11, Color("#7f9098"))
+		y += 30.0
+
+	_text(Vector2(left, y), "Appearance", 13, INK)
+	y += 22.0
+	y = _swatch_row(left, y, "Robe   Z", Appearance.ROBES, player.appearance.robe)
+	y = _swatch_row(left, y, "Hair   X", Appearance.HAIRS, player.appearance.hair)
+	y = _swatch_row(left, y, "Skin   C", Appearance.SKINS, player.appearance.skin)
+	y += 6.0
+	_text(Vector2(left, y), "Presentation   N     %s" % player.appearance.pronouns(), 12, INK)
+	y += 34.0
+
+	var hint := "TAB origin    Z robe    X hair    C skin    N presentation    BACKSPACE back    ENTER begin"
+	_text(Vector2(cx - _text_width(hint, 13) * 0.5, y), hint, 13, INK)
+
+
+func _swatch_row(x: float, y: float, label: String, colors: Array, selected: int) -> float:
+	_text(Vector2(x, y), label, 12, MUTED)
+	var sx := x + 120.0
+	for i in colors.size():
+		var rect := Rect2(Vector2(sx + float(i) * 26.0, y - 12.0), Vector2(20.0, 14.0))
+		draw_rect(rect, Color(String(colors[i])))
+		draw_rect(rect, ACCENT if i == selected else Color("#2b343a"), false, 2.0 if i == selected else 1.0)
+	return y + 22.0
 
 
 func _attribute_note(key: String) -> String:

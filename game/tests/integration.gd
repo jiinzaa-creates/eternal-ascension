@@ -694,6 +694,37 @@ func _run() -> void:
 				reported = true
 		check(reported, "regrowth is reported when the player returns")
 
+	# --- character origin and appearance --------------------------------------
+	check(not DB.origin(Game.origin_id).is_empty(), "the run records an origin")
+	check(int(main.creation_stage) == 0, "creation starts on the formation screen")
+
+	Game.origin_id = "origin.fallen_clan"
+	player.cultivation.method_id = "method.traditional"
+	player.passives.clear()
+	player.rebuild_stats()
+	var origin_stones: int = Game.spirit_stones
+	main._apply_origin()
+	check(player.cultivation.method_id == "method.sword", "an origin sets the starting method")
+	check(player.passives.has("passive.sword_heart"), "an origin can grant a passive")
+	check(Game.spirit_stones == origin_stones, "the fallen heir starts with no extra stones")
+
+	Game.origin_id = "origin.merchant_child"
+	var merchant_stones: int = Game.spirit_stones
+	main._apply_origin()
+	check(Game.spirit_stones == merchant_stones + 180, "an origin adds its purse")
+
+	player.appearance.robe = 4
+	player.appearance.hair = 2
+	player.appearance.skin = 3
+	player.appearance.presentation = 2
+	main._save(91)
+	player.appearance.from_dict({})
+	main._load_game(91)
+	await frames(2)
+	check(player.appearance.robe == 4 and player.appearance.hair == 2, "appearance survives a save")
+	check(player.appearance.skin == 3 and player.appearance.pronouns() == Appearance.PRESENTATIONS[2], "skin and presentation survive a save")
+	check(Game.origin_id == "origin.merchant_child", "the origin survives a save")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
