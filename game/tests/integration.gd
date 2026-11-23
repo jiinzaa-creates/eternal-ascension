@@ -409,9 +409,11 @@ func _run() -> void:
 	check(exit_node.get_parent() == main.world, "realm interactables sort with the world")
 	check(main.realm_instance.all_rooms_reachable(), "every room of the generated realm is reachable")
 
+	var physique_at_altar: String = player.physique_id
 	player.global_position = altar.global_position
 	main._try_interact()
 	check(main.inheritance_taken, "the altar grants an inheritance")
+	check(Physiques.tier_of(player.physique_id) >= Physiques.tier_of(physique_at_altar), "the inheritance never weakens the body")
 	check(player.passives.has("passive.void_affinity"), "the inheritance grants a passive")
 	check(player.technique_ids.has("tech.palm.thousand_petals"), "the inheritance grants a hidden technique")
 
@@ -820,6 +822,16 @@ func _run() -> void:
 		check(main._marrow_count() == marrow_before - 1, "evolution consumes the marrow")
 		check(player.cultivation.root_mult() > 0.0, "the evolved root has a cultivation multiplier")
 
+	# --- physiques -------------------------------------------------------------
+	check(not Physiques.find(player.physique_id).is_empty(), "the run records an innate physique")
+	var physique_before: String = player.physique_id
+	var armour_before: float = player.stats.armor()
+	var better := Physiques.tier_of("physique.iron_bone") > Physiques.tier_of(physique_before)
+	check(player.inherit_physique("physique.iron_bone") == better, "inheritance accepts only a better body")
+	if better:
+		check(player.stats.armor() > armour_before, "the inherited body changes the stat pipeline")
+	check(not player.inherit_physique("physique.mortal_frame"), "inheritance never downgrades")
+
 	main._save(90)
 	var saved_tier: int = player.cultivation.root_tier
 	var saved_purity: float = player.cultivation.purity_bonus
@@ -837,6 +849,7 @@ func _run() -> void:
 
 	var saved_passives := player.passives.size()
 	var saved_stones := Game.spirit_stones
+	var saved_physique: String = player.physique_id
 	player.passives.clear()
 	player.rebuild_stats()
 	main.quests.step_index = 0
@@ -848,6 +861,7 @@ func _run() -> void:
 	check(player.passives.size() == saved_passives, "quick load restores passives")
 	check(main.quests.completed, "quick load restores quest completion")
 	check(main.inheritance_taken, "quick load restores the inheritance")
+	check(player.physique_id == saved_physique, "quick load restores the physique")
 	check(Game.spirit_stones == saved_stones, "quick load restores spirit stones")
 	check(container.used, "a searched container stays spent after loading")
 	check(player.technique_ids.has("tech.blood.crimson_moon"), "a manual's technique survives a reload")

@@ -70,6 +70,7 @@ var _help_visible := true
 var _hazard_accum := 0.0
 var _npc_index := 0
 var _root_rolls := 0
+var _physique_rolls := 0
 
 
 func _ready() -> void:
@@ -139,6 +140,7 @@ func _spawn_player() -> void:
 	player.cultivation.root_tier = _roll_root()
 	player.cultivation.purity_bonus = _roll_purity()
 	player.cultivation.identified = false
+	player.physique_id = Physiques.roll(_physique_rolls)
 	player.spawn_point = player.position
 
 	camera_rig = CameraRig.new()
@@ -766,6 +768,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("creation_presentation"):
 			player.appearance.cycle("presentation")
 			return
+		if event.is_action_pressed("creation_physique"):
+			_physique_rolls += 1
+			player.physique_id = Physiques.roll(_physique_rolls)
+			player.rebuild_stats()
+			Bus.player_stats_changed.emit()
+			Bus.toast.emit("Your body reshapes — %s." % Physiques.name_of(player.physique_id))
+			return
 		if creation_stage == 0:
 			for i in Attributes.KEYS.size():
 				if event.is_action_pressed("skill_%d" % (i + 1)):
@@ -1173,6 +1182,11 @@ func _claim_inheritance() -> void:
 		Bus.toast.emit("Inheritance: the Thousand Petal Illusion is yours.")
 	if gained:
 		Bus.toast.emit("Inheritance: Void Affinity awakens in your meridians.")
+	var inherited := Physiques.inherited_for(player.physique_id, realm_seed)
+	if player.inherit_physique(inherited):
+		Bus.toast.emit("Inheritance: %s awakens in your bones." % Physiques.name_of(player.physique_id))
+	elif not inherited.is_empty() and inherited == player.physique_id:
+		Bus.toast.emit("The altar's body is no greater than the one you already carry.")
 	if not learned and not gained:
 		Bus.toast.emit("The altar yields nothing you can still use.")
 	Bus.cultivation_changed.emit()

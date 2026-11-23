@@ -21,6 +21,7 @@ func _ready() -> void:
 	_extreme_tests()
 	_secondary_tests()
 	_root_system_tests()
+	_physique_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -482,6 +483,86 @@ func _root_system_tests() -> void:
 	var wild := Cultivation.new()
 	wild.from_dict({"purity_bonus": 9.0})
 	check(wild.purity_bonus == Roots.PURITY_BONUS_MAX, "a wild purity bonus is clamped")
+
+
+# ------------------------------------------------------------- physiques ----
+
+func _physique_tests() -> void:
+	print("[physiques] rolls, stat effects and inheritance")
+	check(DB.physiques.size() >= 6, "at least six physiques exist (%d)" % DB.physiques.size())
+	var seen := {}
+	var known_stats: Array = []
+	known_stats.append_array(Attributes.KEYS)
+	known_stats.append_array(StatBlock.PERCENT_STATS)
+	known_stats.append_array(StatBlock.FLAT_STATS)
+	for entry in DB.physiques:
+		var id := String(entry.get("id", ""))
+		seen[id] = true
+		check(id != "" and String(entry.get("name", "")) != "", "every physique is named")
+		check(int(entry.get("tier", 0)) >= 1 and int(entry.get("tier", 0)) <= Physiques.MAX_TIER, "%s has a valid tier" % id)
+		for mod in entry.get("mods", []):
+			check(known_stats.has(String(mod.get("stat", ""))), "%s uses a known stat (%s)" % [id, String(mod.get("stat", ""))])
+	check(seen.size() == DB.physiques.size(), "physique ids are unique")
+	check(not Physiques.find("physique.mortal_frame").is_empty(), "physiques are indexed by id")
+
+	var first := Physiques.roll(7)
+	check(first != "" and not Physiques.find(first).is_empty(), "a roll returns a real physique")
+	check(Physiques.roll(7) == first, "rolls are deterministic")
+	var tiers := {}
+	for key in 120:
+		tiers[Physiques.tier_of(Physiques.roll(key))] = true
+	check(tiers.size() >= 3, "rolls reach several tiers (%d)" % tiers.size())
+
+	check(Physiques.tier_of("physique.chaotic_embryo") > Physiques.tier_of("physique.iron_bone"), "tiers are ordered")
+	check(Physiques.best_of("physique.iron_bone", "physique.sword_bone") == "physique.sword_bone", "a better body wins")
+	check(Physiques.best_of("physique.sword_bone", "physique.iron_bone") == "physique.sword_bone", "a worse body is rejected")
+	check(Physiques.best_of("physique.iron_bone", "physique.iron_bone") == "physique.iron_bone", "a tie keeps the current body")
+	check(not Physiques.describe("physique.iron_bone").is_empty(), "physiques describe themselves")
+
+	var bare := StatBlock.new(Attributes.new())
+	bare.rebuild({}, [], 1, 1.0)
+	var iron := StatBlock.new(Attributes.new())
+	iron.rebuild({}, [], 1, 1.0, "physique.iron_bone")
+	check(iron.armor() > bare.armor(), "a physique adds armour")
+	check(iron.get_attr("str") == bare.get_attr("str") + 2, "a physique adds attributes")
+	var unknown := StatBlock.new(Attributes.new())
+	unknown.rebuild({}, [], 1, 1.0, "physique.nonexistent")
+	check(unknown.armor() == bare.armor(), "an unknown physique adds nothing")
+
+	var body := Player.new()
+	body.attrs = Attributes.new()
+	body.stats = StatBlock.new(body.attrs)
+	body.cultivation = Cultivation.new()
+	body.physique_id = "physique.mortal_frame"
+	body.rebuild_stats()
+	check(not body.inherit_physique("physique.mortal_frame"), "an equal body is not inherited")
+	check(not body.inherit_physique("physique.nonexistent"), "an unknown body is not inherited")
+	check(body.inherit_physique("physique.sword_bone"), "a better body is inherited")
+	check(body.physique_id == "physique.sword_bone", "the inherited body is kept")
+	check(not body.inherit_physique("physique.iron_bone"), "inheritance cannot downgrade")
+	body.free()
+
+	var saved := Player.new()
+	saved.attrs = Attributes.new()
+	saved.stats = StatBlock.new(saved.attrs)
+	saved.cultivation = Cultivation.new()
+	saved.physique_id = "physique.pure_yang"
+	var data := saved.to_dict()
+	var loaded := Player.new()
+	loaded.attrs = Attributes.new()
+	loaded.stats = StatBlock.new(loaded.attrs)
+	loaded.cultivation = Cultivation.new()
+	loaded.from_dict(data)
+	check(loaded.physique_id == "physique.pure_yang", "the physique survives a save")
+	var legacy := Player.new()
+	legacy.attrs = Attributes.new()
+	legacy.stats = StatBlock.new(legacy.attrs)
+	legacy.cultivation = Cultivation.new()
+	legacy.from_dict({"display_name": "Old"})
+	check(legacy.physique_id == Physiques.DEFAULT_ID, "legacy saves get the default body")
+	loaded.free()
+	saved.free()
+	legacy.free()
 
 
 func _rng_tests() -> void:

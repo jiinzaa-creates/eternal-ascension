@@ -42,6 +42,7 @@ const KEY_BINDINGS := {
 	"creation_hair": [KEY_X],
 	"creation_skin": [KEY_C],
 	"creation_presentation": [KEY_N],
+	"creation_physique": [KEY_P],
 }
 
 const MOUSE_BINDINGS := {

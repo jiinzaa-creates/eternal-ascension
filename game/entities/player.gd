@@ -23,6 +23,8 @@ const AIM_DEADZONE := 0.25
 var display_name := "Wanderer"
 ## Code-drawn looks: robe, hair and skin palettes plus a presentation line.
 var appearance := Appearance.new()
+## Innate body. Its mods enter the stat pipeline like equipment or a passive.
+var physique_id := Physiques.DEFAULT_ID
 var attrs: Attributes
 var stats: StatBlock
 var cultivation: Cultivation
@@ -77,8 +79,20 @@ func _ready() -> void:
 
 
 func rebuild_stats() -> void:
-	stats.rebuild(equipment, passives, cultivation.realm, cultivation.attr_mult())
+	stats.rebuild(equipment, passives, cultivation.realm, cultivation.attr_mult(), physique_id)
 	_recalc_vitals()
+
+
+## Replaces the body only with a strictly better one; ties keep what you have.
+func inherit_physique(id: String) -> bool:
+	if Physiques.find(id).is_empty():
+		return false
+	if Physiques.tier_of(id) <= Physiques.tier_of(physique_id):
+		return false
+	physique_id = id
+	rebuild_stats()
+	Bus.player_stats_changed.emit()
+	return true
 
 
 func add_passive(id: String) -> bool:
@@ -485,6 +499,7 @@ func to_dict() -> Dictionary:
 	return {
 		"display_name": display_name,
 		"appearance": appearance.to_dict(),
+		"physique": physique_id,
 		"position": [global_position.x, global_position.y],
 		"hp": hp,
 		"hp_max": hp_max,
@@ -501,6 +516,9 @@ func to_dict() -> Dictionary:
 func from_dict(data: Dictionary) -> void:
 	display_name = String(data.get("display_name", display_name))
 	appearance.from_dict(data.get("appearance", {}))
+	physique_id = String(data.get("physique", Physiques.DEFAULT_ID))
+	if Physiques.find(physique_id).is_empty():
+		physique_id = Physiques.DEFAULT_ID
 	var pos: Array = data.get("position", [global_position.x, global_position.y])
 	global_position = Vector2(float(pos[0]), float(pos[1]))
 	attrs.from_dict(data.get("attrs", {}))

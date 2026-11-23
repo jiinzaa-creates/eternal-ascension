@@ -20,6 +20,7 @@ var quests: Array = []
 var npc_data: Dictionary = {}
 var biomes: Array = []
 var origins: Array = []
+var physiques: Array = []
 
 var _by_id: Dictionary = {}
 
@@ -46,6 +47,7 @@ func load_all() -> void:
 	npc_data = _read("npcs.json")
 	biomes = _read("biomes.json").get("biomes", [])
 	origins = _read("origins.json").get("origins", [])
+	physiques = _read("physiques.json").get("physiques", [])
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -58,6 +60,7 @@ func load_all() -> void:
 	_index("quest", quests)
 	_index("biome", biomes)
 	_index("origin", origins)
+	_index("physique", physiques)
 
 
 func _read(file: String) -> Dictionary:
@@ -130,6 +133,10 @@ func biome(id: String) -> Dictionary:
 
 func origin(id: String) -> Dictionary:
 	return by_id("origin", id)
+
+
+func physique(id: String) -> Dictionary:
+	return by_id("physique", id)
 
 
 ## Snapshot of every biome by id. Passed to worker threads, so it is detached
@@ -260,6 +267,25 @@ func validate() -> Array:
 			if String(enemy.get("name", "")) == "":
 				problems.append("biome %s has an unnamed enemy" % id)
 
+	if physiques.size() < 6:
+		problems.append("expected at least 6 physiques, found %d" % physiques.size())
+	var physique_ids: Dictionary = {}
+	for p in physiques:
+		var id := String(p.get("id", ""))
+		if id == "":
+			problems.append("physique without id")
+			continue
+		if physique_ids.has(id):
+			problems.append("duplicate physique id " + id)
+		physique_ids[id] = true
+		if String(p.get("name", "")) == "":
+			problems.append("physique %s has no name" % id)
+		if int(p.get("tier", 0)) < 1 or int(p.get("tier", 0)) > Physiques.MAX_TIER:
+			problems.append("physique %s has an out-of-range tier" % id)
+		for mod in p.get("mods", []):
+			if String(mod.get("stat", "")) == "":
+				problems.append("physique %s has a mod without a stat" % id)
+
 	if origins.size() < 3:
 		problems.append("expected at least 3 character origins, found %d" % origins.size())
 	var origin_ids: Dictionary = {}
@@ -310,4 +336,5 @@ func counts() -> Dictionary:
 		"archetypes": archetypes().size(),
 		"biomes": biomes.size(),
 		"origins": origins.size(),
+		"physiques": physiques.size(),
 	}

@@ -59,7 +59,8 @@ func reset() -> void:
 
 ## Rebuilds every modifier from equipment and passives. Called whenever the
 ## player equips something, gains a passive, or advances a realm.
-func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float) -> void:
+func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float,
+		physique_id: String = "") -> void:
 	reset()
 	realm = realm_number
 	realm_mult = realm_attribute_mult
@@ -71,6 +72,11 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 		flat_stats["weapon_damage"] = flat("weapon_damage") + float(item.get("base_damage", 0.0))
 		flat_stats["armor"] = flat("armor") + float(item.get("armor", 0.0))
 		apply_mods(item.get("mods", []), String(item.get("name", "item")))
+
+	if physique_id != "":
+		var physique: Dictionary = DB.physique(physique_id)
+		if not physique.is_empty():
+			apply_mods(physique.get("mods", []), String(physique.get("name", "physique")))
 
 	for id in passive_ids:
 		var passive: Dictionary = DB.by_id("passive", String(id))

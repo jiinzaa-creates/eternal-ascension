@@ -80,7 +80,7 @@ func _draw() -> void:
 func draw_vitals(player: Player) -> void:
 	var x := 24.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 220.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 244.0), PANEL_BG)
 
 	_text(Vector2(x, y), player.cultivation.stage_label(), 19, ACCENT)
 	y += 20.0
@@ -89,6 +89,8 @@ func draw_vitals(player: Player) -> void:
 	if not player.cultivation.identified:
 		root_label = "unread root"
 	_text(Vector2(x, y), "Root: %s   Method: %s" % [root_label, String(player.cultivation.method_data().get("name", "?"))], 12, MUTED)
+	y += 18.0
+	_text(Vector2(x, y), "Physique: %s (tier %d)" % [Physiques.name_of(player.physique_id), Physiques.tier_of(player.physique_id)], 12, Color("#c8b8e8"))
 	y += 20.0
 
 	_bar(Vector2(x, y), Vector2(196.0, 10.0), player.hp / maxf(1.0, player.hp_max), Color("#d05050"),
@@ -280,7 +282,10 @@ func draw_creation(player: Player) -> void:
 	y += 24.0
 	var aff_line := "Affinities: " + ", ".join(affinities)
 	_text(Vector2(cx - _text_width(aff_line, 12) * 0.5, y), aff_line, 12, MUTED)
-	y += 34.0
+	y += 22.0
+	var physique_line := "Physique: %s (tier %d)" % [Physiques.name_of(player.physique_id), Physiques.tier_of(player.physique_id)]
+	_text(Vector2(cx - _text_width(physique_line, 13) * 0.5, y), physique_line, 13, Color("#c8b8e8"))
+	y += 26.0
 
 	var remaining := int(host.allocation_remaining())
 	var points_line := "FORMATION POINTS REMAINING: %d" % remaining
@@ -301,7 +306,7 @@ func draw_creation(player: Player) -> void:
 		_text(Vector2(x + 118.0, line_y), _attribute_note(key), 11, MUTED)
 	y += 26.0 * 3.0 + 26.0
 
-	var hint := "1-6 add a point      BACKSPACE refund      R reroll root      ENTER continue"
+	var hint := "1-6 add a point   BACKSPACE refund   R reroll root   P reroll physique   ENTER continue"
 	_text(Vector2(cx - _text_width(hint, 14) * 0.5, y), hint, 14, INK)
 	y += 34.0
 

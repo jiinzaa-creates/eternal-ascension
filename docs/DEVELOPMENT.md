@@ -45,6 +45,20 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Physiques
+
+- Content lives in `data/physiques.json`; a physique is **mods only** (same keys as equipment and
+  passives) and is applied in `StatBlock.rebuild(..., physique_id)`. There is no physique-specific
+  stat code path, and there must not be one.
+- `Physiques.roll(key)` is weighted and deterministic (`Rng.stream("physique", key)` mixes the world
+  seed). The roll counter advances on creation rerolls (`P`), so rerolling the body is a new roll.
+- **Inheritance is monotonic**: `best_of` and `Player.inherit_physique` accept only a strictly higher
+  tier, ties keep the current body. The realm altar rolls with `realm_seed`, so the inheritance is
+  repeatable per save and can never be a downgrade dressed as a reward.
+- `Player.rebuild_stats()` passes the physique, so any path that changes equipment, passives or realm
+  also re-applies it. Legacy saves default to `physique.mortal_frame` (empty mods), so nothing moves.
+- Creation shows the rolled physique; HUD vitals show it permanently.
+
 ## Spiritual roots: appraisal, marrow, evolution
 
 - A root rolls a tier at creation plus a **hidden purity bonus** (`purity_bonus`, 0–0.25) from
