@@ -2600,6 +2600,88 @@ func _run() -> void:
 	check(m43_good_gear, "sealed chest gear is never mortal grade")
 	m43_chest.queue_free()
 
+	# --- crafting: forge, refine and disassemble at the anvil ------------------
+	var m44_forge := _find_interactable(main.interactables, "forge.azure")
+	check(m44_forge != null and m44_forge.kind == Interactable.Kind.FORGE, "the settlement has a forge")
+	check(main.settlement.has_location("forge") and main.settlement.building_for("forge") != null, "the forge has a building")
+	Game.spirit_stones = maxi(Game.spirit_stones, 500)
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m44.ore", "slot": "material", "name": "Spirit Ore", "material": "ore", "count": 12}))
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m44.herb", "slot": "material", "name": "Spirit Herb", "material": "herb", "count": 4}))
+	check(Items.material_key(Items.normalize_item({"id": "item.ore.m44", "slot": "material", "name": "Ore"})) == "ore", "a legacy ore is a crafting material")
+
+	main._open_forge()
+	check(main.forge_open, "the forge opens")
+	check(not player.is_physics_processing(), "the forge freezes play")
+	main.forge_mode = 0
+	var m44_recipe_index := -1
+	for i in main.forge_rows().size():
+		if String((main.forge_rows()[i] as Dictionary).get("id", "")) == "recipe.forge.iron_jian":
+			m44_recipe_index = i
+	check(m44_recipe_index >= 0, "the forge lists its recipes")
+	main.forge_index = m44_recipe_index
+	var m44_swords_before := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("base", "")) == "base.sword.iron_jian":
+			m44_swords_before += 1
+	for slot in Items.EQUIP_SLOTS:
+		if String((player.equipment.get(slot, {}) as Dictionary).get("base", "")) == "base.sword.iron_jian":
+			m44_swords_before += 1
+	var m44_stones_before := Game.spirit_stones
+	var m44_ore_before: int = int(Crafting.material_counts(player.inventory).get("ore", 0))
+	main.forge_act()
+	var m44_swords_after := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("base", "")) == "base.sword.iron_jian":
+			m44_swords_after += 1
+	for slot in Items.EQUIP_SLOTS:
+		if String((player.equipment.get(slot, {}) as Dictionary).get("base", "")) == "base.sword.iron_jian":
+			m44_swords_after += 1
+	check(m44_swords_after == m44_swords_before + 1, "the forge puts a real piece in hand")
+	check(Game.spirit_stones == m44_stones_before - 60, "forging charges its stones")
+	check(int(Crafting.material_counts(player.inventory).get("ore", 0)) == m44_ore_before - 3, "forging spends its ore")
+	check(Game.crafts_made > 0, "an attempt is recorded")
+
+	var m44_refine := Items.normalize_item({
+		"id": "item.m44.refine", "base": "base.sword.iron_jian", "slot": "weapon",
+		"name": "Iron Jian", "ilvl": 3, "rarity": 1, "value": 30})
+	player.inventory = Items.add_to_inventory(player.inventory, m44_refine)
+	main.forge_mode = 1
+	var m44_refine_index := -1
+	for i in main.forge_rows().size():
+		if String((main.forge_rows()[i] as Dictionary).get("id", "")) == "item.m44.refine":
+			m44_refine_index = i
+	check(m44_refine_index >= 0, "the forge lists satchel gear for refining")
+	main.forge_index = m44_refine_index
+	var m44_refine_stones := Game.spirit_stones
+	var m44_refine_ore: int = int(Crafting.material_counts(player.inventory).get("ore", 0))
+	main.forge_act()
+	check(Game.spirit_stones == m44_refine_stones - 40, "refining charges its stones")
+	check(int(Crafting.material_counts(player.inventory).get("ore", 0)) == m44_refine_ore - 2, "refining spends its ore")
+
+	var m44_ring := Items.normalize_item({
+		"id": "item.m44.ring", "base": "base.ring.jade", "slot": "ring",
+		"name": "Jade Ring", "ilvl": 3, "rarity": 2, "value": 40})
+	player.inventory = Items.add_to_inventory(player.inventory, m44_ring)
+	main.forge_mode = 2
+	var m44_ring_index := -1
+	for i in main.forge_rows().size():
+		if String((main.forge_rows()[i] as Dictionary).get("id", "")) == "item.m44.ring":
+			m44_ring_index = i
+	check(m44_ring_index >= 0, "the forge lists gear for breaking down")
+	main.forge_index = m44_ring_index
+	var m44_break_ore: int = int(Crafting.material_counts(player.inventory).get("ore", 0))
+	main.forge_act()
+	check(int(Crafting.material_counts(player.inventory).get("ore", 0)) == m44_break_ore + Crafting.disassemble_ore(m44_ring), "disassembly returns ore")
+	var m44_ring_gone := true
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("id", "")) == "item.m44.ring":
+			m44_ring_gone = false
+	check(m44_ring_gone, "the broken piece leaves the satchel")
+	main.close_forge()
+	check(not main.forge_open and player.is_physics_processing(), "closing the forge resumes play")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

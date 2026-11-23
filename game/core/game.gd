@@ -26,6 +26,9 @@ var born_day: int = 1
 var dead: bool = false
 ## Highest aging stage already announced this run, so each warning fires once.
 var age_warning_stage: int = 0
+## Crafting attempts this run. Every attempt advances it, failures included, so
+## a retry rolls a new item instead of repeating the failed stream.
+var crafts_made: int = 0
 
 
 func _process(delta: float) -> void:
@@ -47,6 +50,7 @@ func new_run(seed_value: int = 0) -> void:
 	born_day = Clock.day
 	dead = false
 	age_warning_stage = 0
+	crafts_made = 0
 	hitstop.clear()
 
 
@@ -82,6 +86,7 @@ func to_dict() -> Dictionary:
 		"born_day": born_day,
 		"dead": dead,
 		"age_warning_stage": age_warning_stage,
+		"crafts_made": crafts_made,
 	}
 
 
@@ -99,3 +104,4 @@ func from_dict(data: Dictionary) -> void:
 	born_day = int(data.get("born_day", Clock.day))
 	dead = bool(data.get("dead", false))
 	age_warning_stage = int(data.get("age_warning_stage", 0))
+	crafts_made = int(data.get("crafts_made", 0))

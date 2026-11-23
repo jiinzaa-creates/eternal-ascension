@@ -46,6 +46,7 @@ func _ready() -> void:
 	_equipment_rules_tests()
 	_unique_tests()
 	_inventory_tests()
+	_crafting_tests()
 	_loot_tests()
 	_cultivation_tests()
 	_combat_tests()
@@ -2171,6 +2172,105 @@ func _inventory_tests() -> void:
 	check(String(body.inventory[0]["id"]) == "item.inv.plate", "the satchel itself is reordered")
 	check(body.sort_inventory("junk") == "recent", "an unknown order falls back to stored order")
 	check(Items.to_save(sword).size() != 0 and body.inventory.size() == 3, "sorting keeps the satchel canonical")
+
+
+# ---------------------------------------------------------------- crafting ----
+
+func _crafting_tests() -> void:
+	print("[crafting] forge recipes, costs, quality and the three verbs")
+	var rules := Crafting.new(DB)
+	check(not DB.station("station.forge").is_empty(), "the forge station is loaded")
+	check(DB.recipes.size() >= 5, "forge recipes are loaded")
+	check(rules.recipes_for("station.forge").size() == DB.recipes.size(), "every recipe belongs to the forge")
+	check(rules.recipes_for("station.nope").is_empty(), "an unknown station has no recipes")
+	check(not DB.crafting_action("refine").is_empty() and not DB.crafting_action("disassemble").is_empty(), "both forge actions exist")
+	check(Crafting.MATERIALS.has("ore") and Crafting.MATERIALS.has("core"), "material kinds are declared")
+	check(Crafting.material_label("ore") == "Spirit Ore" and not Crafting.is_material_key("wood"), "materials are labelled and checked")
+
+	var recipe := DB.recipe("recipe.forge.iron_jian")
+	check(not recipe.is_empty() and String(recipe.get("station", "")) == "station.forge", "the iron jian recipe exists")
+	var legacy_ore := Items.normalize_item({"id": "item.ore.spirit.0", "slot": "material", "name": "Spirit Ore", "count": 2})
+	check(Items.material_key(legacy_ore) == "ore", "a legacy ore is recognised by its id")
+	var kinded_ore := Items.normalize_item({"id": "item.test.ore", "slot": "material", "name": "Spirit Ore", "material": "ore", "count": 3})
+	check(Items.material_key(kinded_ore) == "ore" and bool(Items.to_save(kinded_ore).has("material")), "a material kind survives the save form")
+	check(Items.material_key(_item_for("item.test.sword2", "weapon", "Sword")) == "", "gear is not a material")
+
+	var bag: Array = []
+	bag = Items.add_to_inventory(bag, legacy_ore)
+	bag = Items.add_to_inventory(bag, Items.normalize_item({"id": "item.ore.spirit.1", "slot": "material", "name": "Spirit Ore", "count": 2}))
+	bag = Items.add_to_inventory(bag, Items.normalize_item({"id": "item.herb.spirit.0", "slot": "material", "name": "Spirit Herb", "count": 1}))
+	check(int(Crafting.material_counts(bag)["ore"]) == 4, "material counts add stacks")
+	check(Crafting.requirement_text(recipe) == "3 Spirit Ore, 60 spirit stones", "the cost line reads")
+	check(not bool(Crafting.check(recipe, bag, 10, 1)["ok"]), "a recipe refuses an empty purse")
+	check(String(Crafting.check(recipe, bag, 10, 1)["reason"]).contains("spirit stones"), "the refusal names the missing stones")
+	check(bool(Crafting.check(recipe, bag, 100, 1)["ok"]), "a payable recipe passes")
+	check(not bool(Crafting.check(recipe, bag, 100, 0)["ok"]), "a realm gate is enforced")
+	check(not bool(Crafting.check(recipe, [], 100, 1)["ok"]), "missing materials are refused")
+	var before_consume := Crafting.material_counts(bag)
+	var short := Crafting.consume(bag, [{"material": "ore", "count": 9}])
+	check(not bool(short["ok"]) and Crafting.material_counts(short["inventory"]) == before_consume, "an unaffordable consume changes nothing")
+	var paid := Crafting.consume(bag, [{"material": "ore", "count": 3}])
+	check(bool(paid["ok"]), "a payable consume succeeds")
+	check(int(Crafting.material_counts(paid["inventory"])["ore"]) == 1, "consume takes exactly the cost")
+	check(int(Crafting.material_counts(paid["inventory"])["herb"]) == 1, "consume leaves other materials alone")
+
+	check(approx(Crafting.quality_chance(1.0), 0.0), "an ordinary smith has no quality chance")
+	check(Crafting.quality_chance(2.0) > 0.0 and Crafting.quality_chance(9.0) <= Crafting.MAX_QUALITY_CHANCE, "quality chance is bounded")
+	var forged := rules.craft(recipe, 3, 4242, 0, 1.0)
+	check(bool(forged["ok"]) and not bool(forged["quality"]), "a plain forge succeeds at the authored rarity")
+	var piece: Dictionary = forged["item"]
+	check(String(piece["base"]) == "base.sword.iron_jian" and int(piece["rarity"]) == 1, "a recipe forges its authored base and rarity")
+	check(JSON.stringify(forged) == JSON.stringify(rules.craft(recipe, 3, 4242, 0, 1.0)), "a forge attempt is reproducible")
+	check(JSON.stringify(rules.craft(recipe, 3, 4242, 1, 1.0)) != JSON.stringify(forged), "a new attempt rolls a new piece")
+
+	var flawed := recipe.duplicate(true)
+	flawed["failure_chance"] = 1.0
+	var failed := rules.craft(flawed, 3, 1, 0, 1.0)
+	check(bool(failed["failed"]) and not bool(failed["ok"]), "a guaranteed failure makes nothing")
+	check((failed["item"] as Dictionary).is_empty(), "a failed forge has no item")
+
+	var lifted := false
+	var bounded := true
+	for i in 40:
+		var attempt := rules.craft(recipe, 6, 9000 + i, 0, 3.0)
+		if not bool(attempt["ok"]):
+			continue
+		var made: Dictionary = attempt["item"]
+		if int(made["rarity"]) > 1:
+			lifted = true
+		if int(made["rarity"]) >= ItemGen.RARITY_NAMES.size():
+			bounded = false
+	check(lifted, "a skilled smith occasionally lifts the rarity")
+	check(bounded, "quality never exceeds the shipped rarities")
+
+	var target := Items.normalize_item({
+		"id": "item.test.refine", "base": "base.sword.iron_jian", "slot": "weapon", "name": "Iron Jian",
+		"ilvl": 3, "rarity": 1, "value": 20, "durability": 120.0,
+		"mods": [{"id": "prefix.sharpened", "stat": "physical_damage_pct", "value": 5.0, "tier": 1, "text": "+5%"}],
+	})
+	var refined := rules.refine(target, 77, 0, 1.0)
+	check(bool(refined["ok"]), "a piece can be refined")
+	var new_piece: Dictionary = refined["item"]
+	check(String(new_piece["base"]) == "base.sword.iron_jian" and int(new_piece["ilvl"]) == 3, "refining keeps the base and level")
+	check(int(new_piece["rarity"]) == 1, "refining keeps the rarity at ordinary skill")
+	check(approx(Items.durability_of(new_piece), 120.0), "refining keeps the wear")
+	check(JSON.stringify(new_piece) != JSON.stringify(target), "refining rerolls the affixes")
+	check(not bool(rules.refine(_item_for("item.test.material3", "material", "Ore"), 1, 0, 1.0)["ok"]), "a material cannot be refined")
+	var relic := Uniques.new(DB).make("item.unique.hollow_moon_blade")
+	var relic_refused := rules.refine(relic, 1, 0, 1.0)
+	check(not bool(relic_refused["ok"]) and String(relic_refused["reason"]).contains("relic"), "a relic refuses the smith")
+
+	check(Crafting.disassemble_ore(target) == 1 + 2 + 1, "ore scales with rarity and level")
+	check(Crafting.disassemble_ore(_item_for("item.test.material4", "material", "Ore")) == 0, "a material cannot be broken down")
+	var gem := _item_for("item.test.gem", "ring", "Jade Ring", {"rarity": 3, "ilvl": 8})
+	check(Crafting.disassemble_ore(gem) > Crafting.disassemble_ore(target), "a richer piece yields more ore")
+	check(Crafting.disassemble_ore(relic) == 0, "a relic cannot be broken down")
+
+	var crafting_problems := 0
+	for problem in DB.validate():
+		if String(problem).contains("recipe") or String(problem).contains("crafting"):
+			crafting_problems += 1
+	check(crafting_problems == 0, "crafting data validates")
 
 
 # -------------------------------------------------------------------- loot ----

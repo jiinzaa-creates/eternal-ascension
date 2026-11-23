@@ -25,9 +25,11 @@ static func is_equipment_slot(slot: String) -> bool:
 	return slot == "weapon" or slot == "armor" or slot == "ring" or slot == "talisman"
 
 
-func generate(ilvl: int = 1, key: int = 0, counter: int = 0, force_rarity: int = -1, force_slot: String = "") -> Dictionary:
+## `force_base` pins the authored base a recipe names; loot leaves it empty and
+## lets the weighted pool decide.
+func generate(ilvl: int = 1, key: int = 0, counter: int = 0, force_rarity: int = -1, force_slot: String = "", force_base: String = "") -> Dictionary:
 	var r: RandomNumberGenerator = rng.stream("itemgen", key, counter)
-	var base := _pick_base(r, ilvl, force_slot)
+	var base := _pick_base(r, ilvl, force_slot, force_base)
 	if base.is_empty():
 		return {}
 
@@ -63,13 +65,15 @@ func generate(ilvl: int = 1, key: int = 0, counter: int = 0, force_rarity: int =
 	}
 
 
-func _pick_base(r: RandomNumberGenerator, ilvl: int, force_slot: String = "") -> Dictionary:
+func _pick_base(r: RandomNumberGenerator, ilvl: int, force_slot: String = "", force_base: String = "") -> Dictionary:
 	var eligible: Array = []
 	var weights: Array = []
 	for base in db.bases:
 		if int(base.get("ilvl", 1)) > ilvl + 1:
 			continue
 		if force_slot != "" and String(base.get("slot", "")) != force_slot:
+			continue
+		if force_base != "" and String(base.get("id", "")) != force_base:
 			continue
 		eligible.append(base)
 		weights.append(int(base.get("weight", 10)))

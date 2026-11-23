@@ -141,6 +141,7 @@ static func core_item(species: Dictionary, ilvl: int, counter: int) -> Dictionar
 		"name": name,
 		"base_name": name,
 		"slot": "material",
+		"material": "core",
 		"ilvl": maxi(1, ilvl),
 		"rarity": 2,
 		"rarity_name": ItemGen.RARITY_NAMES[2],

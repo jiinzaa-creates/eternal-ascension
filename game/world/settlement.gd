@@ -11,6 +11,7 @@ const SETTLEMENT_NAME := "Azure Cloud Market"
 const LOCATIONS := {
 	"plaza": Vector2(0, 0),
 	"market": Vector2(200, -70),
+	"forge": Vector2(180, 210),
 	"tavern": Vector2(-200, 70),
 	"training": Vector2(-80, 240),
 	"shrine": Vector2(0, -300),
@@ -27,6 +28,7 @@ const BUILDINGS := [
 	{"location": "market", "size": Vector2(120, 90), "wall": "#3d3a32", "roof": "#665a3f"},
 	{"location": "dorms", "size": Vector2(150, 90), "wall": "#3c3f48", "roof": "#4d5560"},
 	{"location": "fields", "size": Vector2(170, 110), "wall": "#2f3a28", "roof": "#3f4f33"},
+	{"location": "forge", "size": Vector2(120, 90), "wall": "#3a2e28", "roof": "#5a3a2a"},
 ]
 
 

@@ -879,6 +879,40 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   slot agrees, a known source (a real boss id or the altar), a known effect with a positive amount,
   real mods and a positive value.
 
+## Crafting at the forge
+
+- **Recipes are data.** `data/crafting.json` holds one station (`station.forge`, placed at the
+  settlement's forge building), five recipes and two actions. A recipe names its station, an
+  authored output `base` and rarity, the materials it eats, a stone cost, a realm gate and a
+  failure chance. `DB.validate()` rejects a missing station or base, a non-equipment output, a
+  bad rarity, a negative cost, an invalid failure chance, an unknown material or a station with
+  no recipes.
+- **Three verbs, not eleven.** `Crafting.craft()` **forges** a recipe through
+  `ItemGen.generate(..., force_base)`; `Crafting.refine()` rerolls a piece's affixes while keeping
+  base, level, rarity and current durability; `Crafting.disassemble_ore()` prices breaking a piece
+  back into ore from its rarity and level. Relics and materials are refused by refine and
+  disassemble: authored items are not smithing stock.
+- **Costs are exact.** `Crafting.material_counts()` sums stacks by unit, `Crafting.check()` names
+  everything missing at once (materials, stones, realm) and `Crafting.consume()` refuses to
+  half-pay: an unaffordable cost returns the satchel unchanged, and a paid one removes only what
+  was asked for.
+- **Determinism and failure.** A forge attempt is a pure function of
+  `(recipe, ilvl, key, counter, quality_mult)`. The scene keys it on `Game.crafts_made`, which
+  advances on every attempt including failures — otherwise a retry would replay the same failed
+  stream forever. A failed forge consumes its cost and makes nothing; a failed refine consumes its
+  cost and leaves the piece untouched.
+- **Quality is INT.** `StatBlock.crafting_quality_mult()` feeds `Crafting.quality_chance()`, a
+  bounded chance to lift the result one rarity step (never past the shipped top). A plain smith has
+  no chance at all, so authored rarity is the floor.
+- **Materials carry their kind.** `Items.FIELDS` gained an optional `material`, set by ore, herb,
+  marrow and beast-core creation; `Items.material_key()` falls back to the old stable id prefixes
+  (`item.ore.`, `item.herb.`, `item.marrow.`, `item.core.`) so pre-M44 saves still craft.
+- **The screen freezes play.** `E` at the forge opens `draw_forge()`: TAB cycles forge / refine /
+  disassemble, arrows choose and ENTER commits, with the cost line, the refusal reason, the
+  forge's `desc` and the yield shown before the key is pressed.
+- **Save.** Crafted items are ordinary canonical items. The only new state is `Game.crafts_made`,
+  an optional save key defaulting to 0; schema stays 2.
+
 ## Loot tables
 
 - **One table per source, all in data.** `data/loot_tables.json` holds `kill.wild`,

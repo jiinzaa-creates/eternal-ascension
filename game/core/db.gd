@@ -30,6 +30,9 @@ var loot_tables: Array = []
 var origins: Array = []
 var physiques: Array = []
 var weapon_types: Array = []
+var crafting_stations: Array = []
+var recipes: Array = []
+var crafting_actions: Array = []
 
 var _by_id: Dictionary = {}
 
@@ -66,6 +69,10 @@ func load_all() -> void:
 	origins = _read("origins.json").get("origins", [])
 	physiques = _read("physiques.json").get("physiques", [])
 	weapon_types = _read("weapons.json").get("weapon_types", [])
+	var crafting := _read("crafting.json")
+	crafting_stations = crafting.get("stations", [])
+	recipes = crafting.get("recipes", [])
+	crafting_actions = crafting.get("actions", [])
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -88,6 +95,9 @@ func load_all() -> void:
 	_index("origin", origins)
 	_index("physique", physiques)
 	_index("weapon_type", weapon_types)
+	_index("station", crafting_stations)
+	_index("recipe", recipes)
+	_index("action", crafting_actions)
 
 
 func _read(file: String) -> Dictionary:
@@ -122,6 +132,18 @@ func by_id(kind: String, id: String) -> Dictionary:
 
 func loot_table(id: String) -> Dictionary:
 	return by_id("loot", id)
+
+
+func station(id: String) -> Dictionary:
+	return by_id("station", id)
+
+
+func recipe(id: String) -> Dictionary:
+	return by_id("recipe", id)
+
+
+func crafting_action(id: String) -> Dictionary:
+	return by_id("action", id)
 
 
 func has(kind: String, id: String) -> bool:
@@ -710,6 +732,7 @@ func validate() -> Array:
 
 	# Loot tables are the whole drop economy: a bad weight would skew every kill.
 	_validate_loot(problems)
+	_validate_crafting(problems)
 
 	# Duplicate IDs across the whole registry would corrupt save references.
 	var seen: Dictionary = {}
@@ -730,6 +753,104 @@ func _base_exists_for_slot(slot: String) -> bool:
 		if typeof(entry) == TYPE_DICTIONARY and String((entry as Dictionary).get("slot", "")) == slot:
 			return true
 	return false
+
+
+## A recipe that names a missing base, station or material would only fail when a
+## player paid for it, so all of it is checked at load.
+func _validate_crafting(problems: Array) -> void:
+	var station_ids: Dictionary = {}
+	for entry in crafting_stations:
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("crafting station is not an object")
+			continue
+		var station_id := String((entry as Dictionary).get("id", ""))
+		if station_id == "":
+			problems.append("crafting station without id")
+			continue
+		if station_ids.has(station_id):
+			problems.append("duplicate crafting station " + station_id)
+		station_ids[station_id] = true
+		if String((entry as Dictionary).get("name", "")) == "":
+			problems.append("crafting station %s has no name" % station_id)
+
+	var recipe_ids: Dictionary = {}
+	var per_station: Dictionary = {}
+	for entry in recipes:
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("recipe is not an object")
+			continue
+		var recipe: Dictionary = entry
+		var recipe_id := String(recipe.get("id", ""))
+		if recipe_id == "":
+			problems.append("recipe without id")
+			continue
+		if recipe_ids.has(recipe_id):
+			problems.append("duplicate recipe " + recipe_id)
+		recipe_ids[recipe_id] = true
+		if String(recipe.get("name", "")) == "":
+			problems.append("recipe %s has no name" % recipe_id)
+		var station_id := String(recipe.get("station", ""))
+		if not station_ids.has(station_id):
+			problems.append("recipe %s names unknown station %s" % [recipe_id, station_id])
+		else:
+			per_station[station_id] = int(per_station.get(station_id, 0)) + 1
+		var output: Variant = recipe.get("output", {})
+		if typeof(output) != TYPE_DICTIONARY or String((output as Dictionary).get("base", "")) == "":
+			problems.append("recipe %s has no output base" % recipe_id)
+		else:
+			var base_id := String((output as Dictionary).get("base", ""))
+			if not has("base", base_id):
+				problems.append("recipe %s names unknown base %s" % [recipe_id, base_id])
+			elif not Items.is_equipment(String(by_id("base", base_id).get("slot", ""))):
+				problems.append("recipe %s makes equipment from a non-equipment base" % recipe_id)
+			var rarity := int((output as Dictionary).get("rarity", 1))
+			if rarity < 0 or rarity >= ItemGen.RARITY_NAMES.size():
+				problems.append("recipe %s has an out-of-range rarity" % recipe_id)
+		_validate_craft_cost(recipe, "recipe " + recipe_id, problems, true)
+	for station_id in station_ids.keys():
+		if int(per_station.get(station_id, 0)) == 0:
+			problems.append("crafting station %s has no recipes" % station_id)
+
+	var action_ids: Dictionary = {}
+	for entry in crafting_actions:
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("crafting action is not an object")
+			continue
+		var action: Dictionary = entry
+		var action_id := String(action.get("id", ""))
+		if action_id == "":
+			problems.append("crafting action without id")
+			continue
+		if action_ids.has(action_id):
+			problems.append("duplicate crafting action " + action_id)
+		action_ids[action_id] = true
+		_validate_craft_cost(action, "action " + action_id, problems, false)
+	for required in ["refine", "disassemble"]:
+		if not action_ids.has(required):
+			problems.append("missing crafting action " + required)
+
+
+func _validate_craft_cost(data: Dictionary, label: String, problems: Array, needs_realm: bool) -> void:
+	if int(data.get("stones", 0)) < 0:
+		problems.append("%s has a negative stone cost" % label)
+	if needs_realm and int(data.get("realm", 1)) < 1:
+		problems.append("%s needs a realm of at least one" % label)
+	var chance := float(data.get("failure_chance", 0.0))
+	if chance < 0.0 or chance > 1.0:
+		problems.append("%s has an invalid failure chance" % label)
+	var materials: Variant = data.get("materials", [])
+	if typeof(materials) != TYPE_ARRAY:
+		problems.append("%s has malformed materials" % label)
+		return
+	for entry in (materials as Array):
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("%s has a malformed material" % label)
+			continue
+		var key := String((entry as Dictionary).get("material", ""))
+		if not Crafting.is_material_key(key):
+			problems.append("%s names unknown material %s" % [label, key])
+		if int((entry as Dictionary).get("count", 0)) < 1:
+			problems.append("%s needs a positive amount of %s" % [label, key])
 
 
 ## Loot tables are the whole drop economy: a bad weight would skew every kill,

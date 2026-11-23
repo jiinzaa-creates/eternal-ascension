@@ -62,6 +62,13 @@ var storage := Storage.new()
 var storage_open := false
 var storage_side := 0
 var storage_index := 0
+## Forge screen: recipes, refinement and breaking gear down. Three modes, one
+## cursor, frozen play so a swing never falls on the anvil.
+var crafting: Crafting
+var forge_open := false
+var forge_mode := 0
+var forge_index := 0
+const FORGE_MODES: Array[String] = ["forge", "refine", "disassemble"]
 var waypoint_name := ""
 var waypoint_position := Vector2.ZERO
 ## Discovered sites, recorded with a position so they stay travel destinations
@@ -105,6 +112,7 @@ var _physique_rolls := 0
 
 func _ready() -> void:
 	Game.new_run()
+	crafting = Crafting.new(DB)
 	continent = Continent.generate(Game.world_seed)
 	DisplayPolicy.apply(get_window())
 	get_window().size_changed.connect(_on_window_resized)
@@ -345,6 +353,13 @@ func _spawn_interactables() -> void:
 	storehouse.position = settlement.position_for("market") + Vector2(46, 62)
 	world.add_child(storehouse)
 	interactables.append(storehouse)
+
+	# The forge: recipes, refining and breaking gear down, at the smithy door.
+	var forge := Interactable.new()
+	forge.setup(Interactable.Kind.FORGE, "forge.azure", "Azure Forge — craft or refine")
+	forge.position = settlement.position_for("forge") + Vector2(0, 62)
+	world.add_child(forge)
+	interactables.append(forge)
 
 	# A manual teaches a technique that is otherwise hidden from character start.
 	var manual := Interactable.new()
@@ -820,7 +835,7 @@ func toggle_gear() -> void:
 	if gear_open:
 		close_gear()
 		return
-	if bars_open or travel_open or shop_open or storage_open or (world_map != null and world_map.visible):
+	if bars_open or travel_open or shop_open or storage_open or forge_open or (world_map != null and world_map.visible):
 		return
 	gear_open = true
 	gear_index = 0
@@ -892,7 +907,7 @@ func storage_move() -> void:
 func _open_storage() -> void:
 	if player == null or phase == "creation" or String(phase) == "ended":
 		return
-	if gear_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+	if gear_open or forge_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
 		return
 	storage_open = true
 	storage_side = 0
@@ -903,6 +918,145 @@ func _open_storage() -> void:
 
 func close_storage() -> void:
 	storage_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+# ------------------------------------------------------------------ forge ----
+
+## Recipes in forge mode, gear in the other two: the same cursor, a different
+## list, so the panel never needs a second selection model.
+func forge_rows() -> Array:
+	if FORGE_MODES[forge_mode] == "forge":
+		return crafting.recipes_for("station.forge") if crafting != null else []
+	return gear_candidates()
+
+
+func forge_selected() -> Dictionary:
+	var rows: Array = forge_rows()
+	if forge_index < 0 or forge_index >= rows.size():
+		return {}
+	return rows[forge_index] as Dictionary
+
+
+## The cost of the current mode, or {} in forge mode where each recipe carries
+## its own price.
+func forge_cost(mode_index: int) -> Dictionary:
+	if crafting == null:
+		return {}
+	match FORGE_MODES[mode_index]:
+		"refine":
+			return crafting.action("refine")
+		"disassemble":
+			return crafting.action("disassemble")
+		_:
+			return {}
+
+
+func forge_act() -> void:
+	if player == null or crafting == null:
+		return
+	var chosen := forge_selected()
+	if chosen.is_empty():
+		return
+	match FORGE_MODES[forge_mode]:
+		"forge":
+			_forge_make(chosen)
+		"refine":
+			_forge_refine(chosen)
+		_:
+			_forge_disassemble(chosen)
+
+
+func _spend_craft(cost: Dictionary) -> void:
+	var paid := Crafting.consume(player.inventory, cost.get("materials", []))
+	if bool(paid.get("ok", false)):
+		player.inventory = paid.get("inventory", player.inventory)
+	Game.spirit_stones = maxi(0, Game.spirit_stones - int(cost.get("stones", 0)))
+	Bus.player_stats_changed.emit()
+
+
+func _forge_make(recipe: Dictionary) -> void:
+	var check := Crafting.check(recipe, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("The forge refuses: %s." % String(check.get("reason", "not enough")))
+		return
+	var output: Dictionary = recipe.get("output", {})
+	var base: Dictionary = DB.base_item(String(output.get("base", "")))
+	var ilvl := maxi(int(base.get("ilvl", 1)), player.cultivation.realm)
+	# Every attempt advances the counter, failures included: a retry must roll a
+	# new stream or a failed recipe would fail forever.
+	var attempt := Game.crafts_made
+	Game.crafts_made += 1
+	var result := crafting.craft(recipe, ilvl, 50000 + attempt, 0, player.stats.crafting_quality_mult())
+	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
+		Bus.toast.emit(String(result.get("reason", "the forge cannot make that")).capitalize() + ".")
+		return
+	_spend_craft(recipe)
+	if bool(result.get("failed", false)):
+		Bus.toast.emit("The forge fails; the materials are lost.")
+		return
+	var item: Dictionary = result["item"]
+	player.pick_up(item)
+	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
+	Bus.toast.emit("Forged %s%s." % [String(item.get("name", "a piece")), flourish])
+
+
+func _forge_refine(item: Dictionary) -> void:
+	var rules: Dictionary = crafting.action("refine")
+	var check := Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("Refining needs %s." % String(check.get("reason", "more materials")))
+		return
+	var attempt := Game.crafts_made
+	Game.crafts_made += 1
+	var result := crafting.refine(item, 60000 + attempt, 0, player.stats.crafting_quality_mult())
+	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
+		Bus.toast.emit(String(result.get("reason", "the piece refuses the hammer")).capitalize() + ".")
+		return
+	_spend_craft(rules)
+	if bool(result.get("failed", false)):
+		Bus.toast.emit("The refine fails; the piece is unchanged.")
+		return
+	var refined: Dictionary = result["item"]
+	for i in player.inventory.size():
+		if String((player.inventory[i] as Dictionary).get("id", "")) == String(item.get("id", "")):
+			player.inventory[i] = refined
+			break
+	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
+	Bus.toast.emit("Refined %s%s." % [String(refined.get("name", "a piece")), flourish])
+
+
+func _forge_disassemble(item: Dictionary) -> void:
+	var ore := Crafting.disassemble_ore(item)
+	if ore <= 0:
+		Bus.toast.emit("That cannot be broken down.")
+		return
+	for i in player.inventory.size():
+		if String((player.inventory[i] as Dictionary).get("id", "")) == String(item.get("id", "")):
+			player.inventory.remove_at(i)
+			break
+	player.inventory = Items.add_to_inventory(player.inventory, _make_ore(ore))
+	forge_index = clampi(forge_index, 0, maxi(0, forge_rows().size() - 1))
+	Bus.player_stats_changed.emit()
+	Bus.toast.emit("Broken down into %d Spirit Ore." % ore)
+
+
+func _open_forge() -> void:
+	if player == null or phase == "creation" or String(phase) == "ended":
+		return
+	if gear_open or storage_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+		return
+	forge_open = true
+	forge_mode = 0
+	forge_index = 0
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func close_forge() -> void:
+	forge_open = false
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process(true)
@@ -1184,6 +1338,26 @@ func _unhandled_input(event: InputEvent) -> void:
 				travel_index = i
 				_show_travel()
 				return
+		return
+
+	if forge_open:
+		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
+			close_forge()
+			return
+		if event.is_action_pressed("shop_mode"):
+			forge_mode = (forge_mode + 1) % FORGE_MODES.size()
+			forge_index = 0
+			return
+		var forge_list := forge_rows()
+		if event.is_action_pressed("ui_down"):
+			forge_index = mini(forge_index + 1, maxi(0, forge_list.size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			forge_index = maxi(0, forge_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			forge_act()
+			return
 		return
 
 	if storage_open:
@@ -1585,6 +1759,8 @@ func _use_interactable(node: Interactable) -> void:
 			_rest_at_inn()
 		Interactable.Kind.STORAGE:
 			_open_storage()
+		Interactable.Kind.FORGE:
+			_open_forge()
 		Interactable.Kind.RUIN:
 			if node.used:
 				return
@@ -1713,12 +1889,13 @@ func _use_root_pavilion() -> void:
 	Bus.toast.emit("Your root evolves — %s." % Roots.describe(cultivation.root_data(), cultivation.effective_purity()))
 
 
-func _make_marrow() -> Dictionary:
+func _make_marrow(count: int = 1) -> Dictionary:
 	return {
 		"id": "item.marrow.spirit.%d" % player.inventory.size(),
 		"name": "Spirit Root Marrow",
 		"base_name": "Spirit Root Marrow",
 		"slot": "material",
+		"material": "marrow",
 		"ilvl": 3,
 		"rarity": 2,
 		"rarity_name": "Rare",
@@ -1727,6 +1904,7 @@ func _make_marrow() -> Dictionary:
 		"armor": 0.0,
 		"mods": [],
 		"value": 60,
+		"count": maxi(1, count),
 	}
 
 
@@ -1745,12 +1923,13 @@ func _consume_marrow() -> void:
 			return
 
 
-func _make_ore() -> Dictionary:
+func _make_ore(count: int = 1) -> Dictionary:
 	return {
 		"id": "item.ore.spirit.%d" % player.inventory.size(),
 		"name": "Spirit Ore",
 		"base_name": "Spirit Ore",
 		"slot": "material",
+		"material": "ore",
 		"ilvl": 2,
 		"rarity": 1,
 		"rarity_name": "Refined",
@@ -1759,15 +1938,17 @@ func _make_ore() -> Dictionary:
 		"armor": 0.0,
 		"mods": [],
 		"value": 22,
+		"count": maxi(1, count),
 	}
 
 
-func _make_herb() -> Dictionary:
+func _make_herb(count: int = 1) -> Dictionary:
 	return {
 		"id": "item.herb.spirit.%d" % player.inventory.size(),
 		"name": "Spirit Herb",
 		"base_name": "Spirit Herb",
 		"slot": "material",
+		"material": "herb",
 		"ilvl": 1,
 		"rarity": 1,
 		"rarity_name": "Refined",
@@ -1776,6 +1957,7 @@ func _make_herb() -> Dictionary:
 		"armor": 0.0,
 		"mods": [],
 		"value": 12,
+		"count": maxi(1, count),
 	}
 
 

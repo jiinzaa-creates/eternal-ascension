@@ -34,7 +34,7 @@ const REPAIR_RATE := 0.18
 const FIELDS: Array[String] = [
 	"id", "seed", "base", "base_name", "slot", "weapon_type", "ilvl", "rarity",
 	"rarity_name", "name", "implicit", "base_damage", "armor", "mods", "value",
-	"unique", "lore", "count", "durability",
+	"unique", "lore", "material", "count", "durability",
 ]
 
 
@@ -161,6 +161,7 @@ static func normalize_item(value: Variant) -> Dictionary:
 	out["value"] = maxi(0, int(data.get("value", 0)))
 	out["unique"] = bool(data.get("unique", false))
 	out["lore"] = String(data.get("lore", ""))
+	out["material"] = String(data.get("material", ""))
 	out["count"] = clampi(int(data.get("count", 1)), 1, 999)
 	if DURABLE_SLOTS.has(String(out["slot"])):
 		var maximum := max_durability(String(out["slot"]))
@@ -310,6 +311,25 @@ static func total_count(inventory: Array) -> int:
 			continue
 		total += maxi(0, int(item.get("count", 0)))
 	return total
+
+
+## What kind of crafting material an item is, or "" for anything that is not
+## one. New material items carry the field; older ones are recognised by the
+## stable id prefix they were always written with.
+static func material_key(item: Dictionary) -> String:
+	var explicit := String(item.get("material", ""))
+	if explicit != "":
+		return explicit
+	var id := String(item.get("id", ""))
+	if id.begins_with("item.ore."):
+		return "ore"
+	if id.begins_with("item.herb."):
+		return "herb"
+	if id.begins_with("item.marrow."):
+		return "marrow"
+	if id.begins_with("item.core."):
+		return "core"
+	return ""
 
 
 ## "Spirit Herb x3" for a stack, the plain name for a single item, and a diamond

@@ -98,6 +98,7 @@ func _draw() -> void:
 	draw_inventory(player)
 	draw_gear(player)
 	draw_storage(player)
+	draw_forge(player)
 	draw_quest(player)
 	draw_prompt()
 	draw_realm_banner()
@@ -518,6 +519,90 @@ func draw_gear(player: Player) -> void:
 		_text(Vector2(cx, cy), "Wearable.  ENTER wears it.", 12, ACCENT)
 	else:
 		_text(Vector2(cx, cy), "Refused — %s" % String(check.get("reason", "cannot be worn")), 12, Color("#e08f8f"))
+
+
+## The forge: recipes, refinement and disassembly behind one cursor. The panel
+## never performs an action silently — ENTER is always the commitment.
+func draw_forge(player: Player) -> void:
+	if host == null or not bool(host.forge_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
+	var panel := Rect2(view * 0.5 - Vector2(390.0, 240.0), Vector2(780.0, 480.0))
+	draw_rect(panel, Color("#0b1014", 0.97))
+	draw_rect(panel, Color("#e0a060", 0.45), false, 1.5)
+	var origin := panel.position
+	_text(origin + Vector2(22.0, 32.0), "AZURE FORGE", 18, Color("#e8b070"))
+	var modes: Array[String] = ["FORGE", "REFINE", "DISASSEMBLE"]
+	var mode := int(host.forge_mode)
+	var tabs := ""
+	for i in modes.size():
+		tabs += ("[%s] " % modes[i]) if i == mode else (" %s  " % modes[i])
+	_text(origin + Vector2(160.0, 32.0), tabs + "   TAB switches", 11, MUTED)
+	_text(origin + Vector2(22.0, 52.0), "↑/↓ choose    ENTER work    E — close", 11, Color("#6b7b84"))
+
+	var rows: Array = host.forge_rows()
+	var selected := clampi(int(host.forge_index), 0, maxi(0, rows.size() - 1))
+	var first := maxi(0, selected - 10)
+	var list_y := origin.y + 82.0
+	if rows.is_empty():
+		_text(Vector2(origin.x + 22.0, list_y), "Nothing to work here.", 12, MUTED)
+	for i in range(first, mini(rows.size(), first + 12)):
+		var entry: Dictionary = rows[i]
+		var label := String(entry.get("name", "?")) if mode == 0 else Items.label(entry)
+		var line := "%s %s" % [">" if i == selected else " ", _fit(label, 12, 330.0)]
+		_text(Vector2(origin.x + 22.0, list_y), line, 12, ACCENT if i == selected else _item_color(entry))
+		list_y += 20.0
+	if rows.is_empty():
+		return
+
+	var chosen: Dictionary = rows[selected]
+	var cx := origin.x + 390.0
+	var cy := origin.y + 82.0
+	if mode == 0:
+		var check: Dictionary = Crafting.check(chosen, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		var base: Dictionary = DB.base_item(String((chosen.get("output", {}) as Dictionary).get("base", "")))
+		_text(Vector2(cx, cy), String(chosen.get("name", "?")), 14, ACCENT)
+		cy += 22.0
+		_text(Vector2(cx, cy), _fit("Makes: %s (ilvl %d+)" % [String(base.get("name", "?")), maxi(int(base.get("ilvl", 1)), player.cultivation.realm)], 12, 360.0), 12, MUTED)
+		cy += 20.0
+		_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(chosen), 11, 360.0), 11, Color("#d8c070"))
+		cy += 20.0
+		_text(Vector2(cx, cy), _fit(String(chosen.get("desc", "")), 11, 360.0), 11, Color("#7f9098"))
+		cy += 32.0
+		if bool(check.get("ok", false)):
+			_text(Vector2(cx, cy), "Ready.  ENTER forges it.", 12, ACCENT)
+		else:
+			_text(Vector2(cx, cy), _fit("Refused — %s" % String(check.get("reason", "not enough")), 11, 360.0), 11, Color("#e08f8f"))
+		return
+
+	var rules: Dictionary = host.forge_cost(mode)
+	_text(Vector2(cx, cy), _fit(Items.label(chosen), 14, 360.0), 14, _item_color(chosen))
+	cy += 22.0
+	if mode == 1:
+		var refine_check: Dictionary = Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(rules), 11, 360.0), 11, Color("#d8c070"))
+		cy += 20.0
+		_text(Vector2(cx, cy), _fit(String(rules.get("desc", "")), 11, 360.0), 11, Color("#7f9098"))
+		cy += 32.0
+		if bool(chosen.get("unique", false)):
+			_text(Vector2(cx, cy), "An authored relic refuses a smith.", 11, Color("#e08f8f"))
+		elif not bool(refine_check.get("ok", false)):
+			_text(Vector2(cx, cy), _fit("Needs %s." % String(refine_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
+		else:
+			_text(Vector2(cx, cy), "ENTER rerolls every affix.", 12, ACCENT)
+		return
+	var ore := Crafting.disassemble_ore(chosen)
+	_text(Vector2(cx, cy), "Yields: %d Spirit Ore" % ore, 12, Color("#d8c070"))
+	cy += 20.0
+	_text(Vector2(cx, cy), _fit(String(rules.get("desc", "")), 11, 360.0), 11, Color("#7f9098"))
+	cy += 32.0
+	if ore <= 0:
+		_text(Vector2(cx, cy), "That cannot be broken down.", 11, Color("#e08f8f"))
+	elif bool(chosen.get("unique", false)):
+		_text(Vector2(cx, cy), "An authored relic refuses the hammer.", 11, Color("#e08f8f"))
+	else:
+		_text(Vector2(cx, cy), "ENTER breaks it down for good.", 12, ACCENT)
 
 
 ## The storehouse: the satchel on the left, the shelves on the right. The cursor

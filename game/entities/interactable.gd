@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN, TRIBULATION, STORAGE }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN, TRIBULATION, STORAGE, FORGE }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -267,6 +267,15 @@ func _draw() -> void:
 			draw_rect(Rect2(-22, -14, 44, 6), Color("#6a5638"))
 			draw_circle(Vector2(0, -26), 5.0, Color("#ffd9a0", 0.5 + pulse * 0.4))
 			draw_line(Vector2(0, -21), Vector2(0, -14), Color("#6a5638"), 2.0)
+		Kind.FORGE:
+			# A smithy: a stone anvil, a low furnace and a coal glow.
+			draw_rect(Rect2(-18, -6, 36, 12), Color("#3a3430"))
+			draw_rect(Rect2(-14, -14, 28, 8), Color("#4a423a"))
+			draw_rect(Rect2(-10, -22, 20, 9), Color("#5a5048"))
+			draw_rect(Rect2(16, -18, 16, 22), Color("#40342c"))
+			draw_circle(Vector2(24, -8), 4.0, Color("#e08040", 0.4 + pulse * 0.5))
+			draw_line(Vector2(-8, -28), Vector2(10, -28), Color("#6a6258"), 2.5)
+			draw_line(Vector2(1, -28), Vector2(-1, -20), Color("#8a8078"), 2.0)
 		Kind.STORAGE:
 			# A storehouse: crates stacked under a leaning tile roof.
 			draw_rect(Rect2(-24, -10, 48, 16), Color("#40382e"))
