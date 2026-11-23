@@ -97,6 +97,7 @@ func _draw() -> void:
 	draw_techniques(player)
 	draw_inventory(player)
 	draw_gear(player)
+	draw_storage(player)
 	draw_quest(player)
 	draw_prompt()
 	draw_realm_banner()
@@ -411,90 +412,161 @@ func draw_inventory(player: Player) -> void:
 	var y := 290.0
 	draw_rect(Rect2(w - 316.0 - 12.0, y - 22.0, 316.0, 170.0), PANEL_BG)
 	_text(Vector2(w - 316.0, y), "Satchel  (%d items, %d kinds)" % [Items.total_count(player.inventory), player.inventory.size()], 13, INK)
+	_text(Vector2(w - 96.0, y), Inventory.sort_label(player.inventory_sort), 11, MUTED)
 	y += 20.0
-	var recent: Array = player.inventory.slice(maxi(0, player.inventory.size() - 6))
-	for item in recent:
+	# The satchel's own order, so the strip and the grid never disagree.
+	var shown: Array = player.inventory.slice(0, 6)
+	for item in shown:
 		_text(Vector2(w - 316.0, y), Items.label(item), 12, _item_color(item))
 		y += 17.0
 	if player.inventory.is_empty():
 		_text(Vector2(w - 316.0, y), "Empty. Kill something.", 12, MUTED)
 
 
-## The gear screen: what is worn, what could replace it, and exactly what the
-## pipeline would gain or lose. It never equips by itself; ENTER goes through
-## Player.equip(), the same rules a pickup does.
+## The satchel screen: a 6x5 grid of everything carried, the worn slots beside
+## it, and — for a piece of gear — exactly what the stat pipeline would gain or
+## lose. It never equips by itself; ENTER goes through Player.equip(), the same
+## rules a pickup does.
 func draw_gear(player: Player) -> void:
 	if host == null or not bool(host.gear_open):
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
-	var panel := Rect2(view * 0.5 - Vector2(400.0, 250.0), Vector2(800.0, 500.0))
+	var panel := Rect2(view * 0.5 - Vector2(440.0, 260.0), Vector2(880.0, 520.0))
 	draw_rect(panel, Color("#0b1014", 0.97))
 	draw_rect(panel, Color("#7fd3e0", 0.45), false, 1.5)
 	var origin := panel.position
-	_text(origin + Vector2(22.0, 32.0), "GEAR", 18, ACCENT)
-	_text(origin + Vector2(92.0, 32.0), "I — close    ↑/↓ — choose    ENTER — wear", 11, MUTED)
+	_text(origin + Vector2(22.0, 32.0), "SATCHEL", 18, ACCENT)
+	_text(origin + Vector2(112.0, 32.0), "sort: %s (R)    I — close    arrows — choose    ENTER — wear" % Inventory.sort_label(player.inventory_sort), 11, MUTED)
 
-	var y := origin.y + 66.0
-	_text(origin + Vector2(22.0, y), "WORN", 11, MUTED)
-	y += 22.0
+	var rows: Array = host.inventory_rows()
+	var count := rows.size()
+	_text(origin + Vector2(22.0, 64.0), "CARRIED  (%d kinds, %d items)" % [count, Items.total_count(rows)], 11, MUTED)
+
+	# Grid: one page of six by five cells, the cursor on one of them.
+	var selected := clampi(int(host.gear_index), 0, maxi(0, count - 1))
+	var pages := Inventory.page_count(rows)
+	var page := Inventory.page_of(selected) if count > 0 else 0
+	var cell := Vector2(72.0, 34.0)
+	var grid_origin := origin + Vector2(22.0, 78.0)
+	for i in Inventory.PAGE_SIZE:
+		var index := page * Inventory.PAGE_SIZE + i
+		var rect := Rect2(grid_origin + Vector2(float(i % Inventory.COLS) * (cell.x + 4.0), float(i / Inventory.COLS) * (cell.y + 4.0)), cell)
+		draw_rect(rect, Color("#111a1f"))
+		draw_rect(rect, Color("#243039"), false, 1.0)
+		if index >= count:
+			continue
+		var item: Dictionary = rows[index]
+		if index == selected:
+			draw_rect(rect, Color("#7fd3e0", 0.85), false, 2.0)
+		_text(rect.position + Vector2(4.0, 14.0), _fit(Items.label(item), 9, cell.x - 8.0), 9, _item_color(item))
+		_text(rect.position + Vector2(4.0, 28.0), _fit(Inventory.slot_label(item), 9, cell.x - 8.0), 9, Color("#5c6b73"))
+	_text(grid_origin + Vector2(0.0, 5.0 * (cell.y + 4.0) + 18.0), "Page %d/%d" % [page + 1, pages], 11, MUTED)
+
+	# Worn slots, kept beside the grid rather than in it: they are not carried.
+	var worn_x := origin.x + 500.0
+	var worn_y := origin.y + 64.0
+	_text(Vector2(worn_x, worn_y), "WORN", 11, MUTED)
+	worn_y += 20.0
 	for slot in ["weapon", "armor", "ring", "talisman"]:
 		var worn: Dictionary = player.equipment.get(slot, {})
-		_text(origin + Vector2(22.0, y), String(Equipment.SLOT_LABELS.get(slot, slot)), 11, MUTED)
+		_text(Vector2(worn_x, worn_y), String(Equipment.SLOT_LABELS.get(slot, slot)), 11, MUTED)
 		var label := "—"
 		var color := Color("#5c6b73")
 		if not worn.is_empty():
 			label = Items.label(worn)
 			color = _item_color(worn)
-		_text(origin + Vector2(94.0, y), _fit(label, 12, 250.0), 12, color)
-		y += 22.0
+		_text(Vector2(worn_x + 72.0, worn_y), _fit(label, 12, 280.0), 12, color)
+		worn_y += 21.0
 
-	var rows: Array = host.gear_candidates()
-	var list_y := origin.y + 66.0
-	_text(origin + Vector2(370.0, list_y), "SATCHEL GEAR  (%d)" % rows.size(), 11, MUTED)
-	list_y += 22.0
-	if rows.is_empty():
-		_text(origin + Vector2(370.0, list_y), "Nothing else to wear.", 12, MUTED)
-	var selected := clampi(int(host.gear_index), 0, maxi(0, rows.size() - 1))
-	var first := maxi(0, selected - 6)
-	for i in range(first, mini(rows.size(), first + 9)):
-		var item: Dictionary = rows[i]
-		var text := "%s %s" % [">" if i == selected else " ", _fit(Items.label(item), 12, 250.0)]
-		_text(origin + Vector2(370.0, list_y), text, 12, ACCENT if i == selected else _item_color(item))
-		list_y += 19.0
-
-	if rows.is_empty():
+	var cx := worn_x
+	var cy := origin.y + 190.0
+	draw_line(Vector2(cx, cy - 16.0), Vector2(panel.position.x + panel.size.x - 22.0, cy - 16.0), Color("#243039"), 1.0)
+	if count == 0:
+		_text(Vector2(cx, cy), "Satchel empty.", 12, MUTED)
 		return
 	var chosen: Dictionary = rows[selected]
-	var info: Dictionary = host.gear_compare(chosen)
-	var check: Dictionary = info.get("check", {})
-	var cx := origin.x + 22.0
-	var cy := origin.y + 210.0
-	draw_line(Vector2(cx, cy - 16.0), Vector2(panel.position.x + panel.size.x - 22.0, cy - 16.0), Color("#243039"), 1.0)
 	var worn_slot: Dictionary = player.equipment.get(String(chosen.get("slot", "")), {})
 	var against := "no piece worn there" if worn_slot.is_empty() else "against %s" % String(worn_slot.get("name", "?"))
-	_text(Vector2(cx, cy), _fit("%s  (ilvl %d)  — %s" % [String(chosen.get("name", "?")), int(chosen.get("ilvl", 1)), against], 13, 740.0), 13, _item_color(chosen))
-	cy += 24.0
+	_text(Vector2(cx, cy), _fit("%s  (ilvl %d)  — %s" % [String(chosen.get("name", "?")), int(chosen.get("ilvl", 1)), against], 13, 358.0), 13, _item_color(chosen))
+	cy += 22.0
+	_text(Vector2(cx, cy), "%s · value %d · sells for %d" % [Inventory.slot_label(chosen), int(chosen.get("value", 0)), Economy.sell_value(chosen)], 11, MUTED)
+	cy += 18.0
 	var lore := String(chosen.get("lore", ""))
 	if lore != "":
-		_text(Vector2(cx, cy), _fit(lore, 11, 740.0), 11, Color("#d8c070"))
-		cy += 20.0
+		_text(Vector2(cx, cy), _fit(lore, 11, 358.0), 11, Color("#d8c070"))
+		cy += 19.0
+
+	if not Items.is_equipment(String(chosen.get("slot", ""))):
+		_text(Vector2(cx, cy), "Not wearable. Keep it, sell it, or store it.", 11, MUTED)
+		return
+	var info: Dictionary = host.gear_compare(chosen)
+	var check: Dictionary = info.get("check", {})
 	var deltas: Array = info.get("deltas", [])
 	if deltas.is_empty():
 		_text(Vector2(cx, cy), "Identical numbers.", 12, MUTED)
-		cy += 20.0
+		cy += 19.0
 	for delta in deltas:
 		var value := float((delta as Dictionary).get("delta", 0.0))
 		var unit := String((delta as Dictionary).get("unit", ""))
 		var shown := ("%.1f" % value) if absf(value) < 10.0 else str(roundi(value))
 		var line := "%s%s%s %s" % ["+" if value > 0.0 else "", shown, unit, String((delta as Dictionary).get("label", ""))]
 		_text(Vector2(cx + 10.0, cy), line, 12, Color("#8fe0a8") if value > 0.0 else Color("#e08f8f"))
-		cy += 19.0
-	cy += 8.0
+		cy += 18.0
+	cy += 6.0
 	if bool(check.get("ok", true)):
 		_text(Vector2(cx, cy), "Wearable.  ENTER wears it.", 12, ACCENT)
 	else:
 		_text(Vector2(cx, cy), "Refused — %s" % String(check.get("reason", "cannot be worn")), 12, Color("#e08f8f"))
+
+
+## The storehouse: the satchel on the left, the shelves on the right. The cursor
+## sits on one side and ENTER moves that stack across whole.
+func draw_storage(player: Player) -> void:
+	if host == null or not bool(host.storage_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
+	var panel := Rect2(view * 0.5 - Vector2(380.0, 240.0), Vector2(760.0, 480.0))
+	draw_rect(panel, Color("#0b1014", 0.97))
+	draw_rect(panel, Color("#c8b070", 0.45), false, 1.5)
+	var origin := panel.position
+	_text(origin + Vector2(22.0, 32.0), "STOREHOUSE", 18, Color("#d8c070"))
+	_text(origin + Vector2(166.0, 32.0), "←/→ side    ↑/↓ choose    ENTER move    E — close", 11, MUTED)
+
+	var side := int(host.storage_side)
+	var store: Storage = host.storage
+	_text(origin + Vector2(22.0, 64.0), "SATCHEL  (%d kinds)" % player.inventory.size(), 11, ACCENT if side == 0 else MUTED)
+	_text(origin + Vector2(390.0, 64.0), "STORED  (%d/%d kinds)" % [store.slots_used(), Storage.CAPACITY], 11, ACCENT if side == 1 else MUTED)
+	var cursor := clampi(int(host.storage_index), 0, 999)
+	for column in 2:
+		var column_rows: Array = host.storage_rows(column)
+		var active := column == side
+		var chosen_index := cursor if active else 0
+		chosen_index = clampi(chosen_index, 0, maxi(0, column_rows.size() - 1))
+		var first := maxi(0, chosen_index - 9)
+		var x := origin.x + (22.0 if column == 0 else 390.0)
+		var y := origin.y + 90.0
+		if column_rows.is_empty():
+			_text(Vector2(x, y), "Empty.", 11, Color("#4a5a63"))
+		for i in range(first, mini(column_rows.size(), first + 11)):
+			var item: Dictionary = column_rows[i]
+			var line := _fit(Items.label(item), 12, 330.0)
+			var color := _item_color(item)
+			if active and i == chosen_index:
+				line = "> " + line
+				color = ACCENT
+			_text(Vector2(x, y), line, 12, color)
+			y += 20.0
+
+	var chosen: Dictionary = host.storage_selected()
+	var footer_y := origin.y + 372.0
+	if not chosen.is_empty():
+		var line := "%s · %s · value %d · sells for %d" % [String(chosen.get("name", "?")), Inventory.slot_label(chosen), int(chosen.get("value", 0)), Economy.sell_value(chosen)]
+		_text(Vector2(origin.x + 22.0, footer_y), _fit(line, 12, 716.0), 12, _item_color(chosen))
+	else:
+		_text(Vector2(origin.x + 22.0, footer_y), "Nothing selected.", 12, MUTED)
+	_text(Vector2(origin.x + 22.0, footer_y + 26.0), "ENTER moves the whole stack across. The storehouse is saved with the run.", 11, MUTED)
 
 
 func draw_prompt() -> void:
@@ -547,7 +619,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · I gear · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

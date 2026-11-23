@@ -2503,6 +2503,62 @@ func _run() -> void:
 	player.cultivation.qi = m41_prev_qi
 	player.rebuild_stats()
 
+	# --- inventory: the grid, the sort key and the storehouse ------------------
+	var m42_store := _find_interactable(main.interactables, "storage.market")
+	check(m42_store != null and m42_store.kind == Interactable.Kind.STORAGE, "the market has a storehouse")
+	check(main.inventory_rows().size() == player.inventory.size(), "the grid reads the satchel")
+	var m42_sort_before: String = player.inventory_sort
+	var m42_ids_before: Array = []
+	for entry in player.inventory:
+		m42_ids_before.append(String((entry as Dictionary).get("id", "")))
+	main.toggle_gear()
+	check(main.gear_open, "I opens the satchel screen")
+	main.cycle_inventory_sort()
+	check(player.inventory_sort != m42_sort_before, "R changes the satchel's order")
+	var m42_ids_after: Array = []
+	for entry in player.inventory:
+		m42_ids_after.append(String((entry as Dictionary).get("id", "")))
+	var m42_permutation := m42_ids_after.size() == m42_ids_before.size()
+	for id_value in m42_ids_before:
+		if not m42_ids_after.has(id_value):
+			m42_permutation = false
+	check(m42_permutation, "sorting only reorders the satchel")
+	check(Inventory.page_count(main.inventory_rows()) >= 1, "the grid pages the satchel")
+	main.close_gear()
+	check(not main.gear_open and player.is_physics_processing(), "closing the satchel resumes play")
+
+	var m42_material := Items.normalize_item({"id": "item.m42.ore", "slot": "material", "name": "Test Ore", "base": "ore.spirit", "value": 9, "count": 3})
+	player.inventory = Items.add_to_inventory(player.inventory, m42_material)
+	var m42_store_before: int = main.storage.slots_used()
+	main._open_storage()
+	check(main.storage_open, "the storehouse opens")
+	check(not player.is_physics_processing(), "the storehouse freezes play")
+	main.storage_side = 0
+	var m42_cursor := -1
+	for i in main.storage_rows(0).size():
+		if String((main.storage_rows(0)[i] as Dictionary).get("id", "")) == "item.m42.ore":
+			m42_cursor = i
+	main.storage_index = m42_cursor
+	main.storage_move()
+	check(main.storage.has("item.m42.ore"), "ENTER stores the selected stack")
+	check(main.storage.slots_used() == m42_store_before + 1, "the shelf count rises")
+	var m42_still_bagged := false
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("id", "")) == "item.m42.ore":
+			m42_still_bagged = true
+	check(not m42_still_bagged, "the stored stack leaves the satchel")
+	main.storage_side = 1
+	main.storage_index = main.storage.index_of("item.m42.ore")
+	main.storage_move()
+	check(not main.storage.has("item.m42.ore"), "ENTER withdraws the selected stack")
+	var m42_returned := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("id", "")) == "item.m42.ore":
+			m42_returned += int((entry as Dictionary).get("count", 1))
+	check(m42_returned == 3, "the whole stack comes back")
+	main.close_storage()
+	check(not main.storage_open and player.is_physics_processing(), "closing the storehouse resumes play")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
@@ -2528,6 +2584,17 @@ func _run() -> void:
 	check(container.used, "a searched container stays spent after loading")
 	check(player.technique_ids.has("tech.blood.crimson_moon"), "a manual's technique survives a reload")
 	Save.delete_slot(96)
+
+	# M42: the storehouse and the chosen order are part of the run.
+	Save.delete_slot(98)
+	main.storage.items = Items.add_to_inventory(main.storage.items, Items.normalize_item({"id": "item.m42.keep", "slot": "material", "name": "Kept Ore", "base": "ore.spirit", "value": 4}))
+	player.sort_inventory("value")
+	main._save(98)
+	main.storage.items.clear()
+	main._load_game(98)
+	check(main.storage.has("item.m42.keep"), "the storehouse survives a save")
+	check(player.inventory_sort == "value", "the satchel order survives a save")
+	Save.delete_slot(98)
 
 	main.queue_free()
 	await get_tree().process_frame

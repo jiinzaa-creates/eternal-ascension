@@ -35,6 +35,9 @@ var passives: Array = []
 ## Permanent insights. Each one adds its mods to the one pipeline.
 var enlightenments: Array = []
 var inventory: Array = []
+## The satchel's current order. `recent` means "as stored": every other mode
+## rewrites the array itself when it is chosen.
+var inventory_sort := "recent"
 var equipment: Dictionary = {}
 var technique_ids: Array = []
 var selected_technique: int = 0
@@ -1300,6 +1303,15 @@ func pick_up(item: Dictionary) -> void:
 	Bus.player_stats_changed.emit()
 
 
+## Reorders the satchel in place, so the HUD, the shop and the grid always agree
+## about what index 4 is. Returns the mode actually applied.
+func sort_inventory(mode: String) -> String:
+	inventory_sort = mode if Inventory.is_sort_mode(mode) else "recent"
+	inventory = Inventory.sort_entries(inventory, inventory_sort)
+	Bus.player_stats_changed.emit()
+	return inventory_sort
+
+
 ## Wears one equipped piece and keeps the copy in the satchel in step. The stat
 ## pipeline is rebuilt only when the piece actually breaks, so a swing does not
 ## pay for a full recalculation.
@@ -1426,6 +1438,7 @@ func to_dict() -> Dictionary:
 		"passives": passives.duplicate(),
 		"enlightenments": enlightenments.duplicate(),
 		"inventory": Items.inventory_to_save(inventory),
+		"inventory_sort": inventory_sort,
 		"equipment": Items.equipment_to_save(equipment),
 		"technique_ids": technique_ids,
 		"selected_technique": selected_technique,
@@ -1457,6 +1470,8 @@ func from_dict(data: Dictionary) -> void:
 	# Saves written by an older build have neither stacks nor durability; the
 	# canonical pass fills both and drops anything that is not a real item.
 	inventory = Items.normalize_inventory(data.get("inventory", []))
+	var saved_sort := String(data.get("inventory_sort", "recent"))
+	inventory_sort = saved_sort if Inventory.is_sort_mode(saved_sort) else "recent"
 	equipment = Items.normalize_equipment(data.get("equipment", {}))
 	var ids: Array = data.get("technique_ids", [])
 	if not ids.is_empty():

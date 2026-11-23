@@ -45,6 +45,7 @@ func _ready() -> void:
 	_procedural_generation_tests()
 	_equipment_rules_tests()
 	_unique_tests()
+	_inventory_tests()
 	_cultivation_tests()
 	_combat_tests()
 	_world_tests()
@@ -2055,6 +2056,120 @@ func _unique_tests() -> void:
 			spurious = true
 	check(not spurious, "ordinary generation never produces a relic")
 	check(DB.uniques.size() >= 2, "relic content is loaded")
+
+
+# ---------------------------------------------------------------- inventory ----
+
+func _inventory_tests() -> void:
+	print("[inventory] grid pages, sort orders and the storehouse")
+	check(Inventory.COLS == 6 and Inventory.ROWS == 5 and Inventory.PAGE_SIZE == 30, "the grid is six by five")
+	check(Inventory.SORTS.has("recent") and Inventory.SORTS.has("slot") and Inventory.SORTS.has("rarity") \
+		and Inventory.SORTS.has("value") and Inventory.SORTS.has("name"), "every shipped order exists")
+	check(Inventory.next_sort("recent") == "slot" and Inventory.next_sort("name") == "recent", "the sort key cycles")
+	check(Inventory.next_sort("junk") == "recent", "an unknown order falls back to the stored order")
+	check(Inventory.sort_label("value") == "Value", "orders are labelled")
+	check(not Inventory.is_sort_mode("junk"), "an unknown order is not a mode")
+
+	var sword := _item_for("item.inv.sword", "weapon", "Iron Jian", {"rarity": 1, "ilvl": 3, "value": 30})
+	var plate := _item_for("item.inv.plate", "armor", "Iron Plate", {"rarity": 2, "ilvl": 2, "value": 50})
+	var ore := _item_for("item.inv.ore", "material", "Spirit Ore", {"rarity": 0, "ilvl": 1, "value": 5, "base": "ore.spirit"})
+	var pill := _item_for("item.inv.pill", "consumable", "Qi Pill", {"rarity": 3, "ilvl": 4, "value": 80})
+	var bag: Array = [sword, plate, ore, pill]
+	var by_value := Inventory.sort_entries(bag, "value")
+	check(String(by_value[0]["id"]) == "item.inv.pill" and String(by_value[3]["id"]) == "item.inv.ore", "value sorts richest first")
+	check(String(Inventory.sort_entries(bag, "rarity")[0]["id"]) == "item.inv.pill", "rarity sorts rarest first")
+	var by_slot := Inventory.sort_entries(bag, "slot")
+	check(String(by_slot[0]["id"]) == "item.inv.sword" and String(by_slot[1]["id"]) == "item.inv.plate", "slot sorts weapons before armour")
+	check(String(by_slot[3]["id"]) == "item.inv.ore", "materials come last")
+	var by_name := Inventory.sort_entries(bag, "name")
+	check(String(by_name[0]["name"]) == "Iron Jian" and String(by_name[1]["name"]) == "Iron Plate", "name sorts alphabetically")
+	check(Inventory.sort_entries(bag, "recent") == bag, "recent keeps the stored order")
+	check(String(bag[0]["id"]) == "item.inv.sword", "sorting never mutates the satchel")
+	check(by_value.size() == bag.size(), "sorting keeps every entry")
+	var ids_a: Array = []
+	var ids_b: Array = []
+	for entry in by_value:
+		ids_a.append(String((entry as Dictionary)["id"]))
+	for entry in Inventory.sort_entries(bag.duplicate(true), "value"):
+		ids_b.append(String((entry as Dictionary)["id"]))
+	check(ids_a == ids_b, "the same satchel sorts the same way twice")
+	var twin_a := _item_for("item.inv.twin.a", "material", "Twin Ore", {"value": 7})
+	var twin_b := _item_for("item.inv.twin.b", "material", "Twin Ore", {"value": 7})
+	var twins := Inventory.sort_entries([twin_b, twin_a], "value")
+	check(String(twins[0]["id"]) == "item.inv.twin.a", "equal values break ties on the stable id")
+	check(Inventory.slot_label(sword) == "Weapon" and Inventory.slot_rank(ore) > Inventory.slot_rank(plate), "slot labels and ranks agree")
+
+	check(Inventory.page_count([]) == 1, "an empty satchel still has one page")
+	var many: Array = []
+	for i in 61:
+		many.append(_item_for("item.inv.bulk.%d" % i, "material", "Ore %d" % i, {"value": i}))
+	check(Inventory.page_count(many) == 3, "sixty one kinds need three pages")
+	check(Inventory.page_slice(many, 0).size() == 30 and Inventory.page_slice(many, 2).size() == 1, "the last page is short")
+	check(Inventory.page_slice(many, 9).size() == 1, "a page past the end is clamped")
+	check(Inventory.page_of(0) == 0 and Inventory.page_of(30) == 1 and Inventory.page_of(60) == 2, "index to page is exact")
+	check(Inventory.cell_of(0) == Vector2i(0, 0) and Inventory.cell_of(7) == Vector2i(1, 1), "index to cell is exact")
+	check(Inventory.index_at(0, Vector2i(1, 1), 8) == 7, "cell to index is exact")
+	check(Inventory.index_at(2, Vector2i(0, 0), 61) == 60, "a cell on a later page is offset")
+	check(Inventory.index_at(0, Vector2i(5, 4), 10) == -1, "an empty cell has no index")
+	check(Inventory.move_cursor(0, -1, 4) == 0 and Inventory.move_cursor(3, 1, 4) == 3, "the cursor cannot leave the list")
+	check(Inventory.move_cursor(0, Inventory.COLS, 10) == 6, "down moves one grid row")
+	check(Inventory.move_cursor(0, 1, 0) == 0, "an empty grid has a safe cursor")
+
+	var store := Storage.new()
+	check(Storage.CAPACITY == 60, "the storehouse has sixty shelves")
+	check(store.slots_used() == 0 and not store.is_full(), "a new storehouse is empty")
+	var carried: Array = Items.add_to_inventory([], ore)
+	carried = Items.add_to_inventory(carried, sword)
+	var deposited: Dictionary = store.deposit(carried, "item.inv.ore")
+	check(bool(deposited["ok"]), "a satchel stack can be stored")
+	var left: Array = deposited["inventory"]
+	check(left.size() == 1 and String(left[0]["id"]) == "item.inv.sword", "deposit removes only that stack")
+	check(store.has("item.inv.ore") and store.slots_used() == 1, "the storehouse holds it")
+	var missing := store.deposit(left, "item.inv.missing")
+	check(not bool(missing["ok"]) and String(missing["reason"]) != "", "depositing what you do not carry is refused with a reason")
+	var merged := store.deposit(Items.add_to_inventory([], ore), "item.inv.ore")
+	check(bool(merged["ok"]) and store.slots_used() == 1, "a second stack merges on the shelf")
+	check(int((store.item_at(0) as Dictionary)["count"]) == 2, "the shelf remembers both units")
+	var withdrawn: Dictionary = store.withdraw(left, "item.inv.ore")
+	check(bool(withdrawn["ok"]) and store.slots_used() == 0, "withdrawing empties the shelf")
+	check((withdrawn["inventory"] as Array).size() == 2, "the withdrawal returns to the satchel")
+	check(not bool(store.withdraw([], "item.inv.ore")["ok"]), "withdrawing an empty shelf is refused")
+
+	var shelf: Array = []
+	for i in Storage.CAPACITY:
+		shelf = Items.add_to_inventory(shelf, _item_for("item.inv.shelf.%d" % i, "material", "Ore %d" % i, {"base": "ore.spirit"}))
+	check(shelf.size() == Storage.CAPACITY, "sixty distinct materials fill sixty shelves")
+	var full_store := Storage.new()
+	full_store.items = shelf.duplicate(true)
+	check(full_store.is_full(), "sixty kinds fill the storehouse")
+	var refused := full_store.deposit(Items.add_to_inventory([], sword), "item.inv.sword")
+	check(not bool(refused["ok"]), "a full storehouse refuses a new kind")
+	check(String(refused["reason"]).contains("full"), "the refusal says the storehouse is full")
+	check(not full_store.has("item.inv.sword"), "a refused deposit stores nothing")
+	check((refused["inventory"] as Array).size() == 1, "a refused deposit keeps the satchel intact")
+	var ore_again := _item_for("item.inv.ore.again", "material", "Ore 0", {"base": "ore.spirit"})
+	var merged_full := full_store.deposit(Items.add_to_inventory([], ore_again), "item.inv.ore.again")
+	check(bool(merged_full["ok"]) and full_store.slots_used() == Storage.CAPACITY, "a full storehouse still accepts a stack that merges")
+
+	var saved_store := Storage.new()
+	saved_store.items = [ore, sword]
+	var parsed: Dictionary = JSON.parse_string(JSON.stringify(saved_store.to_dict()))
+	var restored := Storage.new()
+	restored.from_dict(parsed)
+	check(restored.slots_used() == 2, "the storehouse survives JSON")
+	check(String((restored.item_at(1) as Dictionary)["id"]) == "item.inv.sword", "stored gear keeps its id")
+	var dirty := Storage.new()
+	dirty.from_dict({"items": [{"id": "item.inv.bad"}, "junk", ore]})
+	check(dirty.slots_used() == 1, "a hand-edited storehouse drops malformed entries")
+	check(Storage.new().to_dict().has("items"), "the save form is explicit")
+
+	var body := Player.new()
+	check(body.inventory_sort == "recent", "a new satchel starts in stored order")
+	body.inventory = [sword, plate, ore]
+	check(body.sort_inventory("value") == "value", "the body records the chosen order")
+	check(String(body.inventory[0]["id"]) == "item.inv.plate", "the satchel itself is reordered")
+	check(body.sort_inventory("junk") == "recent", "an unknown order falls back to stored order")
+	check(Items.to_save(sword).size() != 0 and body.inventory.size() == 3, "sorting keeps the satchel canonical")
 
 
 # ------------------------------------------------------------ cultivation ----

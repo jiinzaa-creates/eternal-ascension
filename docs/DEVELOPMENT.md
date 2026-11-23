@@ -879,6 +879,35 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   slot agrees, a known source (a real boss id or the altar), a known effect with a positive amount,
   real mods and a positive value.
 
+## Inventory, sorting and the storehouse
+
+- **The grid is a view; the satchel is the array.** `Inventory` (pure, static) gives the flat
+  `player.inventory` a 6×5 page grid: `page_count`, `page_slice`, `page_of`, `cell_of`,
+  `index_at`, `move_cursor` and `slot_rank`. One page is thirty kinds; an empty satchel still has
+  one page so the cursor arithmetic never divides by zero. The screen draws the page and the
+  cursor, but nothing about the grid is stored.
+- **Sorting rewrites the order itself.** `Inventory.sort_entries(entries, mode)` decorate-sorts a
+  copy and `Player.sort_inventory(mode)` assigns the result back to the satchel. Keeping a parallel
+  view array would let the HUD strip, the sell list and the grid disagree about what index 4 is.
+  The orders are `recent` (the stored order, unchanged), `slot`, `rarity`, `value` and `name`, and
+  every comparison is total: after its own key it falls back to rarity, item level, lower-case name,
+  stable id and finally insertion index, so equal items cannot swap between runs.
+- **The storehouse is a container with a limit.** `Storage` holds canonical items like the satchel,
+  but capped at `Storage.CAPACITY` kinds (60). A move always transfers a whole stack. `deposit()`
+  and `withdraw()` return `{ok, reason, inventory, item}` and never mutate the player's array, so
+  the scene replaces `player.inventory` with the returned bag. A full storehouse refuses a new
+  kind with a reason but still accepts a stack that merges into an existing shelf, and every entry
+  is re-normalised on load, so a hand-edited save cannot smuggle in a malformed item.
+- **Two screens, both freezing play.** `I` opens the satchel grid (`draw_gear`): grid, worn slots,
+  value and sell price, and — for equipment — the same delta comparison and equip gate as before;
+  `R` cycles the order. The storehouse (`draw_storage`) shows the satchel and the shelves side by
+  side; `←`/`→` or TAB switches side, `↑`/`↓` chooses and ENTER moves the stack. Neither screen
+  equips or sells implicitly.
+- **Save.** The player carries `inventory_sort` (optional, defaulting to `recent`, unknown values
+  load as `recent`) and the run carries a top-level `storage` block of canonical items. Schema
+  stays 2: both keys are optional, and an older save loads with an empty storehouse and stored
+  order.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.

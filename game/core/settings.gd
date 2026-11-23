@@ -28,6 +28,7 @@ const KEY_BINDINGS := {
 	"bar_next": [KEY_BRACKETRIGHT],
 	"open_bars": [KEY_B],
 	"open_inventory": [KEY_I],
+	"sort_inventory": [KEY_R],
 	"open_character": [KEY_C],
 	"quick_save": [KEY_F5],
 	"quick_load": [KEY_F9],

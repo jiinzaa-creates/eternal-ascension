@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN, TRIBULATION }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN, TRIBULATION, STORAGE }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -267,6 +267,14 @@ func _draw() -> void:
 			draw_rect(Rect2(-22, -14, 44, 6), Color("#6a5638"))
 			draw_circle(Vector2(0, -26), 5.0, Color("#ffd9a0", 0.5 + pulse * 0.4))
 			draw_line(Vector2(0, -21), Vector2(0, -14), Color("#6a5638"), 2.0)
+		Kind.STORAGE:
+			# A storehouse: crates stacked under a leaning tile roof.
+			draw_rect(Rect2(-24, -10, 48, 16), Color("#40382e"))
+			draw_rect(Rect2(-26, -16, 52, 7), Color("#6a5a44"))
+			draw_rect(Rect2(-19, -30, 16, 14), Color("#5a4a32"))
+			draw_rect(Rect2(3, -28, 14, 12), Color("#5a4a32"))
+			draw_line(Vector2(-26, -16), Vector2(20, -34), Color("#8a7350"), 2.0)
+			draw_line(Vector2(-9, -23), Vector2(7, -23), Color("#3a3024"), 1.5)
 		Kind.RUIN:
 			# Broken wall: two standing stones and fallen rubble between them.
 			draw_rect(Rect2(-22, -18, 10, 22), Color("#3f4440"))

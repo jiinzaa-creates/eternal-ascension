@@ -53,6 +53,12 @@ var bars_open := false
 ## It freezes play, so choosing a ring is never mistaken for a swing.
 var gear_open := false
 var gear_index := 0
+## Storehouse screen: the satchel and the settlement's shelves, with the cursor
+## on one side. It freezes play for the same reason the satchel does.
+var storage := Storage.new()
+var storage_open := false
+var storage_side := 0
+var storage_index := 0
 var waypoint_name := ""
 var waypoint_position := Vector2.ZERO
 ## Discovered sites, recorded with a position so they stay travel destinations
@@ -327,6 +333,14 @@ func _spawn_interactables() -> void:
 		crate.position = settlement.position_for(String(spot[2])) + (spot[3] as Vector2)
 		world.add_child(crate)
 		interactables.append(crate)
+
+	# The storehouse: a second container with a limit, kept by the market so a
+	# heavy satchel is a walk away rather than a permanent loss.
+	var storehouse := Interactable.new()
+	storehouse.setup(Interactable.Kind.STORAGE, "storage.market", "Storehouse — deposit or withdraw")
+	storehouse.position = settlement.position_for("market") + Vector2(46, 62)
+	world.add_child(storehouse)
+	interactables.append(storehouse)
 
 	# A manual teaches a technique that is otherwise hidden from character start.
 	var manual := Interactable.new()
@@ -797,7 +811,7 @@ func toggle_gear() -> void:
 	if gear_open:
 		close_gear()
 		return
-	if bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+	if bars_open or travel_open or shop_open or storage_open or (world_map != null and world_map.visible):
 		return
 	gear_open = true
 	gear_index = 0
@@ -807,6 +821,79 @@ func toggle_gear() -> void:
 
 func close_gear() -> void:
 	gear_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## The grid's order is the satchel's order: sorting rewrites the array once, so
+## no list can show an index that no longer points at the item it did.
+func inventory_rows() -> Array:
+	if player == null:
+		return []
+	return player.inventory
+
+
+func cycle_inventory_sort() -> void:
+	if player == null:
+		return
+	var mode := player.sort_inventory(Inventory.next_sort(player.inventory_sort))
+	Bus.toast.emit("Satchel sorted by %s." % Inventory.sort_label(mode))
+
+
+# ---------------------------------------------------------------- storage ----
+
+## The screen lists both containers; the cursor only ever sits on one of them.
+func storage_rows(side: int) -> Array:
+	if player == null:
+		return []
+	return player.inventory if side == 0 else storage.items
+
+
+func storage_selected() -> Dictionary:
+	var rows: Array = storage_rows(storage_side)
+	if storage_index < 0 or storage_index >= rows.size():
+		return {}
+	return rows[storage_index] as Dictionary
+
+
+## Moves the selected stack whole to the other container. There is no partial
+## move: a half-stack would only trade one untidy shelf for two.
+func storage_move() -> void:
+	if player == null:
+		return
+	var chosen := storage_selected()
+	if chosen.is_empty():
+		Bus.toast.emit("Nothing selected.")
+		return
+	var item_id := String(chosen.get("id", ""))
+	var moved: Dictionary = storage.deposit(player.inventory, item_id) if storage_side == 0 \
+		else storage.withdraw(player.inventory, item_id)
+	if not bool(moved.get("ok", false)):
+		Bus.toast.emit("Cannot move %s — %s." % [String(chosen.get("name", "item")), String(moved.get("reason", "refused"))])
+		return
+	var bag: Array = moved.get("inventory", [])
+	player.inventory = bag
+	storage_index = clampi(storage_index, 0, maxi(0, storage_rows(storage_side).size() - 1))
+	var verb := "Stored" if storage_side == 0 else "Withdrew"
+	Bus.toast.emit("%s %s." % [verb, Items.label(chosen)])
+	Bus.player_stats_changed.emit()
+
+
+func _open_storage() -> void:
+	if player == null or phase == "creation" or String(phase) == "ended":
+		return
+	if gear_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+		return
+	storage_open = true
+	storage_side = 0
+	storage_index = 0
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func close_storage() -> void:
+	storage_open = false
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process(true)
@@ -1090,27 +1177,62 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		return
 
+	if storage_open:
+		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel") \
+				or event.is_action_pressed("open_inventory"):
+			close_storage()
+			return
+		if event.is_action_pressed("shop_mode") or event.is_action_pressed("ui_left") \
+				or event.is_action_pressed("ui_right"):
+			storage_side = 1 - storage_side
+			storage_index = 0
+			return
+		var storage_list := storage_rows(storage_side)
+		if event.is_action_pressed("ui_down"):
+			storage_index = mini(storage_index + 1, maxi(0, storage_list.size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			storage_index = maxi(0, storage_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			storage_move()
+			return
+		return
+
 	if gear_open:
 		if event.is_action_pressed("open_inventory") or event.is_action_pressed("ui_cancel") \
 				or event.is_action_pressed("interact"):
 			close_gear()
 			return
-		var rows := gear_candidates()
+		var rows: Array = inventory_rows()
+		if event.is_action_pressed("sort_inventory"):
+			cycle_inventory_sort()
+			gear_index = 0
+			return
 		if event.is_action_pressed("ui_down"):
-			gear_index = mini(gear_index + 1, maxi(0, rows.size() - 1))
+			gear_index = Inventory.move_cursor(gear_index, Inventory.COLS, rows.size())
 			return
 		if event.is_action_pressed("ui_up"):
-			gear_index = maxi(0, gear_index - 1)
+			gear_index = Inventory.move_cursor(gear_index, -Inventory.COLS, rows.size())
+			return
+		if event.is_action_pressed("ui_right"):
+			gear_index = Inventory.move_cursor(gear_index, 1, rows.size())
+			return
+		if event.is_action_pressed("ui_left"):
+			gear_index = Inventory.move_cursor(gear_index, -1, rows.size())
 			return
 		if event.is_action_pressed("accept") and not rows.is_empty():
 			gear_index = clampi(gear_index, 0, rows.size() - 1)
 			var wanted: Dictionary = rows[gear_index]
+			if not Items.is_equipment(String(wanted.get("slot", ""))):
+				Bus.toast.emit("%s is not something you can wear." % String(wanted.get("name", "item")))
+				return
 			var result := player.equip(wanted)
 			if bool(result.get("ok", false)):
 				Bus.toast.emit("Worn: %s." % String(wanted.get("name", "item")))
 			else:
 				Bus.toast.emit("Cannot wear %s — %s" % [String(wanted.get("name", "item")), String(result.get("reason", "refused"))])
-			gear_index = clampi(gear_index, 0, maxi(0, gear_candidates().size() - 1))
+			gear_index = clampi(gear_index, 0, maxi(0, inventory_rows().size() - 1))
 			return
 		return
 
@@ -1195,6 +1317,8 @@ func interaction_prompt() -> String:
 		var npc := best as Npc
 		return "E  Talk to %s (%s)" % [npc.display_name, npc.role]
 	var interactable := best as Interactable
+	if interactable.kind == Interactable.Kind.STORAGE:
+		return "E  %s  (%d/%d kinds stored)" % [interactable.display_label(), storage.slots_used(), Storage.CAPACITY]
 	return "E  %s" % interactable.display_label()
 
 
@@ -1450,6 +1574,8 @@ func _use_interactable(node: Interactable) -> void:
 			_open_shop()
 		Interactable.Kind.INN:
 			_rest_at_inn()
+		Interactable.Kind.STORAGE:
+			_open_storage()
 		Interactable.Kind.RUIN:
 			if node.used:
 				return
@@ -1899,6 +2025,7 @@ func _save(slot: int) -> void:
 		"used_interactables": used_interactables.duplicate(),
 		"chunk_deltas": world_delta.to_dict(),
 		"shop": merchant.to_dict(),
+		"storage": storage.to_dict(),
 		"travel_sites": travel_sites.duplicate(true),
 		"waypoint": {"name": waypoint_name, "x": waypoint_position.x, "y": waypoint_position.y},
 		"realm_seed": realm_seed,
@@ -1959,6 +2086,7 @@ func _load_game(slot: int) -> void:
 	world_delta = WorldDelta.from_dict(data.get("chunk_deltas", {}))
 	chunks.delta = world_delta
 	merchant.from_dict(data.get("shop", {}))
+	storage.from_dict(data.get("storage", {}))
 	travel_sites = data.get("travel_sites", {}).duplicate(true)
 	var waypoint: Dictionary = data.get("waypoint", {})
 	waypoint_name = String(waypoint.get("name", ""))
