@@ -43,6 +43,7 @@ func _ready() -> void:
 	_rng_tests()
 	_item_tests()
 	_procedural_generation_tests()
+	_equipment_rules_tests()
 	_cultivation_tests()
 	_combat_tests()
 	_world_tests()
@@ -1928,6 +1929,67 @@ func _procedural_generation_tests() -> void:
 		{"id": "prefix.swift", "stat": "attack_speed_pct", "value": 5.0, "text": "+5%"},
 	]})
 	check(int(((untiered["mods"] as Array)[0] as Dictionary)["tier"]) == 1, "a mod without a tier reads as tier one")
+
+
+# -------------------------------------------------------- equipment rules ----
+
+func _equipment_rules_tests() -> void:
+	print("[equipment] requirements, conflicts and comparison")
+	var rules := Equipment.new(DB)
+	var attrs := Attributes.new()
+	var plate: Dictionary = Items.normalize_item({"id": "item.test.plate", "slot": "armor", "name": "Plate", "base": "base.robe.iron_plate", "armor": 14.0, "ilvl": 2, "value": 20})
+	var charm: Dictionary = Items.normalize_item({"id": "item.test.charm", "slot": "talisman", "name": "Charm", "base": "base.talisman.wind_charm", "ilvl": 1, "value": 14})
+	var jade: Dictionary = Items.normalize_item({"id": "item.test.jade", "slot": "ring", "name": "Jade", "base": "base.ring.jade", "ilvl": 1, "value": 10})
+	var rod: Dictionary = Items.normalize_item({"id": "item.test.rod", "slot": "weapon", "name": "Rod", "base": "base.staff.azure_rod", "base_damage": 6.0, "ilvl": 3, "value": 30})
+	var spirit_ring: Dictionary = Items.normalize_item({"id": "item.test.spirit_ring", "slot": "ring", "name": "Spirit Ring", "base": "base.ring.spirit_iron", "ilvl": 3, "value": 28})
+
+	check(int(rules.requirements(plate).get("str", 0)) == 12, "a base carries its requirements")
+	check(rules.missing_requirements(plate, attrs, 1) == ["STR 12"], "a level ten body misses a STR 12 plate")
+	check(not bool(rules.can_equip(plate, {}, attrs, 1)["ok"]), "the gate refuses the plate")
+	check(String(rules.can_equip(plate, {}, attrs, 1)["reason"]).begins_with("Requires"), "the refusal names the requirement")
+	attrs.add("str", 2)
+	check(rules.missing_requirements(plate, attrs, 1).is_empty(), "the requirement is met exactly")
+	check(bool(rules.can_equip(plate, {}, attrs, 1)["ok"]), "STR 12 wears the plate")
+	check(not bool(rules.can_equip(spirit_ring, {}, attrs, 1)["ok"]), "a realm requirement is enforced")
+	check(bool(rules.can_equip(spirit_ring, {}, attrs, 2)["ok"]), "realm two wears the spirit ring")
+	check(not bool(rules.can_equip(rod, {}, Attributes.new(), 1)["ok"]), "an INT 14 rod refuses an INT 10 body")
+	var smart := Attributes.new()
+	smart.add("int", 4)
+	check(bool(rules.can_equip(rod, {}, smart, 1)["ok"]), "INT 14 wears the rod")
+
+	var worn_plate := {"armor": plate}
+	var clash := rules.conflict_with(charm, worn_plate)
+	check(String(clash.get("name", "")) == "Plate", "the wind charm sees the plate")
+	check(not bool(rules.can_equip(charm, worn_plate, attrs, 1)["ok"]), "wind and heavy plate conflict")
+	check(not bool(rules.can_equip(plate, {"talisman": charm}, attrs, 1)["ok"]), "the conflict is symmetric")
+	check(rules.conflict_with(jade, worn_plate).is_empty(), "an unrelated piece does not conflict")
+	check(rules.conflict_with(charm, {"ring": jade}).is_empty(), "wind does not conflict with jade")
+	check(bool(rules.can_equip(plate, {"ring": jade}, attrs, 1)["ok"]), "plate and jade coexist")
+	check(not bool(rules.can_equip({"id": "item.test.pill", "slot": "consumable"}, {}, attrs, 1)["ok"]), "a pill is not equipment")
+
+	var plain: Dictionary = Items.normalize_item({"id": "item.test.jian.a", "slot": "weapon", "name": "Jian", "base": "base.sword.iron_jian", "base_damage": 8.0, "ilvl": 1, "rarity": 0, "value": 12})
+	var better := plain.duplicate(true)
+	better["id"] = "item.test.jian.b"
+	better["base_damage"] = 11.0
+	better["mods"] = [{"id": "prefix.sharpened", "stat": "physical_damage_pct", "value": 10.0, "tier": 1, "text": "+10% physical damage"}]
+	var cmp := rules.compare(better, plain)
+	var by_stat: Dictionary = {}
+	for delta in cmp["deltas"]:
+		by_stat[String((delta as Dictionary)["stat"])] = delta
+	check(by_stat.has("weapon_damage") and approx(float((by_stat["weapon_damage"] as Dictionary)["delta"]), 3.0), "comparison reports the base damage gain")
+	check(by_stat.has("physical_damage_pct"), "comparison reports the new affix")
+	check((cmp["deltas"] as Array).size() == 2, "only real differences are listed")
+	var worse := plain.duplicate(true)
+	worse["base_damage"] = 5.0
+	var loss := rules.compare(worse, plain)
+	check(float(((loss["deltas"] as Array)[0] as Dictionary)["delta"]) < 0.0, "a downgrade reads negative")
+	check((rules.compare(plain, plain)["deltas"] as Array).is_empty(), "an identical piece has no deltas")
+	check(approx(float(rules.stat_map(plate)["armor"]), 14.0), "armour feeds the comparison")
+	var modded := plain.duplicate(true)
+	modded["mods"] = [{"stat": "str", "value": 2.0}, {"stat": "str", "value": 3.0}]
+	check(approx(float(rules.stat_map(modded)["str"]), 5.0), "affixes of the same stat sum")
+	check(Equipment.unit_for("physical_damage_pct") == "%", "percent affixes compare in percent")
+	check(Equipment.label_for("qi_max_flat") == "maximum Qi", "comparison labels are readable")
 
 
 # ------------------------------------------------------------ cultivation ----

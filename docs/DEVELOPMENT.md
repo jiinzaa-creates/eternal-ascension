@@ -827,6 +827,32 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **Tiers survive the save.** `Items.normalize_item()` keeps a mod's `tier` (defaulting to one for
   legacy items), so the canonical save form and the item that generated are the same record.
 
+## Equipment rules and comparison
+
+- **Rules live on the base, not the instance.** `data/items.json` gives each base optional
+  `requires` (`str`, `dex`, `agi`, `int`, `wis`, `char`, or `realm`), `tags` and `conflicts`. The
+  instance carries no rules, so a save never has to store them and old saves inherit new rules
+  automatically. A piece whose base is unknown is unrestricted rather than locked out.
+- **One equip gate.** `Equipment.can_equip()` checks requirements against `Player.attrs` and
+  `cultivation.realm`, then walks the other equipped slots: a conflict fires when the candidate's
+  `conflicts` meet a worn piece's `tags` *or* a worn piece's `conflicts` meet the candidate's tags,
+  so the rule is symmetric. `Player.equip()` is the only voluntary route and returns
+  `{ok, reason}`; `pick_up()`'s auto-equip calls the same method and simply leaves refused loot in
+  the satchel. Requirements are read live, so consuming a stat potion or breaking through opens
+  gear that was refused a minute ago.
+- **Comparison is the pipeline's own shape.** `Equipment.stat_map()` reads an item exactly as
+  `StatBlock.rebuild()` does — base `base_damage` as `weapon_damage`, `armor` as `armor`, affixes
+  summed per stat — and `compare()` returns `{deltas, before, after}` with zero differences dropped.
+  The panel therefore cannot promise a gain the stat block will not deliver. `label_for()` /
+  `unit_for()` turn stat keys into the words the rest of the UI uses.
+- **The gear screen** (`I`, `main.toggle_gear()`) freezes play, lists the four worn slots, the satchel
+  pieces not currently worn, and for the highlighted piece the stat-by-stat deltas plus the equip
+  verdict. `ENTER` wears through `Player.equip()`, `↑/↓` moves and `I`/`ESC` closes; a refused piece
+  says why ("Requires STR 12", "Conflicts with Iron-Scaled Plate").
+- **Validation.** `DB._validate_affix`-style checks cover bases too: requirements must name a real
+  attribute or `realm` and be positive, tags and conflicts must be non-empty, and every conflict tag
+  must be carried by some base, so a restriction cannot silently refer to nothing.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.

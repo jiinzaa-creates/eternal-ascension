@@ -421,6 +421,30 @@ func validate() -> Array:
 			problems.append("item base %s has no slot" % b.get("id", "?"))
 		if String(b.get("slot", "")) == "weapon" and not weapon_type_ids.has(String(b.get("weapon_type", ""))):
 			problems.append("weapon base %s names unknown weapon category '%s'" % [b.get("id", "?"), String(b.get("weapon_type", ""))])
+		# Requirements may only name a real attribute or the realm, and must ask
+		# for a positive number; a requirement nobody can read is a locked door.
+		var requires: Dictionary = b.get("requires", {})
+		for key in requires.keys():
+			var req_name := String(key)
+			if req_name != "realm" and not Attributes.KEYS.has(req_name):
+				problems.append("item base %s requires unknown attribute %s" % [b.get("id", "?"), req_name])
+			if int(requires[key]) <= 0:
+				problems.append("item base %s requires a non-positive %s" % [b.get("id", "?"), req_name])
+		for field in ["tags", "conflicts"]:
+			var tag_list: Array = b.get(field, [])
+			for tag in tag_list:
+				if String(tag) == "":
+					problems.append("item base %s has an empty %s tag" % [b.get("id", "?"), field])
+	# A conflict must name a tag some base actually carries, or the rule can never
+	# fire and the data is lying about a restriction.
+	var base_tags: Dictionary = {}
+	for b in bases:
+		for tag in b.get("tags", []):
+			base_tags[String(tag)] = true
+	for b in bases:
+		for tag in b.get("conflicts", []):
+			if not base_tags.has(String(tag)):
+				problems.append("item base %s conflicts with unused tag %s" % [b.get("id", "?"), String(tag)])
 	if prefixes.is_empty() or suffixes.is_empty():
 		problems.append("item affix pools are empty")
 	var affix_ids: Dictionary = {}

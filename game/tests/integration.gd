@@ -2408,6 +2408,49 @@ func _run() -> void:
 	var m39_saved_mods: Dictionary = Items.to_save(m39_high)
 	check(JSON.stringify(Items.to_save(Items.from_save(m39_saved_mods))) == JSON.stringify(m39_saved_mods), "the canonical save keeps rolled tiers")
 
+	# --- equipment: requirements, conflicts and the gear panel -----------------
+	var m40_plate := Items.normalize_item({"id": "item.m40.plate", "slot": "armor", "name": "Test Plate", "base": "base.robe.iron_plate", "armor": 14.0, "ilvl": 2, "value": 20})
+	var m40_charm := Items.normalize_item({"id": "item.m40.charm", "slot": "talisman", "name": "Test Charm", "base": "base.talisman.wind_charm", "ilvl": 1, "value": 14})
+	var m40_prev_armor: Dictionary = player.equipment.get("armor", {})
+	var m40_prev_talisman: Dictionary = player.equipment.get("talisman", {})
+	var m40_prev_str := player.attrs.get_attr("str")
+	player.attrs.values["str"] = 10
+	player.equipment["armor"] = {}
+	player.equipment["talisman"] = {}
+	player.rebuild_stats()
+	var m40_refused := player.equip(m40_plate)
+	check(not bool(m40_refused.get("ok", true)), "a STR 10 body cannot wear STR 12 plate")
+	check(String(m40_refused.get("reason", "")).contains("Requires"), "the refusal names the requirement")
+	check(player.equipment.get("armor", {}).is_empty(), "a refused piece is not worn")
+	player.attrs.values["str"] = 14
+	# The ninth point of STR can wake a passive of its own, so the baseline is
+	# taken after the attribute change and before the plate goes on.
+	player.rebuild_stats()
+	var m40_before_armor := float(player.stats.flat_stats.get("armor", 0.0))
+	check(bool(player.equip(m40_plate).get("ok", false)), "a STR 14 body wears the plate")
+	var m40_after_armor := float(player.stats.flat_stats.get("armor", 0.0))
+	check(approx(m40_after_armor - m40_before_armor, 14.0), "worn plate reaches the stat pipeline")
+	check(not bool(player.equip(m40_charm).get("ok", true)), "the wind charm refuses heavy plate")
+	check(player.equipment.get("talisman", {}).is_empty(), "the conflicting charm stays bagged")
+	player.inventory = Items.add_to_inventory(player.inventory, m40_charm)
+	var m40_rows: Array = main.gear_candidates()
+	var m40_found := false
+	for row in m40_rows:
+		if String((row as Dictionary).get("id", "")) == "item.m40.charm":
+			m40_found = true
+	check(m40_found, "the gear panel lists the bagged charm")
+	var m40_cmp: Dictionary = main.gear_compare(m40_charm)
+	check(not bool((m40_cmp.get("check", {}) as Dictionary).get("ok", true)), "the panel shows the conflict")
+	main.toggle_gear()
+	check(main.gear_open, "I opens the gear panel")
+	check(not player.is_physics_processing(), "the gear panel freezes play")
+	main.close_gear()
+	check(not main.gear_open and player.is_physics_processing(), "closing the panel resumes play")
+	player.attrs.values["str"] = m40_prev_str
+	player.equipment["armor"] = m40_prev_armor
+	player.equipment["talisman"] = m40_prev_talisman
+	player.rebuild_stats()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

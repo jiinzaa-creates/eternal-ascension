@@ -49,6 +49,10 @@ var travel_index := 0
 ## never be mistaken for an attack.
 var skill_bar_panel: SkillBarPanel
 var bars_open := false
+## Gear overlay: worn slots, satchel candidates and a stat-by-stat comparison.
+## It freezes play, so choosing a ring is never mistaken for a swing.
+var gear_open := false
+var gear_index := 0
 var waypoint_name := ""
 var waypoint_position := Vector2.ZERO
 ## Discovered sites, recorded with a position so they stay travel destinations
@@ -555,7 +559,7 @@ func _process(delta: float) -> void:
 			DB.biome(Biome.for_chunk(chunks.world_to_chunk(player.global_position), Game.world_seed)))
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
-	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open:
+	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open:
 		return
 
 	_simulate_npcs()
@@ -754,6 +758,58 @@ func _rest_at_inn() -> void:
 	if mend:
 		message += " The innkeeper mends your gear. (-%d stones)" % repair
 	Bus.toast.emit(message)
+
+
+# ------------------------------------------------------------------ gear ----
+
+## Equipped pieces are excluded: re-wearing what is already on is noise.
+func gear_candidates() -> Array:
+	var out: Array = []
+	if player == null:
+		return out
+	for entry in player.inventory:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = entry
+		var slot := String(item.get("slot", ""))
+		if not Items.is_equipment(slot):
+			continue
+		var worn: Dictionary = player.equipment.get(slot, {})
+		if not worn.is_empty() and String(worn.get("id", "")) == String(item.get("id", "")):
+			continue
+		out.append(item)
+	return out
+
+
+## Comparison plus the equip gate, computed once per panel redraw.
+func gear_compare(item: Dictionary) -> Dictionary:
+	var rules := Equipment.new(DB)
+	var slot := String(item.get("slot", ""))
+	var worn: Dictionary = player.equipment.get(slot, {})
+	var out := rules.compare(item, worn)
+	out["check"] = rules.can_equip(item, player.equipment, player.attrs, player.cultivation.realm)
+	return out
+
+
+func toggle_gear() -> void:
+	if player == null or phase == "creation" or String(phase) == "ended":
+		return
+	if gear_open:
+		close_gear()
+		return
+	if bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+		return
+	gear_open = true
+	gear_index = 0
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func close_gear() -> void:
+	gear_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
 
 
 # ---------------------------------------------------------- simulation ----
@@ -1032,6 +1088,34 @@ func _unhandled_input(event: InputEvent) -> void:
 				travel_index = i
 				_show_travel()
 				return
+		return
+
+	if gear_open:
+		if event.is_action_pressed("open_inventory") or event.is_action_pressed("ui_cancel") \
+				or event.is_action_pressed("interact"):
+			close_gear()
+			return
+		var rows := gear_candidates()
+		if event.is_action_pressed("ui_down"):
+			gear_index = mini(gear_index + 1, maxi(0, rows.size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			gear_index = maxi(0, gear_index - 1)
+			return
+		if event.is_action_pressed("accept") and not rows.is_empty():
+			gear_index = clampi(gear_index, 0, rows.size() - 1)
+			var wanted: Dictionary = rows[gear_index]
+			var result := player.equip(wanted)
+			if bool(result.get("ok", false)):
+				Bus.toast.emit("Worn: %s." % String(wanted.get("name", "item")))
+			else:
+				Bus.toast.emit("Cannot wear %s — %s" % [String(wanted.get("name", "item")), String(result.get("reason", "refused"))])
+			gear_index = clampi(gear_index, 0, maxi(0, gear_candidates().size() - 1))
+			return
+		return
+
+	if event.is_action_pressed("open_inventory"):
+		toggle_gear()
 		return
 
 	if event.is_action_pressed("open_travel"):

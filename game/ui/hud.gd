@@ -86,6 +86,7 @@ func _draw() -> void:
 	draw_waypoint(player)
 	draw_techniques(player)
 	draw_inventory(player)
+	draw_gear(player)
 	draw_quest(player)
 	draw_prompt()
 	draw_realm_banner()
@@ -412,6 +413,81 @@ func draw_inventory(player: Player) -> void:
 		_text(Vector2(w - 316.0, y), "Empty. Kill something.", 12, MUTED)
 
 
+## The gear screen: what is worn, what could replace it, and exactly what the
+## pipeline would gain or lose. It never equips by itself; ENTER goes through
+## Player.equip(), the same rules a pickup does.
+func draw_gear(player: Player) -> void:
+	if host == null or not bool(host.gear_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
+	var panel := Rect2(view * 0.5 - Vector2(400.0, 250.0), Vector2(800.0, 500.0))
+	draw_rect(panel, Color("#0b1014", 0.97))
+	draw_rect(panel, Color("#7fd3e0", 0.45), false, 1.5)
+	var origin := panel.position
+	_text(origin + Vector2(22.0, 32.0), "GEAR", 18, ACCENT)
+	_text(origin + Vector2(92.0, 32.0), "I — close    ↑/↓ — choose    ENTER — wear", 11, MUTED)
+
+	var y := origin.y + 66.0
+	_text(origin + Vector2(22.0, y), "WORN", 11, MUTED)
+	y += 22.0
+	for slot in ["weapon", "armor", "ring", "talisman"]:
+		var worn: Dictionary = player.equipment.get(slot, {})
+		_text(origin + Vector2(22.0, y), String(Equipment.SLOT_LABELS.get(slot, slot)), 11, MUTED)
+		var label := "—"
+		var color := Color("#5c6b73")
+		if not worn.is_empty():
+			label = Items.label(worn)
+			var rarity := clampi(int(worn.get("rarity", 0)), 0, ItemGen.RARITY_COLORS.size() - 1)
+			color = Color(ItemGen.RARITY_COLORS[rarity])
+		_text(origin + Vector2(94.0, y), _fit(label, 12, 250.0), 12, color)
+		y += 22.0
+
+	var rows: Array = host.gear_candidates()
+	var list_y := origin.y + 66.0
+	_text(origin + Vector2(370.0, list_y), "SATCHEL GEAR  (%d)" % rows.size(), 11, MUTED)
+	list_y += 22.0
+	if rows.is_empty():
+		_text(origin + Vector2(370.0, list_y), "Nothing else to wear.", 12, MUTED)
+	var selected := clampi(int(host.gear_index), 0, maxi(0, rows.size() - 1))
+	var first := maxi(0, selected - 6)
+	for i in range(first, mini(rows.size(), first + 9)):
+		var item: Dictionary = rows[i]
+		var rarity := clampi(int(item.get("rarity", 0)), 0, ItemGen.RARITY_COLORS.size() - 1)
+		var text := "%s %s" % [">" if i == selected else " ", _fit(Items.label(item), 12, 250.0)]
+		_text(origin + Vector2(370.0, list_y), text, 12, ACCENT if i == selected else Color(ItemGen.RARITY_COLORS[rarity]))
+		list_y += 19.0
+
+	if rows.is_empty():
+		return
+	var chosen: Dictionary = rows[selected]
+	var info: Dictionary = host.gear_compare(chosen)
+	var check: Dictionary = info.get("check", {})
+	var cx := origin.x + 22.0
+	var cy := origin.y + 210.0
+	draw_line(Vector2(cx, cy - 16.0), Vector2(panel.position.x + panel.size.x - 22.0, cy - 16.0), Color("#243039"), 1.0)
+	var worn_slot: Dictionary = player.equipment.get(String(chosen.get("slot", "")), {})
+	var against := "no piece worn there" if worn_slot.is_empty() else "against %s" % String(worn_slot.get("name", "?"))
+	_text(Vector2(cx, cy), _fit("%s  (ilvl %d)  — %s" % [String(chosen.get("name", "?")), int(chosen.get("ilvl", 1)), against], 13, 740.0), 13, INK)
+	cy += 24.0
+	var deltas: Array = info.get("deltas", [])
+	if deltas.is_empty():
+		_text(Vector2(cx, cy), "Identical numbers.", 12, MUTED)
+		cy += 20.0
+	for delta in deltas:
+		var value := float((delta as Dictionary).get("delta", 0.0))
+		var unit := String((delta as Dictionary).get("unit", ""))
+		var shown := ("%.1f" % value) if absf(value) < 10.0 else str(roundi(value))
+		var line := "%s%s%s %s" % ["+" if value > 0.0 else "", shown, unit, String((delta as Dictionary).get("label", ""))]
+		_text(Vector2(cx + 10.0, cy), line, 12, Color("#8fe0a8") if value > 0.0 else Color("#e08f8f"))
+		cy += 19.0
+	cy += 8.0
+	if bool(check.get("ok", true)):
+		_text(Vector2(cx, cy), "Wearable.  ENTER wears it.", 12, ACCENT)
+	else:
+		_text(Vector2(cx, cy), "Refused — %s" % String(check.get("reason", "cannot be worn")), 12, Color("#e08f8f"))
+
+
 func draw_prompt() -> void:
 	var prompt := String(host.interaction_prompt())
 	if prompt == "":
@@ -462,7 +538,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · I gear · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

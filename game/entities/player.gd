@@ -1252,9 +1252,31 @@ func environment_bonus() -> float:
 	return Climate.cultivation_bonus(Weather.current) * maxf(0.0, Game.biome_density)
 
 
+## The one voluntary equip route: requirements are read from the body as it is
+## now and cross-slot conflicts from what is worn. Returns the refusal reason so
+## the gear panel can say why and auto-equip can simply leave the piece bagged.
+func equip(item: Dictionary) -> Dictionary:
+	var normalised := Items.normalize_item(item)
+	var slot := String(normalised.get("slot", ""))
+	if not Items.is_equipment(slot) or not Items.is_valid_item(normalised):
+		return {"ok": false, "reason": "cannot be worn"}
+	var check := Equipment.new(DB).can_equip(normalised, equipment, attrs, cultivation.realm)
+	if not bool(check["ok"]):
+		return check
+	equipment[slot] = normalised
+	if slot == "weapon":
+		# A new weapon opens its own chain; the old one's cursor is meaningless.
+		_combo_index = -1
+		_combo_elapsed = 100.0
+	rebuild_stats()
+	Bus.player_stats_changed.emit()
+	return {"ok": true, "reason": ""}
+
+
 ## Every item enters through the schema: malformed items are refused rather
 ## than stored, stackables merge into an existing stack, and equipment is
-## auto-worn when it is at least as good as what is already in the slot.
+## auto-worn only when it is at least as good as the slot and the body passes
+## the same rules a manual equip would.
 func pick_up(item: Dictionary) -> void:
 	var normalised := Items.normalize_item(item)
 	if not Items.is_valid_item(normalised):
@@ -1264,12 +1286,7 @@ func pick_up(item: Dictionary) -> void:
 	if Items.is_equipment(slot):
 		var current: Dictionary = equipment.get(slot, {})
 		if current.is_empty() or int(normalised.get("ilvl", 1)) >= int(current.get("ilvl", 1)):
-			equipment[slot] = normalised
-			if slot == "weapon":
-				# A new weapon opens its own chain; the old one's cursor is meaningless.
-				_combo_index = -1
-				_combo_elapsed = 100.0
-			rebuild_stats()
+			equip(normalised)
 	Bus.item_picked.emit(normalised)
 	Bus.player_stats_changed.emit()
 

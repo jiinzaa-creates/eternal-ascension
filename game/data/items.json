@@ -1,14 +1,14 @@
 {
   "bases": [
-    {"id": "base.sword.iron_jian", "name": "Iron Jian", "slot": "weapon", "weapon_type": "sword", "damage": 8, "ilvl": 1, "weight": 20, "value": 12, "implicit": "1.00 attack speed"},
-    {"id": "base.sword.heavy_saber", "name": "Heavy Saber", "slot": "weapon", "weapon_type": "saber", "damage": 15, "ilvl": 2, "weight": 14, "value": 18, "implicit": "+12 poise damage"},
-    {"id": "base.staff.azure_rod", "name": "Azure Rod", "slot": "weapon", "weapon_type": "staff", "damage": 6, "ilvl": 3, "weight": 10, "value": 30, "implicit": "+1.5 Qi per second"},
-    {"id": "base.whip.spirit_silk", "name": "Spirit Silk Whip", "slot": "weapon", "weapon_type": "whip", "damage": 7, "ilvl": 4, "weight": 7, "value": 34, "implicit": "+8% reach"},
-    {"id": "base.robe.cloud_silk", "name": "Cloud Silk Robe", "slot": "armor", "armor": 5, "ilvl": 1, "weight": 20, "value": 12, "implicit": "+15 maximum Qi"},
-    {"id": "base.robe.iron_plate", "name": "Iron-Scaled Plate", "slot": "armor", "armor": 14, "ilvl": 2, "weight": 12, "value": 20, "implicit": "+8% physical resistance"},
-    {"id": "base.ring.jade", "name": "Jade Ring", "slot": "ring", "ilvl": 1, "weight": 18, "value": 10, "implicit": "+2% critical chance"},
-    {"id": "base.ring.spirit_iron", "name": "Spirit Iron Ring", "slot": "ring", "ilvl": 3, "weight": 9, "value": 28, "implicit": "+6% cultivation speed"},
-    {"id": "base.talisman.wind_charm", "name": "Wind Charm", "slot": "talisman", "ilvl": 1, "weight": 15, "value": 14, "implicit": "+4% movement speed"},
+    {"id": "base.sword.iron_jian", "name": "Iron Jian", "slot": "weapon", "weapon_type": "sword", "damage": 8, "ilvl": 1, "weight": 20, "value": 12, "tags": ["blade"], "implicit": "1.00 attack speed"},
+    {"id": "base.sword.heavy_saber", "name": "Heavy Saber", "slot": "weapon", "weapon_type": "saber", "damage": 15, "ilvl": 2, "weight": 14, "value": 18, "tags": ["blade", "heavy"], "requires": {"str": 12}, "implicit": "+12 poise damage"},
+    {"id": "base.staff.azure_rod", "name": "Azure Rod", "slot": "weapon", "weapon_type": "staff", "damage": 6, "ilvl": 3, "weight": 10, "value": 30, "tags": ["channel"], "conflicts": ["heavy"], "requires": {"int": 14}, "implicit": "+1.5 Qi per second"},
+    {"id": "base.whip.spirit_silk", "name": "Spirit Silk Whip", "slot": "weapon", "weapon_type": "whip", "damage": 7, "ilvl": 4, "weight": 7, "value": 34, "tags": ["wind"], "conflicts": ["heavy"], "requires": {"agi": 12}, "implicit": "+8% reach"},
+    {"id": "base.robe.cloud_silk", "name": "Cloud Silk Robe", "slot": "armor", "armor": 5, "ilvl": 1, "weight": 20, "value": 12, "tags": ["light"], "implicit": "+15 maximum Qi"},
+    {"id": "base.robe.iron_plate", "name": "Iron-Scaled Plate", "slot": "armor", "armor": 14, "ilvl": 2, "weight": 12, "value": 20, "tags": ["heavy"], "requires": {"str": 12}, "implicit": "+8% physical resistance"},
+    {"id": "base.ring.jade", "name": "Jade Ring", "slot": "ring", "ilvl": 1, "weight": 18, "value": 10, "tags": ["jade"], "implicit": "+2% critical chance"},
+    {"id": "base.ring.spirit_iron", "name": "Spirit Iron Ring", "slot": "ring", "ilvl": 3, "weight": 9, "value": 28, "tags": ["jade"], "requires": {"realm": 2}, "implicit": "+6% cultivation speed"},
+    {"id": "base.talisman.wind_charm", "name": "Wind Charm", "slot": "talisman", "ilvl": 1, "weight": 15, "value": 14, "tags": ["wind"], "conflicts": ["heavy"], "implicit": "+4% movement speed"},
     {"id": "base.pill.qi_gathering", "name": "Qi Gathering Pill", "slot": "consumable", "ilvl": 1, "weight": 22, "value": 6, "implicit": "Restores 25% Qi"}
   ],
   "prefixes": [
