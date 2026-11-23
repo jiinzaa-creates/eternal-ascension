@@ -60,6 +60,10 @@ var _peak_notified := false
 var _attack_counter := 0
 var _evade_counter := 0
 var _sprinting := false
+## Last passive-condition state, so a threshold crossing rebuilds once rather
+## than every frame.
+var _was_wounded := false
+var _last_karma := 0
 
 
 func _ready() -> void:
@@ -78,8 +82,29 @@ func _ready() -> void:
 	hp = hp_max
 
 
+## Snapshot the passive rules read. Cheap on purpose: resolve() runs on every
+## rebuild and on every condition threshold crossing.
+func passive_state() -> Dictionary:
+	return {
+		"hp_ratio": hp / maxf(1.0, hp_max),
+		"karma": Game.karma,
+		"attrs": attrs,
+		"realm": cultivation.realm,
+		"physique_tier": Physiques.tier_of(physique_id),
+		"affinities": cultivation.root_data().get("affinities", []),
+	}
+
+
+func active_passives() -> Array:
+	return Passives.resolve(passives, passive_state())
+
+
+func dormant_passives() -> Array:
+	return Passives.issues(passives, passive_state())
+
+
 func rebuild_stats() -> void:
-	stats.rebuild(equipment, passives, cultivation.realm, cultivation.attr_mult(), physique_id)
+	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id)
 	_recalc_vitals()
 
 
@@ -95,12 +120,29 @@ func inherit_physique(id: String) -> bool:
 	return true
 
 
+## Ownership, not activation: quests and inheritances can grant a passive the
+## body cannot use yet. It is kept and wakes when requirements are met.
 func add_passive(id: String) -> bool:
 	if id == "" or DB.passive(id).is_empty() or passives.has(id):
 		return false
 	passives.append(id)
 	rebuild_stats()
 	return true
+
+
+## Voluntary learning (manuals, teachers): refuses what the body cannot use yet.
+func try_learn_passive(id: String) -> Dictionary:
+	if id == "" or Passives.find(id).is_empty():
+		return {"ok": false, "reason": "unknown passive"}
+	if passives.has(id):
+		return {"ok": false, "reason": "already known"}
+	var requirement := Passives.meets_requirements(Passives.find(id), passive_state())
+	if not bool(requirement["ok"]):
+		return {"ok": false, "reason": String(requirement["reason"])}
+	passives.append(id)
+	rebuild_stats()
+	Bus.player_stats_changed.emit()
+	return {"ok": true, "reason": ""}
 
 
 func learn_technique(id: String) -> bool:
@@ -118,8 +160,19 @@ func _process(delta: float) -> void:
 	else:
 		modulate.a = 1.0
 	regenerate(delta)
+	_refresh_passive_conditions()
 	_sync_animation(delta)
 	queue_redraw()
+
+
+## Situational passives (wounded, karma) only change at thresholds, so the stat
+## pipeline is rebuilt on the crossing and not per frame.
+func _refresh_passive_conditions() -> void:
+	var wounded := hp / maxf(1.0, hp_max) < Passives.WOUNDED_RATIO
+	if wounded != _was_wounded or Game.karma != _last_karma:
+		_was_wounded = wounded
+		_last_karma = Game.karma
+		rebuild_stats()
 
 
 ## Out-of-combat health regeneration. Attacking or having just been hit stops it,

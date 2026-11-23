@@ -22,6 +22,7 @@ func _ready() -> void:
 	_secondary_tests()
 	_root_system_tests()
 	_physique_tests()
+	_passive_system_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -563,6 +564,100 @@ func _physique_tests() -> void:
 	loaded.free()
 	saved.free()
 	legacy.free()
+
+
+# --------------------------------------------------------------- passives ----
+
+func _passive_system_tests() -> void:
+	print("[passives] requirements, conflicts, conditions and synergies")
+	var state := {
+		"attrs": Attributes.new(),
+		"realm": 1,
+		"physique_tier": 1,
+		"affinities": ["metal"],
+		"hp_ratio": 1.0,
+		"karma": 0,
+	}
+	var jade := Passives.find("passive.jade_skin")
+	check(not jade.is_empty(), "the jade skin passive exists")
+	check(not bool(Passives.meets_requirements(jade, state)["ok"]), "requirements reject a weak body")
+	var strong_attrs := Attributes.new()
+	strong_attrs.add("str", 6)
+	var strong := state.duplicate()
+	strong["attrs"] = strong_attrs
+	check(bool(Passives.meets_requirements(jade, strong)["ok"]), "requirements accept a qualified body")
+
+	var realm_state := state.duplicate()
+	realm_state["realm"] = 1
+	check(bool(Passives.meets_requirements(Passives.find("passive.iron_bone"), realm_state)["ok"]), "a passive without requirements always qualifies")
+	var affinity_state := state.duplicate()
+	affinity_state["affinities"] = ["fire"]
+	var affinity_passive := {"requires": {"affinity": "metal"}}
+	check(not bool(Passives.meets_requirements(affinity_passive, affinity_state)["ok"]), "an affinity requirement is enforced")
+	var low_realm := {"requires": {"min_realm": 3}}
+	check(not bool(Passives.meets_requirements(low_realm, realm_state)["ok"]), "a realm requirement is enforced")
+
+	check(Passives.resolve(["passive.jade_skin", "passive.iron_bone"], strong) == ["passive.jade_skin"], "the first acquired passive wins a conflict")
+	check(Passives.resolve(["passive.iron_bone", "passive.jade_skin"], strong) == ["passive.iron_bone"], "conflict order follows acquisition")
+	var dormant := Passives.issues(["passive.jade_skin", "passive.iron_bone"], strong)
+	check(dormant.size() == 1 and String(dormant[0]["id"]) == "passive.iron_bone", "the conflicting passive is reported dormant")
+	check(String(dormant[0]["reason"]).contains("conflicts"), "the dormancy reason names the conflict")
+
+	var trance := Passives.find("passive.battle_trance")
+	check(not bool(Passives.condition_met(trance, state)["ok"]), "a wounded passive is dormant at full health")
+	var hurt := state.duplicate()
+	hurt["hp_ratio"] = 0.2
+	check(bool(Passives.condition_met(trance, hurt)["ok"]), "a wounded passive wakes when wounded")
+	check(Passives.resolve(["passive.battle_trance"], hurt) == ["passive.battle_trance"], "conditional passives resolve")
+	var karma_passive := {"condition": {"karma_above": 10}}
+	check(not bool(Passives.condition_met(karma_passive, state)["ok"]), "a karma condition is enforced")
+
+	check(Passives.synergy_mods(["passive.flowing_water"]).is_empty(), "a synergy needs both halves")
+	var paired := Passives.synergy_mods(["passive.flowing_water", "passive.swift_steps"])
+	check(paired.size() == 1 and String(paired[0]["stat"]) == "attack_speed_pct", "a synergy adds its mods")
+
+	var solo := StatBlock.new(Attributes.new())
+	solo.rebuild({}, ["passive.flowing_water"], 1, 1.0)
+	var together := StatBlock.new(Attributes.new())
+	together.rebuild({}, ["passive.flowing_water", "passive.swift_steps"], 1, 1.0)
+	check(together.attack_speed() > solo.attack_speed(), "a synergy reaches the stat pipeline")
+
+	for entry in DB.passives:
+		var id := String(entry.get("id", ""))
+		for other in entry.get("conflicts", []):
+			check(not DB.passive(String(other)).is_empty(), "%s conflicts with a real passive" % id)
+		var synergy: Dictionary = entry.get("synergy", {})
+		if not synergy.is_empty():
+			check(not DB.passive(String(synergy.get("with", ""))).is_empty(), "%s names a real synergy partner" % id)
+		var min_attr: Dictionary = (entry.get("requires", {}) as Dictionary).get("min_attr", {})
+		for key in min_attr.keys():
+			check(Attributes.KEYS.has(String(key)), "%s requires a real attribute" % id)
+
+	var learner := Player.new()
+	learner.attrs = Attributes.new()
+	learner.stats = StatBlock.new(learner.attrs)
+	learner.cultivation = Cultivation.new()
+	learner.hp_max = 100.0
+	learner.hp = 100.0
+	learner.rebuild_stats()
+	check(not bool(learner.try_learn_passive("passive.jade_skin")["ok"]), "learning refuses an unmet requirement")
+	check(not bool(learner.try_learn_passive("passive.flowing_water")["ok"]), "AGI 10 fails the AGI 12 requirement")
+	learner.attrs.add("str", 4)
+	check(bool(learner.try_learn_passive("passive.jade_skin")["ok"]), "learning succeeds once the requirement is met")
+	check(not bool(learner.try_learn_passive("passive.jade_skin")["ok"]), "a known passive is not learned twice")
+	check(not bool(learner.try_learn_passive("passive.nonexistent")["ok"]), "an unknown passive is refused")
+
+	learner.add_passive("passive.battle_trance")
+	check(not learner.active_passives().has("passive.battle_trance"), "battle trance is dormant at full health")
+	var damage_full := learner.stats.physical_mult()
+	learner.hp = learner.hp_max * 0.2
+	learner._refresh_passive_conditions()
+	check(learner.active_passives().has("passive.battle_trance"), "battle trance wakes at low health")
+	check(learner.stats.physical_mult() > damage_full, "the wounded state reaches the stats")
+	learner.hp = learner.hp_max
+	learner._refresh_passive_conditions()
+	check(not learner.active_passives().has("passive.battle_trance"), "battle trance sleeps again at full health")
+	learner.free()
 
 
 func _rng_tests() -> void:

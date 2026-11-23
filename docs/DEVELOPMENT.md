@@ -45,6 +45,25 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Passives: requirements, conflicts, conditions, synergies
+
+- **Ownership and activation are separate.** `Player.add_passive` is a grant (quest, inheritance, origin)
+  and never checks requirements; `Player.try_learn_passive` is voluntary learning (manuals, teachers) and
+  refuses what the body cannot use yet. A granted passive the body cannot use is kept and dormant.
+- `Passives.resolve(owned, state)` returns the ids that actually apply, in owned order. `rebuild_stats`
+  passes exactly those to `StatBlock`, so the pipeline never sees a dormant passive.
+- **Conflicts: first acquired wins.** The earlier id in the owned list stays active; the later one is
+  dormant with a reason. Order is stable because it is the order the save stores. New content should
+  therefore list the more physical passive first only if that is the intended priority.
+- **Requirements** (`requires`): `min_attr`, `min_realm`, `min_physique_tier`, `affinity`. **Conditions**
+  (`condition`): `wounded` (below 35% hp), `karma_above`, `karma_below`. Conditions are evaluated from
+  `Player.passive_state()` and rebuilt only on threshold crossing (`_refresh_passive_conditions`), never
+  per frame.
+- **Synergies** (`synergy: {with, mods}`) add mods when both partners are active; `StatBlock.rebuild`
+  applies them after the passives themselves, additively, so a synergy cannot break the stat floors.
+- `DB.validate` checks requirement attribute keys, self-conflicts and synergies without partners.
+- New passives are learned from manuals (`setup_passive_manual`), three of which stand by the shrine.
+
 ## Physiques
 
 - Content lives in `data/physiques.json`; a physique is **mods only** (same keys as equipment and

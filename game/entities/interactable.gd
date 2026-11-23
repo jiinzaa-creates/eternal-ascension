@@ -18,8 +18,9 @@ var item_seed: int = 0
 ## Doors only: whether the door is currently open, and the building it belongs to.
 var open := false
 var building: Building = null
-## Manuals only: the technique the manual teaches.
+## Manuals only: the technique the manual teaches, or the passive it awakens.
 var manual_technique := ""
+var manual_passive := ""
 ## Examination only: what the player reads.
 var examine_text := ""
 ## Streamed resources: which chunk owns this node. Chunk-owned nodes are freed
@@ -51,6 +52,11 @@ func setup_container(id_value: String, label_value: String, seed_value: int) -> 
 func setup_manual(id_value: String, label_value: String, technique_id: String) -> void:
 	setup(Kind.MANUAL, id_value, label_value)
 	manual_technique = technique_id
+
+
+func setup_passive_manual(id_value: String, label_value: String, passive_id: String) -> void:
+	setup(Kind.MANUAL, id_value, label_value)
+	manual_passive = passive_id
 
 
 func setup_examine(id_value: String, label_value: String, text: String) -> void:

@@ -121,9 +121,12 @@ func draw_vitals(player: Player) -> void:
 	var passive_text := "Passives: none"
 	if not player.passives.is_empty():
 		var names: Array[String] = []
-		for id in player.passives:
+		for id in player.active_passives():
 			names.append(String(DB.passive(String(id)).get("name", id)))
-		passive_text = "Passives: " + ", ".join(names)
+		passive_text = "Passives: " + ", ".join(names) if not names.is_empty() else "Passives: all dormant"
+		var dormant := player.dormant_passives().size()
+		if dormant > 0:
+			passive_text += "   (%d dormant)" % dormant
 	_text(Vector2(x, y), passive_text, 11, Color("#b8a8d8"))
 
 

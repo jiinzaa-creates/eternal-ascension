@@ -229,6 +229,17 @@ func validate() -> Array:
 			problems.append("passive without id")
 		if not p.has("mods"):
 			problems.append("passive %s has no mods" % p.get("id", "?"))
+		var requirements: Dictionary = p.get("requires", {})
+		var min_attr: Dictionary = requirements.get("min_attr", {})
+		for key in min_attr.keys():
+			if not Attributes.KEYS.has(String(key)):
+				problems.append("passive %s requires unknown attribute %s" % [p.get("id", "?"), String(key)])
+		for other in p.get("conflicts", []):
+			if String(other) == String(p.get("id", "")):
+				problems.append("passive %s conflicts with itself" % p.get("id", "?"))
+		var synergy: Dictionary = p.get("synergy", {})
+		if not synergy.is_empty() and String(synergy.get("with", "")) == "":
+			problems.append("passive %s has a synergy without a partner" % p.get("id", "?"))
 
 	if quests.is_empty():
 		problems.append("no quests defined")

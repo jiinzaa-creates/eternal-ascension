@@ -286,6 +286,19 @@ func _spawn_interactables() -> void:
 	world.add_child(manual)
 	interactables.append(manual)
 
+	# Passive manuals: voluntary learning, gated by what the body can use.
+	var manual_specs := [
+		["manual.jade_skin", "Body-Refining Manual — Jade Skin", "passive.jade_skin", Vector2(40, 54)],
+		["manual.battle_trance", "Blood-Refining Manual — Battle Trance", "passive.battle_trance", Vector2(86, 40)],
+		["manual.flowing_water", "Water-Step Manual — Flowing Water", "passive.flowing_water", Vector2(-18, 88)],
+	]
+	for spec in manual_specs:
+		var passive_manual := Interactable.new()
+		passive_manual.setup_passive_manual(String(spec[0]), String(spec[1]), String(spec[2]))
+		passive_manual.position = settlement.position_for("shrine") + (spec[3] as Vector2)
+		world.add_child(passive_manual)
+		interactables.append(passive_manual)
+
 	# Examination: scenery that rewards looking, repeatable and inconsumable.
 	var stele := Interactable.new()
 	stele.setup_examine("stele.azure", "Azure Cloud stele",
@@ -948,6 +961,16 @@ func _use_interactable(node: Interactable) -> void:
 			_loot(node, maxi(2, player.cultivation.realm + 1), node.label.to_lower(), 0)
 		Interactable.Kind.MANUAL:
 			if node.used:
+				return
+			if node.manual_passive != "":
+				var learned := player.try_learn_passive(node.manual_passive)
+				if not bool(learned["ok"]):
+					Bus.toast.emit("The manual will not open to you: %s required." % String(learned["reason"]))
+					return
+				node.used = true
+				var passive: Dictionary = DB.passive(node.manual_passive)
+				Bus.toast.emit("You study the manual. Passive learned: %s." % String(passive.get("name", node.manual_passive)))
+				Bus.player_stats_changed.emit()
 				return
 			if player.learn_technique(node.manual_technique):
 				node.used = true

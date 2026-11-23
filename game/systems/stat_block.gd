@@ -85,6 +85,11 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 		passives.append(String(id))
 		apply_mods(passive.get("mods", []), String(passive.get("name", "passive")))
 
+	# Synergies are bonus mods for pairs the host has already activated.
+	var synergy: Array = Passives.synergy_mods(passive_ids)
+	if not synergy.is_empty():
+		apply_mods(synergy, "synergy")
+
 
 func apply_mods(mods: Array, source_name: String = "") -> void:
 	if mods.is_empty():

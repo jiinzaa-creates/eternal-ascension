@@ -437,7 +437,10 @@ func _run() -> void:
 				if container == null:
 					container = node
 			Interactable.Kind.MANUAL:
-				manual_node = node
+				# Technique manuals and passive manuals share the kind; pick the one
+				# this block is about by id rather than by iteration order.
+				if node.id == "manual.crimson_moon":
+					manual_node = node
 			Interactable.Kind.DOOR:
 				if door == null:
 					door = node
@@ -840,6 +843,56 @@ func _run() -> void:
 	check(player.cultivation.identified, "appraisal survives a save")
 	check(player.cultivation.root_tier == saved_tier, "the evolved root survives a save")
 	check(absf(player.cultivation.purity_bonus - saved_purity) < 0.0001, "the hidden purity survives a save")
+
+	# --- passives: requirements, conditions, conflicts and synergy ------------
+	var jade_manual: Interactable = _find_interactable(main.interactables, "manual.jade_skin")
+	check(jade_manual != null, "the jade skin manual stands by the shrine")
+	player.global_position = jade_manual.global_position
+	main._try_interact()
+	check(not player.passives.has("passive.jade_skin"), "a manual refuses an unmet requirement")
+	check(not jade_manual.used, "a refused manual is not consumed")
+	player.attrs.add("str", 4)
+	player.rebuild_stats()
+	main._try_interact()
+	check(player.passives.has("passive.jade_skin"), "a manual teaches once the requirement is met")
+	check(jade_manual.used, "a learned manual is consumed")
+	check(player.active_passives().has("passive.jade_skin"), "the learned passive is active")
+	var armour_with_jade: float = player.stats.armor()
+	check(armour_with_jade > 0.0, "jade skin adds armour")
+
+	var trance_manual: Interactable = _find_interactable(main.interactables, "manual.battle_trance")
+	check(trance_manual != null, "the battle trance manual exists")
+	player.global_position = trance_manual.global_position
+	main._try_interact()
+	check(player.passives.has("passive.battle_trance"), "battle trance is learned")
+	check(not player.active_passives().has("passive.battle_trance"), "battle trance is dormant at full health")
+	var damage_healthy: float = player.stats.physical_mult()
+	player.hp = player.hp_max * 0.2
+	player._refresh_passive_conditions()
+	check(player.active_passives().has("passive.battle_trance"), "battle trance wakes when wounded")
+	check(player.stats.physical_mult() > damage_healthy, "the wounded passive changes damage")
+	player.hp = player.hp_max
+	player._refresh_passive_conditions()
+
+	player.add_passive("passive.iron_bone")
+	check(player.active_passives().has("passive.jade_skin"), "the first acquired conflicting passive stays active")
+	check(player.dormant_passives().size() >= 1, "the conflicting passive is dormant")
+
+	player.attrs.add("agi", 2)
+	player.add_passive("passive.swift_steps")
+	player.add_passive("passive.flowing_water")
+	player.rebuild_stats()
+	check(player.active_passives().has("passive.flowing_water"), "the agility requirement is met for flowing water")
+	var attack_with_synergy: float = player.stats.attack_speed()
+	player.passives.erase("passive.flowing_water")
+	player.rebuild_stats()
+	check(player.stats.attack_speed() < attack_with_synergy, "the synergy raises attack speed")
+
+	main._save(89)
+	main._load_game(89)
+	await frames(2)
+	check(player.active_passives().has("passive.jade_skin"), "an active passive survives a save")
+	check(player.dormant_passives().size() >= 1, "a dormant passive stays dormant through a save")
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
