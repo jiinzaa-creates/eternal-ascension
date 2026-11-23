@@ -62,6 +62,28 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - `meridians` and `contamination` are optional save keys; legacy saves start with no open channels and clean
   Qi.
 
+## Realms, sublevels and realm arts
+
+- **The ladder is data** (`data/realms.json`): twelve realms, ten sublevels each, with `qi_mult`,
+  `attr_mult`, `lifespan`, `color`, `tribulation`, `unlocks` and one `ability`. `Realms` is the only
+  reader; `StatBlock` takes lifespan from `Realms.lifespan` and `Cultivation.base_qi` takes the
+  sublevel curve from `Realms.sublevel_factor`, so data and rules cannot drift apart.
+- **Sublevels are incremental.** Every sublevel multiplies Qi capacity by `1 + 0.35 * (sublevel - 1)`;
+  1–3 are Early, 4–6 Middle, 7–9 Late and 10 Peak (`Realms.sublevel_label`). The HUD shows
+  `Cultivation.stage_title()` ("Foundation Establishment 5 · Middle"); toasts keep `stage_label()`.
+- **Realms are qualitative.** Each entry declares `unlocks` (`{id, name}`) and one realm art
+  (`id`, `name`, `desc`, `flags`, `mods`). Unlocks are **cumulative** (`Realms.unlock_ids`); the art is
+  **current realm only** (`Realms.ability_mods`), passed to `StatBlock.rebuild(..., realm_ability_mods)`
+  after passives and before meridians. Twelve arts therefore never stack into nonsense.
+- **Mechanically wired flags**: `dash_cancel` (Foundation, realm 2) lets `Player.try_dodge` abandon a
+  swing — before it a committed attack cannot be dodged out of, and spent Qi is never refunded.
+  `technique_weaving` (Spirit Transformation, realm 5) multiplies technique Qi cost and cooldown by
+  `Realms.WEAVING_MULT` (0.9). The other flags (`flight`, `space_folding`, `domain_projection`, …) are
+  declared capabilities that later milestones consume; they do not yet change behaviour.
+- **Apex guard**: `Cultivation.attempt_breakthrough` refuses with `reason == "apex"` at realm 12, and
+  `from_dict` clamps a corrupt realm into 1–12. A successful attempt returns the new realm's `unlocks`
+  and `ability`; `Player` turns them into an "Realm art awakened" toast.
+
 ## Cultivation methods: fit, insight, switching
 
 - Seven methods share one meditation loop and differ only by **mechanic** (`Methods.meditation_multiplier`):

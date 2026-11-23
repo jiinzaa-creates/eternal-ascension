@@ -1035,6 +1035,99 @@ func _run() -> void:
 	check(is_equal_approx(player.cultivation.contamination, 40.0), "contamination survives a save")
 	player.cultivation.cleanse(Meridians.MAX_CONTAMINATION)
 
+	# --- realms, sublevels and realm arts -------------------------------------
+	player.cultivation.realm = 1
+	player.cultivation.sublevel = 1
+	player.rebuild_stats()
+	check(player.cultivation.stage_title().contains("Early"), "realm one is named by its sublevel band")
+	check(not player.cultivation.has_unlock("dash_cancel"), "realm one has no dash cancel")
+	check(approx(player.stats.pct("qi_regen_pct"), 5.0), "the Qi Sense art is in the stat pipeline")
+
+	player._meditating = false
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._dodge_cooldown = 0.0
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player.try_attack()
+	await frames(1)
+	var committed_attack: String = player._attack_state
+	check(committed_attack != "idle", "an attack is committed before the realm art exists")
+	player.try_dodge(Vector2.RIGHT)
+	check(player._attack_state == committed_attack, "realm one cannot abandon a swing")
+	check(player._dodge_timer <= 0.0, "the refused dodge never starts")
+	await frames(40)
+	check(player._attack_state == "idle", "the committed attack finishes on its own")
+
+	player.cultivation.realm = 2
+	player.rebuild_stats()
+	check(player.cultivation.has_unlock("dash_cancel"), "foundation unlocks dash cancel")
+	# Equipment and passives may also carry qi_max_pct, so compare the two realm
+	# arts against each other instead of against a bare number.
+	var realm_two_qi_pct: float = player.stats.pct("qi_max_pct")
+	var realm_one_qi_regen: float = player.stats.pct("qi_regen_pct")
+	player.cultivation.realm = 1
+	player.rebuild_stats()
+	check(realm_two_qi_pct > player.stats.pct("qi_max_pct"), "the Dantian art is in the stat pipeline")
+	check(player.stats.pct("qi_regen_pct") >= realm_one_qi_regen, "the Qi Sense art is in the stat pipeline")
+	player.cultivation.realm = 2
+	player.rebuild_stats()
+	check(String(player.cultivation.realm_ability().get("name", "")) == "Dantian", "the current realm art is named")
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._dodge_cooldown = 0.0
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player.try_attack()
+	await frames(1)
+	player.try_dodge(Vector2.RIGHT)
+	check(player._dodge_timer > 0.0, "foundation can dodge out of an attack")
+	check(player._attack_state == "idle", "the abandoned swing returns to idle")
+	await frames(40)
+
+	# Technique weaving trims cost and cooldown at Spirit Transformation.
+	player.selected_technique = player.technique_ids.find("tech.sword.azure_cleave")
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player.cultivation.realm = 4
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	var qi_before_unwoven: float = player.cultivation.qi
+	player.try_attack()
+	var unbound_cost := qi_before_unwoven - player.cultivation.qi
+	check(unbound_cost > 0.0, "a technique spends Qi before weaving")
+	await frames(40)
+
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player.cultivation.realm = 5
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	var qi_before_woven: float = player.cultivation.qi
+	player.try_attack()
+	var woven_cost := qi_before_woven - player.cultivation.qi
+	check(woven_cost < unbound_cost, "technique weaving discounts Qi")
+	check(approx(woven_cost, unbound_cost * Realms.WEAVING_MULT, 0.05), "weaving is a tenth off the cost")
+	await frames(40)
+
+	player.cultivation.realm = 12
+	player.cultivation.sublevel = 10
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player.rebuild_stats()
+	var apex_attempt: Dictionary = player.attempt_breakthrough()
+	check(String(apex_attempt.get("reason", "")) == "apex", "the scene refuses a breakthrough above the final realm")
+	check(player.cultivation.realm == 12, "the apex attempt leaves the realm alone")
+
+	player.cultivation.realm = 5
+	player.cultivation.sublevel = 3
+	player.cultivation.qi = 8.0
+	player.rebuild_stats()
+	main._save(90)
+	main._load_game(90)
+	await frames(2)
+	check(player.cultivation.realm == 5 and player.cultivation.sublevel == 3, "the realm and sublevel survive a save")
+	check(player.cultivation.has_unlock("technique_weaving"), "realm unlocks follow the saved realm")
+	check(player.cultivation.stage_title().contains("Early"), "the saved sublevel band is derived again")
+	Save.delete_slot(90)
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

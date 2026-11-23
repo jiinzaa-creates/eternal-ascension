@@ -82,7 +82,7 @@ func draw_vitals(player: Player) -> void:
 	var y := 28.0
 	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 244.0), PANEL_BG)
 
-	_text(Vector2(x, y), player.cultivation.stage_label(), 19, ACCENT)
+	_text(Vector2(x, y), player.cultivation.stage_title(), 19, ACCENT)
 	y += 20.0
 	var root: Dictionary = player.cultivation.root_data()
 	var root_label := String(root.get("name", "?"))
@@ -132,6 +132,10 @@ func draw_vitals(player: Player) -> void:
 	_text(Vector2(x, y), "Meridians: %d/12   Contamination: %d%%" % [
 		player.cultivation.meridian_count(), int(player.cultivation.contamination)
 	], 11, Color("#8fd8e8"))
+	y += 18.0
+	_text(Vector2(x, y), "Realm art: %s   Unlocks: %d" % [
+		String(player.cultivation.realm_ability().get("name", "—")), player.cultivation.unlock_ids().size()
+	], 11, Color("#d8c898"))
 
 
 func draw_world_panel(player: Player) -> void:

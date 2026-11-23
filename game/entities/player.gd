@@ -111,7 +111,7 @@ func dormant_passives() -> Array:
 
 func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
-		Meridians.bonus_mods(cultivation.meridians))
+		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm))
 	_recalc_vitals()
 
 
@@ -371,7 +371,7 @@ func _tick_attack(delta: float) -> void:
 			_attack_phase_total = _attack_timer
 			var tech_id := String(_current_technique.get("id", ""))
 			_cooldown = float(_current_technique.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction()) \
-				* Mastery.cooldown_mult(mastery_tier(tech_id))
+				* Mastery.cooldown_mult(mastery_tier(tech_id)) * Realms.technique_mult(cultivation.realm)
 		"recovery":
 			_attack_state = "idle"
 
@@ -393,7 +393,8 @@ func try_attack() -> void:
 	if tech.is_empty():
 		return
 	var tech_id := String(tech.get("id", ""))
-	var cost := float(tech.get("qi_cost", 0.0)) * Mastery.qi_mult(mastery_tier(tech_id))
+	var cost := float(tech.get("qi_cost", 0.0)) * Mastery.qi_mult(mastery_tier(tech_id)) \
+		* Realms.technique_mult(cultivation.realm)
 	if cultivation.qi < cost:
 		Bus.toast.emit("Not enough Qi.")
 		return
@@ -553,6 +554,14 @@ func is_sprinting() -> bool:
 func try_dodge(dir: Vector2) -> void:
 	if _dodge_cooldown > 0.0 or _dodge_timer > 0.0:
 		return
+	# Dash cancel is a Foundation Establishment unlock: before it, a committed
+	# swing cannot be abandoned. The spent Qi is never refunded either way.
+	if _attack_state != "idle":
+		if not Realms.can_dash_cancel(cultivation.realm):
+			return
+		_attack_state = "idle"
+		_attack_timer = 0.0
+		_current_technique = {}
 	if _meditating:
 		toggle_meditation()
 	var dash_dir := dir.normalized()
@@ -574,11 +583,16 @@ func attempt_breakthrough() -> Dictionary:
 			Bus.toast.emit("You have not reached the peak of this realm.")
 		elif reason == "qi_not_full":
 			Bus.toast.emit("Your Qi is not full.")
+		elif reason == "apex":
+			Bus.toast.emit("The peak of the ladder. There is no realm above this one.")
 		return result
 	rebuild_stats()
 	if bool(result.get("success", false)):
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("Breakthrough! You are now %s." % cultivation.stage_label())
+		var ability_name := String(result.get("ability", ""))
+		if ability_name != "":
+			Bus.toast.emit("Realm art awakened: %s." % ability_name)
 	else:
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("The tribulation breaks you. Qi deviation.")

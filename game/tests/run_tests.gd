@@ -26,6 +26,7 @@ func _ready() -> void:
 	_technique_mastery_tests()
 	_method_tests()
 	_qi_meridian_tests()
+	_realm_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -924,6 +925,130 @@ func _qi_meridian_tests() -> void:
 		check(is_equal_approx(failing.contamination, 0.0), "a clean breakthrough does not contaminate")
 	else:
 		check(failing.contamination > 0.0, "a failed breakthrough contaminates the channels")
+
+
+# ---------------------------------------------------------------- realms ----
+
+func _realm_tests() -> void:
+	print("[realms] 12x10 ladder, sublevel bands, unlocks and realm arts")
+	check(Realms.count() == 12, "twelve realms are registered")
+	check(Cultivation.SUBLEVELS == Realms.SUBLEVELS, "the rules and the data agree on ten sublevels")
+	var realm_ids := {}
+	var unlock_ids := {}
+	var previous_qi := 0.0
+	var previous_attr := 0.0
+	var previous_life := -1
+	for n in range(1, Realms.count() + 1):
+		var entry := Realms.find(n)
+		check(int(entry.get("n", 0)) == n, "realm %d is indexed in order" % n)
+		check(Realms.sublevels(n) == 10, "realm %d has ten sublevels" % n)
+		check(Realms.qi_mult(n) > previous_qi, "realm %d raises the Qi multiplier" % n)
+		check(Realms.attr_mult(n) > previous_attr, "realm %d raises the attribute multiplier" % n)
+		previous_qi = Realms.qi_mult(n)
+		previous_attr = Realms.attr_mult(n)
+		realm_ids[String(entry.get("id", ""))] = true
+		check(Realms.ability(n).has("id") and String(Realms.ability(n).get("name", "")) != "", "realm %d names its realm art" % n)
+		check(not (Realms.ability(n).get("mods", []) as Array).is_empty(), "realm %d realm art has a real effect" % n)
+		check(not Realms.unlocks_at(n).is_empty(), "realm %d declares unlocks" % n)
+		for unlock in Realms.unlocks_at(n):
+			var unlock_id := String(unlock.get("id", ""))
+			var unlock_name := String(unlock.get("name", ""))
+			check(unlock_id != "" and unlock_name != "", "realm %d unlock is named" % n)
+			check(not unlock_ids.has(unlock_id), "unlock %s is introduced once" % unlock_id)
+			unlock_ids[unlock_id] = true
+		var life := Realms.lifespan(n)
+		if n < 12:
+			check(life > previous_life, "realm %d extends lifespan" % n)
+			previous_life = life
+		else:
+			check(life == 0, "the final realm has no lifespan limit")
+		check(Realms.color(n).begins_with("#"), "realm %d has a colour" % n)
+	check(realm_ids.size() == 12, "realm ids are unique")
+
+	check(Realms.sublevel_label(1) == "Early" and Realms.sublevel_label(3) == "Early", "sublevels 1-3 are early")
+	check(Realms.sublevel_label(4) == "Middle" and Realms.sublevel_label(6) == "Middle", "sublevels 4-6 are middle")
+	check(Realms.sublevel_label(7) == "Late" and Realms.sublevel_label(9) == "Late", "sublevels 7-9 are late")
+	check(Realms.sublevel_label(10) == "Peak", "sublevel ten is the peak")
+	check(Realms.sublevel_label(0) == "Early" and Realms.sublevel_label(99) == "Peak", "sublevel bands clamp")
+	check(is_equal_approx(Realms.sublevel_factor(1), 1.0), "the first sublevel is the baseline")
+	check(is_equal_approx(Realms.sublevel_factor(10), 1.0 + 0.35 * 9.0), "the peak sublevel follows the curve")
+	check(Realms.sublevel_factor(5) > Realms.sublevel_factor(4), "capacity grows every sublevel")
+	check(Realms.stage_label(2, 5) == "Foundation Establishment 5", "stage labels keep their old shape")
+	check(Realms.stage_title(2, 5).contains("Middle"), "stage titles name the sublevel band")
+	check(Realms.stage_title(2, 5).contains("Foundation Establishment"), "stage titles name the realm")
+	check(Realms.stage_power(2, 10) > Realms.stage_power(2, 1), "sublevels raise stage power")
+	check(Realms.stage_power(3, 1) > Realms.stage_power(2, 1), "a realm jump raises stage power")
+
+	check(not Realms.has_unlock(1, "dash_cancel"), "realm one cannot dash-cancel")
+	check(Realms.has_unlock(2, "dash_cancel"), "foundation establishes dash-cancelling")
+	check(Realms.has_unlock(12, "qi_sense"), "unlocks are cumulative")
+	check(not Realms.has_unlock(6, "dao_comprehension"), "future unlocks stay locked")
+	check(not Realms.has_unlock(99, "qi_sense"), "a realm outside the ladder unlocks nothing")
+	check(not Realms.can_dash_cancel(1) and Realms.can_dash_cancel(2), "dash cancel follows its unlock")
+	check(is_equal_approx(Realms.technique_mult(4), 1.0), "low realms weave nothing")
+	check(is_equal_approx(Realms.technique_mult(5), Realms.WEAVING_MULT), "spirit transformation weaves techniques")
+	check(is_equal_approx(Realms.technique_mult(12), Realms.WEAVING_MULT), "weaving persists once learned")
+	check(Realms.unlock_ids(1).size() == Realms.unlocks_at(1).size(), "realm one owns exactly its own unlocks")
+	check(Realms.unlock_ids(2).size() == Realms.unlocks_at(1).size() + Realms.unlocks_at(2).size(), "cumulative unlocks add up")
+	check(Realms.new_unlocks(1, 2).size() == Realms.unlocks_at(2).size(), "a breakthrough reports only what is new")
+	check(Realms.new_unlocks(1, 1).is_empty(), "no realm change means no new unlock")
+	check(Realms.new_unlocks(5, 3).is_empty(), "unlocks never travel backwards")
+	check(String(Realms.new_unlocks(2, 3)[0]["id"]) == String(Realms.unlocks_at(3)[0]["id"]), "the reported unlock is the next realm's")
+
+	var bare := StatBlock.new(Attributes.new())
+	bare.rebuild({}, [], 1, 1.0)
+	var realm_one := StatBlock.new(Attributes.new())
+	realm_one.rebuild({}, [], 1, 1.0, "", [], Realms.ability_mods(1))
+	check(realm_one.qi_regen_mult() > bare.qi_regen_mult(), "a realm art enters the stat pipeline")
+	check(is_equal_approx(realm_one.pct("qi_regen_pct"), 5.0), "the art contributes its declared mod")
+	var realm_two := StatBlock.new(Attributes.new())
+	realm_two.rebuild({}, [], 2, 1.0, "", [], Realms.ability_mods(2))
+	check(realm_two.max_qi_mult() > bare.max_qi_mult(), "the next realm art changes the pipeline")
+	check(is_equal_approx(realm_two.pct("qi_regen_pct"), 0.0), "only the current realm art applies")
+
+	check(bare.base_lifespan_years() == Realms.lifespan(1), "StatBlock reads lifespan from Realms")
+	var realm_twelve := StatBlock.new(Attributes.new())
+	realm_twelve.rebuild({}, [], 12, 1.0)
+	check(realm_twelve.lifespan_years() == 0, "the final realm is unbounded through the pipeline")
+
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var cultivation := Cultivation.new()
+	cultivation.root_tier = 3
+	check(cultivation.realm_ability().has("name"), "the cultivation state exposes its realm art")
+	check(cultivation.stage_title().contains("Early"), "a new cultivator is early in Qi Condensation")
+	cultivation.sublevel = 10
+	var peak_cap := cultivation.qi_max(stats)
+	cultivation.sublevel = 1
+	check(peak_cap > cultivation.qi_max(stats), "sublevels really raise Qi capacity")
+
+	var apex := Cultivation.new()
+	apex.root_tier = 3
+	apex.realm = 12
+	apex.sublevel = 10
+	apex.qi = apex.qi_max(stats)
+	var apex_result := apex.attempt_breakthrough(stats, Rng.stream("apex", 0, 0), 0, 0)
+	check(String(apex_result.get("reason", "")) == "apex", "there is no realm above the twelfth")
+	check(apex.realm == 12 and not bool(apex_result.get("success", true)), "an apex attempt changes nothing")
+
+	var climber := Cultivation.new()
+	climber.root_tier = 3
+	climber.sublevel = 10
+	climber.qi = climber.qi_max(stats)
+	var attempt := climber.attempt_breakthrough(stats, Rng.stream("realm_unlocks", 0, 0), 0, 0)
+	if bool(attempt.get("success", false)):
+		check(int(attempt.get("realm", 0)) == 2, "a breakthrough lands one realm higher")
+		check((attempt.get("unlocks", []) as Array).size() == Realms.unlocks_at(2).size(), "a breakthrough reports its new unlocks")
+		check(String(attempt.get("ability", "")) == Realms.ability_name(2), "a breakthrough names the realm art")
+	else:
+		check(climber.realm == 1, "a failed breakthrough stays in realm one")
+
+	var clamped := Cultivation.new()
+	clamped.from_dict({"realm": 99, "sublevel": 99})
+	check(clamped.realm == 12 and clamped.sublevel == 10, "a corrupt save is clamped to the ladder")
+	var legacy := Cultivation.new()
+	legacy.from_dict({})
+	check(legacy.realm == 1 and legacy.sublevel == 1, "legacy saves start at the first stage")
 
 
 func _rng_tests() -> void:

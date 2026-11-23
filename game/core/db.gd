@@ -189,6 +189,7 @@ func validate() -> Array:
 
 	if realms.size() != 12:
 		problems.append("expected 12 realms, found %d" % realms.size())
+	var realm_unlock_ids := {}
 	for i in realms.size():
 		var r: Dictionary = realms[i]
 		var n := int(r.get("n", 0))
@@ -202,6 +203,38 @@ func validate() -> Array:
 			problems.append("realm %d has non-positive qi_mult" % n)
 		if float(r.get("attr_mult", 0.0)) <= 0.0:
 			problems.append("realm %d has non-positive attr_mult" % n)
+		if (r.get("unlocks", []) as Array).is_empty():
+			problems.append("realm %d has no unlocks" % n)
+		for entry in r.get("unlocks", []):
+			var unlock_id := ""
+			if typeof(entry) == TYPE_DICTIONARY:
+				unlock_id = String((entry as Dictionary).get("id", ""))
+			elif typeof(entry) == TYPE_STRING:
+				unlock_id = String(entry)
+			if unlock_id == "":
+				problems.append("realm %d has an unlock without an id" % n)
+			elif realm_unlock_ids.has(unlock_id):
+				problems.append("realm unlock %s is declared twice" % unlock_id)
+			realm_unlock_ids[unlock_id] = true
+		var ability: Dictionary = r.get("ability", {})
+		if ability.is_empty():
+			problems.append("realm %d has no realm art" % n)
+		else:
+			if String(ability.get("id", "")) == "" or String(ability.get("name", "")) == "":
+				problems.append("realm %d realm art has no id/name" % n)
+			var ability_mods: Array = ability.get("mods", [])
+			var ability_flags: Array = ability.get("flags", [])
+			if ability_mods.is_empty() and ability_flags.is_empty():
+				problems.append("realm %d realm art has no effect" % n)
+			for mod in ability_mods:
+				if typeof(mod) != TYPE_DICTIONARY:
+					problems.append("realm %d realm art has a malformed mod" % n)
+					continue
+				var ability_stat := String((mod as Dictionary).get("stat", ""))
+				if ability_stat == "":
+					problems.append("realm %d realm art has a mod without a stat" % n)
+				elif not (Attributes.KEYS.has(ability_stat) or StatBlock.PERCENT_STATS.has(ability_stat) or StatBlock.FLAT_STATS.has(ability_stat)):
+					problems.append("realm %d realm art uses unknown stat %s" % [n, ability_stat])
 
 	if roots.size() != 12:
 		problems.append("expected 12 spiritual roots, found %d" % roots.size())

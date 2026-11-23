@@ -60,7 +60,7 @@ func reset() -> void:
 ## Rebuilds every modifier from equipment and passives. Called whenever the
 ## player equips something, gains a passive, or advances a realm.
 func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float,
-		physique_id: String = "", meridian_mods: Array = []) -> void:
+		physique_id: String = "", meridian_mods: Array = [], realm_ability_mods: Array = []) -> void:
 	reset()
 	realm = realm_number
 	realm_mult = realm_attribute_mult
@@ -84,6 +84,11 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 			continue
 		passives.append(String(id))
 		apply_mods(passive.get("mods", []), String(passive.get("name", "passive")))
+
+	# The current realm's art. Only one applies at a time, so twelve sets of
+	# mods can never stack; its behavioural flags are separate and cumulative.
+	if not realm_ability_mods.is_empty():
+		apply_mods(realm_ability_mods, "realm art")
 
 	if not meridian_mods.is_empty():
 		apply_mods(meridian_mods, "meridians")
@@ -213,7 +218,7 @@ func health_regen() -> float:
 ## Years the current realm allows, before any longevity bonus. Realm 12 declares
 ## lifespan 0, which means "no limit".
 func base_lifespan_years() -> int:
-	return maxi(0, int(DB.realm(realm).get("lifespan", 0)))
+	return Realms.lifespan(realm)
 
 
 func lifespan_bonus() -> int:

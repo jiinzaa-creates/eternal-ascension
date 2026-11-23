@@ -93,7 +93,8 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 
 - Six uncapped attributes; one `StatBlock` pipeline (attributes → flat → percent → equipment → realm).
 - 12 spiritual root tiers with weighted generation, purity, affinities, cultivation multipliers.
-- 12 realms × 10 sublevels; Qi accumulation, breakthroughs, tribulation scaling, failure consequences.
+- 12 realms × 10 sublevels as one data-driven ladder: every sublevel raises Qi capacity (1 → 4.15×, banded Early/Middle/Late/Peak), every realm is a multiplier with cumulative unlocks and one realm art, breakthroughs scale with behaviour and their failures cost something, and the twelfth realm is a guarded apex.
+- Realm arts and unlocks: each realm declares what it opens (Qi Sense, Dash Cancel, Meridian Opening, Technique Weaving, Flight, …) and one art whose mods feed the stat pipeline; dash cancel (realm 2) really lets a dodge abandon a swing, and technique weaving (realm 5) really cuts Qi cost and cooldown by 10%.
 - 8 techniques with startup/active/recovery frames, arc hitboxes, Qi costs, poise, knockback, scaling.
 - Deterministic item generation: 4 rarities, tiered prefixes/suffixes, stable IDs, auto-equip.
 - Equipment and passives feed real combat stats through `StatBlock`.
@@ -136,8 +137,8 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 ## Not implemented yet
 
 Character appearance and backgrounds (all characters are still code-drawn shapes, now
-animated procedurally); travel between provinces; physiques; method-specific cultivation
-loops; mastery and manuals; alchemy, forging, professions and economy; NPC goals, memory,
+animated procedurally); travel between provinces; flight, domain projection, space folding
+and the other declared realm capabilities; alchemy, forging, professions and economy; NPC goals, memory,
 relationships, parties and independent progression; the twelve sects and faction politics;
 additional hidden-realm templates; dynamic world events; the main narrative and endgame;
 UI screens beyond the HUD; audio.

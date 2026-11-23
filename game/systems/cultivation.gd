@@ -87,7 +87,21 @@ func consume_blood_charge(amount: float) -> void:
 
 
 func base_qi() -> float:
-	return 100.0 * float(realm_data().get("qi_mult", 1.0)) * (1.0 + 0.35 * float(sublevel - 1))
+	return 100.0 * float(realm_data().get("qi_mult", 1.0)) * Realms.sublevel_factor(sublevel)
+
+
+## Everything this stage has unlocked. Cumulative across realms.
+func unlock_ids() -> Array:
+	return Realms.unlock_ids(realm)
+
+
+func has_unlock(id: String) -> bool:
+	return Realms.has_unlock(realm, id)
+
+
+## The current realm's art. Only the newest one applies to the stat pipeline.
+func realm_ability() -> Dictionary:
+	return Realms.ability(realm)
 
 
 func qi_max(stats: StatBlock) -> float:
@@ -196,6 +210,11 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		return {"success": false, "reason": "not_at_peak", "chance": 0.0, "roll": 0.0}
 	if not is_full(stats):
 		return {"success": false, "reason": "qi_not_full", "chance": 0.0, "roll": 0.0}
+	# The ladder has twelve rungs. Without this guard realm 12 would "advance"
+	# into a realm that has no data and every formula would read defaults.
+	if realm >= Realms.count():
+		return {"success": false, "reason": "apex", "chance": 0.0, "roll": 0.0,
+			"realm": realm, "sublevel": sublevel, "consequences": []}
 
 	var trib := tribulation_scale(kills, karma)
 	var chance := breakthrough_chance(stats, trib)
@@ -237,6 +256,8 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		"realm": realm,
 		"sublevel": sublevel,
 		"reason": "",
+		"unlocks": Realms.unlocks_at(realm) if success else [],
+		"ability": Realms.ability_name(realm) if success else "",
 	}
 	Bus.breakthrough_resolved.emit(result)
 	return result
@@ -248,6 +269,11 @@ func realm_name() -> String:
 
 func stage_label() -> String:
 	return "%s %d" % [realm_name(), sublevel]
+
+
+## Realm, sublevel and band: "Foundation Establishment 5 · Middle".
+func stage_title() -> String:
+	return Realms.stage_title(realm, sublevel)
 
 
 func to_dict() -> Dictionary:
@@ -269,7 +295,9 @@ func to_dict() -> Dictionary:
 
 
 func from_dict(data: Dictionary) -> void:
-	realm = maxi(1, int(data.get("realm", 1)))
+	# Clamp to the ladder: a corrupt or outdated save must not index a realm that
+	# does not exist, which would silently read every multiplier as a default.
+	realm = clampi(int(data.get("realm", 1)), 1, maxi(1, Realms.count()))
 	sublevel = clampi(int(data.get("sublevel", 1)), 1, SUBLEVELS)
 	qi = float(data.get("qi", 0.0))
 	root_tier = clampi(int(data.get("root_tier", 3)), 1, 12)
