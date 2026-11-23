@@ -36,8 +36,11 @@ var hp: float = 100.0
 var hp_max: float = 100.0
 var spawn_point := Vector2.ZERO
 
+var animator := Animator.new()
+
 var _attack_state := "idle"  # idle | startup | active | recovery
 var _attack_timer := 0.0
+var _attack_phase_total := 0.0
 var _current_technique: Dictionary = {}
 var _cooldown := 0.0
 var _dodge_timer := 0.0
@@ -98,7 +101,26 @@ func _process(delta: float) -> void:
 		modulate.a = 0.55
 	else:
 		modulate.a = 1.0
+	_sync_animation(delta)
 	queue_redraw()
+
+
+func _move_ratio() -> float:
+	return velocity.length() / maxf(1.0, stats.move_speed())
+
+
+## Animation reads the same state the combat machine uses, so a strike pose
+## cannot be shown on a frame that cannot hit.
+func _sync_animation(delta: float) -> void:
+	animator.update(delta, _move_ratio(), _sprinting, _attack_state != "idle",
+		_dodge_timer > 0.0, _hurt_flash > 0.0, _meditating, false)
+
+
+func _attack_swing() -> float:
+	if _attack_state == "idle":
+		return 0.0
+	var ratio := 1.0 - clampf(_attack_timer / maxf(0.001, _attack_phase_total), 0.0, 1.0)
+	return Animator.attack_swing(_attack_state, ratio)
 
 
 func _physics_process(delta: float) -> void:
@@ -181,12 +203,14 @@ func _tick_attack(delta: float) -> void:
 		"startup":
 			_attack_state = "active"
 			_attack_timer = maxf(0.016, float(frames.get("active", 4)) / 60.0 / speed)
+			_attack_phase_total = _attack_timer
 			_strike()
 		"active":
 			_attack_state = "recovery"
 			var recovery := float(frames.get("recovery", 12)) / 60.0 / speed
 			recovery *= (1.0 - stats.recovery_reduction())
 			_attack_timer = maxf(0.02, recovery)
+			_attack_phase_total = _attack_timer
 			_cooldown = float(_current_technique.get("cooldown", 0.4))
 		"recovery":
 			_attack_state = "idle"
@@ -217,6 +241,7 @@ func try_attack() -> void:
 	_attack_state = "startup"
 	var frames: Dictionary = tech.get("frames", {})
 	_attack_timer = maxf(0.02, float(frames.get("startup", 9)) / 60.0 / stats.attack_speed())
+	_attack_phase_total = _attack_timer
 	_facing = _aim_dir()
 	cultivation_changed()
 
@@ -383,15 +408,8 @@ func pick_up(item: Dictionary) -> void:
 
 
 func _draw() -> void:
+	# Ground shadow and rings stay in world space: animation must not tilt them.
 	draw_circle(Vector2(0, 7), RADIUS * 0.95, Color(0, 0, 0, 0.3))
-	var body := Color("#dbe4ea")
-	if _hurt_flash > 0.0:
-		body = Color("#ff8080")
-	elif _iframes > 0.0:
-		body = Color("#9fd0ff")
-	draw_circle(Vector2.ZERO, RADIUS, body)
-	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 28, Color("#232b31"), 2.0)
-	draw_line(Vector2.ZERO, _facing * (RADIUS + 7.0), Color("#7fd3e0"), 3.0)
 
 	var qi_ratio := clampf(cultivation.qi / maxf(1.0, cultivation.qi_max(stats)), 0.0, 1.0)
 	if qi_ratio > 0.01:
@@ -401,6 +419,31 @@ func _draw() -> void:
 		for i in 3:
 			var alpha := 0.3 - float(i) * 0.08
 			draw_arc(Vector2.ZERO, RADIUS + 10.0 + float(i) * 9.0, 0.0, TAU, 32, Color("#9fe0c0", alpha), 1.5)
+
+	var body := Color("#dbe4ea")
+	if _hurt_flash > 0.0:
+		body = Color("#ff8080")
+	elif _iframes > 0.0:
+		body = Color("#9fd0ff")
+
+	var pose := Animator.pose(animator.state, animator.time, _move_ratio())
+	var bob: Vector2 = pose["bob"]
+	var squash: Vector2 = pose["squash"]
+	var swing := float(pose["swing"])
+	var lean := float(pose["lean"]) * (1.0 if _facing.x >= 0.0 else -1.0)
+	var attack := _attack_swing()
+
+	# Limbs and torso share one transform so bob, lean and squash stay coherent.
+	draw_set_transform(bob, lean, squash)
+	var limb := Color("#3a454c")
+	draw_line(Vector2(-5, 2), Vector2(-5.0 + swing * 5.0, 12.0), limb, 3.0)
+	draw_line(Vector2(5, 2), Vector2(5.0 - swing * 5.0, 12.0), limb, 3.0)
+	draw_line(Vector2(-4, -3), Vector2(-4.0 - swing * 3.0, -9.0), limb, 2.5)
+	draw_line(Vector2(4, -3), Vector2(4.0 + swing * 3.0 + attack * 5.0, -9.0 - attack * 6.0), limb, 2.5)
+	draw_circle(Vector2.ZERO, RADIUS, body)
+	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 28, Color("#232b31"), 2.0)
+	draw_line(Vector2.ZERO, _facing * (RADIUS + 7.0 + attack * 6.0), Color("#7fd3e0"), 3.0)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	if _arc_flash > 0.0:
 		var base := _facing.angle()

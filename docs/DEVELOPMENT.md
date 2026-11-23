@@ -45,6 +45,22 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Animation
+
+- There are no sprite sheets: animation is a **pose**. `Animator` picks a clip from
+  `(speed_ratio, sprinting, attacking, dodging, hurt, meditating, dead)` and returns bob, squash,
+  limb swing and lean from `Animator.pose(clip, time)`. Actors apply those around their drawing only;
+  shadows and ground rings stay in world space.
+- Clip priority is fixed: death > hurt > dodge > attack > meditation > sprint > run > walk > idle.
+  Sprint still requires movement.
+- **Attack poses come from combat frame data.** `Animator.attack_swing(phase, ratio)` takes the
+  technique's startup/active/recovery phase and the phase progress the player tracks, so the visual
+  strike cannot drift off the frame that deals damage. Do not add an attack animation with its own
+  timer.
+- Any new actor should own an `Animator`, call `update()` once per frame, and wrap its drawing in
+  `draw_set_transform(pose.bob, pose.lean, pose.squash)`.
+- Poses are pure functions and are tested; rendering output is not, and reports must say so.
+
 ## Input and movement
 
 - All bindings live in `core/settings.gd`: `KEY_BINDINGS`, `MOUSE_BINDINGS`, `JOY_AXIS_BINDINGS`
@@ -119,7 +135,8 @@ working system. Reports must list unverified items as unverified.
 game/
   core/       bus, rng, db, clock, log, settings, save, game (autoloads)
   data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs)
-  systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, camera_rig, lighting, display_policy
+  systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, animator,
+              camera_rig, lighting, display_policy
   entities/   player, dummy, npc, interactable
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud

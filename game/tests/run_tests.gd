@@ -30,6 +30,7 @@ func _ready() -> void:
 	_sorting_tests()
 	_motion_tests()
 	_controller_tests()
+	_animation_tests()
 	_npc_tests()
 	_quest_tests()
 	_hidden_realm_tests()
@@ -726,3 +727,60 @@ func _controller_tests() -> void:
 	check(kept_pad, "rebinding a key keeps the gamepad button")
 	Settings.rebind("dodge", KEY_SPACE)
 	check(Settings.action_keycode("dodge") == OS.get_keycode_string(KEY_SPACE), "dodge is restored after the rebind probe")
+
+
+# -------------------------------------------------------------- animation ----
+
+func _animation_tests() -> void:
+	print("[animation] clip selection, clocks and poses")
+	check(Animator.state_for(0.0, false, false, false, false, false, false) == "idle", "standing still is idle")
+	check(Animator.state_for(0.1, false, false, false, false, false, false) == "walk", "slow movement walks")
+	check(Animator.state_for(0.8, false, false, false, false, false, false) == "run", "fast movement runs")
+	check(Animator.state_for(0.8, true, false, false, false, false, false) == "sprint", "sprinting overrides running")
+	check(Animator.state_for(0.0, true, false, false, false, false, false) == "idle", "sprint needs movement")
+	check(Animator.state_for(0.0, false, true, false, false, false, false) == "attack", "attacking overrides idle")
+	check(Animator.state_for(0.8, true, true, false, false, false, false) == "attack", "attacking overrides sprint")
+	check(Animator.state_for(0.0, false, true, true, false, false, false) == "dodge", "dodging overrides attacking")
+	check(Animator.state_for(0.0, false, true, false, true, false, false) == "hurt", "hurt overrides attacking")
+	check(Animator.state_for(0.0, false, false, false, false, true, false) == "meditate", "meditation has its own clip")
+	check(Animator.state_for(0.0, false, false, false, false, false, true) == "dead", "death has absolute priority")
+
+	var animator := Animator.new()
+	check(animator.update(0.5, 0.0, false, false, false, false, false, false) == "idle", "the animator starts idle")
+	check(approx(animator.time, 0.5), "time accumulates inside a clip")
+	animator.update(0.25, 0.8, false, false, false, false, false, false)
+	check(animator.state == "run", "the animator switches clips from speed")
+	check(approx(animator.time, 0.0), "changing clips rewinds the clock")
+	check(animator.previous == "idle", "the previous clip is recorded")
+	animator.update(0.1, 0.8, false, false, false, false, false, false)
+	check(approx(animator.time, 0.1), "time resumes after the switch")
+
+	var idle := Animator.pose("idle", 0.4, 0.0)
+	var run := Animator.pose("run", 0.4, 0.8)
+	var sprint := Animator.pose("sprint", 0.4, 1.0)
+	var idle_bob: Vector2 = idle["bob"]
+	var run_bob: Vector2 = run["bob"]
+	var sprint_bob: Vector2 = sprint["bob"]
+	check(absf(idle_bob.y) < absf(run_bob.y) + 0.001, "running bobs more than idling")
+	check(absf(sprint_bob.y) >= absf(run_bob.y), "sprinting bobs at least as much as running")
+	check(float(sprint["lean"]) > float(run["lean"]), "sprinting leans further forward")
+	check(approx(float(idle["swing"]), 0.0, 0.01), "idling does not swing the limbs")
+
+	var dodge := Animator.pose("dodge", 0.2, 0.0)
+	var dodge_squash: Vector2 = dodge["squash"]
+	check(dodge_squash.x > 1.0 and dodge_squash.y < 1.0, "dodging squashes the body")
+	var dead := Animator.pose("dead", 0.2, 0.0)
+	var dead_squash: Vector2 = dead["squash"]
+	check(dead_squash.y < 0.6, "the death pose collapses the body")
+	for clip in Animator.STATES:
+		var p := Animator.pose(String(clip), 0.7, 0.6)
+		var p_bob: Vector2 = p["bob"]
+		check(is_finite(p_bob.x) and is_finite(p_bob.y) and is_finite(float(p["swing"])), "clip %s produces a finite pose" % clip)
+
+	check(approx(Animator.attack_swing("startup", 0.0), 0.0), "the wind-up starts neutral")
+	check(Animator.attack_swing("startup", 1.0) <= -0.9, "the wind-up ends drawn back")
+	check(Animator.attack_swing("active", 0.0) > 0.5, "the strike snaps forward on the first active frame")
+	check(Animator.attack_swing("active", 0.5) > Animator.attack_swing("startup", 0.5), "active frames are ahead of the wind-up")
+	check(approx(Animator.attack_swing("recovery", 1.0), 0.0), "recovery returns to neutral")
+	check(absf(Animator.attack_swing("active", 2.0)) <= 1.0, "swing is clamped at the ends")
+	check(approx(Animator.attack_swing("idle", 0.5), 0.0), "a non-attack phase has no swing")

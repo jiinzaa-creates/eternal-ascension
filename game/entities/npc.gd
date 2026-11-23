@@ -30,6 +30,7 @@ var speed := 54.0
 var current_activity := "idle"
 var current_location := ""
 var target := Vector2.ZERO
+var animator := Animator.new()
 
 var _idle_timer := 0.0
 var _wander := Vector2.ZERO
@@ -69,6 +70,7 @@ func _physics_process(delta: float) -> void:
 			_wander = Vector2(randf_range(-18.0, 18.0), randf_range(-18.0, 18.0))
 		velocity = _wander
 	move_and_slide()
+	animator.update(delta, velocity.length() / maxf(1.0, speed), false, false, false, false, false, false)
 	queue_redraw()
 
 
@@ -109,6 +111,8 @@ func resolve_schedule(hour: int) -> Dictionary:
 func _draw() -> void:
 	var color := Color(ROLE_COLORS.get(role, "#9aa0a6"))
 	draw_circle(Vector2(0, 6), RADIUS * 0.9, Color(0, 0, 0, 0.3))
+	var pose := Animator.pose(animator.state, animator.time, 0.0)
+	draw_set_transform(pose["bob"], float(pose["lean"]), pose["squash"])
 	draw_circle(Vector2.ZERO, RADIUS, color)
 	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 20, Color("#22282c"), 1.5)
 
@@ -128,6 +132,7 @@ func _draw() -> void:
 		"socialize":
 			activity_color = Color("#c09ad8")
 	draw_arc(Vector2.ZERO, RADIUS + 4.0, -PI * 0.5, -PI * 0.5 + TAU * 0.99, 18, activity_color, 1.5)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	var player: Node2D = Game.player as Node2D
 	if player != null and global_position.distance_to(player.global_position) < 300.0:

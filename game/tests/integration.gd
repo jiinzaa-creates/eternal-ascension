@@ -77,6 +77,7 @@ func _run() -> void:
 	check(not main.elder == null, "the quest giver exists")
 
 	var npc: Npc = main.npcs[0]
+	check(npc.animator != null, "scheduled NPCs own an animator")
 	await frames(3)
 	check(npc.current_activity != "idle" or npc.current_location != "", "NPCs resolve a scheduled activity")
 
@@ -156,6 +157,25 @@ func _run() -> void:
 	check(not player.is_sprinting(), "sprint clears when input stops")
 	player.global_position = main.settlement.position_for("plaza")
 
+	# --- animation -----------------------------------------------------------
+	check(player.animator != null, "the player owns an animator")
+	player.global_position = main.settlement.position_for("plaza") + Vector2(0, 220)
+	player.velocity = Vector2.ZERO
+	await frames(3)
+	check(player.animator.state == "idle", "a standing player animates idle")
+	Input.action_press("move_right")
+	await frames(10)
+	check(player.animator.state == "run" or player.animator.state == "walk", "moving switches the player clip (%s)" % player.animator.state)
+	Input.action_press("sprint")
+	await frames(10)
+	check(player.animator.state == "sprint", "sprinting switches to the sprint clip")
+	Input.action_release("sprint")
+	Input.action_release("move_right")
+	player.velocity = Vector2.ZERO
+	await frames(3)
+	check(player.animator.state == "idle", "stopping returns the player to idle")
+	player.global_position = main.settlement.position_for("plaza")
+
 	# --- combat --------------------------------------------------------------
 	var dummy := Dummy.new()
 	dummy.ilvl = 1
@@ -165,12 +185,17 @@ func _run() -> void:
 	player.cultivation.qi = player.cultivation.qi_max(player.stats)
 	player._facing = Vector2.RIGHT
 	var hp_before := dummy.hp
+	check(dummy.animator != null, "enemies own an animator")
 	player.try_attack()
+	await frames(1)
+	check(player.animator.state == "attack", "attacking switches to the attack clip")
+	check(player._attack_swing() <= 0.0, "the wind-up pose is drawn back before the strike")
 	var aim: Vector2 = player._facing.normalized()
 	dummy.global_position = player.global_position + aim * 36.0
 	await frames(30)
 	check(is_instance_valid(dummy) and dummy.hp < hp_before, "an attack damages an enemy through the frame machine")
 	check(player._attack_state == "idle", "the attack state machine returns to idle")
+	check(player.animator.state == "idle", "the player returns to an idle clip after the attack")
 
 	# --- questline -----------------------------------------------------------
 	player.global_position = main.elder.global_position

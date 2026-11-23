@@ -18,6 +18,8 @@ var attack_range := 48.0
 var damage := 7.0
 var aggressive := true
 
+var animator := Animator.new()
+
 var _flash := 0.0
 var _knock := Vector2.ZERO
 var _windup := 0.0
@@ -43,6 +45,8 @@ func _physics_process(delta: float) -> void:
 	_flash = maxf(0.0, _flash - delta)
 	_stagger = maxf(0.0, _stagger - delta)
 	_cooldown = maxf(0.0, _cooldown - delta)
+	animator.update(delta, velocity.length() / maxf(1.0, speed), false,
+		_windup > 0.0, false, _stagger > 0.0, false, _dead)
 
 	var knock_step := 900.0 * delta
 	_knock = _knock.move_toward(Vector2.ZERO, knock_step)
@@ -124,10 +128,14 @@ func _draw() -> void:
 		body = Color("#c8a050")
 	if _windup > 0.0:
 		body = Color("#e07040")
+
+	var pose := Animator.pose(animator.state, animator.time, 0.0)
+	draw_set_transform(pose["bob"], float(pose["lean"]), pose["squash"])
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(0, -RADIUS), Vector2(RADIUS, 0), Vector2(0, RADIUS), Vector2(-RADIUS, 0),
 	]), body)
 	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 24, Color("#2a1c1c"), 2.0)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	if _windup > 0.0:
 		draw_arc(Vector2.ZERO, attack_range, 0.0, TAU, 32, Color("#ff9060", 0.5), 2.0)

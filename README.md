@@ -94,6 +94,8 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Deterministic item generation: 4 rarities, tiered prefixes/suffixes, stable IDs, auto-equip.
 - Equipment and passives feed real combat stats through `StatBlock`.
 - Seamless streaming over a 12×12-chunk province with deterministic chunk regeneration.
+- Procedural animation: nine clips (idle, walk, run, sprint, attack, dodge, hurt, meditate, dead) with bob, lean, squash and limb swing on the player, NPCs and enemies.
+- Attack animation is driven by the same startup/active/recovery frame data as the hit window, so the strike pose cannot drift off the damaging frame.
 - Acceleration-based movement (2 400 u/s² accelerating, 3 000 braking), so turns plant instead of snapping.
 - Hold-to-sprint at 1.45×, and right-stick aiming that falls back to the mouse.
 - One input layer for keyboard, mouse and gamepad; rebinding a key never drops its gamepad button.
@@ -109,8 +111,8 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 
 ## Not implemented yet
 
-Character appearance and backgrounds; weather and seasons; animation (all characters are
-code-drawn shapes); fast travel and maps; physiques; method-specific cultivation
+Character appearance and backgrounds (all characters are still code-drawn shapes, now
+animated procedurally); weather and seasons; fast travel and maps; physiques; method-specific cultivation
 loops; mastery and manuals; alchemy, forging, professions and economy; NPC goals, memory,
 relationships, parties and independent progression; the twelve sects and faction politics;
 additional hidden-realm templates; dynamic world events; the main narrative and endgame;
