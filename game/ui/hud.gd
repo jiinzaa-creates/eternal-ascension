@@ -88,7 +88,7 @@ func draw_vitals(player: Player) -> void:
 	var root_label := String(root.get("name", "?"))
 	if not player.cultivation.identified:
 		root_label = "unread root"
-	_text(Vector2(x, y), "Root: %s   Method: %s" % [root_label, String(player.cultivation.method_data().get("name", "?"))], 12, MUTED)
+	_text(Vector2(x, y), "Root: %s   Method: %s (%d%%)" % [root_label, String(player.cultivation.method_data().get("name", "?")), player.cultivation.method_insight_points(player.cultivation.method_id)], 12, MUTED)
 	y += 18.0
 	_text(Vector2(x, y), "Physique: %s (tier %d)" % [Physiques.name_of(player.physique_id), Physiques.tier_of(player.physique_id)], 12, Color("#c8b8e8"))
 	y += 20.0

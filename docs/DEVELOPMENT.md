@@ -45,6 +45,25 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Cultivation methods: fit, insight, switching
+
+- Seven methods share one meditation loop and differ only by **mechanic** (`Methods.meditation_multiplier`):
+  traditional is always 1.0; body scales with STR; sword is 0.3 while calm and 1.7 within 6 s of combat
+  (`Player._combat_timer`); blood scales with `blood_charge`; slaughter with total kills; dual needs an NPC
+  within 110 px; heavenly needs `Clock.is_night()`.
+- **Requirements are structured** in `methods.json` (`requires.attrs`, `kills`, `physique_tier`, `realm`), not
+  parsed from the human-readable `requirement` line. `Methods.qualifies` is the single gate.
+- **Insight** is a per-method float 0–100. `meditate_tick` adds `delta * clamp(fit, 0, 2)`, so focused
+  method play builds it and idle wrong-method sitting barely does. It is stored fractionally (a per-frame
+  slice must still add up) and gives at most +20% to the method's own multiplier
+  (`effective_method_mult`).
+- **Blood charge** is the Blood Sea's fuel: `Player.on_kill` adds it (called from `_on_enemy_died`), meditating
+  spends it at 2/s. Capped at 100 and saved.
+- **Switching** happens at the method stele (`Kind.METHOD`) for `Methods.SWITCH_COST` (150 stones). It cycles
+  only through methods the character currently qualifies for, so a locked method cannot be bought by accident.
+  Origins still set the starting method for free, once, at run start.
+- `method_insight` and `blood_charge` are optional save keys; legacy saves start at zero insight and no charge.
+
 ## Techniques: mastery, teachers, observation
 
 - **Mastery is one stored integer per technique** (`Player.technique_xp`, id → xp). Tiers, labels and

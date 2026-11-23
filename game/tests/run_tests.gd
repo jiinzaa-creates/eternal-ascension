@@ -24,6 +24,7 @@ func _ready() -> void:
 	_physique_tests()
 	_passive_system_tests()
 	_technique_mastery_tests()
+	_method_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -750,6 +751,102 @@ func _technique_mastery_tests() -> void:
 	watcher.free()
 	restored.free()
 	legacy.free()
+
+
+# --------------------------------------------------------------- methods ----
+
+func _method_tests() -> void:
+	print("[methods] requirements, meditation fit, insight")
+	check(DB.methods.size() == 7, "all seven methods are defined (%d)" % DB.methods.size())
+	for method in DB.methods:
+		var id := String(method.get("id", ""))
+		check(float(method.get("cult_mult", 0.0)) > 0.0, "%s has a cultivation multiplier" % id)
+		check(String(method.get("mechanic", "")) != "", "%s names a mechanic" % id)
+		var method_attrs: Dictionary = (method.get("requires", {}) as Dictionary).get("attrs", {})
+		for key in method_attrs.keys():
+			check(Attributes.KEYS.has(String(key)), "%s requires a real attribute" % id)
+
+	var state := {"attrs": Attributes.new(), "realm": 1, "kills": 0, "physique_tier": 1}
+	check(bool(Methods.qualifies("method.traditional", state)["ok"]), "the traditional path is always open")
+	check(not bool(Methods.qualifies("method.body", state)["ok"]), "body tempering needs STR 18")
+	check(not bool(Methods.qualifies("method.sword", state)["ok"]), "the sword method needs DEX and WIS")
+	check(not bool(Methods.qualifies("method.slaughter", state)["ok"]), "the slaughter dao needs 50 kills")
+	check(not bool(Methods.qualifies("method.dual", state)["ok"]), "dual cultivation needs CHAR 20")
+	check(not bool(Methods.qualifies("method.heavenly", state)["ok"]), "heavenly absorption needs realm 2")
+	check(not bool(Methods.qualifies("method.nonexistent", state)["ok"]), "an unknown method is refused")
+
+	var strong := state.duplicate()
+	strong["attrs"] = Attributes.new()
+	strong["attrs"].add("str", 8)
+	check(bool(Methods.qualifies("method.body", strong)["ok"]), "STR 18 opens body tempering")
+	var bloody := state.duplicate()
+	bloody["physique_tier"] = 3
+	check(bool(Methods.qualifies("method.blood", bloody)["ok"]), "a stronger physique opens the blood sea")
+	var killer := state.duplicate()
+	killer["kills"] = 50
+	check(bool(Methods.qualifies("method.slaughter", killer)["ok"]), "50 kills open the slaughter dao")
+	var high_realm := state.duplicate()
+	high_realm["realm"] = 2
+	check(bool(Methods.qualifies("method.heavenly", high_realm)["ok"]), "realm 2 opens heavenly absorption")
+
+	check(is_equal_approx(Methods.meditation_multiplier("method.traditional", state), 1.0), "the traditional path meditates at baseline")
+	check(Methods.meditation_multiplier("method.body", strong) > Methods.meditation_multiplier("method.body", state), "body tempering feeds on strength")
+	check(is_equal_approx(Methods.meditation_multiplier("method.sword", state), 0.3), "a sword cultivator gains little from sitting")
+	var fighting := state.duplicate()
+	fighting["recent_combat"] = true
+	check(Methods.meditation_multiplier("method.sword", fighting) > 1.5, "sword intent feeds on combat")
+	var charged := state.duplicate()
+	charged["blood_charge"] = 100.0
+	check(Methods.meditation_multiplier("method.blood", charged) > Methods.meditation_multiplier("method.blood", state), "blood essence feeds the blood sea")
+	check(Methods.meditation_multiplier("method.slaughter", killer) > Methods.meditation_multiplier("method.slaughter", state), "the slaughter dao feeds on kills")
+	var partnered := state.duplicate()
+	partnered["partner"] = true
+	check(Methods.meditation_multiplier("method.dual", partnered) > Methods.meditation_multiplier("method.dual", state), "dual cultivation needs a partner")
+	var night := state.duplicate()
+	night["night"] = true
+	check(Methods.meditation_multiplier("method.heavenly", night) > Methods.meditation_multiplier("method.heavenly", state), "heavenly absorption feeds on the night sky")
+
+	check(is_equal_approx(Methods.insight_bonus(0), 1.0), "no insight is no bonus")
+	check(is_equal_approx(Methods.insight_bonus(100), 1.2), "insight caps at a fifth")
+	var options := Methods.available(state)
+	check(options.has("method.traditional"), "the traditional path is always available")
+	check(not options.has("method.slaughter"), "unqualified methods are not offered")
+	check(Methods.next("method.traditional", high_realm) != "method.traditional", "the stele cycles to another method")
+	check(Methods.next("method.traditional", state) == "method.traditional", "with one option the stele stays put")
+
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var cultivation := Cultivation.new()
+	cultivation.root_tier = 3
+	var plain := cultivation.effective_method_mult()
+	cultivation.add_method_insight("method.traditional", 100)
+	check(cultivation.effective_method_mult() > plain, "insight raises the method multiplier")
+	cultivation.add_method_insight("method.traditional", 50)
+	check(cultivation.method_insight_points("method.traditional") == 100, "insight is capped")
+	cultivation.add_blood_charge(150.0)
+	check(is_equal_approx(cultivation.blood_charge, 100.0), "blood charge is capped")
+	cultivation.consume_blood_charge(30.0)
+	check(is_equal_approx(cultivation.blood_charge, 70.0), "blood charge is spent")
+
+	var plain_qi := Cultivation.new()
+	plain_qi.root_tier = 3
+	plain_qi.cultivate(stats, 1.0, 1.0, 1.0)
+	var fed_qi := Cultivation.new()
+	fed_qi.root_tier = 3
+	fed_qi.cultivate(stats, 1.0, 1.0, 2.0)
+	check(fed_qi.qi > plain_qi.qi, "a good method fit doubles the Qi gain")
+
+	cultivation.method_id = "method.blood"
+	var saved := cultivation.to_dict()
+	var restored := Cultivation.new()
+	restored.from_dict(saved)
+	check(restored.method_id == "method.blood", "the method survives a save")
+	check(restored.method_insight_points("method.traditional") == 100, "insight survives a save")
+	check(is_equal_approx(restored.blood_charge, 70.0), "blood charge survives a save")
+	var legacy := Cultivation.new()
+	legacy.from_dict({})
+	check(legacy.method_insight.is_empty(), "legacy saves carry no insight")
+	check(is_equal_approx(legacy.blood_charge, 0.0), "legacy saves carry no blood charge")
 
 
 func _rng_tests() -> void:

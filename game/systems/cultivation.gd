@@ -18,6 +18,10 @@ var root_tier: int = 3
 var identified := false
 var purity_bonus := 0.0
 var method_id: String = "method.traditional"
+## Method id -> insight 0..100, earned by meditating well with that method.
+var method_insight: Dictionary = {}
+## Blood Sea resource: gained by kills, burned while meditating.
+var blood_charge: float = 0.0
 var breakthrough_attempts: int = 0
 var failures: int = 0
 
@@ -53,6 +57,31 @@ func method_mult() -> float:
 	return float(method_data().get("cult_mult", 1.0))
 
 
+func method_insight_points(id: String) -> int:
+	return int(round(float(method_insight.get(id, 0.0))))
+
+
+## The method's own multiplier plus the slow insight bonus for it.
+func effective_method_mult() -> float:
+	return method_mult() * Methods.insight_bonus(method_insight_points(method_id))
+
+
+## Fractional on purpose: a second of meditation must eventually count even
+## though each frame adds a small slice.
+func add_method_insight(id: String, amount: float) -> void:
+	if id == "" or amount <= 0.0:
+		return
+	method_insight[id] = clampf(float(method_insight.get(id, 0.0)) + amount, 0.0, 100.0)
+
+
+func add_blood_charge(amount: float) -> void:
+	blood_charge = clampf(blood_charge + amount, 0.0, 100.0)
+
+
+func consume_blood_charge(amount: float) -> void:
+	blood_charge = clampf(blood_charge - maxf(0.0, amount), 0.0, 100.0)
+
+
 func base_qi() -> float:
 	return 100.0 * float(realm_data().get("qi_mult", 1.0)) * (1.0 + 0.35 * float(sublevel - 1))
 
@@ -62,7 +91,7 @@ func qi_max(stats: StatBlock) -> float:
 
 
 func qi_gain_per_sec(stats: StatBlock, environment: float = 1.0) -> float:
-	return 4.0 * root_mult() * method_mult() * stats.cultivation_rate_mult() * maxf(environment, 0.0)
+	return 4.0 * root_mult() * effective_method_mult() * stats.cultivation_rate_mult() * maxf(environment, 0.0)
 
 
 ## Passive regeneration while not meditating. Small, but real: a wounded
@@ -78,11 +107,14 @@ func regenerate(stats: StatBlock, delta: float) -> float:
 	return qi - before
 
 
-## Meditating for `delta` seconds. Returns the Qi actually gained.
-func cultivate(stats: StatBlock, delta: float, environment: float = 1.0) -> float:
+## Meditating for `delta` seconds. `method_factor` is how well the current
+## moment feeds the method (see Methods.meditation_multiplier). Returns the Qi
+## actually gained.
+func cultivate(stats: StatBlock, delta: float, environment: float = 1.0, method_factor: float = 1.0) -> float:
 	var cap := qi_max(stats)
 	var before := qi
-	qi = minf(cap, qi + qi_gain_per_sec(stats, environment) * delta)
+	var gain := qi_gain_per_sec(stats, environment) * maxf(method_factor, 0.0) * delta
+	qi = minf(cap, qi + gain)
 	return qi - before
 
 
@@ -189,6 +221,8 @@ func to_dict() -> Dictionary:
 		"identified": identified,
 		"purity_bonus": purity_bonus,
 		"method_id": method_id,
+		"method_insight": method_insight.duplicate(),
+		"blood_charge": blood_charge,
 		"breakthrough_attempts": breakthrough_attempts,
 		"failures": failures,
 	}
@@ -203,5 +237,7 @@ func from_dict(data: Dictionary) -> void:
 	identified = bool(data.get("identified", true))
 	purity_bonus = clampf(float(data.get("purity_bonus", 0.0)), 0.0, Roots.PURITY_BONUS_MAX)
 	method_id = String(data.get("method_id", "method.traditional"))
+	method_insight = data.get("method_insight", {}).duplicate()
+	blood_charge = clampf(float(data.get("blood_charge", 0.0)), 0.0, 100.0)
 	breakthrough_attempts = int(data.get("breakthrough_attempts", 0))
 	failures = int(data.get("failures", 0))

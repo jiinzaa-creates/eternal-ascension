@@ -949,6 +949,43 @@ func _run() -> void:
 	check(int(player.observed.get("tech.formation.sealing_array", 0)) == 2, "observation progress survives a save")
 	player.observed.erase("tech.formation.sealing_array")
 
+	# --- cultivation methods ---------------------------------------------------
+	var method_stele: Interactable = _find_interactable(main.interactables, "method.stele")
+	check(method_stele != null, "the method stele stands by the shrine")
+	var stones_for_method: int = Game.spirit_stones
+	var previous_method: String = player.cultivation.method_id
+	Game.spirit_stones = 0
+	main._use_interactable(method_stele)
+	check(player.cultivation.method_id == previous_method, "the stele refuses without stones")
+	Game.spirit_stones = 500
+	main._use_interactable(method_stele)
+	check(player.cultivation.method_id != previous_method, "a qualified method can be adopted")
+	check(Game.spirit_stones == 500 - Methods.SWITCH_COST, "switching methods costs its stones")
+
+	player.cultivation.method_id = "method.traditional"
+	player.cultivation.qi = 0.0
+	var insight_before: int = player.cultivation.method_insight_points("method.traditional")
+	player.meditate_tick(1.0)
+	check(player.cultivation.qi > 0.0, "meditation gains Qi through the method")
+	check(player.cultivation.method_insight_points("method.traditional") >= insight_before, "meditation builds method insight")
+
+	player.cultivation.method_id = "method.blood"
+	player.cultivation.blood_charge = 0.0
+	player.on_kill(3)
+	var charge_after_kill: float = player.cultivation.blood_charge
+	check(charge_after_kill > 0.0, "kills charge the blood method")
+	player.meditate_tick(1.0)
+	check(player.cultivation.blood_charge < charge_after_kill, "meditation spends blood essence")
+	check(player.cultivation.method_insight_points("method.blood") > 0, "the blood method builds its own insight")
+	Game.spirit_stones = stones_for_method
+
+	main._save(87)
+	main._load_game(87)
+	await frames(2)
+	check(player.cultivation.method_id == "method.blood", "the method survives a save")
+	check(player.cultivation.blood_charge > 0.0, "blood essence survives a save")
+	check(player.cultivation.method_insight_points("method.blood") > 0, "method insight survives a save")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

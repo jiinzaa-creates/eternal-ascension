@@ -288,6 +288,13 @@ func _spawn_interactables() -> void:
 	world.add_child(manual)
 	interactables.append(manual)
 
+	# Method stele: reshapes your circulation for a price, gated on requirements.
+	var method_stele := Interactable.new()
+	method_stele.setup_method("method.stele", "Method stele")
+	method_stele.position = settlement.position_for("shrine") + Vector2(112, -26)
+	world.add_child(method_stele)
+	interactables.append(method_stele)
+
 	# A disciple practising a technique nobody wrote down: watch and learn.
 	var demonstration := Interactable.new()
 	demonstration.setup_demonstration("training.falling_petal", "Practising disciple — Falling Petal Cut",
@@ -909,6 +916,25 @@ func _try_interact() -> void:
 
 
 ## Rui sells one cut to anyone who meets its requirements and can pay.
+func _cycle_method() -> void:
+	var state := player.method_state()
+	var next_id := Methods.next(player.cultivation.method_id, state)
+	if next_id == "":
+		Bus.toast.emit("The stele shows you nothing you qualify for.")
+		return
+	if next_id == player.cultivation.method_id:
+		Bus.toast.emit("No other method answers you yet.")
+		return
+	if Game.spirit_stones < Methods.SWITCH_COST:
+		Bus.toast.emit("The stele wants %d stones to reshape a meridian." % Methods.SWITCH_COST)
+		return
+	Game.spirit_stones -= Methods.SWITCH_COST
+	player.cultivation.method_id = next_id
+	var method: Dictionary = DB.by_id("method", next_id)
+	Bus.toast.emit("The stele reshapes your circulation: %s." % String(method.get("name", next_id)))
+	Bus.cultivation_changed.emit()
+
+
 func _teach_technique() -> void:
 	var tech_id := "tech.sword.falling_petal"
 	var price := 180
@@ -1016,6 +1042,8 @@ func _use_interactable(node: Interactable) -> void:
 				Bus.cultivation_changed.emit()
 			else:
 				Bus.toast.emit("You already know what this manual teaches.")
+		Interactable.Kind.METHOD:
+			_cycle_method()
 		Interactable.Kind.DEMONSTRATION:
 			var watched := player.observe_technique(node.demo_technique)
 			var demo: Dictionary = DB.technique(node.demo_technique)
@@ -1345,6 +1373,8 @@ func _on_weather_changed(weather: Dictionary) -> void:
 
 
 func _on_enemy_died(at: Vector2, ilvl: int) -> void:
+	if player != null:
+		player.on_kill(ilvl)
 	var generator := ItemGen.new(DB, Rng)
 	var item := generator.generate(maxi(1, ilvl + player.cultivation.realm), Game.kills + 1000, ground_items.size())
 	if not item.is_empty():

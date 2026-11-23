@@ -204,6 +204,16 @@ func validate() -> Array:
 
 	if methods.is_empty():
 		problems.append("no cultivation methods defined")
+	for m in methods:
+		var method_id := String(m.get("id", "?"))
+		if float(m.get("cult_mult", 0.0)) <= 0.0:
+			problems.append("method %s has no cultivation multiplier" % method_id)
+		if String(m.get("mechanic", "")) == "":
+			problems.append("method %s has no mechanic" % method_id)
+		var method_attrs: Dictionary = (m.get("requires", {}) as Dictionary).get("attrs", {})
+		for key in method_attrs.keys():
+			if not Attributes.KEYS.has(String(key)):
+				problems.append("method %s requires unknown attribute %s" % [method_id, String(key)])
 	if techniques.size() < 6:
 		problems.append("expected at least 6 techniques, found %d" % techniques.size())
 	for t in techniques:

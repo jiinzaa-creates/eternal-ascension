@@ -1,0 +1,96 @@
+class_name Methods
+extends RefCounted
+## Cultivation methods: who may practise one, and how well the current moment
+## feeds it.
+##
+## Every method's `mechanic` is a different input to the same meditation loop:
+## sitting is strong for the traditional path and nearly worthless for a sword
+## cultivator between fights. The multiplier is pure so the whole matrix can be
+## tested without a player, a clock or a world.
+
+const SWITCH_COST := 150
+
+
+static func all() -> Array:
+	return DB.methods
+
+
+static func find(id: String) -> Dictionary:
+	return DB.by_id("method", id)
+
+
+static func qualifies(id: String, state: Dictionary) -> Dictionary:
+	var method := find(id)
+	if method.is_empty():
+		return {"ok": false, "reason": "unknown method"}
+	var req: Dictionary = method.get("requires", {})
+	var min_realm := int(req.get("realm", 0))
+	if int(state.get("realm", 0)) < min_realm:
+		return {"ok": false, "reason": "realm %d" % min_realm}
+	var min_kills := int(req.get("kills", 0))
+	if int(state.get("kills", 0)) < min_kills:
+		return {"ok": false, "reason": "%d kills" % min_kills}
+	var min_tier := int(req.get("physique_tier", 0))
+	if min_tier > 0 and int(state.get("physique_tier", 0)) < min_tier:
+		return {"ok": false, "reason": "physique tier %d" % min_tier}
+	var attrs: Variant = state.get("attrs", null)
+	var min_attr: Dictionary = req.get("attrs", {})
+	for key in min_attr.keys():
+		var have := 0
+		if attrs != null:
+			have = (attrs as Attributes).get_attr(String(key))
+		var need := int(min_attr[key])
+		if have < need:
+			return {"ok": false, "reason": "%s %d" % [String(key).to_upper(), need]}
+	return {"ok": true, "reason": ""}
+
+
+## How productive meditation is right now for this method. 1.0 is the baseline
+## the traditional path always gets; the others trade it for conditions.
+static func meditation_multiplier(id: String, state: Dictionary) -> float:
+	var method := find(id)
+	var mechanic := String(method.get("mechanic", "qi_accumulation"))
+	match mechanic:
+		"physical_conditioning":
+			var attrs: Variant = state.get("attrs", null)
+			var strength := 0.0
+			if attrs != null:
+				strength = float((attrs as Attributes).get_attr("str"))
+			return clampf(0.5 + Attributes.soft(strength, 30.0) / 30.0 * 0.9, 0.3, 1.5)
+		"sword_intent":
+			return 1.7 if bool(state.get("recent_combat", false)) else 0.3
+		"blood_essence":
+			return 0.4 + clampf(float(state.get("blood_charge", 0.0)), 0.0, 100.0) / 100.0 * 1.2
+		"kills":
+			return 1.0 + clampf(float(state.get("kills", 0)), 0.0, 100.0) * 0.006
+		"partner":
+			return 1.5 if bool(state.get("partner", false)) else 0.35
+		"celestial":
+			return 1.8 if bool(state.get("night", false)) else 0.35
+		_:
+			return 1.0
+
+
+## Insight is a long, slow bonus: at most +20% to the method's own multiplier.
+static func insight_bonus(insight: int) -> float:
+	return 1.0 + clampf(float(insight), 0.0, 100.0) * 0.002
+
+
+static func available(state: Dictionary) -> Array:
+	var out: Array = []
+	for method in all():
+		var id := String(method.get("id", ""))
+		if bool(qualifies(id, state)["ok"]):
+			out.append(id)
+	return out
+
+
+## The stele cycles, so a method nobody qualifies for is simply skipped.
+static func next(current: String, state: Dictionary) -> String:
+	var options := available(state)
+	if options.is_empty():
+		return ""
+	var index := options.find(current)
+	if index < 0:
+		return String(options[0])
+	return String(options[(index + 1) % options.size()])

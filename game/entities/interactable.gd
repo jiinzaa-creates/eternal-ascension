@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -59,6 +59,10 @@ func setup_manual(id_value: String, label_value: String, technique_id: String) -
 func setup_passive_manual(id_value: String, label_value: String, passive_id: String) -> void:
 	setup(Kind.MANUAL, id_value, label_value)
 	manual_passive = passive_id
+
+
+func setup_method(id_value: String, label_value: String) -> void:
+	setup(Kind.METHOD, id_value, label_value)
 
 
 func setup_demonstration(id_value: String, label_value: String, technique_id: String) -> void:
@@ -137,6 +141,8 @@ func display_label() -> String:
 		return "Searched %s" % label
 	if kind == Kind.INN:
 		return "%s — %d stones" % [label, Economy.rest_cost()]
+	if kind == Kind.METHOD:
+		return "%s — %d stones" % [label, Methods.SWITCH_COST]
 	return label
 
 
@@ -214,6 +220,12 @@ func _draw() -> void:
 			draw_line(Vector2(0, -17), Vector2(0, -6), Color("#8a7a5a"), 3.0)
 			draw_arc(Vector2(0, -14), 20.0, -1.1 + pulse * 0.5, 0.9 + pulse * 0.5, 16,
 				Color("#d8a0c0", 0.65), 2.0)
+		Kind.METHOD:
+			# A method stele: dark stone, carved channels, a slow inner light.
+			draw_rect(Rect2(-9, -30, 18, 38), Color("#2e2a34"))
+			draw_rect(Rect2(-13, 4, 26, 6), Color("#3a3442"))
+			draw_line(Vector2(0, -26), Vector2(0, 2), Color("#8f7fbf", 0.5 + pulse * 0.4), 1.5)
+			draw_arc(Vector2(0, -14), 6.0 + pulse * 2.0, 0.0, TAU, 18, Color("#b0a0ff", 0.35), 1.0)
 		Kind.EXAMINE:
 			draw_rect(Rect2(-7, -6, 14, 10), Color("#4a4a44"))
 			draw_rect(Rect2(-4, -26, 8, 20), Color("#5c5c54"))

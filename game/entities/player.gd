@@ -54,6 +54,8 @@ var _dodge_timer := 0.0
 var _dodge_cooldown := 0.0
 var _iframes := 0.0
 var _meditating := false
+## Seconds of "recent combat" left; the Sword Heart method feeds on it.
+var _combat_timer := 0.0
 var _facing := Vector2.RIGHT
 var _arc_flash := 0.0
 var _arc_radius := 70.0
@@ -282,7 +284,7 @@ func _physics_process(delta: float) -> void:
 
 	if _meditating:
 		velocity = Vector2.ZERO
-		var gained := cultivation.cultivate(stats, delta, environment_bonus())
+		var gained := meditate_tick(delta)
 		if gained > 0.0:
 			cultivation_changed()
 			if cultivation.is_full(stats):
@@ -338,6 +340,7 @@ func _aim_dir() -> Vector2:
 
 
 func _tick_timers(delta: float) -> void:
+	_combat_timer = maxf(0.0, _combat_timer - delta)
 	_cooldown = maxf(0.0, _cooldown - delta)
 	_dodge_cooldown = maxf(0.0, _dodge_cooldown - delta)
 	_dodge_timer = maxf(0.0, _dodge_timer - delta)
@@ -425,6 +428,7 @@ func _strike() -> void:
 	var knock := Damage.knockback(tech, stats)
 	var lifesteal := float(tech.get("lifesteal", 0.0)) + stats.lifesteal()
 
+	_combat_timer = 6.0
 	_arc_flash = 0.13
 	_arc_radius = radius
 	_arc_angle = arc
@@ -458,6 +462,7 @@ func armor() -> float:
 func take_hit(amount: float, _from: Vector2 = Vector2.ZERO, can_evade: bool = true) -> void:
 	if _iframes > 0.0 or hp <= 0.0:
 		return
+	_combat_timer = 6.0
 	if can_evade and stats.evasion_chance() > 0.0:
 		_evade_counter += 1
 		var roll := float(Rng.roll_float("evade", Game.kills * 977 + _evade_counter, cultivation.realm))
@@ -486,6 +491,44 @@ func _die() -> void:
 	_iframes = 2.0
 	Bus.cultivation_changed.emit()
 	Bus.player_stats_changed.emit()
+
+
+## What the method rules read right now. Pure data, no side effects.
+func method_state() -> Dictionary:
+	var partner := false
+	if is_inside_tree():
+		for npc in get_tree().get_nodes_in_group("npc"):
+			var node := npc as Node2D
+			if node != null and node.global_position.distance_to(global_position) < 110.0:
+				partner = true
+				break
+	return {
+		"attrs": attrs,
+		"realm": cultivation.realm,
+		"kills": Game.kills,
+		"physique_tier": Physiques.tier_of(physique_id),
+		"recent_combat": _combat_timer > 0.0,
+		"blood_charge": cultivation.blood_charge,
+		"partner": partner,
+		"night": Clock.is_night(),
+	}
+
+
+## One meditation step: Qi, method insight, and the blood method's fuel.
+func meditate_tick(delta: float) -> float:
+	var state := method_state()
+	var factor := Methods.meditation_multiplier(cultivation.method_id, state)
+	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
+	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
+	if cultivation.method_id == "method.blood" and cultivation.blood_charge > 0.0:
+		cultivation.consume_blood_charge(delta * 2.0)
+	return gained
+
+
+## Kills feed the blood method; other methods ignore them.
+func on_kill(ilvl: int = 1) -> void:
+	if cultivation.method_id == "method.blood":
+		cultivation.add_blood_charge(3.0 + float(maxi(1, ilvl)) * 2.0)
 
 
 func toggle_meditation() -> void:
