@@ -45,6 +45,21 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Continent
+
+- `Continent.generate(seed)` is pure and builds the whole geography as data: cells, land mask,
+  terrain, unique region names, neighbours and distance tiers.
+- **Connectivity is built in, not repaired afterwards**: land grows outward from `CAPITAL`, so no
+  region can ever be stranded, and a minimum region count is forced so unlucky rolls cannot make a
+  two-cell continent. Any change to generation must preserve both properties.
+- Only `CAPITAL` is playable; every other region is geography until travel exists. `region_for_world_position`
+  is the single place that assumption lives — travel will replace it, not the map.
+- Nothing about the continent is saved: it is a function of the world seed, like the province.
+- `WorldMap` reads `Continent` data only and draws; it never generates. Layout maths lives in
+  `Continent.map_rect` so it is testable without a `Control`.
+- While the map is open, play is frozen by disabling both player loops. Do not render an opaque
+  overlay without doing this.
+
 ## Streaming
 
 - Generation is split in two: `ChunkGen.payload_for(coord, seed)` returns **plain data only**

@@ -211,7 +211,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB attack · SPACE dodge · F meditate · G breakthrough · E interact · 1-6 technique · F5 save · F9 load · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB attack · SPACE dodge · F meditate · G breakthrough · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))
 	var pad := "Gamepad: left stick move · right stick aim · X attack · A dodge · B interact · Y meditate · RB sprint"
 	_text(Vector2(24.0, size.y - 28.0), pad, 11, Color("#6b7b84"))

@@ -24,6 +24,7 @@ func _ready() -> void:
 	_combat_tests()
 	_world_tests()
 	_chunk_delta_tests()
+	_continent_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -456,6 +457,76 @@ func _chunk_delta_tests() -> void:
 	check(threaded_manager.chunk_count() == 25, "worker threads fill the ring too (%d)" % threaded_manager.chunk_count())
 	check(threaded_manager.signature_at(Vector2i(5, 5)) == ChunkGen.signature_for(Vector2i(5, 5), 4242), "threaded chunks match the pure generator")
 	threaded_manager.queue_free()
+
+
+# ------------------------------------------------------------- continent ----
+
+func _continent_tests() -> void:
+	print("[continent] land, names, connectivity and map layout")
+	var data := Continent.generate(777)
+	check((data["cells"] as Array).size() == Continent.COLS * Continent.ROWS, "the continent is a %dx%d lattice" % [Continent.COLS, Continent.ROWS])
+	check(int(data["capital"]) == Continent.index_of(Continent.CAPITAL), "the capital is the playable cell")
+	check(bool((data["cells"] as Array)[int(data["capital"])]["land"]), "the capital cell is always land")
+
+	var regions: Array = data["regions"]
+	check(regions.size() >= Continent.MIN_REGIONS, "a continent has at least %d regions (%d)" % [Continent.MIN_REGIONS, regions.size()])
+	check(regions.size() <= Continent.COLS * Continent.ROWS, "there cannot be more regions than cells")
+
+	var names := {}
+	for region in regions:
+		names[String(region["name"])] = true
+	check(names.size() == regions.size(), "region names are unique")
+
+	var region_map := {}
+	for region in regions:
+		region_map[int(region["index"])] = region
+	var capital_region: Dictionary = region_map[int(data["capital"])]
+	check(bool(capital_region["capital"]), "the capital region is flagged")
+	check(int(capital_region["tier"]) == 1, "the capital is tier one")
+
+	var seen := {int(data["capital"]): true}
+	var queue: Array = [int(data["capital"])]
+	while not queue.is_empty():
+		var current: int = queue.pop_front()
+		for neighbour in (region_map[current] as Dictionary)["neighbours"]:
+			if not seen.has(int(neighbour)):
+				seen[int(neighbour)] = true
+				queue.append(int(neighbour))
+	check(seen.size() == regions.size(), "every land region connects to the capital (%d/%d)" % [seen.size(), regions.size()])
+
+	var every_tier := true
+	for region in regions:
+		if int(region["tier"]) < 1:
+			every_tier = false
+	check(every_tier, "every region has a distance tier")
+
+	var mask := ""
+	for cell in data["cells"]:
+		mask += "1" if bool(cell["land"]) else "0"
+	var repeat := Continent.generate(777)
+	var repeat_mask := ""
+	for cell in repeat["cells"]:
+		repeat_mask += "1" if bool(cell["land"]) else "0"
+	check(mask == repeat_mask, "the same seed redraws the same land")
+	check(String(data["name"]) == String(repeat["name"]), "the continent keeps its name across generations")
+
+	var other_mask := ""
+	for cell in Continent.generate(778)["cells"]:
+		other_mask += "1" if bool(cell["land"]) else "0"
+	check(mask != other_mask, "a different seed redraws the land")
+
+	check(Continent.region_for_world_position(Vector2(5632, 5632)) == int(data["capital"]), "the playable province is the capital region")
+	check(int(Continent.region_by_index(data, int(data["capital"]))["index"]) == int(data["capital"]), "regions can be looked up by index")
+	check(Continent.region_by_index(data, -5).is_empty(), "an unknown region index returns nothing")
+
+	var area := Rect2(0, 0, 500, 400)
+	var first := Continent.map_rect(Vector2i(0, 0), area)
+	var east := Continent.map_rect(Vector2i(1, 0), area)
+	var south := Continent.map_rect(Vector2i(0, 1), area)
+	check(area.encloses(first) and area.encloses(east) and area.encloses(south), "map cells stay inside the drawing area")
+	check(east.position.x > first.position.x and south.position.y > first.position.y, "map cells advance east and south")
+	check(not first.intersects(east), "map cells do not overlap")
+	check(Continent.coord_of(Continent.index_of(Vector2i(3, 2))) == Vector2i(3, 2), "cell coordinates round trip")
 
 
 # -------------------------------------------------------------------- npc ----

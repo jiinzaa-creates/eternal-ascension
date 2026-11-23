@@ -22,6 +22,9 @@ var elder: Npc
 var world: Node2D
 var camera_rig: CameraRig
 var lighting: WorldLighting
+## Continent geography, derived from the seed and never saved.
+var continent: Dictionary = {}
+var world_map: WorldMap
 var interactables: Array = []
 var ground_items: Array = []
 var quests: QuestLog
@@ -47,6 +50,7 @@ var _npc_index := 0
 
 func _ready() -> void:
 	Game.new_run()
+	continent = Continent.generate(Game.world_seed)
 	DisplayPolicy.apply(get_window())
 	get_window().size_changed.connect(_on_window_resized)
 	_root_rng = Rng.stream("root_roll", 0)
@@ -122,6 +126,9 @@ func _build_hud() -> void:
 	hud = Hud.new()
 	hud.host = self
 	layer.add_child(hud)
+	world_map = WorldMap.new()
+	layer.add_child(world_map)
+	world_map.setup(continent, Continent.region_for_world_position(player.global_position))
 
 
 func _spawn_npcs() -> void:
@@ -316,6 +323,10 @@ func _begin_run() -> void:
 func _process(delta: float) -> void:
 	if player == null:
 		return
+	# The continent map is a reading screen: it freezes play instead of letting
+	# the player walk blind behind an opaque overlay.
+	if world_map != null and world_map.visible:
+		return
 	# The province is hidden inside a realm: streaming there would load chunks
 	# for tomb coordinates and spawn props under the tomb floor.
 	chunks.today = Clock.day
@@ -373,6 +384,17 @@ func _on_window_resized() -> void:
 	DisplayPolicy.apply(get_window())
 
 
+func toggle_map() -> void:
+	if world_map == null or player == null or phase == "creation":
+		return
+	world_map.toggle()
+	if world_map.visible:
+		world_map.setup(continent, Continent.region_for_world_position(player.global_position))
+	# Freeze both loops, so an open map is not a blind walk.
+	player.set_physics_process(not world_map.visible)
+	player.set_process(not world_map.visible)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if phase == "creation":
 		if event.is_action_pressed("accept"):
@@ -392,6 +414,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("quick_save"):
 		_save(1)
+	elif event.is_action_pressed("map"):
+		toggle_map()
 	elif event.is_action_pressed("quick_load"):
 		_load_game(1)
 	elif event.is_action_pressed("toggle_help"):

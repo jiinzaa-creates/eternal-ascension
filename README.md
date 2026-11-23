@@ -28,6 +28,7 @@ an inheritance, and a crash-safe save system.
 | Select technique (slots 1–6) | 1 – 6 |
 | Quick save / quick load | F5 / F9 |
 | Zoom camera in / out | Mouse wheel, `=` / `-` |
+| Continent map | M |
 | Toggle help | F1 |
 
 Gamepad: left stick moves, right stick aims, **X** attacks, **A** dodges, **B** interacts,
@@ -96,6 +97,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Seamless streaming over a 12×12-chunk province: pure payload generation on worker threads, nodes built on the main thread, and a deterministic seed identity for every chunk.
 - Chunk deltas: harvested resources are remembered per chunk with the day they were taken, saved with the run, and restored when the chunk streams back in.
 - Background regrowth: chunk herbs return a few days after being harvested, evaluated from the clock when the chunk reloads rather than ticked per frame.
+- Continent geography: a seeded 5×4 lattice of named land regions with terrain, distance tiers from the capital, enforced connectivity, and a code-drawn map (M) that shows where the playable province sits; nothing about it is stored.
 - Weather and seasons: four 30-day seasons, six weather kinds drawn from a per-season table, deterministic weather per six-hour block of a given seed, weather-driven ambient light and storm flashes, and a cultivation rate that rain thins and storms charge.
 - Interaction: doors that open a building's interior, one-shot containers with deterministic loot, technique manuals, and repeatable examination of scenery.
 - Procedural animation: nine clips (idle, walk, run, sprint, attack, dodge, hurt, meditate, dead) with bob, lean, squash and limb swing on the player, NPCs and enemies.
@@ -116,7 +118,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 ## Not implemented yet
 
 Character appearance and backgrounds (all characters are still code-drawn shapes, now
-animated procedurally); fast travel and maps; physiques; method-specific cultivation
+animated procedurally); travel between provinces; physiques; method-specific cultivation
 loops; mastery and manuals; alchemy, forging, professions and economy; NPC goals, memory,
 relationships, parties and independent progression; the twelve sects and faction politics;
 additional hidden-realm templates; dynamic world events; the main narrative and endgame;

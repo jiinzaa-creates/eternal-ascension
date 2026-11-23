@@ -89,6 +89,20 @@ func _run() -> void:
 	check(main.interactables.size() >= 5, "world interactables exist (shrine, herbs, rift)")
 	check(not main.elder == null, "the quest giver exists")
 
+	# --- continent geography --------------------------------------------------
+	check(not main.continent.is_empty(), "the run has a continent")
+	check(Continent.region_for_world_position(player.global_position) == int(main.continent["capital"]), "the playable province is the capital region")
+	check(bool(Continent.region_by_index(main.continent, int(main.continent["capital"]))["capital"]), "the capital region is marked on the continent")
+	check(main.world_map != null, "the run owns a continent map")
+	check(not main.world_map.visible, "the map starts closed")
+	main.toggle_map()
+	check(main.world_map.visible, "the map opens")
+	check(main.world_map.region_count() == (main.continent["regions"] as Array).size(), "the map shows every region")
+	check(not player.is_physics_processing(), "the map freezes the player")
+	main.toggle_map()
+	check(not main.world_map.visible, "the map closes")
+	check(player.is_physics_processing() and player.is_processing(), "closing the map restores the player")
+
 	var npc: Npc = main.npcs[0]
 	check(npc.animator != null, "scheduled NPCs own an animator")
 	await frames(3)
