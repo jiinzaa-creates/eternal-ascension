@@ -20,6 +20,7 @@ func _ready() -> void:
 	_stat_pipeline_tests()
 	_extreme_tests()
 	_secondary_tests()
+	_root_system_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -412,6 +413,75 @@ func _secondary_tests() -> void:
 	var derived := plain.derived()
 	check(derived.has("evasion") and derived.has("penetration") and derived.has("cooldown_reduction"), "derived exposes the secondary stats")
 	check(derived.has("crit_multiplier") and derived.has("health_regen") and derived.has("lifespan"), "derived exposes survival stats")
+
+
+# ---------------------------------------------------------------- roots ----
+
+func _root_system_tests() -> void:
+	print("[roots] appraisal, hidden purity, marrow and evolution")
+	var cultivation := Cultivation.new()
+	cultivation.root_tier = 3
+	cultivation.purity_bonus = 0.2
+	cultivation.identified = false
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var base_purity := float(cultivation.root_data().get("purity", 0.55))
+	check(approx(cultivation.effective_purity(), base_purity), "an unread root uses only its base purity")
+	var unread_qi := cultivation.qi_max(stats)
+	var unread_regen := cultivation.qi_regen_per_sec(stats)
+	cultivation.identified = true
+	check(approx(cultivation.effective_purity(), minf(1.0, base_purity + 0.2)), "a read root adds its hidden purity")
+	check(cultivation.qi_max(stats) >= unread_qi, "reading a root never lowers Qi capacity")
+	check(cultivation.qi_regen_per_sec(stats) > unread_regen, "reading a root never lowers Qi regeneration")
+
+	var evolved := Cultivation.new()
+	evolved.root_tier = 2
+	var before := evolved.root_mult()
+	evolved.root_tier = 3
+	check(evolved.root_mult() > before, "a higher tier multiplies cultivation more")
+
+	check(Roots.evolve_cost(3) > Roots.evolve_cost(2), "evolution costs more at higher tiers")
+	var blocked := Roots.can_evolve(Roots.MAX_TIER, 5, 999999)
+	check(not bool(blocked["ok"]) and String(blocked["reason"]) == "max_tier", "the twelfth tier cannot evolve")
+	blocked = Roots.can_evolve(3, 0, 999999)
+	check(not bool(blocked["ok"]) and String(blocked["reason"]) == "no_marrow", "evolution needs marrow")
+	blocked = Roots.can_evolve(3, 1, 0)
+	check(not bool(blocked["ok"]) and String(blocked["reason"]) == "no_stones", "evolution needs stones")
+	var allowed := Roots.can_evolve(3, 1, Roots.evolve_cost(3))
+	check(bool(allowed["ok"]) and int(allowed["cost"]) == Roots.evolve_cost(3), "marrow and stones allow evolution")
+
+	var purity_a := Roots.roll_purity_bonus(42)
+	check(approx(purity_a, Roots.roll_purity_bonus(42)), "purity rolls are deterministic")
+	check(purity_a >= 0.0 and purity_a <= Roots.PURITY_BONUS_MAX, "purity rolls stay in range")
+
+	check(Roots.marrow_found(Vector2i(4, 9), "mine") == Roots.marrow_found(Vector2i(4, 9), "mine"), "marrow drops are deterministic per site")
+	var hits := 0
+	for x in 20:
+		for y in 15:
+			if Roots.marrow_found(Vector2i(x, y), "mine"):
+				hits += 1
+	var ratio := float(hits) / 300.0
+	check(ratio > 0.15 and ratio < 0.6, "marrow is findable but not everywhere (%.2f)" % ratio)
+
+	check(Roots.purity_label(1.0) == "flawless", "purity reads as a word")
+	check(Roots.purity_label(0.0) == "muddy", "low purity reads as muddy")
+	check(Roots.affinity_text(cultivation.root_data()) != "", "affinities are listed")
+	check(Roots.describe(cultivation.root_data(), 0.9).contains(String(cultivation.root_data().get("name", ""))), "a root describes itself")
+
+	var round_trip := Cultivation.new()
+	round_trip.identified = false
+	round_trip.purity_bonus = 0.11
+	var data := round_trip.to_dict()
+	var loaded := Cultivation.new()
+	loaded.from_dict(data)
+	check(not loaded.identified and approx(loaded.purity_bonus, 0.11), "appraisal state survives a save")
+	var legacy := Cultivation.new()
+	legacy.from_dict({"realm": 2, "root_tier": 4})
+	check(legacy.identified, "legacy saves keep the root they were played with")
+	check(legacy.purity_bonus == 0.0, "legacy saves add no hidden purity")
+	var wild := Cultivation.new()
+	wild.from_dict({"purity_bonus": 9.0})
+	check(wild.purity_bonus == Roots.PURITY_BONUS_MAX, "a wild purity bonus is clamped")
 
 
 func _rng_tests() -> void:

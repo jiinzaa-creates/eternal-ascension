@@ -85,7 +85,10 @@ func draw_vitals(player: Player) -> void:
 	_text(Vector2(x, y), player.cultivation.stage_label(), 19, ACCENT)
 	y += 20.0
 	var root: Dictionary = player.cultivation.root_data()
-	_text(Vector2(x, y), "Root: %s   Method: %s" % [String(root.get("name", "?")), String(player.cultivation.method_data().get("name", "?"))], 12, MUTED)
+	var root_label := String(root.get("name", "?"))
+	if not player.cultivation.identified:
+		root_label = "unread root"
+	_text(Vector2(x, y), "Root: %s   Method: %s" % [root_label, String(player.cultivation.method_data().get("name", "?"))], 12, MUTED)
 	y += 20.0
 
 	_bar(Vector2(x, y), Vector2(196.0, 10.0), player.hp / maxf(1.0, player.hp_max), Color("#d05050"),

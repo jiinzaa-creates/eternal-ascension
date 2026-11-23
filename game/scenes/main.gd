@@ -69,6 +69,7 @@ var _spawn_timer := 0.0
 var _help_visible := true
 var _hazard_accum := 0.0
 var _npc_index := 0
+var _root_rolls := 0
 
 
 func _ready() -> void:
@@ -136,6 +137,8 @@ func _spawn_player() -> void:
 	world.add_child(player)
 	player.display_name = _random_name()
 	player.cultivation.root_tier = _roll_root()
+	player.cultivation.purity_bonus = _roll_purity()
+	player.cultivation.identified = false
 	player.spawn_point = player.position
 
 	camera_rig = CameraRig.new()
@@ -289,6 +292,13 @@ func _spawn_interactables() -> void:
 	world.add_child(stele)
 	interactables.append(stele)
 
+	# Root appraisal and evolution, beside the shrine that reads meridians.
+	var pavilion := Interactable.new()
+	pavilion.setup(Interactable.Kind.ROOT, "root.pavilion", "Root-Reading Pavilion — appraise or evolve")
+	pavilion.position = settlement.position_for("shrine") + Vector2(-84, 62)
+	world.add_child(pavilion)
+	interactables.append(pavilion)
+
 	var board := Interactable.new()
 	board.setup_examine("board.market", "Market notice board",
 		"Notices: a bounty on marsh boars, a lost jade comb, and a warning not to enter the eastern rift.")
@@ -308,6 +318,11 @@ func _spawn_interactables() -> void:
 	inn.position = settlement.position_for("tavern") + Vector2(-74, 46)
 	world.add_child(inn)
 	interactables.append(inn)
+
+
+func _roll_purity() -> float:
+	_root_rolls += 1
+	return Roots.roll_purity_bonus(_root_rolls)
 
 
 func _roll_root() -> int:
@@ -730,6 +745,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.is_action_pressed("reroll"):
 			player.cultivation.root_tier = _roll_root()
+			player.cultivation.purity_bonus = _roll_purity()
+			player.cultivation.identified = false
 			player.rebuild_stats()
 			Bus.cultivation_changed.emit()
 			Bus.toast.emit("Your root shifts.")
@@ -940,6 +957,9 @@ func _use_interactable(node: Interactable) -> void:
 			if node.used:
 				return
 			_loot(node, 5, "ruin cache", 1)
+			if Roots.marrow_found(node.chunk_coord, "ruin"):
+				player.pick_up(_make_marrow())
+				Bus.toast.emit("Among the rubble: a knot of root marrow.")
 			_award_discovery(node, 40)
 		Interactable.Kind.MINE:
 			if node.used:
@@ -947,6 +967,9 @@ func _use_interactable(node: Interactable) -> void:
 			_mark_spent(node)
 			player.pick_up(_make_ore())
 			Bus.toast.emit("Mined spirit ore from the vein.")
+			if Roots.marrow_found(node.chunk_coord, "mine"):
+				player.pick_up(_make_marrow())
+				Bus.toast.emit("A knot of root marrow comes loose from the rock.")
 			_award_discovery(node, 25)
 		Interactable.Kind.DEPOSIT:
 			if node.used:
@@ -956,6 +979,8 @@ func _use_interactable(node: Interactable) -> void:
 			Bus.player_stats_changed.emit()
 			Bus.toast.emit("Gathered 25 spirit stones from the deposit.")
 			_award_discovery(node, 15)
+		Interactable.Kind.ROOT:
+			_use_root_pavilion()
 
 
 ## Spends a node: streamed resources record a chunk delta with their own regrow
@@ -998,6 +1023,85 @@ func _award_discovery(node: Interactable, reward: int) -> void:
 	}
 	Game.spirit_stones += reward
 	Bus.toast.emit("Discovery — %s (+%d spirit stones)." % [node.label, reward])
+
+
+# ------------------------------------------------------------- roots ----
+
+## Appraises an unread root, then evolves it one tier for marrow and stones.
+## Repeatable: the pavilion is not consumed, and the prompt is honest about why a
+## step is unavailable.
+func _use_root_pavilion() -> void:
+	if player == null:
+		return
+	var cultivation := player.cultivation
+	if not cultivation.identified:
+		if Game.spirit_stones < Roots.IDENTIFY_COST:
+			Bus.toast.emit("Appraisal costs %d spirit stones. You have %d." % [Roots.IDENTIFY_COST, Game.spirit_stones])
+			return
+		Game.spirit_stones -= Roots.IDENTIFY_COST
+		cultivation.identified = true
+		var before := cultivation.qi_max(player.stats)
+		player.rebuild_stats()
+		cultivation.qi = minf(cultivation.qi, cultivation.qi_max(player.stats))
+		Bus.player_stats_changed.emit()
+		Bus.cultivation_changed.emit()
+		Bus.toast.emit("The pavilion reads your root: %s. Qi capacity %d -> %d." % [
+			Roots.describe(cultivation.root_data(), cultivation.effective_purity()),
+			int(before), int(cultivation.qi_max(player.stats)),
+		])
+		return
+
+	var tier := cultivation.root_tier
+	var check := Roots.can_evolve(tier, _marrow_count(), Game.spirit_stones)
+	if not bool(check["ok"]):
+		match String(check["reason"]):
+			"max_tier":
+				Bus.toast.emit("Your root is already at the twelfth tier.")
+			"no_marrow":
+				Bus.toast.emit("Evolution needs Spirit Root Marrow. Mines and ruins sometimes hold it.")
+			"no_stones":
+				Bus.toast.emit("Evolution costs %d spirit stones. You have %d." % [int(check["cost"]), Game.spirit_stones])
+		return
+	_consume_marrow()
+	Game.spirit_stones -= int(check["cost"])
+	cultivation.root_tier = mini(Roots.MAX_TIER, tier + 1)
+	player.rebuild_stats()
+	cultivation.qi = minf(cultivation.qi, cultivation.qi_max(player.stats))
+	Bus.player_stats_changed.emit()
+	Bus.cultivation_changed.emit()
+	Bus.toast.emit("Your root evolves — %s." % Roots.describe(cultivation.root_data(), cultivation.effective_purity()))
+
+
+func _make_marrow() -> Dictionary:
+	return {
+		"id": "item.marrow.spirit.%d" % player.inventory.size(),
+		"name": "Spirit Root Marrow",
+		"base_name": "Spirit Root Marrow",
+		"slot": "material",
+		"ilvl": 3,
+		"rarity": 2,
+		"rarity_name": "Rare",
+		"implicit": "Root evolution reagent",
+		"base_damage": 0.0,
+		"armor": 0.0,
+		"mods": [],
+		"value": 60,
+	}
+
+
+func _marrow_count() -> int:
+	var count := 0
+	for item in player.inventory:
+		if String(item.get("id", "")).begins_with("item.marrow"):
+			count += 1
+	return count
+
+
+func _consume_marrow() -> void:
+	for i in player.inventory.size():
+		if String(player.inventory[i].get("id", "")).begins_with("item.marrow"):
+			player.inventory.remove_at(i)
+			return
 
 
 func _make_ore() -> Dictionary:

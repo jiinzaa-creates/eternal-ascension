@@ -13,6 +13,10 @@ var realm: int = 1
 var sublevel: int = 1
 var qi: float = 0.0
 var root_tier: int = 3
+## Appraisal state. The hidden purity bonus only applies once the root has been
+## read; the tier's own purity always applies, so nothing is lost by not knowing.
+var identified := false
+var purity_bonus := 0.0
 var method_id: String = "method.traditional"
 var breakthrough_attempts: int = 0
 var failures: int = 0
@@ -38,6 +42,13 @@ func root_mult() -> float:
 	return float(root_data().get("cult_mult", 1.0))
 
 
+## Purity the formulas actually use: the tier's base purity plus the hidden bonus
+## once the root has been appraised.
+func effective_purity() -> float:
+	var base := float(root_data().get("purity", 0.55))
+	return clampf(base + (purity_bonus if identified else 0.0), 0.0, 1.0)
+
+
 func method_mult() -> float:
 	return float(method_data().get("cult_mult", 1.0))
 
@@ -47,8 +58,7 @@ func base_qi() -> float:
 
 
 func qi_max(stats: StatBlock) -> float:
-	var purity := float(root_data().get("purity", 0.55))
-	return base_qi() * stats.max_qi_mult() * (0.75 + 0.5 * purity) + stats.qi_max_flat()
+	return base_qi() * stats.max_qi_mult() * (0.75 + 0.5 * effective_purity()) + stats.qi_max_flat()
 
 
 func qi_gain_per_sec(stats: StatBlock, environment: float = 1.0) -> float:
@@ -58,8 +68,7 @@ func qi_gain_per_sec(stats: StatBlock, environment: float = 1.0) -> float:
 ## Passive regeneration while not meditating. Small, but real: a wounded
 ## cultivator recovers between fights without sitting down.
 func qi_regen_per_sec(stats: StatBlock) -> float:
-	var purity := float(root_data().get("purity", 0.55))
-	return (0.6 + Attributes.soft(float(stats.get_attr("wis")), 25.0) / 22.0) * purity * stats.qi_regen_mult() + stats.qi_regen_flat()
+	return (0.6 + Attributes.soft(float(stats.get_attr("wis")), 25.0) / 22.0) * effective_purity() * stats.qi_regen_mult() + stats.qi_regen_flat()
 
 
 func regenerate(stats: StatBlock, delta: float) -> float:
@@ -177,6 +186,8 @@ func to_dict() -> Dictionary:
 		"sublevel": sublevel,
 		"qi": qi,
 		"root_tier": root_tier,
+		"identified": identified,
+		"purity_bonus": purity_bonus,
 		"method_id": method_id,
 		"breakthrough_attempts": breakthrough_attempts,
 		"failures": failures,
@@ -188,6 +199,9 @@ func from_dict(data: Dictionary) -> void:
 	sublevel = clampi(int(data.get("sublevel", 1)), 1, SUBLEVELS)
 	qi = float(data.get("qi", 0.0))
 	root_tier = clampi(int(data.get("root_tier", 3)), 1, 12)
+	# Legacy saves were played with a visible root, so they keep it appraised.
+	identified = bool(data.get("identified", true))
+	purity_bonus = clampf(float(data.get("purity_bonus", 0.0)), 0.0, Roots.PURITY_BONUS_MAX)
 	method_id = String(data.get("method_id", "method.traditional"))
 	breakthrough_attempts = int(data.get("breakthrough_attempts", 0))
 	failures = int(data.get("failures", 0))

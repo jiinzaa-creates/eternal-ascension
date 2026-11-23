@@ -45,6 +45,24 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Spiritual roots: appraisal, marrow, evolution
+
+- A root rolls a tier at creation plus a **hidden purity bonus** (`purity_bonus`, 0–0.25) from
+  `Rng.stream("root_purity", counter)`. The tier's own purity always applies; the bonus applies only
+  once `identified`. This makes appraisal pure upside, so ignorance cannot trap a build.
+- `Cultivation.effective_purity()` is the single place purity is computed — `qi_max` and
+  `qi_regen_per_sec` read it. Do not read `root_data().purity` directly anywhere else.
+- The pavilion (`root.pavilion`, `Interactable.Kind.ROOT`) appraises for `Roots.IDENTIFY_COST` (40),
+  then evolves one tier for one Spirit Root Marrow plus `Roots.evolve_cost(tier)`. It is repeatable
+  and every refusal names its reason (`max_tier`, `no_marrow`, `no_stones`).
+- **Marrow is discovered, not bought**: `Roots.marrow_found(coord, site)` is deterministic per site
+  (35%), rolled by mines and ruins. The same mine always either holds it or does not, so a save
+  cannot reroll a site by reloading.
+- Evolution keeps the purity bonus and clamps Qi to the new maximum; it does not touch realm,
+  sublevel or method.
+- Legacy saves default to `identified = true` (they were played with a visible root) and add no
+  hidden purity, so their numbers do not move.
+
 ## Secondary stats
 
 - New modifier keys: percent `evasion`, `penetration`, `cooldown_reduction`, `crit_damage`; flat

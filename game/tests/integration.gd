@@ -794,6 +794,41 @@ func _run() -> void:
 	armoured.queue_free()
 	bare.queue_free()
 
+	# --- spiritual roots: appraisal, marrow, evolution ------------------------
+	check(not player.cultivation.identified, "a new run starts with an unread root")
+	check(player.cultivation.purity_bonus >= 0.0, "a hidden purity bonus was rolled")
+	var pavilion: Interactable = _find_interactable(main.interactables, "root.pavilion")
+	check(pavilion != null, "the root pavilion stands by the shrine")
+	Game.spirit_stones = 300
+	var purity_before := player.cultivation.effective_purity()
+	var qi_before := player.cultivation.qi_max(player.stats)
+	main._use_interactable(pavilion)
+	check(player.cultivation.identified, "the pavilion reads the root")
+	check(Game.spirit_stones == 300 - Roots.IDENTIFY_COST, "appraisal costs its stones")
+	check(player.cultivation.effective_purity() >= purity_before, "a read root is never worse")
+	check(player.cultivation.qi_max(player.stats) >= qi_before, "a read root raises or keeps Qi capacity")
+
+	var tier_before: int = player.cultivation.root_tier
+	player.pick_up(main._make_marrow())
+	check(main._marrow_count() >= 1, "marrow is an inventory material")
+	if tier_before < Roots.MAX_TIER:
+		Game.spirit_stones = Roots.evolve_cost(tier_before)
+		var marrow_before: int = main._marrow_count()
+		main._use_interactable(pavilion)
+		check(Game.spirit_stones == 0, "evolution spends its stones")
+		check(player.cultivation.root_tier == tier_before + 1, "marrow and stones evolve the root")
+		check(main._marrow_count() == marrow_before - 1, "evolution consumes the marrow")
+		check(player.cultivation.root_mult() > 0.0, "the evolved root has a cultivation multiplier")
+
+	main._save(90)
+	var saved_tier: int = player.cultivation.root_tier
+	var saved_purity: float = player.cultivation.purity_bonus
+	main._load_game(90)
+	await frames(2)
+	check(player.cultivation.identified, "appraisal survives a save")
+	check(player.cultivation.root_tier == saved_tier, "the evolved root survives a save")
+	check(absf(player.cultivation.purity_bonus - saved_purity) < 0.0001, "the hidden purity survives a save")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
