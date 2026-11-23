@@ -34,6 +34,10 @@ var inventory: Array = []
 var equipment: Dictionary = {}
 var technique_ids: Array = []
 var selected_technique: int = 0
+## Technique id -> mastery xp. Everything else about mastery is derived.
+var technique_xp: Dictionary = {}
+## Technique id -> times watched for observation-based learning.
+var observed: Dictionary = {}
 
 var hp: float = 100.0
 var hp_max: float = 100.0
@@ -145,11 +149,77 @@ func try_learn_passive(id: String) -> Dictionary:
 	return {"ok": true, "reason": ""}
 
 
+## Grant path (starting kit, manuals, inheritances, quest rewards): no checks,
+## because a reward must never be lost to a requirement.
 func learn_technique(id: String) -> bool:
 	if id == "" or DB.technique(id).is_empty() or technique_ids.has(id):
 		return false
 	technique_ids.append(id)
 	return true
+
+
+func technique_state() -> Dictionary:
+	return {"realm": cultivation.realm, "attrs": attrs}
+
+
+## Voluntary path (teachers, observation): refuses what the body cannot use yet.
+func try_learn_technique(id: String) -> Dictionary:
+	if id == "" or DB.technique(id).is_empty():
+		return {"ok": false, "reason": "unknown technique"}
+	if technique_ids.has(id):
+		return {"ok": false, "reason": "already known"}
+	var check := Techniques.can_learn(id, technique_state())
+	if not bool(check["ok"]):
+		return check
+	technique_ids.append(id)
+	Bus.cultivation_changed.emit()
+	return {"ok": true, "reason": ""}
+
+
+func mastery_xp(id: String) -> int:
+	return int(technique_xp.get(id, 0))
+
+
+func mastery_tier(id: String) -> int:
+	return Mastery.tier_for(mastery_xp(id))
+
+
+func mastery_label(id: String) -> String:
+	return Mastery.label(mastery_tier(id))
+
+
+func add_technique_xp(id: String, amount: int) -> void:
+	if amount <= 0 or DB.technique(id).is_empty():
+		return
+	var before := mastery_tier(id)
+	var after_xp := Mastery.clamp_xp(mastery_xp(id) + amount)
+	if after_xp == mastery_xp(id):
+		return
+	technique_xp[id] = after_xp
+	if mastery_tier(id) != before:
+		var tech := DB.technique(id)
+		Bus.toast.emit("%s — %s (%d)." % [String(tech.get("name", id)), mastery_label(id), mastery_tier(id)])
+
+
+## Watch a technique being performed. Returns {ok, reason, progress, learned}.
+## Progress persists, so watching across sessions still finishes the lesson.
+func observe_technique(id: String) -> Dictionary:
+	if id == "" or DB.technique(id).is_empty():
+		return {"ok": false, "reason": "unknown technique", "progress": 0.0, "learned": false}
+	if technique_ids.has(id):
+		return {"ok": false, "reason": "already known", "progress": 1.0, "learned": false}
+	var check := Techniques.can_learn(id, technique_state())
+	if not bool(check["ok"]):
+		return {"ok": false, "reason": String(check["reason"]), "progress": 0.0, "learned": false}
+	var count := int(observed.get(id, 0)) + 1
+	observed[id] = count
+	if count < Techniques.OBSERVE_REQUIRED:
+		return {"ok": true, "reason": "", "progress": Techniques.observation_progress(count), "learned": false}
+	var learned := try_learn_technique(id)
+	if bool(learned["ok"]):
+		observed.erase(id)
+		return {"ok": true, "reason": "", "progress": 1.0, "learned": true}
+	return {"ok": false, "reason": String(learned["reason"]), "progress": 0.0, "learned": false}
 
 
 func _process(delta: float) -> void:
@@ -295,7 +365,9 @@ func _tick_attack(delta: float) -> void:
 			recovery *= (1.0 - stats.recovery_reduction())
 			_attack_timer = maxf(0.02, recovery)
 			_attack_phase_total = _attack_timer
-			_cooldown = float(_current_technique.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction())
+			var tech_id := String(_current_technique.get("id", ""))
+			_cooldown = float(_current_technique.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction()) \
+				* Mastery.cooldown_mult(mastery_tier(tech_id))
 		"recovery":
 			_attack_state = "idle"
 
@@ -316,7 +388,8 @@ func try_attack() -> void:
 	var tech := current_technique()
 	if tech.is_empty():
 		return
-	var cost := float(tech.get("qi_cost", 0.0))
+	var tech_id := String(tech.get("id", ""))
+	var cost := float(tech.get("qi_cost", 0.0)) * Mastery.qi_mult(mastery_tier(tech_id))
 	if cultivation.qi < cost:
 		Bus.toast.emit("Not enough Qi.")
 		return
@@ -342,7 +415,10 @@ func _strike() -> void:
 	var crit_roll := float(Rng.roll_float("crit", Game.kills * 1000 + _attack_counter, cultivation.realm))
 	var is_crit := crit_roll < stats.crit_chance()
 
-	var raw := Damage.technique_damage(tech, stats, stats.weapon_damage())
+	var tech_id := String(tech.get("id", ""))
+	var raw := Damage.technique_damage(tech, stats, stats.weapon_damage(),
+		Mastery.damage_mult(mastery_tier(tech_id)))
+	add_technique_xp(tech_id, Mastery.XP_PER_HIT)
 	if is_crit:
 		raw *= stats.crit_multiplier()
 	var poise := Damage.poise_damage(tech, stats)
@@ -563,6 +639,8 @@ func to_dict() -> Dictionary:
 		"equipment": equipped,
 		"technique_ids": technique_ids,
 		"selected_technique": selected_technique,
+		"technique_xp": technique_xp.duplicate(),
+		"observed": observed.duplicate(),
 	}
 
 
@@ -583,6 +661,8 @@ func from_dict(data: Dictionary) -> void:
 	if not ids.is_empty():
 		technique_ids = ids.duplicate()
 	selected_technique = int(data.get("selected_technique", 0))
+	technique_xp = data.get("technique_xp", {}).duplicate()
+	observed = data.get("observed", {}).duplicate()
 	rebuild_stats()
 	hp = float(data.get("hp", hp_max))
 	spawn_point = global_position

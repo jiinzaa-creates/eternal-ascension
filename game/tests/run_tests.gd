@@ -23,6 +23,7 @@ func _ready() -> void:
 	_root_system_tests()
 	_physique_tests()
 	_passive_system_tests()
+	_technique_mastery_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -658,6 +659,97 @@ func _passive_system_tests() -> void:
 	learner._refresh_passive_conditions()
 	check(not learner.active_passives().has("passive.battle_trance"), "battle trance sleeps again at full health")
 	learner.free()
+
+
+# -------------------------------------------------------------- techniques ----
+
+func _technique_mastery_tests() -> void:
+	print("[techniques] mastery curve, teachers and observation")
+	check(Mastery.tier_for(0) == 0, "zero xp is untrained")
+	check(Mastery.tier_for(Mastery.total_xp(1)) == 1, "the first threshold promotes")
+	check(Mastery.tier_for(Mastery.total_xp(3)) == 3, "thresholds are cumulative")
+	check(Mastery.tier_for(99999) == Mastery.MAX_TIER, "xp stops at the top tier")
+	check(Mastery.clamp_xp(99999) == Mastery.total_xp(Mastery.MAX_TIER), "xp is capped")
+	check(Mastery.damage_mult(5) > Mastery.damage_mult(0), "mastery raises damage")
+	check(Mastery.cooldown_mult(5) < Mastery.cooldown_mult(0), "mastery shortens cooldowns")
+	check(Mastery.qi_mult(5) < Mastery.qi_mult(0), "mastery cheapens Qi")
+	check(Mastery.LABELS.size() == Mastery.MAX_TIER + 1, "every tier is named")
+	check(is_equal_approx(Mastery.progress(0), 0.0), "progress starts at zero")
+	check(is_equal_approx(Mastery.progress(Mastery.total_xp(Mastery.MAX_TIER)), 1.0), "progress ends at the top")
+	check(Mastery.progress(int(Mastery.xp_to_next(0) * 0.5)) > 0.4, "progress tracks the current tier")
+
+	var state := {"realm": 1, "attrs": Attributes.new()}
+	check(not bool(Techniques.can_learn("tech.sword.falling_petal", state)["ok"]), "a low realm cannot learn")
+	state["realm"] = 2
+	check(not bool(Techniques.can_learn("tech.sword.falling_petal", state)["ok"]), "an unmet attribute blocks learning")
+	state["attrs"].add("dex", 4)
+	check(bool(Techniques.can_learn("tech.sword.falling_petal", state)["ok"]), "requirements pass when met")
+	check(not bool(Techniques.can_learn("tech.nonexistent", state)["ok"]), "an unknown technique cannot be learned")
+	check(is_equal_approx(Techniques.observation_progress(3), 1.0), "three observations finish a lesson")
+	check(is_equal_approx(Techniques.observation_progress(1), 1.0 / 3.0), "observation progress is fractional")
+
+	var tech := DB.technique("tech.sword.azure_cleave")
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var plain_damage := Damage.technique_damage(tech, stats)
+	check(is_equal_approx(Damage.technique_damage(tech, stats, 0.0, 1.0), plain_damage), "default mastery changes nothing")
+	check(is_equal_approx(Damage.technique_damage(tech, stats, 0.0, 2.0), plain_damage * 2.0), "mastery scales technique damage")
+
+	var learner := Player.new()
+	learner.attrs = Attributes.new()
+	learner.stats = StatBlock.new(learner.attrs)
+	learner.cultivation = Cultivation.new()
+	learner.hp_max = 100.0
+	learner.hp = 100.0
+	learner.rebuild_stats()
+	check(not bool(learner.try_learn_technique("tech.sword.falling_petal")["ok"]), "a teacher cannot teach an unready body")
+	learner.attrs.add("dex", 4)
+	learner.cultivation.realm = 2
+	check(bool(learner.try_learn_technique("tech.sword.falling_petal")["ok"]), "a qualified body learns")
+	check(not bool(learner.try_learn_technique("tech.sword.falling_petal")["ok"]), "a known technique is not learned twice")
+	check(not bool(learner.try_learn_technique("tech.nonexistent")["ok"]), "an unknown technique is refused")
+	check(learner.learn_technique("tech.blood.crimson_moon"), "a grant path still bypasses requirements")
+	learner.free()
+
+	var watcher := Player.new()
+	watcher.attrs = Attributes.new()
+	watcher.stats = StatBlock.new(watcher.attrs)
+	watcher.cultivation = Cultivation.new()
+	watcher.hp_max = 100.0
+	watcher.hp = 100.0
+	watcher.rebuild_stats()
+	check(not bool(watcher.observe_technique("tech.sword.falling_petal")["ok"]), "observation refuses an unready body")
+	watcher.cultivation.realm = 2
+	watcher.attrs.add("dex", 4)
+	var first := watcher.observe_technique("tech.sword.falling_petal")
+	check(bool(first["ok"]) and not bool(first["learned"]), "the first observation only teaches")
+	check(is_equal_approx(float(first["progress"]), 1.0 / 3.0), "observation progress is tracked")
+	watcher.observe_technique("tech.sword.falling_petal")
+	var third := watcher.observe_technique("tech.sword.falling_petal")
+	check(bool(third["learned"]), "the third observation completes the lesson")
+	check(watcher.technique_ids.has("tech.sword.falling_petal"), "observation teaches the technique")
+	check(watcher.observed.is_empty(), "finished observation progress is cleared")
+
+	watcher.add_technique_xp("tech.sword.falling_petal", 200)
+	check(watcher.mastery_tier("tech.sword.falling_petal") == Mastery.MAX_TIER, "xp raises the mastery tier")
+	check(watcher.mastery_label("tech.sword.falling_petal") == "Perfected", "the top tier is named")
+	var saved := watcher.to_dict()
+	var restored := Player.new()
+	restored.attrs = Attributes.new()
+	restored.stats = StatBlock.new(restored.attrs)
+	restored.cultivation = Cultivation.new()
+	restored.from_dict(saved)
+	check(restored.mastery_tier("tech.sword.falling_petal") == Mastery.MAX_TIER, "mastery survives a save")
+	var legacy := Player.new()
+	legacy.attrs = Attributes.new()
+	legacy.stats = StatBlock.new(legacy.attrs)
+	legacy.cultivation = Cultivation.new()
+	legacy.from_dict({"display_name": "Old"})
+	check(legacy.technique_xp.is_empty(), "legacy saves carry no mastery")
+	check(legacy.observed.is_empty(), "legacy saves carry no observation")
+	watcher.free()
+	restored.free()
+	legacy.free()
 
 
 func _rng_tests() -> void:

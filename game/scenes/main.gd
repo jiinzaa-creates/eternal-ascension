@@ -169,6 +169,8 @@ func _spawn_npcs() -> void:
 	var schedules: Dictionary = DB.schedules()
 	elder = _make_npc("elder_bai", "Elder Bai Qing", "Elder", "sect.azure_cloud",
 		4, schedules.get("elder", []), Vector2(-30, 40))
+	_make_npc("instructor_rui", "Instructor Rui", "Sword Instructor", "sect.azure_cloud",
+		3, schedules.get("inner_disciple", []), Vector2(64, 120))
 
 	var plan := [
 		["sect_master", 1],
@@ -285,6 +287,14 @@ func _spawn_interactables() -> void:
 	manual.position = settlement.position_for("sect_hall") + Vector2(-46, 12)
 	world.add_child(manual)
 	interactables.append(manual)
+
+	# A disciple practising a technique nobody wrote down: watch and learn.
+	var demonstration := Interactable.new()
+	demonstration.setup_demonstration("training.falling_petal", "Practising disciple — Falling Petal Cut",
+		"tech.sword.falling_petal")
+	demonstration.position = settlement.position_for("plaza") + Vector2(-58, 148)
+	world.add_child(demonstration)
+	interactables.append(demonstration)
 
 	# Passive manuals: voluntary learning, gated by what the body can use.
 	var manual_specs := [
@@ -898,7 +908,34 @@ func _try_interact() -> void:
 		_use_interactable(best as Interactable)
 
 
+## Rui sells one cut to anyone who meets its requirements and can pay.
+func _teach_technique() -> void:
+	var tech_id := "tech.sword.falling_petal"
+	var price := 180
+	var tech: Dictionary = DB.technique(tech_id)
+	if player.technique_ids.has(tech_id):
+		Bus.toast.emit("Instructor Rui: \"You already carry that cut. Show it to me one day.\"")
+		return
+	var check := Techniques.can_learn(tech_id, player.technique_state())
+	if not bool(check["ok"]):
+		Bus.toast.emit("Instructor Rui: \"Come back when you are %s.\"" % String(check["reason"]))
+		return
+	if Game.spirit_stones < price:
+		Bus.toast.emit("Instructor Rui: \"%d stones, and not one less.\"" % price)
+		return
+	var learned := player.try_learn_technique(tech_id)
+	if not bool(learned["ok"]):
+		Bus.toast.emit("Instructor Rui: \"%s.\"" % String(learned["reason"]))
+		return
+	Game.spirit_stones -= price
+	Bus.toast.emit("Instructor Rui teaches %s. (-%d stones)" % [String(tech.get("name", tech_id)), price])
+	Bus.cultivation_changed.emit()
+
+
 func _talk(npc: Npc) -> void:
+	if npc.npc_id == "instructor_rui":
+		_teach_technique()
+		return
 	if npc.npc_id != "elder_bai":
 		Bus.toast.emit("%s (%s): \"The Qi is thin today.\"" % [npc.display_name, npc.role])
 		return
@@ -979,6 +1016,18 @@ func _use_interactable(node: Interactable) -> void:
 				Bus.cultivation_changed.emit()
 			else:
 				Bus.toast.emit("You already know what this manual teaches.")
+		Interactable.Kind.DEMONSTRATION:
+			var watched := player.observe_technique(node.demo_technique)
+			var demo: Dictionary = DB.technique(node.demo_technique)
+			if bool(watched.get("learned", false)):
+				Bus.toast.emit("You have watched the cut often enough. Technique learned: %s." % String(demo.get("name", node.demo_technique)))
+				Bus.cultivation_changed.emit()
+			elif bool(watched["ok"]):
+				Bus.toast.emit("You watch the cut. Understanding %d%%." % roundi(float(watched["progress"]) * 100.0))
+			elif String(watched["reason"]) == "already known":
+				Bus.toast.emit("You already know the cut; there is nothing left to watch.")
+			else:
+				Bus.toast.emit("The disciple's cut is beyond you: %s required." % String(watched["reason"]))
 		Interactable.Kind.EXAMINE:
 			Bus.toast.emit(node.examine_text)
 		Interactable.Kind.SHOP:

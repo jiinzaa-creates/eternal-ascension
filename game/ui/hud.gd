@@ -195,6 +195,8 @@ func draw_techniques(player: Player) -> void:
 		draw_rect(rect, Color("#182229", 0.9) if not selected else Color("#24343d", 0.95))
 		draw_rect(rect, Color("#7fd3e0") if selected else Color("#2b343a"), false, 2.0 if selected else 1.0)
 		_text(rect.position + Vector2(8.0, 17.0), "%d  %s" % [i + 1, String(tech.get("name", "?"))], 10, INK)
+		var tier := player.mastery_tier(String(player.technique_ids[i]))
+		_text(rect.position + Vector2(8.0, 31.0), Mastery.label(tier), 9, MUTED)
 		var cost := float(tech.get("qi_cost", 0.0))
 		var affordable := player.cultivation.qi >= cost
 		_text(rect.position + Vector2(8.0, 33.0), "Qi %d" % int(cost), 11, Color("#7fd3e0") if affordable else Color("#c05858"))

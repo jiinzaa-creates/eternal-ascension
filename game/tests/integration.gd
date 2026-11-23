@@ -894,6 +894,61 @@ func _run() -> void:
 	check(player.active_passives().has("passive.jade_skin"), "an active passive survives a save")
 	check(player.dormant_passives().size() >= 1, "a dormant passive stays dormant through a save")
 
+	# --- technique mastery: teachers and observation ---------------------------
+	var instructor: Npc = null
+	for candidate in main.npcs:
+		if candidate.npc_id == "instructor_rui":
+			instructor = candidate
+	check(instructor != null, "the sword instructor stands in the settlement")
+	var demonstration: Interactable = _find_interactable(main.interactables, "training.falling_petal")
+	check(demonstration != null, "a disciple practises the falling petal cut")
+
+	main._use_interactable(demonstration)
+	check(not player.technique_ids.has("tech.sword.falling_petal"), "observation refuses a low realm")
+	check(not player.observed.has("tech.sword.falling_petal"), "a refused observation does not count")
+
+	player.attrs.add("dex", 4)
+	player.cultivation.realm = 2
+	player.rebuild_stats()
+	var stones_before_teach: int = Game.spirit_stones
+	Game.spirit_stones = 100
+	main._talk(instructor)
+	check(not player.technique_ids.has("tech.sword.falling_petal"), "a teacher refuses an unpaid lesson")
+	Game.spirit_stones = 500
+	main._talk(instructor)
+	check(player.technique_ids.has("tech.sword.falling_petal"), "a qualified student buys the technique")
+	check(Game.spirit_stones == 500 - 180, "the lesson costs its price")
+	main._talk(instructor)
+	check(Game.spirit_stones == 500 - 180, "a known technique is not bought twice")
+	Game.spirit_stones = stones_before_teach
+
+	main._use_interactable(demonstration)
+	check(player.technique_ids.has("tech.sword.falling_petal"), "observing a known technique teaches nothing new")
+	check(not player.observed.has("tech.sword.falling_petal"), "a known technique is not observed")
+
+	player.add_technique_xp("tech.sword.falling_petal", 200)
+	check(player.mastery_tier("tech.sword.falling_petal") == Mastery.MAX_TIER, "practice raises mastery")
+	player.selected_technique = player.technique_ids.find("tech.sword.falling_petal")
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	var qi_before_cast: float = player.cultivation.qi
+	player.try_attack()
+	var expected_cost := 18.0 * Mastery.qi_mult(Mastery.MAX_TIER)
+	check(approx(qi_before_cast - player.cultivation.qi, expected_cost, 0.01), "mastery discounts the Qi cost")
+	var xp_before_strike: int = player.mastery_xp("tech.sword.falling_petal")
+	player._strike()
+	check(player.mastery_xp("tech.sword.falling_petal") == xp_before_strike, "maxed mastery gains no further xp")
+	var cleave_before: int = player.mastery_xp("tech.sword.azure_cleave")
+	player.add_technique_xp("tech.sword.azure_cleave", 3)
+	check(player.mastery_xp("tech.sword.azure_cleave") == cleave_before + 3, "xp accumulates per technique")
+
+	player.observed["tech.formation.sealing_array"] = 2
+	main._save(88)
+	main._load_game(88)
+	await frames(2)
+	check(player.mastery_tier("tech.sword.falling_petal") == Mastery.MAX_TIER, "mastery survives a save")
+	check(int(player.observed.get("tech.formation.sealing_array", 0)) == 2, "observation progress survives a save")
+	player.observed.erase("tech.formation.sealing_array")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

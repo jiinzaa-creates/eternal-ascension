@@ -45,6 +45,26 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Techniques: mastery, teachers, observation
+
+- **Mastery is one stored integer per technique** (`Player.technique_xp`, id → xp). Tiers, labels and
+  multipliers are pure functions in `Mastery`, so balance changes are a code edit, not a save migration.
+  Mastery improves damage, lowers Qi cost and shortens cooldowns; it never alters frame data, because
+  timing is the technique's identity.
+- XP is earned by landing the technique (`_strike`, 1 per swing) and cannot exceed the top tier. The
+  technique bar shows each technique's tier label.
+- **Grants vs. learning** mirrors passives: `learn_technique` is the grant path used by the starting kit,
+  manuals, inheritances and quest rewards and never checks requirements; `try_learn_technique` is used by
+  teachers and observation and enforces the technique's `requirements` (realm plus attribute minimums).
+  `requirements.physique` is a legacy bloodline marker, not a physique id, and is not checked.
+- **Teachers** are ordinary NPCs with a selling branch in `_talk` (Instructor Rui sells Falling Petal Cut
+  for 180 stones). They check requirements, then price, and only then spend.
+- **Observation**: a demonstration interactable (`Kind.DEMONSTRATION`) offers `observe_technique`, which
+  requires the same qualifications and takes `Techniques.OBSERVE_REQUIRED` (3) watches. Progress is
+  stored per technique in `Player.observed` and saved, so watching across sessions still finishes.
+- Both `technique_xp` and `observed` are optional save keys; legacy saves start with untrained techniques
+  and no observations.
+
 ## Passives: requirements, conflicts, conditions, synergies
 
 - **Ownership and activation are separate.** `Player.add_passive` is a grant (quest, inheritance, origin)

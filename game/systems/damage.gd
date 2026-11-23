@@ -18,14 +18,15 @@ static func resolve(raw: float, resist: float = 0.0, attacker_power: float = 0.0
 
 
 ## Attribute + technique scaling, before resistances. Matches the combat spec.
-static func technique_damage(technique: Dictionary, stats: StatBlock, weapon_damage: float = 0.0) -> float:
+static func technique_damage(technique: Dictionary, stats: StatBlock, weapon_damage: float = 0.0,
+		mastery_mult: float = 1.0) -> float:
 	var base := float(technique.get("base_damage", 0.0))
 	var scaling: Dictionary = technique.get("scaling", {})
 	var scaled := 0.0
 	for key in scaling.keys():
 		scaled += float(stats.get_attr(String(key))) * float(scaling[key])
 	var raw := (base + scaled + weapon_damage) * stats.physical_mult()
-	return raw
+	return raw * maxf(0.0, mastery_mult)
 
 
 static func poise_damage(technique: Dictionary, stats: StatBlock) -> float:

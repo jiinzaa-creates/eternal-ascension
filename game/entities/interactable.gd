@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -21,6 +21,8 @@ var building: Building = null
 ## Manuals only: the technique the manual teaches, or the passive it awakens.
 var manual_technique := ""
 var manual_passive := ""
+## Demonstrations only: the technique being practised for onlookers.
+var demo_technique := ""
 ## Examination only: what the player reads.
 var examine_text := ""
 ## Streamed resources: which chunk owns this node. Chunk-owned nodes are freed
@@ -57,6 +59,11 @@ func setup_manual(id_value: String, label_value: String, technique_id: String) -
 func setup_passive_manual(id_value: String, label_value: String, passive_id: String) -> void:
 	setup(Kind.MANUAL, id_value, label_value)
 	manual_passive = passive_id
+
+
+func setup_demonstration(id_value: String, label_value: String, technique_id: String) -> void:
+	setup(Kind.DEMONSTRATION, id_value, label_value)
+	demo_technique = technique_id
 
 
 func setup_examine(id_value: String, label_value: String, text: String) -> void:
@@ -199,6 +206,14 @@ func _draw() -> void:
 			draw_line(Vector2(0, -15), Vector2(0, 0), Color("#8a7a5a"), 1.0)
 			if not used:
 				draw_circle(Vector2(0, -8), 2.0, Color("#c0505a", 0.5 + pulse * 0.5))
+		Kind.DEMONSTRATION:
+			# A training post and a disciple mid-cut, the arc sweeping with the pulse.
+			draw_rect(Rect2(-5, -4, 10, 16), Color("#4a3a28"))
+			draw_rect(Rect2(-9, -6, 18, 4), Color("#5c4a32"))
+			draw_circle(Vector2(0, -22), 5.0, Color("#8a7a5a"))
+			draw_line(Vector2(0, -17), Vector2(0, -6), Color("#8a7a5a"), 3.0)
+			draw_arc(Vector2(0, -14), 20.0, -1.1 + pulse * 0.5, 0.9 + pulse * 0.5, 16,
+				Color("#d8a0c0", 0.65), 2.0)
 		Kind.EXAMINE:
 			draw_rect(Rect2(-7, -6, 14, 10), Color("#4a4a44"))
 			draw_rect(Rect2(-4, -26, 8, 20), Color("#5c5c54"))
