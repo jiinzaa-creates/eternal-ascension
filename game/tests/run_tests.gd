@@ -19,6 +19,7 @@ func _ready() -> void:
 	_attribute_tests()
 	_stat_pipeline_tests()
 	_extreme_tests()
+	_secondary_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -336,6 +337,81 @@ func _extreme_tests() -> void:
 	realm_two.rebuild({}, [], 1, 2.0)
 	check(approx(realm_two.physical_mult(), stats.physical_mult() * 2.0), "realm multiplier applies once, multiplicatively")
 	check(realm_two.crit_chance() == stats.crit_chance(), "realm does not change crit chance")
+
+
+# -------------------------------------------------------------- secondary ----
+
+func _secondary_tests() -> void:
+	print("[secondary] evasion, penetration, cooldown, crit damage, regen, lifespan")
+	var plain := StatBlock.new(Attributes.new())
+	plain.rebuild({}, [], 1, 1.0)
+	check(plain.evasion_chance() > 0.0 and plain.evasion_chance() < 0.1, "base evasion is small but real")
+	check(plain.penetration_fraction() > 0.0, "base penetration is positive")
+	check(plain.cooldown_reduction() > 0.0, "base cooldown reduction is positive")
+	check(absf(plain.crit_multiplier() - 1.8) < 0.02, "base crit damage matches the old constant")
+	check(plain.health_regen() > 0.0, "base health regen is positive")
+	check(plain.base_lifespan_years() == 120, "realm one lifespan comes from data")
+	check(plain.lifespan_years() >= 120, "a starting cultivator has years left")
+
+	check(plain.evades(0.0), "a zero roll evades")
+	check(not plain.evades(1.0), "a certain roll never evades")
+	check(not plain.evades(plain.evasion_chance()), "the threshold itself is a hit")
+
+	var agi := Attributes.new()
+	agi.add("agi", 60)
+	var agile := StatBlock.new(agi)
+	agile.rebuild({}, [], 1, 1.0)
+	check(agile.evasion_chance() > plain.evasion_chance(), "AGI raises evasion")
+	check(agile.cooldown_reduction() > plain.cooldown_reduction(), "AGI lowers cooldowns")
+	check(agile.crit_multiplier() == plain.crit_multiplier(), "AGI does not change crit damage")
+
+	var dex := Attributes.new()
+	dex.add("dex", 60)
+	var precise := StatBlock.new(dex)
+	precise.rebuild({}, [], 1, 1.0)
+	check(precise.penetration_fraction() > plain.penetration_fraction(), "DEX raises penetration")
+	check(precise.crit_multiplier() > plain.crit_multiplier(), "DEX raises crit damage")
+	check(precise.evasion_chance() == plain.evasion_chance(), "DEX leaves evasion alone")
+
+	var wis := Attributes.new()
+	wis.add("wis", 60)
+	var serene := StatBlock.new(wis)
+	serene.rebuild({}, [], 1, 1.0)
+	check(serene.health_regen() > plain.health_regen(), "WIS raises health regen")
+	check(serene.lifespan_bonus() > plain.lifespan_bonus(), "WIS extends lifespan")
+	check(serene.lifespan_years() > plain.lifespan_years(), "WIS raises total lifespan")
+
+	var capped := StatBlock.new(Attributes.new())
+	capped.rebuild({"ring": {"name": "capped", "mods": [
+		{"stat": "evasion", "value": 500}, {"stat": "penetration", "value": 500},
+		{"stat": "cooldown_reduction", "value": 500}, {"stat": "crit_damage", "value": 500},
+		{"stat": "lifespan", "value": 25},
+	]}}, [], 1, 1.0)
+	check(capped.evasion_chance() == StatBlock.EVASION_CAP, "evasion caps")
+	check(capped.penetration_fraction() == StatBlock.PENETRATION_CAP, "penetration caps")
+	check(capped.cooldown_reduction() == StatBlock.COOLDOWN_CAP, "cooldown reduction caps")
+	check(capped.crit_multiplier() == StatBlock.CRIT_DAMAGE_CAP, "crit damage caps")
+	check(capped.lifespan_years() == plain.lifespan_years() + 25, "lifespan modifiers add years")
+
+	var cursed := StatBlock.new(Attributes.new())
+	cursed.rebuild({"ring": {"name": "cursed", "mods": [
+		{"stat": "evasion", "value": -500}, {"stat": "penetration", "value": -500},
+		{"stat": "cooldown_reduction", "value": -500}, {"stat": "crit_damage", "value": -500},
+		{"stat": "health_regen", "value": -100}, {"stat": "lifespan", "value": -500},
+	]}}, [], 1, 1.0)
+	check(cursed.evasion_chance() == 0.0 and cursed.penetration_fraction() == 0.0, "cursed gear cannot push secondary stats negative")
+	check(cursed.cooldown_reduction() == 0.0, "cursed gear cannot slow attacks below normal")
+	check(cursed.crit_multiplier() == StatBlock.CRIT_DAMAGE_FLOOR, "cursed gear floors crit damage")
+	check(cursed.health_regen() == 0.0, "cursed gear can stop regen but not reverse it")
+	check(cursed.lifespan_bonus() == 0, "cursed gear cannot shorten lifespan below the realm's")
+
+	var immortal := StatBlock.new(Attributes.new())
+	immortal.rebuild({}, [], 12, 1.0)
+	check(immortal.lifespan_years() == 0, "realm twelve has no lifespan limit")
+
+	var derived := plain.derived()
+	check(derived.has("evasion") and derived.has("penetration") and derived.has("cooldown_reduction"), "derived exposes the secondary stats")
+	check(derived.has("crit_multiplier") and derived.has("health_regen") and derived.has("lifespan"), "derived exposes survival stats")
 
 
 func _rng_tests() -> void:

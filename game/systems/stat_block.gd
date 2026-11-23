@@ -15,10 +15,21 @@ const PERCENT_STATS: Array[String] = [
 	"physical_damage_pct", "attack_speed_pct", "crit_chance", "qi_max_pct",
 	"physical_resist", "move_speed_pct", "cult_speed_pct", "qi_regen_pct",
 	"lightning_damage_pct",
+	# Secondary stats. Percent values are points, not fractions: +8 means 8%.
+	"evasion", "penetration", "cooldown_reduction", "crit_damage",
 ]
 const FLAT_STATS: Array[String] = [
 	"qi_regen_flat", "qi_max_flat", "armor", "weapon_damage", "lifesteal",
+	"health_regen", "lifespan",
 ]
+
+# Secondary stat caps. They exist so a stack of affixes cannot make a character
+# untouchable, unkillable or infinitely long-lived.
+const EVASION_CAP := 0.55
+const PENETRATION_CAP := 0.6
+const COOLDOWN_CAP := 0.5
+const CRIT_DAMAGE_CAP := 3.0
+const CRIT_DAMAGE_FLOOR := 1.2
 
 var base: Attributes
 var realm: int = 1
@@ -148,6 +159,61 @@ func lifesteal() -> float:
 	return clampf(flat("lifesteal"), 0.0, 0.5)
 
 
+# --- secondary stats ----------------------------------------------------------
+
+## Chance to avoid a physical hit entirely. Rolled by the victim, never by the
+## attacker, so one evasion stat cannot double-dip.
+func evasion_chance() -> float:
+	var curve := (1.0 - exp(-float(get_attr("agi")) / 70.0)) * 0.32
+	return clampf(curve + pct("evasion") / 100.0, 0.0, EVASION_CAP)
+
+
+## Pure decision helper: strict less-than keeps a 0% evasion character from ever
+## evading a roll of exactly 0.0.
+func evades(roll: float) -> bool:
+	return roll >= 0.0 and roll < evasion_chance()
+
+
+## Fraction of a target's armour ignored. Capped below 1 so armour always means
+## something, even against a dedicated piercer.
+func penetration_fraction() -> float:
+	return clampf(Attributes.soft(float(get_attr("dex")), 45.0) / 45.0 * 0.25 + pct("penetration") / 100.0, 0.0, PENETRATION_CAP)
+
+
+func cooldown_reduction() -> float:
+	return clampf(Attributes.soft(float(get_attr("agi")), 40.0) / 40.0 * 0.15 + pct("cooldown_reduction") / 100.0, 0.0, COOLDOWN_CAP)
+
+
+## Critical damage multiplier. The DEX curve alone lands near the old 1.8 at
+## DEX 10, so existing combat numbers do not silently change.
+func crit_multiplier() -> float:
+	return clampf(1.7 + Attributes.soft(float(get_attr("dex")), 30.0) / 30.0 * 0.35 + pct("crit_damage") / 100.0,
+		CRIT_DAMAGE_FLOOR, CRIT_DAMAGE_CAP)
+
+
+## Health per second, only while out of combat (the player enforces that).
+func health_regen() -> float:
+	return maxf(0.0, 0.35 + Attributes.soft(float(get_attr("wis")), 30.0) / 30.0 * 0.9 + flat("health_regen"))
+
+
+## Years the current realm allows, before any longevity bonus. Realm 12 declares
+## lifespan 0, which means "no limit".
+func base_lifespan_years() -> int:
+	return maxi(0, int(DB.realm(realm).get("lifespan", 0)))
+
+
+func lifespan_bonus() -> int:
+	return maxi(0, int(Attributes.soft(float(get_attr("wis")), 40.0) / 40.0 * 25.0) + int(flat("lifespan")))
+
+
+## Total lifespan in years; 0 means unbounded.
+func lifespan_years() -> int:
+	var base := base_lifespan_years()
+	if base <= 0:
+		return 0
+	return base + lifespan_bonus()
+
+
 # --- mobility ---------------------------------------------------------------
 
 func move_speed() -> float:
@@ -231,6 +297,12 @@ func derived() -> Dictionary:
 		"mental_resist": mental_resist(),
 		"party_slots": party_slots(),
 		"carry_slots": carry_slots(),
+		"evasion": evasion_chance(),
+		"penetration": penetration_fraction(),
+		"cooldown_reduction": cooldown_reduction(),
+		"crit_multiplier": crit_multiplier(),
+		"health_regen": health_regen(),
+		"lifespan": lifespan_years(),
 	}
 
 

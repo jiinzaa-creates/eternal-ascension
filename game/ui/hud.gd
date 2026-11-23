@@ -80,7 +80,7 @@ func _draw() -> void:
 func draw_vitals(player: Player) -> void:
 	var x := 24.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 186.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 220.0), PANEL_BG)
 
 	_text(Vector2(x, y), player.cultivation.stage_label(), 19, ACCENT)
 	y += 20.0
@@ -101,6 +101,17 @@ func draw_vitals(player: Player) -> void:
 	_text(Vector2(x, y), "DMG x%.2f  CRIT %d%%  ARM %d" % [
 		float(derived["physical_mult"]), int(float(derived["crit_chance"]) * 100.0), int(float(derived["armor"]))
 	], 12, MUTED)
+	y += 18.0
+	var evasion := player.stats.evasion_chance()
+	var lifespan := player.stats.lifespan_years()
+	_text(Vector2(x, y), "EVA %d%%   PEN %d%%   CDR %d%%   CRIT x%.2f" % [
+		int(evasion * 100.0), int(player.stats.penetration_fraction() * 100.0),
+		int(player.stats.cooldown_reduction() * 100.0), player.stats.crit_multiplier()
+	], 11, MUTED)
+	y += 16.0
+	_text(Vector2(x, y), "Regen %.1f/s   Lifespan %s" % [
+		player.stats.health_regen(), "unbounded" if lifespan <= 0 else "%d years" % lifespan
+	], 11, MUTED)
 	y += 18.0
 	var passive_text := "Passives: none"
 	if not player.passives.is_empty():

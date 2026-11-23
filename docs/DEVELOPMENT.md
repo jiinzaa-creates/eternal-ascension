@@ -45,6 +45,29 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Secondary stats
+
+- New modifier keys: percent `evasion`, `penetration`, `cooldown_reduction`, `crit_damage`; flat
+  `health_regen` (hp/s) and `lifespan` (years). They live in `PERCENT_STATS`/`FLAT_STATS`, so
+  affixes, passives and equipment all reach them through the same pipeline.
+- Caps and floors are constants on `StatBlock` (`EVASION_CAP` 0.55, `PENETRATION_CAP` 0.6,
+  `COOLDOWN_CAP` 0.5, crit damage 1.2–3.0). A stack of affixes must not make a character
+  untouchable or immortal.
+- **Evasion is rolled by the victim**, in `Player.take_hit`, from the `"evade"` Rng stream keyed by
+  kills and a private counter. `take_hit(..., can_evade)` is false for floor hazards: a hazard is not
+  an attack. `StatBlock.evades(roll)` is the pure decision, strict `<` so 0% never evades.
+- **Armour lives on `Dummy`** (`armor_value = 8 + 5*ilvl`) and `take_hit` now applies
+  `Damage.mitigate_armor`. Penetration reduces that armour before mitigation; without armour on the
+  target, penetration would be a stat with no effect.
+- **Cooldown reduction** multiplies the technique cooldown when a swing finishes; **crit damage**
+  replaces the old constant `CRIT_MULTIPLIER` in `Player` (the DEX curve lands at ~1.8 at DEX 10, so
+  tuning did not shift).
+- **Regen** is `Player.regenerate(delta)`: no regen while attacking or within `_hurt_flash`, so a
+  fight cannot be won by out-healing it. Lifespan is display/data only until aging exists; realm 12
+  declares 0 years, meaning unbounded.
+- Affixes for all six exist in `data/items.json` (Piercing, Hasty, Ruinous, of Evasion, of Vitality,
+  of Longevity) so the stats are reachable from loot rather than only from test code.
+
 ## Attributes and extreme values
 
 - Raw attributes floor at **zero** in `Attributes.add`/`from_dict`. Debuffs can take a mortal to

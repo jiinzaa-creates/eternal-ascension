@@ -427,7 +427,8 @@ func _process(delta: float) -> void:
 			if dps > 0.0:
 				_hazard_accum += dps * delta
 				if _hazard_accum >= 5.0:
-					player.take_hit(_hazard_accum, player.global_position)
+					# Floor hazards are not dodgeable: evasion is for attacks.
+					player.take_hit(_hazard_accum, player.global_position, false)
 					_hazard_accum = 0.0
 		return
 

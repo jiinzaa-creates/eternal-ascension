@@ -16,6 +16,8 @@ var ilvl := 1
 var speed := 60.0
 var attack_range := 48.0
 var damage := 7.0
+## Physical armour. Without it, penetration would have nothing to pierce.
+var armor_value := 0.0
 var aggressive := true
 var display_name := "Cultivator Dummy"
 var body_color := Color("#a85050")
@@ -39,6 +41,11 @@ func _ready() -> void:
 	poise_max = 40.0 + ilvl * 6.0
 	poise = poise_max
 	damage = 6.0 + ilvl * 2.0
+	armor_value = _armor_for_level()
+
+
+func _armor_for_level() -> float:
+	return 8.0 + float(ilvl) * 5.0
 
 
 ## Applies a biome enemy definition. Called after `_ready`, because `_ready`
@@ -53,6 +60,7 @@ func apply_biome_enemy(entry: Dictionary, realm: int) -> void:
 	poise_max = (40.0 + ilvl * 6.0) * float(entry.get("poise_mult", 1.0))
 	poise = poise_max
 	damage = (6.0 + ilvl * 2.0) * float(entry.get("damage_mult", 1.0))
+	armor_value = _armor_for_level()
 	speed = float(entry.get("speed", speed))
 	body_color = Color(String(entry.get("color", "#a85050")))
 	queue_redraw()
@@ -112,10 +120,12 @@ func _release_attack(target: Node2D) -> void:
 		target.take_hit(damage, global_position)
 
 
-func take_hit(amount: float, knock: Vector2, poise_damage: float) -> void:
+## `penetration` is the attacker's fraction of ignored armour (0..0.6).
+func take_hit(amount: float, knock: Vector2, poise_damage: float, penetration: float = 0.0) -> void:
 	if _dead:
 		return
-	hp -= amount
+	var effective_armor := armor_value * (1.0 - clampf(penetration, 0.0, 0.9))
+	hp -= Damage.mitigate_armor(amount, effective_armor)
 	poise -= poise_damage
 	_knock += knock * 0.12
 	_flash = 0.14

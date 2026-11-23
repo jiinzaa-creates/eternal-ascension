@@ -749,6 +749,51 @@ func _run() -> void:
 	player.rebuild_stats()
 	check(player.stats.weapon_damage() >= 0.0, "removing the curse restores a sane weapon slot")
 
+	# --- secondary stats ------------------------------------------------------
+	check(player.stats.evasion_chance() > 0.0, "the player has an evasion chance")
+	check(player.stats.evasion_chance() <= StatBlock.EVASION_CAP, "evasion is capped")
+	check(player.stats.penetration_fraction() > 0.0, "the player has penetration")
+	check(player.stats.crit_multiplier() >= StatBlock.CRIT_DAMAGE_FLOOR, "crit damage is a real multiplier")
+	check(player.stats.lifespan_years() > 0, "a starting cultivator has years left")
+
+	# Out-of-combat regeneration heals slowly and stops mid-attack.
+	player.hp = player.hp_max * 0.5
+	player._hurt_flash = 0.0
+	player._attack_state = "idle"
+	var before_regen: float = player.hp
+	player.regenerate(1.0)
+	check(player.hp > before_regen, "health regenerates out of combat")
+	var regen_mid_fight: float = player.hp
+	player._attack_state = "active"
+	player.regenerate(1.0)
+	check(player.hp == regen_mid_fight, "regeneration stops while attacking")
+	player._attack_state = "idle"
+	player.hp = player.hp_max
+
+	# Armour exists, and penetration means the same blow gets through it.
+	var armoured := Dummy.new()
+	main.world.add_child(armoured)
+	armoured.aggressive = false
+	armoured.global_position = player.global_position + Vector2(240, 0)
+	var bare := Dummy.new()
+	main.world.add_child(bare)
+	bare.aggressive = false
+	bare.armor_value = 0.0
+	bare.global_position = player.global_position + Vector2(300, 0)
+	await frames(1)
+	var armoured_hp: float = armoured.hp
+	armoured.take_hit(40.0, Vector2.ZERO, 0.0, 0.0)
+	var armoured_loss: float = armoured_hp - armoured.hp
+	var bare_hp: float = bare.hp
+	bare.take_hit(40.0, Vector2.ZERO, 0.0, 0.0)
+	var bare_loss: float = bare_hp - bare.hp
+	check(armoured_loss < bare_loss, "armour reduces an incoming hit")
+	var armoured_again: float = armoured.hp
+	armoured.take_hit(40.0, Vector2.ZERO, 0.0, 1.0)
+	check(armoured_again - armoured.hp > armoured_loss, "penetration beats armour")
+	armoured.queue_free()
+	bare.queue_free()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

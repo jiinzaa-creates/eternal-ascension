@@ -13,7 +13,6 @@ extends CharacterBody2D
 const RADIUS := 14.0
 const BASE_HP := 80.0
 const DODGE_SPEED := 520.0
-const CRIT_MULTIPLIER := 1.8
 ## World units per second squared. The character reaches full speed in about a
 ## tenth of a second and stops in less, which keeps turns responsive without
 ## the instant velocity snap the first build shipped.
@@ -57,6 +56,7 @@ var _hurt_flash := 0.0
 var _hud_timer := 0.0
 var _peak_notified := false
 var _attack_counter := 0
+var _evade_counter := 0
 var _sprinting := false
 
 
@@ -103,8 +103,23 @@ func _process(delta: float) -> void:
 		modulate.a = 0.55
 	else:
 		modulate.a = 1.0
+	regenerate(delta)
 	_sync_animation(delta)
 	queue_redraw()
+
+
+## Out-of-combat health regeneration. Attacking or having just been hit stops it,
+## so a fight is never a healing race against the player's own stats.
+func regenerate(delta: float) -> void:
+	if hp <= 0.0 or hp >= hp_max:
+		return
+	if _attack_state != "idle" or _hurt_flash > 0.0:
+		return
+	var amount := stats.health_regen() * delta
+	if amount <= 0.0:
+		return
+	hp = minf(hp_max, hp + amount)
+	Bus.player_stats_changed.emit()
 
 
 func _move_ratio() -> float:
@@ -213,7 +228,7 @@ func _tick_attack(delta: float) -> void:
 			recovery *= (1.0 - stats.recovery_reduction())
 			_attack_timer = maxf(0.02, recovery)
 			_attack_phase_total = _attack_timer
-			_cooldown = float(_current_technique.get("cooldown", 0.4))
+			_cooldown = float(_current_technique.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction())
 		"recovery":
 			_attack_state = "idle"
 
@@ -262,7 +277,7 @@ func _strike() -> void:
 
 	var raw := Damage.technique_damage(tech, stats, stats.weapon_damage())
 	if is_crit:
-		raw *= CRIT_MULTIPLIER
+		raw *= stats.crit_multiplier()
 	var poise := Damage.poise_damage(tech, stats)
 	var knock := Damage.knockback(tech, stats)
 	var lifesteal := float(tech.get("lifesteal", 0.0)) + stats.lifesteal()
@@ -282,7 +297,7 @@ func _strike() -> void:
 			continue
 		var final := Damage.resolve(raw, 0.0, float(cultivation.realm))
 		if enemy.has_method("take_hit"):
-			enemy.take_hit(final, _facing.normalized() * knock, poise)
+			enemy.take_hit(final, _facing.normalized() * knock, poise, stats.penetration_fraction())
 		Bus.damage_dealt.emit(final, enemy)
 		if lifesteal > 0.0:
 			heal(final * lifesteal)
@@ -297,9 +312,15 @@ func armor() -> float:
 	return stats.armor()
 
 
-func take_hit(amount: float, _from: Vector2 = Vector2.ZERO) -> void:
+func take_hit(amount: float, _from: Vector2 = Vector2.ZERO, can_evade: bool = true) -> void:
 	if _iframes > 0.0 or hp <= 0.0:
 		return
+	if can_evade and stats.evasion_chance() > 0.0:
+		_evade_counter += 1
+		var roll := float(Rng.roll_float("evade", Game.kills * 977 + _evade_counter, cultivation.realm))
+		if stats.evades(roll):
+			Bus.toast.emit("You slip aside.")
+			return
 	var raw := Damage.mitigate_armor(amount, stats.armor())
 	var final := Damage.resolve(raw, stats.physical_resist() * 100.0, 1.0)
 	hp = maxf(0.0, hp - final)
