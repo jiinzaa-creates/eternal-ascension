@@ -45,6 +45,23 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Meridians, contamination and Qi density
+
+- **Twelve primary meridians** (`data/meridians.json`) are opened in data order at the meridian hall for
+  spirit stones plus `Meridians.OPEN_QI_PCT` (35%) of current Qi capacity. Each is permanent, adds one mod
+  through `StatBlock.rebuild(..., meridian_mods)` and raises capacity by 4% (`Meridians.capacity_mult`).
+  Realm gates (`realm` on the entry) are checked by `Meridians.can_open`; the hall only ever offers
+  `next_available`, so you cannot skip into a high-realm channel.
+- **Contamination** is a 0–100 value on `Cultivation`, saved with the character. It multiplies Qi gain and
+  regeneration by `1 - contamination / 200`, i.e. at most −50%, never inverting. Sources: practising the
+  Blood Sea (0.8/s while meditating) and a failed breakthrough (+12). The shrine purges it for
+  `Meridians.CLEANSE_COST` (30 stones).
+- **Qi density** is per-biome data (`qi_density`: verdant 1.0, marsh 1.15, ashen 0.8, frost 0.9) and is
+  multiplied into `Player.environment_bonus()` with the weather. `Game.biome_density` is derived each frame
+  from the chunk under the player and is never saved.
+- `meridians` and `contamination` are optional save keys; legacy saves start with no open channels and clean
+  Qi.
+
 ## Cultivation methods: fit, insight, switching
 
 - Seven methods share one meditation loop and differ only by **mechanic** (`Methods.meditation_multiplier`):

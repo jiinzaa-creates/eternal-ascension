@@ -288,6 +288,13 @@ func _spawn_interactables() -> void:
 	world.add_child(manual)
 	interactables.append(manual)
 
+	# Meridian hall: opens the next channel the body can bear, for Qi and stones.
+	var meridian_hall := Interactable.new()
+	meridian_hall.setup_meridian_hall("meridian.hall", "Meridian hall")
+	meridian_hall.position = settlement.position_for("shrine") + Vector2(-72, 36)
+	world.add_child(meridian_hall)
+	interactables.append(meridian_hall)
+
 	# Method stele: reshapes your circulation for a price, gated on requirements.
 	var method_stele := Interactable.new()
 	method_stele.setup_method("method.stele", "Method stele")
@@ -441,6 +448,12 @@ func _apply_origin() -> void:
 func _process(delta: float) -> void:
 	if player == null:
 		return
+	# Regional Qi density is derived from where the body stands, never saved.
+	if realm_instance != null:
+		Game.biome_density = 1.0
+	else:
+		Game.biome_density = Biome.qi_density(
+			DB.biome(Biome.for_chunk(chunks.world_to_chunk(player.global_position), Game.world_seed)))
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open:
@@ -916,6 +929,31 @@ func _try_interact() -> void:
 
 
 ## Rui sells one cut to anyone who meets its requirements and can pay.
+func _open_meridian() -> void:
+	var next := Meridians.next_available(player.cultivation.meridians, player.cultivation.realm)
+	if next.is_empty():
+		Bus.toast.emit("The hall has nothing your realm can still open.")
+		return
+	var meridian_id := String(next.get("id", ""))
+	var stones := Meridians.stone_cost(meridian_id)
+	if Game.spirit_stones < stones:
+		Bus.toast.emit("The hall asks %d stones for the %s." % [stones, String(next.get("name", meridian_id))])
+		return
+	var qi_cost := Meridians.qi_cost(meridian_id, player.cultivation.qi_max(player.stats))
+	if player.cultivation.qi < qi_cost:
+		Bus.toast.emit("You lack the Qi to force the %s open." % String(next.get("name", meridian_id)))
+		return
+	Game.spirit_stones -= stones
+	player.cultivation.qi -= qi_cost
+	if not player.cultivation.open_meridian(meridian_id):
+		return
+	player.rebuild_stats()
+	Bus.toast.emit("Meridian opened: %s (+%s %s)." % [
+		String(next.get("name", meridian_id)), String(next.get("stat", "")), str(next.get("value", 0))])
+	Bus.player_stats_changed.emit()
+	Bus.cultivation_changed.emit()
+
+
 func _cycle_method() -> void:
 	var state := player.method_state()
 	var next_id := Methods.next(player.cultivation.method_id, state)
@@ -1001,6 +1039,13 @@ func _use_interactable(node: Interactable) -> void:
 				_toast_new_objective()
 			else:
 				Bus.toast.emit("The shrine hums. Your meridians settle.")
+			if player.cultivation.contamination > 0.0:
+				if Game.spirit_stones >= Meridians.CLEANSE_COST:
+					Game.spirit_stones -= Meridians.CLEANSE_COST
+					player.cultivation.cleanse(Meridians.MAX_CONTAMINATION)
+					Bus.toast.emit("The shrine burns the impurity from your channels. (-%d stones)" % Meridians.CLEANSE_COST)
+				else:
+					Bus.toast.emit("The shrine could purge you, for %d stones." % Meridians.CLEANSE_COST)
 			cultivation_restore()
 		Interactable.Kind.PORTAL:
 			if node.id == "realm.exit":
@@ -1044,6 +1089,8 @@ func _use_interactable(node: Interactable) -> void:
 				Bus.toast.emit("You already know what this manual teaches.")
 		Interactable.Kind.METHOD:
 			_cycle_method()
+		Interactable.Kind.MERIDIAN:
+			_open_meridian()
 		Interactable.Kind.DEMONSTRATION:
 			var watched := player.observe_technique(node.demo_technique)
 			var demo: Dictionary = DB.technique(node.demo_technique)

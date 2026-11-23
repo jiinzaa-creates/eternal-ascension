@@ -1,0 +1,16 @@
+{
+  "meridians": [
+    {"id": "meridian.lung", "name": "Lung Meridian", "element": "metal", "stat": "wis", "value": 1, "realm": 1, "stones": 40},
+    {"id": "meridian.large_intestine", "name": "Large Intestine Meridian", "element": "metal", "stat": "armor", "value": 4, "realm": 1, "stones": 40},
+    {"id": "meridian.stomach", "name": "Stomach Meridian", "element": "earth", "stat": "str", "value": 1, "realm": 1, "stones": 40},
+    {"id": "meridian.spleen", "name": "Spleen Meridian", "element": "earth", "stat": "physical_resist", "value": 3, "realm": 1, "stones": 40},
+    {"id": "meridian.heart", "name": "Heart Meridian", "element": "fire", "stat": "qi_max_pct", "value": 4, "realm": 2, "stones": 80},
+    {"id": "meridian.small_intestine", "name": "Small Intestine Meridian", "element": "fire", "stat": "wis", "value": 2, "realm": 2, "stones": 80},
+    {"id": "meridian.bladder", "name": "Bladder Meridian", "element": "water", "stat": "move_speed_pct", "value": 3, "realm": 2, "stones": 80},
+    {"id": "meridian.kidney", "name": "Kidney Meridian", "element": "water", "stat": "qi_regen_pct", "value": 10, "realm": 2, "stones": 80},
+    {"id": "meridian.pericardium", "name": "Pericardium Meridian", "element": "fire", "stat": "attack_speed_pct", "value": 3, "realm": 3, "stones": 140},
+    {"id": "meridian.triple_burner", "name": "Triple Burner Meridian", "element": "fire", "stat": "cult_speed_pct", "value": 4, "realm": 3, "stones": 140},
+    {"id": "meridian.gallbladder", "name": "Gallbladder Meridian", "element": "wood", "stat": "dex", "value": 2, "realm": 4, "stones": 220},
+    {"id": "meridian.liver", "name": "Liver Meridian", "element": "wood", "stat": "crit_chance", "value": 2, "realm": 4, "stones": 220}
+  ]
+}

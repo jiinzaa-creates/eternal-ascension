@@ -7,6 +7,9 @@ var player: Node = null
 var world_seed: int = 8814237719
 var kills: int = 0
 var karma: int = 0
+## Ambient Qi density of the biome the player stands in. Derived from the world
+## each frame, never saved.
+var biome_density: float = 1.0
 var spirit_stones: int = 0
 var discovered: Dictionary = {}
 ## Origin chosen at creation. Applied once, at the start of a run; loading a save

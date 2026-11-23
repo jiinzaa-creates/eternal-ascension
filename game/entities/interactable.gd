@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -63,6 +63,10 @@ func setup_passive_manual(id_value: String, label_value: String, passive_id: Str
 
 func setup_method(id_value: String, label_value: String) -> void:
 	setup(Kind.METHOD, id_value, label_value)
+
+
+func setup_meridian_hall(id_value: String, label_value: String) -> void:
+	setup(Kind.MERIDIAN, id_value, label_value)
 
 
 func setup_demonstration(id_value: String, label_value: String, technique_id: String) -> void:
@@ -220,6 +224,14 @@ func _draw() -> void:
 			draw_line(Vector2(0, -17), Vector2(0, -6), Color("#8a7a5a"), 3.0)
 			draw_arc(Vector2(0, -14), 20.0, -1.1 + pulse * 0.5, 0.9 + pulse * 0.5, 16,
 				Color("#d8a0c0", 0.65), 2.0)
+		Kind.MERIDIAN:
+			# A meridian hall: a low stone table with twelve lit channels.
+			draw_rect(Rect2(-24, 2, 48, 10), Color("#3a4048"))
+			draw_rect(Rect2(-28, -4, 56, 8), Color("#4a525a"))
+			for i in 6:
+				var flow := 0.35 + 0.35 * sin(_pulse * 2.0 + float(i))
+				draw_line(Vector2(-22.0 + float(i) * 8.0, -4.0), Vector2(-22.0 + float(i) * 8.0, -18.0 - float(i % 3) * 3.0),
+					Color("#8fd8e8", flow), 1.5)
 		Kind.METHOD:
 			# A method stele: dark stone, carved channels, a slow inner light.
 			draw_rect(Rect2(-9, -30, 18, 38), Color("#2e2a34"))

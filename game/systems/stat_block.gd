@@ -60,7 +60,7 @@ func reset() -> void:
 ## Rebuilds every modifier from equipment and passives. Called whenever the
 ## player equips something, gains a passive, or advances a realm.
 func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float,
-		physique_id: String = "") -> void:
+		physique_id: String = "", meridian_mods: Array = []) -> void:
 	reset()
 	realm = realm_number
 	realm_mult = realm_attribute_mult
@@ -84,6 +84,9 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 			continue
 		passives.append(String(id))
 		apply_mods(passive.get("mods", []), String(passive.get("name", "passive")))
+
+	if not meridian_mods.is_empty():
+		apply_mods(meridian_mods, "meridians")
 
 	# Synergies are bonus mods for pairs the host has already activated.
 	var synergy: Array = Passives.synergy_mods(passive_ids)

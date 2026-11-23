@@ -3,6 +3,7 @@
 		{
 			"id": "biome.verdant",
 			"name": "Verdant Fringe",
+			"qi_density": 1.0,
 			"palette": ["#152218", "#182619", "#12201a", "#1a241b"],
 			"features": {"tuft": 74, "bush": 10, "rock": 9, "tree": 7},
 			"resources": [
@@ -18,6 +19,7 @@
 		{
 			"id": "biome.marsh",
 			"name": "Moonlit Marsh",
+			"qi_density": 1.15,
 			"palette": ["#132626", "#152a28", "#112322", "#172b2a"],
 			"features": {"tuft": 72, "bush": 14, "rock": 4, "tree": 10},
 			"resources": [
@@ -32,6 +34,7 @@
 		{
 			"id": "biome.ashen",
 			"name": "Ashen Scrub",
+			"qi_density": 0.8,
 			"palette": ["#221d16", "#241f18", "#1e1a14", "#262019"],
 			"features": {"tuft": 70, "bush": 6, "rock": 18, "tree": 6},
 			"resources": [
@@ -46,6 +49,7 @@
 		{
 			"id": "biome.frost",
 			"name": "Frostvale",
+			"qi_density": 0.9,
 			"palette": ["#1c2530", "#1e2833", "#18222c", "#202a36"],
 			"features": {"tuft": 74, "bush": 4, "rock": 14, "tree": 8},
 			"resources": [

@@ -11,6 +11,7 @@ const DATA_DIR := "res://data/"
 var realms: Array = []
 var roots: Array = []
 var methods: Array = []
+var meridians: Array = []
 var techniques: Array = []
 var bases: Array = []
 var prefixes: Array = []
@@ -37,6 +38,7 @@ func load_all() -> void:
 	realms = _read("realms.json").get("realms", [])
 	roots = _read("roots.json").get("roots", [])
 	methods = _read("methods.json").get("methods", [])
+	meridians = _read("meridians.json").get("meridians", [])
 	techniques = _read("techniques.json").get("techniques", [])
 	var items := _read("items.json")
 	bases = items.get("bases", [])
@@ -52,6 +54,7 @@ func load_all() -> void:
 	_index("realm", realms)
 	_index("root", roots)
 	_index("method", methods)
+	_index("meridian", meridians)
 	_index("technique", techniques)
 	_index("base", bases)
 	_index("prefix", prefixes)
@@ -109,6 +112,10 @@ func get_root(tier: int) -> Dictionary:
 		if int(r.get("tier", 0)) == tier:
 			return r
 	return {}
+
+
+func meridian(id: String) -> Dictionary:
+	return by_id("meridian", id)
 
 
 func technique(id: String) -> Dictionary:
@@ -204,6 +211,18 @@ func validate() -> Array:
 
 	if methods.is_empty():
 		problems.append("no cultivation methods defined")
+	if meridians.size() != 12:
+		problems.append("expected 12 meridians, found %d" % meridians.size())
+	var meridian_ids := {}
+	for m in meridians:
+		var meridian_id := String(m.get("id", "?"))
+		if meridian_ids.has(meridian_id):
+			problems.append("duplicate meridian id %s" % meridian_id)
+		meridian_ids[meridian_id] = true
+		if String(m.get("stat", "")) == "":
+			problems.append("meridian %s has no stat" % meridian_id)
+		if int(m.get("realm", 0)) < 1 or int(m.get("realm", 0)) > 12:
+			problems.append("meridian %s has an invalid realm" % meridian_id)
 	for m in methods:
 		var method_id := String(m.get("id", "?"))
 		if float(m.get("cult_mult", 0.0)) <= 0.0:
@@ -348,6 +367,7 @@ func counts() -> Dictionary:
 		"realms": realms.size(),
 		"roots": roots.size(),
 		"methods": methods.size(),
+		"meridians": meridians.size(),
 		"techniques": techniques.size(),
 		"bases": bases.size(),
 		"prefixes": prefixes.size(),

@@ -483,7 +483,7 @@ func _run() -> void:
 	check(Climate.KINDS.has(Weather.kind()), "the live weather is a known kind")
 	check(not Weather.label().is_empty(), "the HUD has a season and weather label")
 	check(Weather.label().contains(Weather.season_name()), "the weather label names the season")
-	check(approx(player.environment_bonus(), Climate.cultivation_bonus(Weather.current), 0.0001), "cultivation reads the live weather")
+	check(approx(player.environment_bonus(), Climate.cultivation_bonus(Weather.current) * Game.biome_density, 0.0001), "cultivation reads the live weather and the land")
 
 	var expected_light: Color = Climate.lighting_modulate(Clock.ambient_for_hour(Clock.hour), Weather.current)
 	if Weather.flash_strength() == 0.0:
@@ -985,6 +985,55 @@ func _run() -> void:
 	check(player.cultivation.method_id == "method.blood", "the method survives a save")
 	check(player.cultivation.blood_charge > 0.0, "blood essence survives a save")
 	check(player.cultivation.method_insight_points("method.blood") > 0, "method insight survives a save")
+
+	# --- meridians, contamination and Qi density -------------------------------
+	var meridian_hall: Interactable = _find_interactable(main.interactables, "meridian.hall")
+	check(meridian_hall != null, "the meridian hall stands by the shrine")
+	var stones_for_meridian: int = Game.spirit_stones
+	Game.spirit_stones = 0
+	main._use_interactable(meridian_hall)
+	check(player.cultivation.meridian_count() == 0, "the hall refuses without stones")
+	Game.spirit_stones = 500
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	var cap_before_meridian: float = player.cultivation.qi_max(player.stats)
+	var wis_before: int = player.stats.get_attr("wis")
+	var qi_before_meridian: float = player.cultivation.qi
+	main._use_interactable(meridian_hall)
+	check(player.cultivation.meridian_count() == 1, "a meridian can be opened")
+	check(player.cultivation.qi_max(player.stats) > cap_before_meridian, "an open meridian raises Qi capacity")
+	check(player.stats.get_attr("wis") > wis_before, "the opened meridian adds its stat")
+	check(player.cultivation.qi < qi_before_meridian, "opening a meridian spends Qi")
+	check(Game.spirit_stones == 500 - Meridians.stone_cost("meridian.lung"), "opening a meridian costs stones")
+
+	player.cultivation.method_id = "method.blood"
+	player.cultivation.blood_charge = 40.0
+	player.cultivation.cleanse(Meridians.MAX_CONTAMINATION)
+	player.meditate_tick(2.0)
+	check(player.cultivation.contamination > 0.0, "the blood method contaminates the channels")
+	var contaminated_gain: float = player.cultivation.qi_gain_per_sec(player.stats)
+	check(player.cultivation.contamination_mult() < 1.0, "contamination dampens cultivation")
+	player.cultivation.cleanse(Meridians.MAX_CONTAMINATION)
+	check(player.cultivation.qi_gain_per_sec(player.stats) > contaminated_gain, "cleansing restores Qi gain")
+
+	var shrine_node: Interactable = _find_interactable(main.interactables, "shrine.azure")
+	player.cultivation.add_contamination(60.0)
+	var stones_before_cleanse: int = Game.spirit_stones
+	check(shrine_node != null, "the shrine still stands")
+	main._use_interactable(shrine_node)
+	check(player.cultivation.contamination == 0.0, "the shrine purges contamination")
+	check(Game.spirit_stones == stones_before_cleanse - Meridians.CLEANSE_COST, "purging costs its stones")
+
+	var meridian_biome := Biome.for_chunk(main.chunks.world_to_chunk(player.global_position), Game.world_seed)
+	check(approx(Game.biome_density, Biome.qi_density(DB.biome(meridian_biome)), 0.0001), "the world reports its Qi density")
+
+	Game.spirit_stones = stones_for_meridian
+	player.cultivation.add_contamination(40.0)
+	main._save(86)
+	main._load_game(86)
+	await frames(2)
+	check(player.cultivation.meridian_count() == 1, "meridians survive a save")
+	check(is_equal_approx(player.cultivation.contamination, 40.0), "contamination survives a save")
+	player.cultivation.cleanse(Meridians.MAX_CONTAMINATION)
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

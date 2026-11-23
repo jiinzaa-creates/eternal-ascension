@@ -128,6 +128,10 @@ func draw_vitals(player: Player) -> void:
 		if dormant > 0:
 			passive_text += "   (%d dormant)" % dormant
 	_text(Vector2(x, y), passive_text, 11, Color("#b8a8d8"))
+	y += 18.0
+	_text(Vector2(x, y), "Meridians: %d/12   Contamination: %d%%" % [
+		player.cultivation.meridian_count(), int(player.cultivation.contamination)
+	], 11, Color("#8fd8e8"))
 
 
 func draw_world_panel(player: Player) -> void:

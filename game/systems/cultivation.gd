@@ -22,6 +22,10 @@ var method_id: String = "method.traditional"
 var method_insight: Dictionary = {}
 ## Blood Sea resource: gained by kills, burned while meditating.
 var blood_charge: float = 0.0
+## Opened meridians, in the order they were opened.
+var meridians: Array = []
+## Impurity in the channels, 0..100. Slows gain and regeneration until purged.
+var contamination: float = 0.0
 var breakthrough_attempts: int = 0
 var failures: int = 0
 
@@ -87,17 +91,50 @@ func base_qi() -> float:
 
 
 func qi_max(stats: StatBlock) -> float:
-	return base_qi() * stats.max_qi_mult() * (0.75 + 0.5 * effective_purity()) + stats.qi_max_flat()
+	return (base_qi() * stats.max_qi_mult() * (0.75 + 0.5 * effective_purity()) + stats.qi_max_flat()) \
+		* Meridians.capacity_mult(meridians)
+
+
+func meridian_count() -> int:
+	return Meridians.count(meridians)
+
+
+func has_meridian(id: String) -> bool:
+	return meridians.has(id)
+
+
+## Permanent. Returns false for unknown, duplicate or realm-locked channels;
+## the caller is responsible for having paid for it.
+func open_meridian(id: String) -> bool:
+	if not bool(Meridians.can_open(id, meridians, realm)["ok"]):
+		return false
+	meridians.append(id)
+	return true
+
+
+## Contamination cuts Qi gain and regeneration by up to half. It never inverts
+## and never reaches zero output.
+func contamination_mult() -> float:
+	return 1.0 - clampf(contamination, 0.0, Meridians.MAX_CONTAMINATION) / (Meridians.MAX_CONTAMINATION * 2.0)
+
+
+func add_contamination(amount: float) -> void:
+	contamination = clampf(contamination + maxf(0.0, amount), 0.0, Meridians.MAX_CONTAMINATION)
+
+
+func cleanse(amount: float) -> void:
+	contamination = clampf(contamination - maxf(0.0, amount), 0.0, Meridians.MAX_CONTAMINATION)
 
 
 func qi_gain_per_sec(stats: StatBlock, environment: float = 1.0) -> float:
-	return 4.0 * root_mult() * effective_method_mult() * stats.cultivation_rate_mult() * maxf(environment, 0.0)
+	return 4.0 * root_mult() * effective_method_mult() * stats.cultivation_rate_mult() \
+		* maxf(environment, 0.0) * contamination_mult()
 
 
 ## Passive regeneration while not meditating. Small, but real: a wounded
 ## cultivator recovers between fights without sitting down.
 func qi_regen_per_sec(stats: StatBlock) -> float:
-	return (0.6 + Attributes.soft(float(stats.get_attr("wis")), 25.0) / 22.0) * effective_purity() * stats.qi_regen_mult() + stats.qi_regen_flat()
+	return ((0.6 + Attributes.soft(float(stats.get_attr("wis")), 25.0) / 22.0) * effective_purity() * stats.qi_regen_mult() + stats.qi_regen_flat()) * contamination_mult()
 
 
 func regenerate(stats: StatBlock, delta: float) -> float:
@@ -180,6 +217,7 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		failures += 1
 		hp_cost = 0.35
 		qi = 0.0
+		add_contamination(Meridians.DEVIATION_CONTAMINATION)
 		consequences.append("qi_deviation")
 		if roll < chance * 0.35:
 			consequences.append("meridian_damage")
@@ -223,6 +261,8 @@ func to_dict() -> Dictionary:
 		"method_id": method_id,
 		"method_insight": method_insight.duplicate(),
 		"blood_charge": blood_charge,
+		"meridians": meridians.duplicate(),
+		"contamination": contamination,
 		"breakthrough_attempts": breakthrough_attempts,
 		"failures": failures,
 	}
@@ -239,5 +279,7 @@ func from_dict(data: Dictionary) -> void:
 	method_id = String(data.get("method_id", "method.traditional"))
 	method_insight = data.get("method_insight", {}).duplicate()
 	blood_charge = clampf(float(data.get("blood_charge", 0.0)), 0.0, 100.0)
+	meridians = data.get("meridians", []).duplicate()
+	contamination = clampf(float(data.get("contamination", 0.0)), 0.0, Meridians.MAX_CONTAMINATION)
 	breakthrough_attempts = int(data.get("breakthrough_attempts", 0))
 	failures = int(data.get("failures", 0))

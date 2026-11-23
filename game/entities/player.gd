@@ -110,7 +110,8 @@ func dormant_passives() -> Array:
 
 
 func rebuild_stats() -> void:
-	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id)
+	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
+		Meridians.bonus_mods(cultivation.meridians))
 	_recalc_vitals()
 
 
@@ -520,8 +521,9 @@ func meditate_tick(delta: float) -> float:
 	var factor := Methods.meditation_multiplier(cultivation.method_id, state)
 	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
 	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
-	if cultivation.method_id == "method.blood" and cultivation.blood_charge > 0.0:
+	if cultivation.method_id == "method.blood":
 		cultivation.consume_blood_charge(delta * 2.0)
+		cultivation.add_contamination(delta * Meridians.BLOOD_CONTAMINATION_PER_SECOND)
 	return gained
 
 
@@ -600,9 +602,9 @@ func cultivation_changed() -> void:
 
 
 func environment_bonus() -> float:
-	# Weather is the environment's first real input: rain thins the Qi, storms
-	# charge it, snow slows it. Regional spirit-density will join this later.
-	return Climate.cultivation_bonus(Weather.current)
+	# Weather and regional Qi density multiply: a storm in the ashen scrub is
+	# still a poor place to sit.
+	return Climate.cultivation_bonus(Weather.current) * maxf(0.0, Game.biome_density)
 
 
 func pick_up(item: Dictionary) -> void:

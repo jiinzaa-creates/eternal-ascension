@@ -42,6 +42,12 @@ static func _corner(seed_value: int, x: int, y: int) -> float:
 	return Rng.stream_from(seed_value, "biome", x * 73856093 + y * 19349663, 0).randf()
 
 
+## Regional Qi density: how rich the ambient Qi is here. Defaults to 1.0 so a
+## definition without the field is neutral rather than broken.
+static func qi_density(biome: Dictionary) -> float:
+	return maxf(0.0, float(biome.get("qi_density", 1.0)))
+
+
 ## Picks a resource (herb) definition from a biome's table.
 static func pick_resource(biome: Dictionary, r: RandomNumberGenerator) -> Dictionary:
 	return _pick(biome.get("resources", []), r)

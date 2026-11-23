@@ -25,6 +25,7 @@ func _ready() -> void:
 	_passive_system_tests()
 	_technique_mastery_tests()
 	_method_tests()
+	_qi_meridian_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -847,6 +848,82 @@ func _method_tests() -> void:
 	legacy.from_dict({})
 	check(legacy.method_insight.is_empty(), "legacy saves carry no insight")
 	check(is_equal_approx(legacy.blood_charge, 0.0), "legacy saves carry no blood charge")
+
+
+# -------------------------------------------------------- qi & meridians ----
+
+func _qi_meridian_tests() -> void:
+	print("[meridians] channels, contamination and Qi density")
+	check(DB.meridians.size() == 12, "twelve meridians are defined (%d)" % DB.meridians.size())
+	for meridian in DB.meridians:
+		var id := String(meridian.get("id", ""))
+		check(String(meridian.get("stat", "")) != "", "%s names a stat" % id)
+		check(int(meridian.get("realm", 0)) >= 1 and int(meridian.get("realm", 0)) <= 12, "%s has a valid realm" % id)
+		check(int(meridian.get("stones", -1)) >= 0, "%s has a stone cost" % id)
+
+	check(Meridians.count(["meridian.lung", "meridian.lung", "meridian.none"]) == 1, "meridians count once")
+	check(is_equal_approx(Meridians.capacity_mult(["meridian.lung", "meridian.stomach"]), 1.08), "each meridian adds capacity")
+	var mods := Meridians.bonus_mods(["meridian.lung"])
+	check(mods.size() == 1 and String(mods[0]["stat"]) == "wis", "a meridian contributes its stat")
+	check(not bool(Meridians.can_open("meridian.heart", [], 1)["ok"]), "a realm-locked meridian is refused")
+	check(bool(Meridians.can_open("meridian.heart", [], 2)["ok"]), "the right realm opens it")
+	check(not bool(Meridians.can_open("meridian.lung", ["meridian.lung"], 9)["ok"]), "a meridian opens once")
+	check(not bool(Meridians.can_open("meridian.none", [], 9)["ok"]), "an unknown meridian is refused")
+	check(String(Meridians.next_available([], 1)["id"]) == "meridian.lung", "opening follows data order")
+	check(String(Meridians.next_available(["meridian.lung"], 1)["id"]) == "meridian.large_intestine", "the next channel follows")
+	check(Meridians.next_available([], 0).is_empty(), "no realm opens nothing")
+	check(is_equal_approx(Meridians.qi_cost("meridian.lung", 100.0), 35.0), "opening costs a share of capacity")
+
+	var bare := StatBlock.new(Attributes.new())
+	bare.rebuild({}, [], 1, 1.0)
+	var opened := StatBlock.new(Attributes.new())
+	opened.rebuild({}, [], 1, 1.0, "", Meridians.bonus_mods(["meridian.lung", "meridian.large_intestine"]))
+	check(opened.get_attr("wis") == bare.get_attr("wis") + 1, "meridians add attributes")
+	check(opened.armor() > bare.armor(), "meridians add armour")
+
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var cultivation := Cultivation.new()
+	cultivation.root_tier = 3
+	var cap_before := cultivation.qi_max(stats)
+	check(cultivation.open_meridian("meridian.lung"), "a meridian opens")
+	check(cultivation.meridian_count() == 1, "the count follows")
+	check(cultivation.qi_max(stats) > cap_before, "open channels raise Qi capacity")
+	check(not cultivation.open_meridian("meridian.lung"), "a meridian does not open twice")
+	check(not cultivation.open_meridian("meridian.heart"), "a realm-locked channel refuses")
+
+	var gain_before := cultivation.qi_gain_per_sec(stats)
+	cultivation.add_contamination(50.0)
+	check(cultivation.contamination_mult() < 1.0, "contamination slows gain")
+	check(cultivation.qi_gain_per_sec(stats) < gain_before, "contaminated channels gain less Qi")
+	check(cultivation.qi_regen_per_sec(stats) >= 0.0, "regeneration never inverts")
+	cultivation.cleanse(100.0)
+	check(is_equal_approx(cultivation.contamination, 0.0), "cleansing clears the channels")
+
+	cultivation.add_contamination(20.0)
+	var saved := cultivation.to_dict()
+	var restored := Cultivation.new()
+	restored.from_dict(saved)
+	check(restored.has_meridian("meridian.lung"), "meridians survive a save")
+	check(is_equal_approx(restored.contamination, 20.0), "contamination survives a save")
+	var legacy := Cultivation.new()
+	legacy.from_dict({})
+	check(legacy.meridians.is_empty() and is_equal_approx(legacy.contamination, 0.0), "legacy saves have clean channels")
+
+	check(is_equal_approx(Biome.qi_density({}), 1.0), "a biome without density is neutral")
+	check(is_equal_approx(Biome.qi_density({"qi_density": 1.5}), 1.5), "biome density reads its data")
+
+	var failing := Cultivation.new()
+	failing.root_tier = 3
+	failing.sublevel = Cultivation.SUBLEVELS
+	failing.qi = failing.qi_max(stats)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var result := failing.attempt_breakthrough(stats, rng, 0, 0)
+	if bool(result["success"]):
+		check(is_equal_approx(failing.contamination, 0.0), "a clean breakthrough does not contaminate")
+	else:
+		check(failing.contamination > 0.0, "a failed breakthrough contaminates the channels")
 
 
 func _rng_tests() -> void:
