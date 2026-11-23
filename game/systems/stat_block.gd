@@ -40,6 +40,9 @@ var add_pct: Dictionary = {}
 var flat_stats: Dictionary = {}
 var passives: Array = []
 var sources: Array = []
+## Fraction of STR/DEX/AGI lost to old age, 0..0.9. Applied to the total of base
+## and flat attributes so the raw sheet is never rewritten.
+var aging_penalty: float = 0.0
 
 
 func _init(base_attributes: Attributes = null) -> void:
@@ -61,8 +64,9 @@ func reset() -> void:
 ## player equips something, gains a passive, or advances a realm.
 func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float,
 		physique_id: String = "", meridian_mods: Array = [], realm_ability_mods: Array = [],
-		enlightenment_mods: Array = []) -> void:
+		enlightenment_mods: Array = [], aging: float = 0.0) -> void:
 	reset()
+	aging_penalty = clampf(aging, 0.0, 0.9)
 	realm = realm_number
 	realm_mult = realm_attribute_mult
 
@@ -133,7 +137,10 @@ static func factor(percent: float) -> float:
 
 
 func get_attr(key: String) -> int:
-	return maxi(0, base.get_attr(key) + int(flat_attrs.get(key, 0)))
+	var raw := maxi(0, base.get_attr(key) + int(flat_attrs.get(key, 0)))
+	if aging_penalty > 0.0 and Aging.AGING_KEYS.has(key):
+		return int(round(float(raw) * (1.0 - aging_penalty)))
+	return raw
 
 
 func attr_bonus(key: String) -> int:

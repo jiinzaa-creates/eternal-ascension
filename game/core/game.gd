@@ -17,6 +17,12 @@ var discovered: Dictionary = {}
 var origin_id: String = ""
 var play_time: float = 0.0
 var running: bool = false
+## World day the body was born. Age is derived from it and the clock, never
+## stored twice, so a save can never drift out of step with the calendar.
+var born_day: int = 1
+var dead: bool = false
+## Highest aging stage already announced this run, so each warning fires once.
+var age_warning_stage: int = 0
 
 
 func _process(delta: float) -> void:
@@ -34,10 +40,18 @@ func new_run(seed_value: int = 0) -> void:
 	origin_id = "origin.sect_orphan"
 	play_time = 0.0
 	running = true
+	born_day = Clock.day
+	dead = false
+	age_warning_stage = 0
 
 
 func _fresh_seed() -> int:
 	return int(Time.get_unix_time_from_system()) ^ int(Time.get_ticks_usec())
+
+
+## Current age in years, from the calendar and the recorded birth day.
+func age_years() -> float:
+	return Aging.age_for(born_day, Clock.day)
 
 
 func discover(id: String) -> bool:
@@ -60,6 +74,9 @@ func to_dict() -> Dictionary:
 		"discovered": discovered.duplicate(),
 		"origin": origin_id,
 		"play_time": play_time,
+		"born_day": born_day,
+		"dead": dead,
+		"age_warning_stage": age_warning_stage,
 	}
 
 
@@ -72,3 +89,8 @@ func from_dict(data: Dictionary) -> void:
 	discovered = data.get("discovered", {}).duplicate()
 	origin_id = String(data.get("origin", ""))
 	play_time = float(data.get("play_time", 0.0))
+	# Legacy saves have no birth day: they start their life now, at the age a
+	# new body begins.
+	born_day = int(data.get("born_day", Clock.day))
+	dead = bool(data.get("dead", false))
+	age_warning_stage = int(data.get("age_warning_stage", 0))

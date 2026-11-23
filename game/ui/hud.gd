@@ -59,6 +59,11 @@ func _draw() -> void:
 	if player == null:
 		return
 
+	if String(host.phase) == "ended":
+		draw_ended(player)
+		draw_toasts()
+		return
+
 	if String(host.phase) == "creation":
 		draw_creation(player)
 		draw_toasts()
@@ -76,6 +81,25 @@ func _draw() -> void:
 	draw_toasts()
 	if _help_visible:
 		draw_help()
+
+
+## The end of the road: a quiet screen with the life that was lived, and the
+## only key that still does anything.
+func draw_ended(player: Player) -> void:
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.9))
+	var center := view * 0.5
+	var title := "THE DAO RELEASES YOU"
+	_text(center + Vector2(-_text_width(title, 30) * 0.5, -130.0), title, 30, Color("#c9d8e2"))
+	var lines: Array[String] = [
+		Aging.age_text(Game.age_years(), player.stats.lifespan_years()),
+		"Realm %d · %d kills · %d karma" % [player.cultivation.realm, Game.kills, Game.karma],
+		"%d spirit stones · %d days in the world" % [Game.spirit_stones, maxi(0, Clock.day - Game.born_day)],
+	]
+	for i in lines.size():
+		_text(center + Vector2(-_text_width(lines[i], 15) * 0.5, -60.0 + float(i) * 26.0), lines[i], 15, MUTED)
+	var hint := "ENTER — begin again"
+	_text(center + Vector2(-_text_width(hint, 16) * 0.5, 110.0), hint, 16, Color("#e8d9a8"))
 
 
 func draw_vitals(player: Player) -> void:
@@ -115,8 +139,8 @@ func draw_vitals(player: Player) -> void:
 		int(player.stats.cooldown_reduction() * 100.0), player.stats.crit_multiplier()
 	], 11, MUTED)
 	y += 16.0
-	_text(Vector2(x, y), "Regen %.1f/s   Lifespan %s" % [
-		player.stats.health_regen(), "unbounded" if lifespan <= 0 else "%d years" % lifespan
+	_text(Vector2(x, y), "Regen %.1f/s   %s" % [
+		player.stats.health_regen(), Aging.age_text(Game.age_years(), lifespan)
 	], 11, MUTED)
 	y += 18.0
 	var passive_text := "Passives: none"

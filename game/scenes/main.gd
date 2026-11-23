@@ -419,11 +419,62 @@ func refund_attribute() -> bool:
 
 func _begin_run() -> void:
 	_apply_origin()
+	Game.born_day = Clock.day
+	Game.dead = false
+	Game.age_warning_stage = 0
+	_run_ended = false
+	player.set_physics_process(true)
+	player.set_process(true)
 	phase = "play"
 	player.rebuild_stats()
 	player.hp = player.hp_max
 	player.spawn_point = settlement.position_for("plaza")
 	Bus.toast.emit("Azure Cloud Market. Elder Bai waits by the sect hall.")
+
+
+# --------------------------------------------------------------- aging ----
+
+var _run_ended := false
+
+
+## Aging is read from the calendar each frame rather than ticked by a signal, so
+## fast travel, inn rest and any direct day jump all count in full.
+func _check_aging() -> void:
+	if player == null or Game.dead or String(phase) != "play":
+		return
+	var lifespan := player.stats.lifespan_years()
+	var age := Game.age_years()
+	var stage := Aging.stage(age, lifespan)
+	var rank := Aging.stage_rank(stage)
+	if rank > Game.age_warning_stage:
+		Game.age_warning_stage = rank
+		var warning := Aging.warning_for(stage)
+		if warning != "":
+			Bus.toast.emit(warning)
+			Bus.player_stats_changed.emit()
+	if Aging.is_dead(age, lifespan):
+		_end_run()
+
+
+## The body has outlived its years: the run ends and the end screen takes over.
+## Idempotent, because both the frame check and a loaded dead save may call it.
+func _end_run() -> void:
+	if _run_ended:
+		return
+	_run_ended = true
+	phase = "ended"
+	Game.dead = true
+	Game.running = false
+	if player != null:
+		player.velocity = Vector2.ZERO
+		player.set_physics_process(false)
+		player.set_process(false)
+	if tribulation_arena != null:
+		tribulation_arena.queue_free()
+		tribulation_arena = null
+	Bus.cultivation_changed.emit()
+	Bus.player_stats_changed.emit()
+	Bus.toast.emit("Your years are spent. The dao releases you.")
 
 
 func creation_origins() -> Array:
@@ -458,6 +509,11 @@ func _apply_origin() -> void:
 
 func _process(delta: float) -> void:
 	if player == null:
+		return
+	if String(phase) == "ended":
+		return
+	_check_aging()
+	if String(phase) == "ended":
 		return
 	# Regional Qi density is derived from where the body stands, never saved.
 	if realm_instance != null:
@@ -786,6 +842,10 @@ func toggle_map() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if String(phase) == "ended":
+		if event.is_action_pressed("accept"):
+			get_tree().reload_current_scene()
+		return
 	if phase == "creation":
 		if event.is_action_pressed("accept"):
 			if creation_stage == 0:
@@ -1508,6 +1568,9 @@ func _on_enemy_died(at: Vector2, ilvl: int) -> void:
 # ----------------------------------------------------------- save/load ----
 
 func _save(slot: int) -> void:
+	if String(phase) == "ended":
+		Bus.toast.emit("The story has ended; there is nothing to save.")
+		return
 	if phase == "realm":
 		Bus.toast.emit("You cannot anchor a save inside a hidden realm.")
 		return
@@ -1558,6 +1621,9 @@ func _load_game(slot: int) -> void:
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	player.from_dict(data.get("player", {}))
+	_run_ended = false
+	player.set_physics_process(true)
+	player.set_process(true)
 	ground_items = data.get("ground_items", []).duplicate(true)
 	quests.from_dict(data.get("quests", {}))
 	used_interactables = data.get("used_interactables", []).duplicate()
@@ -1578,6 +1644,8 @@ func _load_game(slot: int) -> void:
 	chunks.today = Clock.day
 	chunks.resync(player.global_position)
 	phase = "play"
+	if Game.dead:
+		_end_run()
 	Log.info("scene", "loaded slot %d" % slot)
 	Bus.toast.emit("Loaded slot %d." % slot)
 

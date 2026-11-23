@@ -114,8 +114,17 @@ func dormant_passives() -> Array:
 func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
-		Enlightenments.mods(enlightenments))
+		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()))
 	_recalc_vitals()
+
+
+## Lifespan this body will have once rebuilt. WIS is never reduced by aging, so
+## the decline cannot feed back into its own lifespan.
+func _lifespan_years() -> int:
+	var base := Realms.lifespan(cultivation.realm)
+	if base <= 0:
+		return 0
+	return base + stats.lifespan_bonus()
 
 
 ## Replaces the body only with a strictly better one; ties keep what you have.

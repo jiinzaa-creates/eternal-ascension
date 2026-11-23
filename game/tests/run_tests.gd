@@ -30,6 +30,7 @@ func _ready() -> void:
 	_breakthrough_tests()
 	_tribulation_tests()
 	_enlightenment_tests()
+	_aging_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1407,6 +1408,73 @@ func _enlightenment_tests() -> void:
 	var corrupt := Cultivation.new()
 	corrupt.from_dict({"enlightenment_meter": 500.0})
 	check(approx(corrupt.enlightenment_meter, Cultivation.ENLIGHTENMENT_GOAL), "a corrupt meter is clamped")
+
+
+# -------------------------------------------------------------- aging ----
+
+func _aging_tests() -> void:
+	print("[aging] calendar age, decline, stages and death")
+	check(approx(Aging.age_for(1, 1), float(Aging.START_AGE)), "a run starts at the starting age")
+	check(approx(Aging.age_for(1, 1 + int(Aging.DAYS_PER_YEAR)), float(Aging.START_AGE + 1)), "one aging year passes per DAYS_PER_YEAR days")
+	check(approx(Aging.age_for(10, 5), float(Aging.START_AGE)), "days cannot run backwards")
+	check(approx(Aging.age_for(1, 1, 20), 20.0), "the starting age can be overridden")
+	check(approx(Aging.ratio(60, 120), 0.5), "age ratio is honest")
+	check(Aging.ratio(60, 0) == 0.0, "an unbounded lifespan has no ratio")
+	check(Aging.remaining_years(60, 120) == 60, "remaining years count down")
+	check(Aging.remaining_years(200, 120) == 0, "remaining years floor at zero")
+	check(Aging.remaining_years(20, 0) == -1, "an unbounded lifespan reports -1")
+
+	check(Aging.stage(20, 120) == "prime", "youth is prime")
+	check(Aging.stage(80, 120) == "middle", "sixty percent is middle age")
+	check(Aging.stage(110, 120) == "old", "late life is old")
+	check(Aging.stage(119, 120) == "fading", "the last years are fading")
+	check(Aging.stage(120, 120) == "ended", "the lifespan is the end")
+	check(Aging.stage(900, 0) == "ageless", "an unbounded lifespan never ages")
+	check(Aging.stage_rank("prime") < Aging.stage_rank("middle") and Aging.stage_rank("middle") < Aging.stage_rank("old"), "stages rank in order")
+	check(Aging.stage_rank("fading") < Aging.stage_rank("ended"), "fading precedes the end")
+	check(Aging.stage_rank("ageless") == 0 and Aging.stage_rank("nonsense") == 0, "unknown stages are harmless")
+
+	check(Aging.decline(20, 120) == 0.0, "the young do not decline")
+	check(Aging.decline(70, 120) == 0.0, "decline waits for its threshold")
+	check(Aging.decline(90, 120) > 0.0, "the old decline")
+	check(Aging.decline(100, 120) > Aging.decline(90, 120), "decline deepens with age")
+	check(approx(Aging.decline(120, 120), Aging.DECLINE_MAX), "decline reaches its cap at the lifespan")
+	check(Aging.decline(120, 0) == 0.0, "the ageless do not decline")
+
+	check(not Aging.is_dead(119, 120), "a year short is still alive")
+	check(Aging.is_dead(120, 120), "the lifespan ends the run")
+	check(not Aging.is_dead(9999, 0), "an unbounded lifespan never ends")
+	check(Aging.warning_for("middle") != "" and Aging.warning_for("old") != "" and Aging.warning_for("fading") != "", "each declining stage warns")
+	check(Aging.warning_for("prime") == "" and Aging.warning_for("ended") == "", "the other stages are silent")
+
+	var attrs := Attributes.new()
+	for key in Attributes.KEYS:
+		attrs.add(key, 30)
+	var young_stats := StatBlock.new(attrs)
+	young_stats.rebuild({}, [], 1, 1.0)
+	var old_stats := StatBlock.new(attrs)
+	old_stats.rebuild({}, [], 1, 1.0, "", [], [], [], Aging.DECLINE_MAX)
+	check(old_stats.get_attr("str") < young_stats.get_attr("str"), "aging reduces STR")
+	check(old_stats.get_attr("dex") < young_stats.get_attr("dex"), "aging reduces DEX")
+	check(old_stats.get_attr("agi") < young_stats.get_attr("agi"), "aging reduces AGI")
+	check(old_stats.get_attr("wis") == young_stats.get_attr("wis"), "aging leaves WIS alone")
+	check(old_stats.get_attr("int") == young_stats.get_attr("int"), "aging leaves INT alone")
+	check(old_stats.get_attr("cha") == young_stats.get_attr("cha"), "aging leaves CHA alone")
+	check(old_stats.get_attr("str") >= 0, "aging cannot push attributes negative")
+	var overloaded := StatBlock.new(attrs)
+	overloaded.rebuild({}, [], 1, 1.0, "", [], [], [], 5.0)
+	check(overloaded.get_attr("str") > 0, "an absurd penalty is clamped, not fatal")
+
+	var game_saved := Game.to_dict()
+	Game.born_day = 7
+	Game.dead = true
+	Game.age_warning_stage = 3
+	var saved := Game.to_dict()
+	Game.from_dict(saved)
+	check(Game.born_day == 7 and Game.dead and Game.age_warning_stage == 3, "aging state survives a run save")
+	Game.from_dict({})
+	check(Game.born_day == Clock.day and not Game.dead and Game.age_warning_stage == 0, "legacy runs start alive and young")
+	Game.from_dict(game_saved)
 
 
 func _rng_tests() -> void:

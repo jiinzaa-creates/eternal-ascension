@@ -1292,6 +1292,68 @@ func _run() -> void:
 	player.cultivation.qi = 8.0
 	player.rebuild_stats()
 
+	# --- aging and lifespan ---------------------------------------------------
+	var born_before := Game.born_day
+	Clock.day = Game.born_day + int(Aging.DAYS_PER_YEAR)
+	check(approx(Game.age_years(), float(Aging.START_AGE + 1)), "world days age the body")
+	Clock.day = Game.born_day
+	check(approx(Game.age_years(), float(Aging.START_AGE)), "returning the calendar returns the age")
+
+	player.cultivation.realm = 1
+	player.rebuild_stats()
+	var young_str := player.stats.get_attr("str")
+	var mortal_lifespan := player.stats.lifespan_years()
+	check(mortal_lifespan > 0, "a realm-one body has a measured lifespan")
+	Clock.day = Game.born_day + int(float(mortal_lifespan - Aging.START_AGE) * Aging.DAYS_PER_YEAR) - 100
+	player.rebuild_stats()
+	check(player.stats.get_attr("str") < young_str, "old age weakens the body")
+	check(player.stats.get_attr("wis") > 0, "old age leaves wisdom intact")
+	Clock.day = Game.born_day
+
+	player.cultivation.realm = 5
+	player.cultivation.sublevel = 3
+	player.cultivation.qi = 8.0
+	player.hp = player.hp_max
+	player.rebuild_stats()
+	Save.delete_slot(93)
+	main._save(93)
+	var born_saved := Game.born_day
+	var day_saved := Clock.day
+	Clock.day = Game.born_day + 240
+	main._load_game(93)
+	await frames(2)
+	check(Game.born_day == born_saved and Clock.day == day_saved, "loading restores the calendar and birth day")
+	Save.delete_slot(93)
+
+	# Death ends the run, stops the body and refuses further saves.
+	Game.age_warning_stage = 0
+	player.cultivation.realm = 1
+	player.rebuild_stats()
+	var death_lifespan: int = player.stats.lifespan_years()
+	Clock.day = Game.born_day + int(float(death_lifespan - Aging.START_AGE + 1) * Aging.DAYS_PER_YEAR)
+	main._check_aging()
+	check(String(main.phase) == "ended", "outliving the lifespan ends the run")
+	check(Game.dead, "the run is marked dead")
+	check(not player.is_physics_processing(), "an ended run stops the body")
+	main._save(93)
+	check(Save.load_game(93).is_empty(), "an ended run cannot be saved")
+
+	# Restore a living run for the rest of the suite.
+	Game.dead = false
+	Game.running = true
+	Game.born_day = born_before
+	Game.age_warning_stage = 0
+	main._run_ended = false
+	main.phase = "play"
+	Clock.day = day_saved
+	player.set_physics_process(true)
+	player.set_process(true)
+	player.cultivation.realm = 5
+	player.cultivation.sublevel = 3
+	player.cultivation.qi = 8.0
+	player.hp = player.hp_max
+	player.rebuild_stats()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

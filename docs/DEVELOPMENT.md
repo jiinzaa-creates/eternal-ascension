@@ -84,6 +84,29 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   `from_dict` clamps a corrupt realm into 1–12. A successful attempt returns the new realm's `unlocks`
   and `ability`; `Player` turns them into an "Realm art awakened" toast.
 
+## Lifespan and aging
+
+- **Age is derived, never ticked.** `Game.born_day` is the only saved aging field; age is
+  `Aging.age_for(born_day, Clock.day)` — `START_AGE` (16) plus elapsed days. Because the clock is read each
+  frame in `main._check_aging`, inn rest, fast travel and any jump in `Clock.day` all count in full, and a
+  save cannot disagree with the calendar.
+- **Compressed years.** The calendar runs 30-day seasons, but the body ages one year every
+  `Aging.DAYS_PER_YEAR` (24) days. A realm-1 lifespan of 120 years is therefore 2,880 world days. The
+  constant is the single tuning knob for the whole aging pace.
+- **Decline.** Past 60% of the lifespan, STR, DEX and AGI fall on a straight line to
+  `DECLINE_MAX` (35%) at the lifespan. `StatBlock.rebuild(..., aging)` scales the *total* of base and flat
+  attributes in `get_attr`, so the raw sheet is untouched and the effect is fully reversible; WIS, INT and
+  CHA are never reduced. The penalty is clamped to 0.9 even for corrupt input.
+- **Stages and warnings.** `prime → middle (60%) → old (85%) → fading (95%) → ended (100%)`, or `ageless`
+  for an unbounded lifespan (realm 12). `Game.age_warning_stage` records the highest announced stage, so each
+  toast (`Aging.warning_for`) fires once, and it is saved.
+- **Death ends the run.** At or past the lifespan `main._end_run` sets `phase = "ended"` and `Game.dead`,
+  stops the body, clears any tribulation and shows the end screen (`HUD.draw_ended`): age, realm, kills,
+  karma, stones and days lived. **ENTER** reloads the scene for a new run. An ended run refuses to save, and
+  loading a dead save returns to the end screen instead of play. `born_day` and `dead` are optional save
+  keys; a legacy save starts alive at the starting age.
+- **HUD.** The vitals regeneration line now reads `Regen x/s   Age N/M · middle age`.
+
 ## Enlightenment and comprehension
 
 - **Understanding is a meter** (`Cultivation.enlightenment_meter`, 0–`ENLIGHTENMENT_GOAL` = 100). It never
