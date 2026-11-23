@@ -657,6 +657,43 @@ func _run() -> void:
 	await frames(3)
 	check(main.waypoint_position == Vector2.ZERO, "reaching a waypoint clears it")
 
+	# --- off-screen simulation ------------------------------------------------
+	var some_npc: Npc = main.npcs[0]
+	check(some_npc.simulated, "NPCs are simulated while the player is near")
+	player.global_position = Vector2(9000, 9000)
+	await frames(3)
+	check(not some_npc.simulated, "NPCs sleep when the player is far away")
+	check(not some_npc.is_physics_processing(), "sleeping NPCs cost no physics frames")
+
+	player.global_position = main.settlement.position_for("plaza")
+	await frames(3)
+	check(some_npc.simulated, "NPCs wake when the player returns")
+	var expected_activity := String(some_npc.resolve_schedule(int(Clock.hour)).get("activity", ""))
+	check(some_npc.current_activity == expected_activity, "a woken NPC is doing what the schedule says now")
+	check(some_npc.global_position.distance_to(main.settlement.position_for(some_npc.current_location)) < 40.0,
+		"a woken NPC stands where the schedule puts them")
+
+	# Resources regrow while their chunk is unloaded, and the player hears about it.
+	var herb: Interactable = null
+	for candidate in main.interactables:
+		if is_instance_valid(candidate) and String(candidate.id).begins_with("herb.chunk."):
+			herb = candidate
+			break
+	check(herb != null, "a herb is streamed near the settlement")
+	if herb != null:
+		Clock.advance(24.0 * 5.0)
+		var regrow_toasts: int = _toasts.size()
+		main.chunks.today = Clock.day
+		main.chunks.delta.mark_spent(herb.chunk_coord, herb.id, Clock.day - 5)
+		main.chunks.resync(player.global_position)
+		await frames(3)
+		check(main.chunks.regrown_total > 0, "resources regrow while their chunk is unloaded")
+		var reported := false
+		for i in range(regrow_toasts, _toasts.size()):
+			if String(_toasts[i]).contains("wilds recover"):
+				reported = true
+		check(reported, "regrowth is reported when the player returns")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

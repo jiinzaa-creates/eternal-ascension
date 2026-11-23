@@ -45,6 +45,22 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Off-screen simulation
+
+- An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an
+  unobserved town costs nothing per frame; `wake()` snaps the NPC to the schedule for the current
+  hour (`snap_to_schedule`) instead of walking it back, and any activity change is remembered.
+- `main._simulate_npcs` owns the rule: NPCs sleep beyond `NPC_SIM_RADIUS` (1500) and inside a hidden
+  realm. Do not add per-NPC distance checks elsewhere; one rule keeps the town coherent.
+- Waking must be reachable from every path that changes the player's position (travel, realm exit,
+  load), which is why this lives in `_process` rather than in the travel code.
+- Changes wait in `_away_notes` and are flushed only when the player is back near the plaza, at most
+  three at a time. `_npc_seen` holds the activity each NPC had when it last slept.
+- `ChunkManager` counts resources that `prune` expired while a chunk was unloaded (`regrown_total`)
+  and emits `regrown`; the host sums it into `_wilds_recovered` and reports it once on return.
+  Regrowth is still clock-evaluated on stream-in, never ticked.
+- Sleeping NPCs are not saved specially: the schedule and the clock are the state.
+
 ## Navigation and fast travel
 
 - `Travel` is pure maths (hours, bearing, metres, destination list). The host moves the player and

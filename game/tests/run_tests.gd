@@ -29,6 +29,7 @@ func _ready() -> void:
 	_economy_tests()
 	_location_tests()
 	_travel_tests()
+	_simulation_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -788,6 +789,52 @@ func _travel_tests() -> void:
 	check(Travel.has_arrived(Vector2(100, 100), Vector2(120, 100)), "arrival is generous")
 	check(not Travel.has_arrived(Vector2(100, 100), Vector2(300, 100)), "a distant waypoint is not arrived")
 	check(not Travel.has_arrived(Vector2(100, 100), Vector2.ZERO), "an unset waypoint never counts as reached")
+
+
+# ------------------------------------------------------------- simulation ----
+
+func _simulation_tests() -> void:
+	print("[simulation] NPCs sleep, wake and snap to their schedule")
+	var npc := Npc.new()
+	npc.npc_id = "test_npc"
+	npc.display_name = "Test Cultivator"
+	npc.schedule = DB.schedules().get("disciple", [])
+
+	check(npc.simulated, "an NPC starts simulated")
+	npc.sleep()
+	check(not npc.simulated, "sleeping stops the NPC simulating")
+	npc.sleep()
+	check(not npc.simulated, "sleeping twice is harmless")
+	npc.wake()
+	check(npc.simulated, "waking resumes the NPC")
+
+	# Waking snaps to the schedule that passed while it slept.
+	var settlement := Settlement.new()
+	settlement.global_position = Vector2(200.0, 100.0)
+	npc.settlement = settlement
+	var previous_hour := Clock.hour
+	Clock.hour = 10.0
+	npc.current_activity = "idle"
+	npc.current_location = "plaza"
+	npc.sleep()
+	Clock.hour = 19.0
+	npc.wake()
+	check(npc.current_activity == String(npc.resolve_schedule(19).get("activity", "")),
+		"a woken NPC picks up the current activity")
+	check(npc.current_location == String(npc.resolve_schedule(19).get("location", "")), "a woken NPC moves to the current location")
+	check(npc.global_position.distance_to(settlement.position_for(npc.current_location)) < 0.01, "a woken NPC stands where the schedule puts them")
+	check(npc.target == npc.global_position, "a woken NPC has nothing left to walk")
+
+	Clock.hour = 23.0
+	npc.snap_to_schedule()
+	check(npc.current_activity == String(npc.resolve_schedule(23).get("activity", "")), "snapping follows the clock")
+	Clock.hour = previous_hour
+
+	npc.settlement = null
+	npc.snap_to_schedule()
+	check(npc.current_activity != "", "an NPC without a home does not crash when snapping")
+	npc.free()
+	settlement.free()
 
 
 # -------------------------------------------------------------------- npc ----

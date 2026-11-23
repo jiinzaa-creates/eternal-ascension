@@ -32,6 +32,10 @@ var current_location := ""
 var target := Vector2.ZERO
 var animator := Animator.new()
 
+## Off-screen simulation. A sleeping NPC costs nothing per frame and snaps to its
+## schedule when the player returns: absence is free, but not amnesia.
+var simulated := true
+
 var _idle_timer := 0.0
 var _wander := Vector2.ZERO
 var _last_hour := -1
@@ -85,11 +89,40 @@ func _update_activity() -> void:
 	if entry.is_empty():
 		return
 	var location := String(entry.get("location", "plaza"))
-	if location == current_location:
-		return
 	current_location = location
 	current_activity = String(entry.get("activity", "idle"))
 	target = settlement.position_for(location)
+
+
+func sleep() -> void:
+	if not simulated:
+		return
+	simulated = false
+	velocity = Vector2.ZERO
+	set_physics_process(false)
+
+
+func wake() -> void:
+	if simulated:
+		return
+	simulated = true
+	set_physics_process(true)
+	snap_to_schedule()
+
+
+## Places an NPC where its schedule says it should be right now, the way it would
+## have walked there had anyone been watching.
+func snap_to_schedule() -> void:
+	if settlement == null:
+		return
+	var entry := resolve_schedule(int(Clock.hour))
+	if entry.is_empty():
+		return
+	current_location = String(entry.get("location", "plaza"))
+	current_activity = String(entry.get("activity", "idle"))
+	target = settlement.position_for(current_location)
+	global_position = target
+	_last_hour = int(Clock.hour)
 
 
 ## Returns the schedule entry active at a given hour, handling ranges that wrap

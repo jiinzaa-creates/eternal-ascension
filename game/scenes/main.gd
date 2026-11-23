@@ -40,6 +40,12 @@ var waypoint_position := Vector2.ZERO
 ## Discovered sites, recorded with a position so they stay travel destinations
 ## after their chunk unloads.
 var travel_sites: Dictionary = {}
+## Off-screen simulation: NPCs sleep beyond this distance, and changes they lived
+## through wait in a short report shown when the player is back in the settlement.
+const NPC_SIM_RADIUS := 1500.0
+var _npc_seen: Dictionary = {}
+var _away_notes: Array = []
+var _wilds_recovered := 0
 var interactables: Array = []
 var ground_items: Array = []
 var quests: QuestLog
@@ -104,6 +110,7 @@ func _build_world() -> void:
 	chunks.set_resource_parent(world)
 	chunks.on_resource_spawned = func(node: Interactable) -> void: interactables.append(node)
 	chunks.on_resource_freed = func(node: Interactable) -> void: interactables.erase(node)
+	chunks.regrown.connect(_on_wilds_regrown)
 	chunks.configure(Game.world_seed)
 	chunks.set_prop_parent(world)
 	chunks.stream_around(SPAWN)
@@ -361,6 +368,9 @@ func _process(delta: float) -> void:
 	if (world_map != null and world_map.visible) or shop_open or travel_open:
 		return
 
+	_simulate_npcs()
+	_flush_away_report()
+
 	if Travel.has_arrived(player.global_position, waypoint_position):
 		Bus.toast.emit("You have reached %s." % waypoint_name)
 		waypoint_name = ""
@@ -525,6 +535,52 @@ func _rest_at_inn() -> void:
 	Clock.advance(8.0)
 	Bus.player_stats_changed.emit()
 	Bus.toast.emit("You sleep for eight hours and wake restored. (-%d stones)" % cost)
+
+
+# ---------------------------------------------------------- simulation ----
+
+## Sleeps every NPC the player cannot see and wakes the ones nearby. Waking snaps
+## an NPC to the schedule that passed while it slept, and any change in activity
+## is remembered for the return report.
+func _simulate_npcs() -> void:
+	var in_realm := realm_instance != null
+	for npc in npcs:
+		if not is_instance_valid(npc):
+			continue
+		var node := npc as Npc
+		var near := not in_realm and node.global_position.distance_to(player.global_position) <= NPC_SIM_RADIUS
+		if near:
+			if not node.simulated:
+				var before := String(_npc_seen.get(node.npc_id, ""))
+				node.wake()
+				if before != "" and before != node.current_activity:
+					_away_notes.append("%s was %s while you were away, and is now %s." % [node.display_name, before, node.current_activity])
+					if _away_notes.size() > 6:
+						_away_notes.pop_front()
+				_npc_seen[node.npc_id] = node.current_activity
+		elif node.simulated:
+			_npc_seen[node.npc_id] = node.current_activity
+			node.sleep()
+
+
+func _flush_away_report() -> void:
+	if _wilds_recovered > 0 and realm_instance == null:
+		Bus.toast.emit("The wilds recover while you were away (%d)." % _wilds_recovered)
+		_wilds_recovered = 0
+	if _away_notes.is_empty() or phase != "play":
+		return
+	if player.global_position.distance_to(settlement.position_for("plaza")) > 600.0:
+		return
+	var shown := mini(3, _away_notes.size())
+	for i in shown:
+		Bus.toast.emit(String(_away_notes[i]))
+	if _away_notes.size() > shown:
+		Bus.toast.emit("...and %d more changes while you were away." % (_away_notes.size() - shown))
+	_away_notes.clear()
+
+
+func _on_wilds_regrown(count: int) -> void:
+	_wilds_recovered += count
 
 
 # --------------------------------------------------------------- travel ----

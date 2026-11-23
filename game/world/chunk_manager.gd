@@ -32,6 +32,10 @@ var biome_defs: Dictionary = {}
 var delta: WorldDelta = null
 var chunks: Dictionary = {}
 var streamed_chunks: int = 0
+## How many spent resources have regrown on stream-in since the last clear, and a
+## signal so the owner can tell the player the wilds moved without them.
+signal regrown(count: int)
+var regrown_total: int = 0
 ## Where streamed props are parented. Props must share a parent with the player
 ## to Y-sort against it, so they live in the world layer rather than the chunk.
 var prop_parent: Node = null
@@ -72,6 +76,7 @@ func clear_all() -> void:
 	chunks.clear()
 	props.clear()
 	streamed_chunks = 0
+	regrown_total = 0
 
 
 ## Streams the ring of chunks around a world position. Cheap to call every
@@ -186,7 +191,10 @@ func _spawn_resources(chunk) -> void:
 	if resource_parent == null:
 		return
 	if delta != null:
-		delta.prune(chunk.coord, today)
+		var recovered: int = delta.prune(chunk.coord, today)
+		if recovered > 0:
+			regrown_total += recovered
+			regrown.emit(recovered)
 	var origin := Vector2(chunk.coord) * CHUNK_SIZE
 	for entry in chunk.herbs:
 		var id := String(entry["id"])
