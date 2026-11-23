@@ -2559,6 +2559,47 @@ func _run() -> void:
 	main.close_storage()
 	check(not main.storage_open and player.is_physics_processing(), "closing the storehouse resumes play")
 
+	# --- loot tables: elite rank, own tables, table-driven chests --------------
+	check(DB.loot_tables.size() >= Loot.REQUIRED_SOURCES.size(), "loot tables are loaded")
+	var m43_rules := Loot.new(DB, Rng)
+	check(JSON.stringify(m43_rules.roll("kill.wild", 4, 5150, 0)) == JSON.stringify(m43_rules.roll("kill.wild", 4, 5150, 0)), "a kill's loot is reproducible")
+	var m43_elite := Dummy.new()
+	m43_elite.ilvl = 3
+	main.world.add_child(m43_elite)
+	m43_elite.global_position = player.global_position + Vector2(240, 0)
+	var m43_base_hp := m43_elite.hp_max
+	m43_elite.make_elite()
+	check(m43_elite.is_elite and m43_elite.hp_max > m43_base_hp, "an elite is tougher than the same body")
+	check(m43_elite.is_in_group("elite"), "an elite is marked for the world")
+	var m43_kills := Game.kills
+	var m43_items_before: int = main.ground_items.size()
+	var m43_stones_before := Game.spirit_stones
+	m43_elite.take_hit(99999.0, Vector2.ZERO, 999.0)
+	await get_tree().process_frame
+	check(Game.kills == m43_kills + 1, "the elite kill counts")
+	var m43_dropped: int = main.ground_items.size() - m43_items_before
+	check(m43_dropped >= 1 and m43_dropped <= Loot.rolls_of(DB.loot_table("kill.elite")).y, "the elite rolls its own table once")
+	check(Game.spirit_stones > m43_stones_before, "an elite carries a purse")
+	if m43_dropped >= 1:
+		var m43_piece: Dictionary = main.ground_items[m43_items_before]["item"]
+		check(int(m43_piece["ilvl"]) >= 5, "the elite table adds its level bonus")
+
+	var m43_chest := Interactable.new()
+	m43_chest.setup(Interactable.Kind.CHEST, "chest.m43.test", "Test chest")
+	main.world.add_child(m43_chest)
+	m43_chest.global_position = player.global_position
+	var m43_chest_before: int = main.ground_items.size()
+	main._loot(m43_chest, 6, "sealed chest", "chest.sealed")
+	check(m43_chest.used, "a table-driven chest is spent")
+	check(main.ground_items.size() > m43_chest_before, "a sealed chest drops from its own table")
+	var m43_good_gear := true
+	for i in range(m43_chest_before, main.ground_items.size()):
+		var m43_item: Dictionary = main.ground_items[i]["item"]
+		if Items.is_equipment(String(m43_item["slot"])) and int(m43_item["rarity"]) < 1:
+			m43_good_gear = false
+	check(m43_good_gear, "sealed chest gear is never mortal grade")
+	m43_chest.queue_free()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

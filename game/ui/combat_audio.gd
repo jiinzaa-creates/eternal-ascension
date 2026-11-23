@@ -31,6 +31,7 @@ func _ready() -> void:
 		_players.append(player)
 	Bus.hit_landed.connect(_on_hit_landed)
 	Bus.enemy_died.connect(_on_enemy_died)
+	Bus.elite_died.connect(_on_enemy_died)
 	Bus.swing_made.connect(_on_swing)
 	Bus.technique_cast.connect(_on_technique)
 	Bus.guard_met.connect(_on_guard)

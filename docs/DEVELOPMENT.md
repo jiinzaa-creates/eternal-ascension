@@ -879,6 +879,42 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   slot agrees, a known source (a real boss id or the altar), a known effect with a positive amount,
   real mods and a positive value.
 
+## Loot tables
+
+- **One table per source, all in data.** `data/loot_tables.json` holds `kill.wild`,
+  `kill.elite`, `kill.boss`, `chest.common`, `chest.sealed`, `chest.ruin` and
+  `inheritance.altar`. Each entry owns `rolls` (min/max pieces, capped by `Loot.MAX_ROLLS`),
+  `empty_chance`, `rarity_weights` (one per shipped rarity), `slot_weights`,
+  `ilvl_bonus`, `min_rarity` and a `stones` range. `Loot.roll(source, ilvl, key,
+  counter)` is the only entry point the scene uses; an unknown source falls back to the
+  wild table rather than deleting loot silently.
+- **Loot chooses the roll, ItemGen chooses the item.** `Loot` picks the slot and
+  rarity from the table's weights and calls `ItemGen.generate(ilvl, key, counter + i,
+  rarity, slot)`. The table's decisions run on a `loot.<source>` stream while each item
+  keeps its own `itemgen` stream, so changing a weight cannot reshuffle existing items and
+  the same `(source, key, counter)` always produces the same pieces. Pieces within one
+  roll get distinct counters, which keeps their stable ids unique.
+- **Only slots with bases are legal.** Loot tables roll equipment and consumables because
+  those are the bases that exist; materials still come from mining, ruins and gathering.
+  `DB._validate_loot()` fails validation if a table weights a slot with no item base, which
+  is what a missing material base looks like from the data side.
+- **Elite is a rank, not a species.** One wild humanoid in eight (`main.ELITE_SHARE`,
+  drawn from the `wild_elite` stream so tuning it cannot move spawns) is promoted by
+  `Dummy.make_elite()`: elite health, damage and poise multipliers applied inside
+  `_recompute_stats()` (never compounded into live numbers), an `Elite` name prefix, a
+  gold ring and membership in the `elite` group. Bosses and beasts refuse promotion. An
+  elite emits `elite_died` *instead of* `enemy_died`, so the scene pays the elite table once
+  and the ordinary wild table never rolls on top; the death sound listens to both.
+- **Every call site names its table.** `main._loot()` powers containers, sealed chests and
+  ruins from `chest.*`; `main._drop_loot()` lays wild and elite pieces on the ground and
+  banks an elite's purse; `_on_boss_defeated()` picks up `kill.boss` spoils beside the boss's
+  own stones and relic; `_claim_inheritance()` rolls `inheritance.altar` on top of the
+  technique, passive, physique and relic it already grants.
+- **Validation.** `DB.validate()` requires every `Loot.REQUIRED_SOURCES` table, unique ids,
+  a full rarity weight list with at least one positive entry, a `min_rarity` in range, an
+  empty chance in 0–1, a non-negative level bonus, a two-number roll and stone range, and
+  slot weights that name known, base-backed slots.
+
 ## Inventory, sorting and the storehouse
 
 - **The grid is a view; the satchel is the array.** `Inventory` (pure, static) gives the flat

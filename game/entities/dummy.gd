@@ -54,6 +54,13 @@ var boss_phase := 0
 var boss_hp_mult := 1.0
 var boss_damage_mult := 1.0
 var boss_poise_mult := 1.0
+## An elite is a rank on a wild humanoid, not a species: a heavier body, a
+## heavier blow, a gold ring and its own loot table. Multipliers are applied in
+## `_recompute_stats()` like the boss ones, never compounded into live numbers.
+var is_elite := false
+var elite_hp_mult := 1.0
+var elite_damage_mult := 1.0
+var elite_poise_mult := 1.0
 ## Where this body belongs. Patrolling, returning and healing all use it.
 var home := Vector2.ZERO
 ## The current state reported to the world, for the HUD and for tests.
@@ -104,12 +111,13 @@ func _recompute_stats() -> void:
 	var hp_mult := float(_entry.get("hp_mult", 1.0))
 	var dmg_mult := float(_entry.get("damage_mult", 1.0))
 	var spawn_speed := float(_entry.get("speed", 60.0))
-	hp_max = (70.0 + ilvl * 18.0) * hp_mult * float(profile.get("hp_mult", 1.0)) * boss_hp_mult
+	hp_max = (70.0 + ilvl * 18.0) * hp_mult * float(profile.get("hp_mult", 1.0)) * boss_hp_mult * elite_hp_mult
 	hp = hp_max
 	poise.set_maximum(
-		(40.0 + ilvl * 6.0) * float(_entry.get("poise_mult", 1.0)) * float(profile.get("poise_mult", 1.0)) * boss_poise_mult,
+		(40.0 + ilvl * 6.0) * float(_entry.get("poise_mult", 1.0)) * float(profile.get("poise_mult", 1.0)) \
+		* boss_poise_mult * elite_poise_mult,
 		true)
-	damage = (6.0 + ilvl * 2.0) * dmg_mult * float(profile.get("damage_mult", 1.0)) * boss_damage_mult
+	damage = (6.0 + ilvl * 2.0) * dmg_mult * float(profile.get("damage_mult", 1.0)) * boss_damage_mult * elite_damage_mult
 	strike_poise = (8.0 + float(ilvl) * 2.0) * dmg_mult * float(profile.get("poise_mult", 1.0))
 	knockback = 140.0 + float(ilvl) * 10.0
 	armor_value = 8.0 + float(ilvl) * 5.0
@@ -138,6 +146,22 @@ func become_beast(species: Dictionary, realm: int) -> void:
 	is_beast = true
 	species_id = String(normalised.get("id", ""))
 	apply_biome_enemy(Beasts.enemy_entry(normalised), realm)
+	queue_redraw()
+
+
+## Promotes a wild humanoid to elite rank. Bosses and beasts are already ranked
+## bodies, so they refuse: an elite always reports through `elite_died` alone.
+func make_elite(hp_mult: float = 2.4, damage_mult: float = 1.35, poise_mult: float = 1.5) -> void:
+	if is_boss or is_beast:
+		return
+	is_elite = true
+	elite_hp_mult = maxf(1.0, hp_mult)
+	elite_damage_mult = maxf(1.0, damage_mult)
+	elite_poise_mult = maxf(1.0, poise_mult)
+	display_name = "Elite " + display_name
+	body_color = body_color.lightened(0.18)
+	add_to_group("elite")
+	_recompute_stats()
 	queue_redraw()
 
 
@@ -528,13 +552,20 @@ func _die() -> void:
 	elif is_beast and species_id != "":
 		Bus.beast_slain.emit(global_position, species_id, ilvl)
 	Game.register_kill()
-	Bus.enemy_died.emit(global_position, ilvl)
+	# An elite reports on its own channel: the scene pays its table and never the
+	# wild one as well, so rank can never roll twice.
+	if is_elite and not is_boss:
+		Bus.elite_died.emit(global_position, ilvl)
+	else:
+		Bus.enemy_died.emit(global_position, ilvl)
 	queue_free()
 
 
 func _draw() -> void:
 	var radius := RADIUS * (1.7 if is_boss else 1.0)
 	draw_circle(Vector2(0, 6), radius * 0.9, Color(0, 0, 0, 0.28))
+	if is_elite and not is_boss:
+		draw_arc(Vector2(0, 4), radius + 6.0, 0.0, TAU, 24, Color("#e0b24d", 0.55), 2.0)
 	if is_boss:
 		var ring := Boss.bar_color(boss_entry)
 		draw_arc(Vector2.ZERO, radius + 9.0, 0.0, TAU, 32, Color(ring, 0.45), 2.0)

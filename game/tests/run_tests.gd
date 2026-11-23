@@ -46,6 +46,7 @@ func _ready() -> void:
 	_equipment_rules_tests()
 	_unique_tests()
 	_inventory_tests()
+	_loot_tests()
 	_cultivation_tests()
 	_combat_tests()
 	_world_tests()
@@ -2170,6 +2171,124 @@ func _inventory_tests() -> void:
 	check(String(body.inventory[0]["id"]) == "item.inv.plate", "the satchel itself is reordered")
 	check(body.sort_inventory("junk") == "recent", "an unknown order falls back to stored order")
 	check(Items.to_save(sword).size() != 0 and body.inventory.size() == 3, "sorting keeps the satchel canonical")
+
+
+# -------------------------------------------------------------------- loot ----
+
+func _loot_tests() -> void:
+	print("[loot] data-driven tables, weights and elite rank")
+	var rules := Loot.new(DB, Rng)
+	var wild := rules.table("kill.wild")
+	check(not wild.is_empty() and String(wild.get("id", "")) == "kill.wild", "the wild table resolves by id")
+	check(String(rules.table("kill.nope").get("id", "")) == "kill.wild", "an unknown source falls back to the wild table")
+	for source in Loot.REQUIRED_SOURCES:
+		check(not rules.table(String(source)).is_empty(), "every called source has a table: %s" % source)
+	check(DB.loot_tables.size() >= Loot.REQUIRED_SOURCES.size(), "all loot tables are loaded")
+	check(not DB.loot_table("kill.boss").is_empty(), "the registry indexes loot tables")
+	check(DB.loot_table("nope").is_empty(), "an unknown table id resolves to nothing")
+	check(Loot.MAX_ROLLS >= 2 and Loot.rolls_of({}) == Vector2i.ONE, "a tableless roll asks for one piece")
+	check(Loot.label("kill.wild") == "Wild", "sources have readable labels")
+
+	var first := rules.roll("kill.wild", 5, 4242, 7)
+	check((first["items"] as Array).size() == 1, "the wild table rolls one piece")
+	check(JSON.stringify(first) == JSON.stringify(rules.roll("kill.wild", 5, 4242, 7)), "the same kill rolls the same loot")
+	check(JSON.stringify(first) != JSON.stringify(rules.roll("kill.wild", 5, 4242, 8)), "a different counter rolls different loot")
+	check(String(((first["items"] as Array)[0] as Dictionary).get("id", "")).begins_with("item."), "a rolled piece is a real item")
+	check(not bool(((first["items"] as Array)[0] as Dictionary).get("unique", false)), "a loot table never rolls a relic")
+
+	var boss := rules.roll("kill.boss", 8, 99, 0)
+	check((boss["items"] as Array).size() == 2, "the boss table rolls two pieces")
+	var boss_ok := true
+	for item in (boss["items"] as Array):
+		var piece: Dictionary = item
+		if not Items.is_equipment(String(piece["slot"])) or int(piece["rarity"]) < 2:
+			boss_ok = false
+	check(boss_ok, "boss loot is equipment at spirit grade or better")
+	check(Loot.rolls_of(DB.loot_table("chest.sealed")) == Vector2i(1, 2), "a table's roll range is data")
+
+	var sealed := rules.roll("chest.sealed", 6, 1234, 0)
+	check(not (sealed["items"] as Array).is_empty(), "a sealed chest always holds something")
+	var sealed_ok := true
+	for item in (sealed["items"] as Array):
+		var piece: Dictionary = item
+		if Items.is_equipment(String(piece["slot"])) and int(piece["rarity"]) < 1:
+			sealed_ok = false
+	check(sealed_ok, "sealed chest gear is never mortal grade")
+
+	var elite := rules.roll("kill.elite", 5, 777, 0)
+	check(not (elite["items"] as Array).is_empty(), "an elite always drops at least one piece")
+	check(int(elite["stones"]) >= 18 and int(elite["stones"]) <= 40, "an elite carries a purse")
+	var wild_purse := 0
+	for i in 20:
+		wild_purse += int(rules.roll("kill.wild", 5, 800 + i, 0)["stones"])
+	check(wild_purse == 0, "ordinary kills carry no purse")
+
+	var rings := {
+		"id": "test.rings", "rolls": [3, 3], "empty_chance": 0.0, "min_rarity": 0,
+		"rarity_weights": [0, 0, 0, 100], "slot_weights": {"ring": 100}, "stones": [0, 0],
+	}
+	var ring_roll := rules.roll_with(rings, 4, 31, 0)
+	check((ring_roll["items"] as Array).size() == 3, "a table rolls its declared count")
+	var rings_ok := true
+	var ring_ids := {}
+	for item in (ring_roll["items"] as Array):
+		var piece: Dictionary = item
+		ring_ids[String(piece["id"])] = true
+		if String(piece["slot"]) != "ring" or int(piece["rarity"]) != 3:
+			rings_ok = false
+	check(rings_ok, "slot and rarity weights are obeyed")
+	check(ring_ids.size() == 3, "pieces from one roll have distinct ids")
+
+	var empty := {
+		"id": "test.empty", "rolls": [2, 2], "empty_chance": 1.0,
+		"rarity_weights": [100, 0, 0, 0], "slot_weights": {"material": 100},
+	}
+	check((rules.roll_with(empty, 3, 5, 0)["items"] as Array).is_empty(), "an empty chance of one drops nothing")
+	var no_slots := {
+		"id": "test.noslots", "rolls": [2, 2],
+		"rarity_weights": [100, 0, 0, 0], "slot_weights": {},
+	}
+	check((rules.roll_with(no_slots, 3, 5, 0)["items"] as Array).is_empty(), "a table with no slot weights drops nothing")
+
+	var high := {
+		"id": "test.high", "rolls": [1, 1], "ilvl_bonus": 4,
+		"rarity_weights": [100, 0, 0, 0], "slot_weights": {"ring": 100},
+	}
+	var high_items: Array = rules.roll_with(high, 5, 12, 0)["items"]
+	check(high_items.size() == 1 and int((high_items[0] as Dictionary)["ilvl"]) == 9, "a table's level bonus raises the item level")
+	var clamped := {
+		"id": "test.clamped", "rolls": [1, 1], "min_rarity": 2,
+		"rarity_weights": [100, 0, 0, 0], "slot_weights": {"ring": 100},
+	}
+	var clamped_items: Array = rules.roll_with(clamped, 4, 13, 0)["items"]
+	check(clamped_items.size() == 1 and int((clamped_items[0] as Dictionary)["rarity"]) == 2, "a minimum rarity lifts a mundane roll")
+	var unknown := rules.roll("kill.nope", 4, 1, 0)
+	check(String(unknown["table"]) == "kill.nope" and not (unknown["items"] as Array).is_empty(), "an unknown source still pays the wild table")
+
+	var plain := Dummy.new()
+	add_child(plain)
+	check(not plain.is_elite, "a body starts unranked")
+	var plain_hp := plain.hp_max
+	var plain_damage := plain.damage
+	plain.make_elite()
+	check(plain.is_elite and plain.is_in_group("elite"), "a wild body can be promoted")
+	check(approx(plain.hp_max, plain_hp * 2.4), "an elite carries elite health")
+	check(plain.damage > plain_damage, "an elite hits harder")
+	check(plain.display_name.begins_with("Elite "), "an elite is named as one")
+	plain.queue_free()
+
+	var boss_body := Dummy.new()
+	add_child(boss_body)
+	boss_body.become_boss(DB.boss("boss.tomb_warden"), 2)
+	boss_body.make_elite()
+	check(not boss_body.is_elite, "a boss cannot also be an elite")
+	boss_body.queue_free()
+	var beast_body := Dummy.new()
+	add_child(beast_body)
+	beast_body.become_beast(Beasts.profile(DB.spirit_beast("beast.moonfang")), 2)
+	beast_body.make_elite()
+	check(not beast_body.is_elite, "a beast keeps its own rank")
+	beast_body.queue_free()
 
 
 # ------------------------------------------------------------ cultivation ----

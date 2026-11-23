@@ -11,6 +11,9 @@ const WILD_DUMMY_TARGET := 4
 const RESPAWN_INTERVAL := 8.0
 ## Share of wild spawns that are spirit beasts rather than humanoid cultivators.
 const BEAST_SHARE := 0.45
+## Share of wild humanoids that turn up as elites. Drawn from its own stream, so
+## tuning the share cannot reshuffle the spawns themselves.
+const ELITE_SHARE := 0.12
 ## The tomb's warden. A save remembers this id once it has fallen.
 const WARDEN_ID := "boss.tomb_warden"
 
@@ -113,6 +116,7 @@ func _ready() -> void:
 	_build_hud()
 	_build_feedback()
 	Bus.enemy_died.connect(_on_enemy_died)
+	Bus.elite_died.connect(_on_elite_died)
 	Bus.beast_slain.connect(_on_beast_slain)
 	Bus.boss_phase_changed.connect(_on_boss_phase_changed)
 	Bus.boss_defeated.connect(_on_boss_defeated)
@@ -652,12 +656,17 @@ func _spawn_wild_dummy() -> void:
 	# Two streams: whether a beast turns up is decided by its own stream, so the
 	# weighted species roll below cannot shift when the share is tuned.
 	var share: RandomNumberGenerator = Rng.stream("wild_beast", Game.kills + 1, _wild_dummy_count())
+	var elite_share: RandomNumberGenerator = Rng.stream("wild_elite", Game.kills + 1, _wild_dummy_count())
 	var species := Beasts.roll(DB.spirit_beasts, String(biome.get("id", "")), r)
 	if not species.is_empty() and share.randf() < BEAST_SHARE:
 		dummy.become_beast(species, player.cultivation.realm)
 	else:
 		var enemy := Biome.pick_enemy(biome, r)
 		dummy.apply_biome_enemy(enemy, player.cultivation.realm)
+		# Rank is decided after the species roll so a beast never becomes an
+		# elite: beasts report on their own death channel and keep their core.
+		if elite_share.randf() < ELITE_SHARE:
+			dummy.make_elite()
 
 
 func current_biome_name() -> String:
@@ -1518,7 +1527,7 @@ func _use_interactable(node: Interactable) -> void:
 		Interactable.Kind.CHEST:
 			if node.used:
 				return
-			_loot(node, 6, "sealed chest", 2)
+			_loot(node, 6, "sealed chest", "chest.sealed")
 		Interactable.Kind.ALTAR:
 			_claim_inheritance()
 		Interactable.Kind.DOOR:
@@ -1529,7 +1538,7 @@ func _use_interactable(node: Interactable) -> void:
 		Interactable.Kind.CONTAINER:
 			if node.used:
 				return
-			_loot(node, maxi(2, player.cultivation.realm + 1), node.label.to_lower(), 0)
+			_loot(node, maxi(2, player.cultivation.realm + 1), node.label.to_lower(), "chest.common")
 		Interactable.Kind.MANUAL:
 			if node.used:
 				return
@@ -1579,7 +1588,7 @@ func _use_interactable(node: Interactable) -> void:
 		Interactable.Kind.RUIN:
 			if node.used:
 				return
-			_loot(node, 5, "ruin cache", 1)
+			_loot(node, 5, "ruin cache", "chest.ruin")
 			if Roots.marrow_found(node.chunk_coord, "ruin"):
 				player.pick_up(_make_marrow())
 				Bus.toast.emit("Among the rubble: a knot of root marrow.")
@@ -1616,18 +1625,27 @@ func _mark_spent(node: Interactable) -> void:
 		used_interactables.append(node.id)
 
 
-## One-shot loot shared by chests, containers and ruins. The item is generated
-## from the node's stable id, so looting it again after a reload is impossible.
-func _loot(node: Interactable, ilvl: int, verb: String, forced_rarity: int = 0) -> void:
+## One-shot loot shared by chests, containers and ruins. The table decides how
+## many pieces and how good; the node's stable id is the roll's key, so looting it
+## again after a reload is impossible.
+func _loot(node: Interactable, ilvl: int, verb: String, table_id: String = "chest.common") -> void:
 	_mark_spent(node)
-	var generator := ItemGen.new(DB, Rng)
-	var item := generator.generate(maxi(1, ilvl), hash(node.id), ground_items.size(), forced_rarity)
-	if item.is_empty():
+	var result := Loot.new(DB, Rng).roll(table_id, maxi(1, ilvl), hash(node.id), ground_items.size())
+	var items: Array = result.get("items", [])
+	if items.is_empty():
 		Bus.toast.emit("The %s is empty." % verb)
 		return
-	ground_items.append({"x": node.global_position.x, "y": node.global_position.y + 30.0, "item": item})
-	Bus.item_dropped.emit(item, node.global_position)
-	Bus.toast.emit("The %s holds %s." % [verb, String(item.get("name", "?"))])
+	var names: Array[String] = []
+	for i in items.size():
+		var item: Dictionary = items[i]
+		ground_items.append({
+			"x": node.global_position.x + float(i) * 10.0,
+			"y": node.global_position.y + 30.0,
+			"item": item,
+		})
+		Bus.item_dropped.emit(item, node.global_position)
+		names.append(String(item.get("name", "?")))
+	Bus.toast.emit("The %s holds %s." % [verb, ", ".join(names)])
 
 
 func cultivation_restore() -> void:
@@ -1815,6 +1833,15 @@ func _claim_inheritance() -> void:
 	if not learned and not gained:
 		Bus.toast.emit("The altar yields nothing you can still use.")
 	_grant_unique(Uniques.ALTAR_SOURCE)
+	# The altar has its own table, not a chest's: one assured piece above the
+	# mundane, rolled from the realm seed so the tomb gives the same thing twice.
+	var spoils := Loot.new(DB, Rng).roll(
+		"inheritance.altar", maxi(1, player.cultivation.realm + 2), realm_seed + 91, ground_items.size())
+	var items: Array = spoils.get("items", [])
+	for item in items:
+		player.pick_up(item as Dictionary)
+	if not items.is_empty():
+		Bus.toast.emit("Inheritance: %s." % String((items[0] as Dictionary).get("name", "a piece of the altar")))
 	Bus.cultivation_changed.emit()
 
 
@@ -1973,34 +2000,67 @@ func _on_boss_defeated(id: String, _at: Vector2) -> void:
 	var reward: Dictionary = Boss.reward(entry)
 	var name := String(entry.get("name", id))
 	Game.spirit_stones += int(reward.get("stones", 0))
-	var generator := ItemGen.new(DB, Rng)
-	var item := generator.generate(
+	# The boss table is two assured pieces at spirit or better; the boss entry's
+	# own ilvl bonus still decides how high they roll.
+	var spoils := Loot.new(DB, Rng).roll(
+		"kill.boss",
 		maxi(1, player.cultivation.realm + int(entry.get("ilvl_bonus", 0))),
 		Game.kills + 7000,
-		ground_items.size(),
-		int(reward.get("rarity", ItemGen.RARITY_NAMES.size() - 1)))
-	if item.is_empty():
+		ground_items.size())
+	var items: Array = spoils.get("items", [])
+	for item in items:
+		player.pick_up(item as Dictionary)
+	if items.is_empty():
 		Bus.toast.emit("%s falls. The altar is open." % name)
 	else:
-		player.pick_up(item)
-		Bus.toast.emit("%s falls. You take the %s." % [name, String(item.get("name", "spoils"))])
+		Bus.toast.emit("%s falls. You take the %s." % [name, String((items[0] as Dictionary).get("name", "spoils"))])
 	# Boss ids are already stable `boss.*` keys, matching the relic's source.
 	_grant_unique(id)
 	Bus.player_stats_changed.emit()
 
 
-func _on_enemy_died(at: Vector2, ilvl: int) -> void:
+## Bookkeeping every kill shares, whatever table then pays for it.
+func _after_kill(ilvl: int) -> void:
 	if player != null:
 		player.on_kill(ilvl)
-	var generator := ItemGen.new(DB, Rng)
-	var item := generator.generate(maxi(1, ilvl + player.cultivation.realm), Game.kills + 1000, ground_items.size())
-	if not item.is_empty():
-		ground_items.append({"x": at.x + 18.0, "y": at.y + 10.0, "item": item})
-		Bus.item_dropped.emit(item, at)
 	var before := quests.step_index
 	quests.track("kill", "beast", 1)
 	if quests.step_index != before:
 		_toast_new_objective()
+
+
+## Rolls one table and lays its pieces on the ground. The counter advances by
+## what is laid down, so two kills in one frame cannot share an item id.
+func _drop_loot(source: String, at: Vector2, ilvl: int, key: int, offset: float = 0.0) -> Dictionary:
+	var result := Loot.new(DB, Rng).roll(source, maxi(1, ilvl), key, ground_items.size())
+	var items: Array = result.get("items", [])
+	for i in items.size():
+		var item: Dictionary = items[i]
+		ground_items.append({
+			"x": at.x + offset + float(i) * 9.0,
+			"y": at.y + 10.0,
+			"item": item,
+		})
+		Bus.item_dropped.emit(item, at)
+	var stones := int(result.get("stones", 0))
+	if stones > 0:
+		Game.spirit_stones += stones
+		Bus.player_stats_changed.emit()
+		Bus.toast.emit("%d spirit stones among the spoils." % stones)
+	return result
+
+
+func _on_enemy_died(at: Vector2, ilvl: int) -> void:
+	_after_kill(ilvl)
+	_drop_loot("kill.wild", at, ilvl + player.cultivation.realm, Game.kills + 1000, 18.0)
+
+
+## An elite body reports here instead of `enemy_died`, so its table never rolls
+## on top of the wild one. The rank itself was applied at spawn.
+func _on_elite_died(at: Vector2, ilvl: int) -> void:
+	_after_kill(ilvl)
+	_drop_loot("kill.elite", at, ilvl + player.cultivation.realm, Game.kills + 2000, 18.0)
+	Bus.toast.emit("An elite falls.")
 
 
 # ----------------------------------------------------------- save/load ----

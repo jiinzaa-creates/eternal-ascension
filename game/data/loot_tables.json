@@ -1,0 +1,81 @@
+{
+	"tables": [
+		{
+			"id": "kill.wild",
+			"name": "Wild cultivator",
+			"rolls": [1, 1],
+			"empty_chance": 0.0,
+			"ilvl_bonus": 0,
+			"min_rarity": 0,
+			"rarity_weights": [55, 27, 13, 5],
+			"slot_weights": {"weapon": 18, "armor": 17, "ring": 12, "talisman": 12, "consumable": 41},
+			"stones": [0, 0]
+		},
+		{
+			"id": "kill.elite",
+			"name": "Elite cultivator",
+			"rolls": [1, 2],
+			"empty_chance": 0.0,
+			"ilvl_bonus": 2,
+			"min_rarity": 1,
+			"rarity_weights": [18, 42, 32, 8],
+			"slot_weights": {"weapon": 26, "armor": 24, "ring": 20, "talisman": 20, "consumable": 10},
+			"stones": [18, 40]
+		},
+		{
+			"id": "kill.boss",
+			"name": "Boss",
+			"rolls": [2, 2],
+			"empty_chance": 0.0,
+			"ilvl_bonus": 0,
+			"min_rarity": 2,
+			"rarity_weights": [0, 0, 25, 75],
+			"slot_weights": {"weapon": 30, "armor": 26, "ring": 22, "talisman": 22},
+			"stones": [0, 0]
+		},
+		{
+			"id": "chest.common",
+			"name": "Container",
+			"rolls": [1, 1],
+			"empty_chance": 0.0,
+			"ilvl_bonus": 0,
+			"min_rarity": 0,
+			"rarity_weights": [55, 30, 13, 2],
+			"slot_weights": {"weapon": 18, "armor": 18, "ring": 12, "talisman": 12, "consumable": 40},
+			"stones": [0, 0]
+		},
+		{
+			"id": "chest.sealed",
+			"name": "Sealed chest",
+			"rolls": [1, 2],
+			"empty_chance": 0.0,
+			"ilvl_bonus": 0,
+			"min_rarity": 1,
+			"rarity_weights": [0, 10, 45, 45],
+			"slot_weights": {"weapon": 32, "armor": 32, "ring": 25, "talisman": 25, "consumable": 6},
+			"stones": [0, 0]
+		},
+		{
+			"id": "chest.ruin",
+			"name": "Ruin cache",
+			"rolls": [1, 1],
+			"empty_chance": 0.0,
+			"ilvl_bonus": 0,
+			"min_rarity": 0,
+			"rarity_weights": [30, 45, 20, 5],
+			"slot_weights": {"weapon": 24, "armor": 24, "ring": 15, "talisman": 15, "consumable": 22},
+			"stones": [0, 0]
+		},
+		{
+			"id": "inheritance.altar",
+			"name": "Inheritance altar",
+			"rolls": [1, 1],
+			"empty_chance": 0.0,
+			"ilvl_bonus": 0,
+			"min_rarity": 2,
+			"rarity_weights": [0, 0, 60, 40],
+			"slot_weights": {"weapon": 25, "armor": 25, "ring": 25, "talisman": 25},
+			"stones": [0, 0]
+		}
+	]
+}

@@ -16,6 +16,9 @@ signal tribulation_finished(result: Dictionary)
 signal enlightenment_gained(id: String)
 
 signal enemy_died(at: Vector2, ilvl: int)
+## An elite fell. It reports here *instead of* `enemy_died`, so the wild table
+## never rolls on top of the elite one; the death sound listens to both.
+signal elite_died(at: Vector2, ilvl: int)
 ## A spirit beast fell. The scene root pays its core; the ordinary loot path
 ## still runs through `enemy_died`.
 signal beast_slain(at: Vector2, species_id: String, ilvl: int)

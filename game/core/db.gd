@@ -26,6 +26,7 @@ var enemy_archetypes: Array = []
 var spirit_beasts: Array = []
 var bosses: Array = []
 var uniques: Array = []
+var loot_tables: Array = []
 var origins: Array = []
 var physiques: Array = []
 var weapon_types: Array = []
@@ -61,6 +62,7 @@ func load_all() -> void:
 	spirit_beasts = _read("spirit_beasts.json").get("beasts", [])
 	bosses = _read("bosses.json").get("bosses", [])
 	uniques = _read("uniques.json").get("uniques", [])
+	loot_tables = _read("loot_tables.json").get("tables", [])
 	origins = _read("origins.json").get("origins", [])
 	physiques = _read("physiques.json").get("physiques", [])
 	weapon_types = _read("weapons.json").get("weapon_types", [])
@@ -82,6 +84,7 @@ func load_all() -> void:
 	_index("spirit_beast", spirit_beasts)
 	_index("boss", bosses)
 	_index("unique", uniques)
+	_index("loot", loot_tables)
 	_index("origin", origins)
 	_index("physique", physiques)
 	_index("weapon_type", weapon_types)
@@ -115,6 +118,10 @@ func by_id(kind: String, id: String) -> Dictionary:
 	if typeof(entry) != TYPE_DICTIONARY:
 		return {}
 	return entry
+
+
+func loot_table(id: String) -> Dictionary:
+	return by_id("loot", id)
 
 
 func has(kind: String, id: String) -> bool:
@@ -701,6 +708,9 @@ func validate() -> Array:
 		if passive != "" and not has("passive", passive):
 			problems.append("origin %s references unknown passive %s" % [id, passive])
 
+	# Loot tables are the whole drop economy: a bad weight would skew every kill.
+	_validate_loot(problems)
+
 	# Duplicate IDs across the whole registry would corrupt save references.
 	var seen: Dictionary = {}
 	for kind in ["realm", "root", "method", "technique", "base", "prefix", "suffix", "passive", "quest", "weapon_type"]:
@@ -713,6 +723,88 @@ func validate() -> Array:
 				seen[full] = true
 
 	return problems
+
+
+func _base_exists_for_slot(slot: String) -> bool:
+	for entry in bases:
+		if typeof(entry) == TYPE_DICTIONARY and String((entry as Dictionary).get("slot", "")) == slot:
+			return true
+	return false
+
+
+## Loot tables are the whole drop economy: a bad weight would skew every kill,
+## and a missing source would silently fall back to the wild table.
+func _validate_loot(problems: Array) -> void:
+	for source in Loot.REQUIRED_SOURCES:
+		if not has("loot", String(source)):
+			problems.append("missing loot table " + String(source))
+	var seen: Dictionary = {}
+	var rarity_count := ItemGen.RARITY_NAMES.size()
+	for entry in loot_tables:
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("loot table is not an object")
+			continue
+		var id := String(entry.get("id", ""))
+		if id == "":
+			problems.append("loot table without id")
+			continue
+		if seen.has(id):
+			problems.append("duplicate loot table " + id)
+		seen[id] = true
+		var weights: Variant = entry.get("rarity_weights", [])
+		if typeof(weights) != TYPE_ARRAY or (weights as Array).size() != rarity_count:
+			problems.append("loot table %s needs %d rarity weights" % [id, rarity_count])
+		else:
+			var rarity_total := 0
+			for value in (weights as Array):
+				var weight := int(value)
+				if weight < 0:
+					problems.append("loot table %s has a negative rarity weight" % id)
+				rarity_total += maxi(0, weight)
+			if rarity_total <= 0:
+				problems.append("loot table %s has no positive rarity weight" % id)
+		var minimum := int(entry.get("min_rarity", 0))
+		if minimum < 0 or minimum >= rarity_count:
+			problems.append("loot table %s has an out-of-range min_rarity" % id)
+		var empty_chance := float(entry.get("empty_chance", 0.0))
+		if empty_chance < 0.0 or empty_chance > 1.0:
+			problems.append("loot table %s has an invalid empty chance" % id)
+		if int(entry.get("ilvl_bonus", 0)) < 0:
+			problems.append("loot table %s has a negative ilvl bonus" % id)
+		var rolls: Variant = entry.get("rolls", [])
+		if typeof(rolls) != TYPE_ARRAY or (rolls as Array).size() != 2:
+			problems.append("loot table %s needs a two-number roll count" % id)
+		else:
+			var low := int((rolls as Array)[0])
+			var high := int((rolls as Array)[1])
+			if low < 1 or high < low or high > Loot.MAX_ROLLS:
+				problems.append("loot table %s has an invalid roll count" % id)
+		var slots: Variant = entry.get("slot_weights", {})
+		if typeof(slots) != TYPE_DICTIONARY:
+			problems.append("loot table %s has malformed slot weights" % id)
+		else:
+			var slot_total := 0
+			for slot in (slots as Dictionary).keys():
+				var slot_name := String(slot)
+				if not Items.is_known_slot(slot_name):
+					problems.append("loot table %s names unknown slot %s" % [id, slot_name])
+				elif not _base_exists_for_slot(slot_name):
+					# A weight on a slot with no base would silently roll nothing.
+					problems.append("loot table %s names slot %s with no item base" % [id, slot_name])
+				var slot_weight := int((slots as Dictionary)[slot])
+				if slot_weight < 0:
+					problems.append("loot table %s has a negative slot weight" % id)
+				slot_total += maxi(0, slot_weight)
+			if slot_total <= 0:
+				problems.append("loot table %s has no positive slot weight" % id)
+		var stones: Variant = entry.get("stones", [0, 0])
+		if typeof(stones) != TYPE_ARRAY or (stones as Array).size() != 2:
+			problems.append("loot table %s needs a two-number stone range" % id)
+		else:
+			var stone_low := int((stones as Array)[0])
+			var stone_high := int((stones as Array)[1])
+			if stone_low < 0 or stone_high < stone_low:
+				problems.append("loot table %s has an invalid stone range" % id)
 
 
 ## A technique's delivery declares its own payload. `melee` is the default, so
