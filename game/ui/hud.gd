@@ -115,7 +115,7 @@ func draw_world_panel(player: Player) -> void:
 	var x := w - 316.0
 	var y := 28.0
 	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 158.0), PANEL_BG)
-	_text(Vector2(x, y), "%s   %s" % [Clock.label(), Weather.label()], 13, MUTED)
+	_text(Vector2(x, y), "%s   %s   %s" % [Clock.label(), Weather.label(), host.current_biome_name()], 13, MUTED)
 	y += 18.0
 	_text(Vector2(x, y), "%s   Kills %d   Karma %d" % [player.display_name, Game.kills, Game.karma], 12, MUTED)
 	y += 18.0

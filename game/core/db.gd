@@ -18,6 +18,7 @@ var suffixes: Array = []
 var passives: Array = []
 var quests: Array = []
 var npc_data: Dictionary = {}
+var biomes: Array = []
 
 var _by_id: Dictionary = {}
 
@@ -42,6 +43,7 @@ func load_all() -> void:
 	passives = _read("passives.json").get("passives", [])
 	quests = _read("quests.json").get("quests", [])
 	npc_data = _read("npcs.json")
+	biomes = _read("biomes.json").get("biomes", [])
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -52,6 +54,7 @@ func load_all() -> void:
 	_index("suffix", suffixes)
 	_index("passive", passives)
 	_index("quest", quests)
+	_index("biome", biomes)
 
 
 func _read(file: String) -> Dictionary:
@@ -116,6 +119,21 @@ func passive(id: String) -> Dictionary:
 
 func quest(id: String) -> Dictionary:
 	return by_id("quest", id)
+
+
+func biome(id: String) -> Dictionary:
+	return by_id("biome", id)
+
+
+## Snapshot of every biome by id. Passed to worker threads, so it is detached
+## from the registry and never mutated afterwards.
+func biome_table() -> Dictionary:
+	var out: Dictionary = {}
+	for b in biomes:
+		var id := String(b.get("id", ""))
+		if id != "":
+			out[id] = b.duplicate(true)
+	return out
 
 
 func schedules() -> Dictionary:
@@ -209,6 +227,30 @@ func validate() -> Array:
 	if npc_data.is_empty() or npc_data.get("archetypes", []).is_empty():
 		problems.append("npc archetype data is missing")
 
+	if biomes.is_empty():
+		problems.append("no biomes defined")
+	for b in biomes:
+		var id := String(b.get("id", ""))
+		if id == "":
+			problems.append("biome without id")
+		if String(b.get("name", "")) == "":
+			problems.append("biome %s has no name" % id)
+		if (b.get("palette", []) as Array).is_empty():
+			problems.append("biome %s has no palette" % id)
+		var features: Dictionary = b.get("features", {})
+		var feature_total := 0
+		for kind in features.keys():
+			feature_total += maxi(0, int(features[kind]))
+		if feature_total <= 0:
+			problems.append("biome %s has no prop weights" % id)
+		if (b.get("resources", []) as Array).is_empty():
+			problems.append("biome %s has no resources" % id)
+		if (b.get("enemies", []) as Array).is_empty():
+			problems.append("biome %s has no enemies" % id)
+		for enemy in b.get("enemies", []):
+			if String(enemy.get("name", "")) == "":
+				problems.append("biome %s has an unnamed enemy" % id)
+
 	# Duplicate IDs across the whole registry would corrupt save references.
 	var seen: Dictionary = {}
 	for kind in ["realm", "root", "method", "technique", "base", "prefix", "suffix", "passive", "quest"]:
@@ -235,4 +277,5 @@ func counts() -> Dictionary:
 		"passives": passives.size(),
 		"quests": quests.size(),
 		"archetypes": archetypes().size(),
+		"biomes": biomes.size(),
 	}

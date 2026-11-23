@@ -85,6 +85,7 @@ func _build_world() -> void:
 	# Payloads generate on worker threads; nodes are still built here.
 	chunks.threaded = true
 	chunks.delta = world_delta
+	chunks.biome_defs = DB.biome_table()
 	chunks.set_resource_parent(world)
 	chunks.on_resource_spawned = func(node: Interactable) -> void: interactables.append(node)
 	chunks.on_resource_freed = func(node: Interactable) -> void: interactables.erase(node)
@@ -374,10 +375,22 @@ func _spawn_wild_dummy() -> void:
 	var r: RandomNumberGenerator = Rng.stream("wild_dummy", Game.kills + 1, _wild_dummy_count())
 	var angle := r.randf_range(0.0, TAU)
 	var distance := r.randf_range(420.0, 760.0)
+	var spawn := settlement.position_for("plaza") + Vector2(cos(angle), sin(angle)) * distance
 	var dummy := Dummy.new()
 	dummy.ilvl = maxi(1, player.cultivation.realm)
-	dummy.position = settlement.position_for("plaza") + Vector2(cos(angle), sin(angle)) * distance
+	dummy.position = spawn
 	world.add_child(dummy)
+	# The biome at the spawn point decides which creature turns up, not a global table.
+	var biome: Dictionary = DB.biome(Biome.for_chunk(chunks.world_to_chunk(spawn), Game.world_seed))
+	var enemy := Biome.pick_enemy(biome, r)
+	dummy.apply_biome_enemy(enemy, player.cultivation.realm)
+
+
+func current_biome_name() -> String:
+	if player == null:
+		return ""
+	var id := Biome.for_chunk(chunks.world_to_chunk(player.global_position), Game.world_seed)
+	return String(DB.biome(id).get("name", "Wilds"))
 
 
 func _on_window_resized() -> void:

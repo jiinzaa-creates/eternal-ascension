@@ -26,6 +26,9 @@ var world_seed: int = 0
 var threaded := false
 ## Current game day, used to evaluate regrow windows.
 var today: int = 1
+## Biome definitions by id, snapshotted from the registry so worker threads can
+## read them without touching autoloads.
+var biome_defs: Dictionary = {}
 var delta: WorldDelta = null
 var chunks: Dictionary = {}
 var streamed_chunks: int = 0
@@ -115,7 +118,7 @@ func settle() -> void:
 
 func _request(coord: Vector2i) -> void:
 	if not threaded:
-		_install(ChunkGen.payload_for(coord, world_seed))
+		_install(ChunkGen.payload_for(coord, world_seed, biome_defs))
 		return
 	var task := WorkerThreadPool.add_task(_generate.bind(coord), false, "chunk %d,%d" % [coord.x, coord.y])
 	_tasks[coord] = task
@@ -124,7 +127,7 @@ func _request(coord: Vector2i) -> void:
 ## Runs on a worker thread. Reads only `world_seed`, which is never mutated while
 ## tasks are in flight, and writes into a mutex-guarded result map.
 func _generate(coord: Vector2i) -> void:
-	var payload := ChunkGen.payload_for(coord, world_seed)
+	var payload := ChunkGen.payload_for(coord, world_seed, biome_defs)
 	_mutex.lock()
 	_results[coord] = payload
 	_mutex.unlock()
@@ -284,6 +287,8 @@ class ProvinceChunk:
 
 	var coord: Vector2i = Vector2i.ZERO
 	var signature: int = 0
+	var biome: String = ""
+	var palette: Array = []
 	var features: Array = []
 	var herbs: Array = []
 	var props: Array = []
@@ -294,12 +299,16 @@ class ProvinceChunk:
 	func apply(payload: Dictionary) -> void:
 		coord = payload.get("coord", Vector2i.ZERO)
 		signature = int(payload.get("signature", 0))
+		biome = String(payload.get("biome", ""))
+		var incoming: Array = payload.get("palette", [])
+		palette = incoming if not incoming.is_empty() else PALETTES.duplicate()
 		features = payload.get("features", [])
 		herbs = payload.get("herbs", [])
 
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, Vector2(SIZE, SIZE)), PALETTES[abs(coord.x + coord.y) % PALETTES.size()])
+		var colors: Array = palette if not palette.is_empty() else PALETTES
+		draw_rect(Rect2(Vector2.ZERO, Vector2(SIZE, SIZE)), colors[abs(coord.x + coord.y) % colors.size()])
 		# A faint boundary makes streaming invisible glitches obvious during play.
 		draw_rect(Rect2(Vector2.ZERO, Vector2(SIZE, SIZE)), Color(1, 1, 1, 0.015), false, 1.0)
 

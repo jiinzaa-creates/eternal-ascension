@@ -47,7 +47,8 @@ func roll_float(domain: String, key: int = 0, counter: int = 0) -> float:
 
 
 ## Picks an index from integer weights. Returns -1 for an empty table.
-func pick_weighted(weights: Array, r: RandomNumberGenerator) -> int:
+## Static so worker threads can use it without touching autoload state.
+static func pick_weighted(weights: Array, r: RandomNumberGenerator) -> int:
 	var total := 0
 	for w in weights:
 		total += maxi(0, int(w))

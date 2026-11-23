@@ -45,6 +45,21 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Biomes
+
+- Definitions live in `data/biomes.json` and are validated by `DB.validate()`: id, name, palette,
+  prop weights, resources and enemies are all required. Add a biome here, not in code.
+- **Identity is pure and thread-safe.** `Biome.for_chunk(coord, seed)` is smooth value noise over a
+  coarse grid, so neighbouring chunks usually share a biome; it reads no files and no autoloads.
+  The settlement's 3×3 chunk block is pinned to `BANDS[0]`, so the opening area never becomes ash.
+- Chunk payloads take a **snapshot** of the biome table (`DB.biome_table()`) because they are built
+  on worker threads. Never pass `DB` itself, and never mutate the snapshot during play.
+- A biome owns four things a chunk uses: ground palette, prop weight table, herb species table and
+  the enemy table used by spawns at that position. Add a new resource or enemy species by editing
+  the biome entry; the code paths already read it.
+- Enemy definitions only carry multipliers (`hp_mult`, `damage_mult`, `ilvl_bonus`, `speed`, colour);
+  `Dummy.apply_biome_enemy` applies them after `_ready`, which derives the base stats from `ilvl`.
+
 ## Continent
 
 - `Continent.generate(seed)` is pure and builds the whole geography as data: cells, land mask,

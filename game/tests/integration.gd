@@ -103,6 +103,35 @@ func _run() -> void:
 	check(not main.world_map.visible, "the map closes")
 	check(player.is_physics_processing() and player.is_processing(), "closing the map restores the player")
 
+	# --- biomes --------------------------------------------------------------
+	check(main.chunks.biome_defs.size() == DB.biomes.size(), "the streamer holds a biome snapshot")
+	check(main.current_biome_name() != "", "the world reports its biome")
+	var home_chunk: Vector2i = main.chunks.world_to_chunk(player.global_position)
+	var home_biome: Dictionary = DB.biome(Biome.for_chunk(home_chunk, Game.world_seed))
+	check(not home_biome.is_empty(), "the chunk under the player has a biome definition")
+	check(String(home_biome["name"]) == main.current_biome_name(), "the HUD biome matches the chunk biome")
+	check(Biome.for_chunk(home_chunk, Game.world_seed) == Biome.BANDS[0], "the settlement sits in the starting biome")
+
+	var sample_coords: Array = main.chunks.chunks.keys()
+	var sample_chunk = main.chunks.chunks[sample_coords[0]]
+	check(String(sample_chunk.biome) != "", "streamed chunks carry their biome")
+	check(not (sample_chunk.palette as Array).is_empty(), "streamed chunks carry a biome palette")
+	var resolved := 0
+	for coord in main.chunks.chunks.keys():
+		var chunk = main.chunks.chunks[coord]
+		if not DB.biome(String(chunk.biome)).is_empty():
+			resolved += 1
+	check(resolved == main.chunks.chunk_count(), "every streamed chunk resolves to a real biome (%d)" % resolved)
+
+	var frost_enemy := Biome.pick_enemy(DB.biome("biome.frost"), Rng.stream("biome_probe", 1))
+	check(not frost_enemy.is_empty(), "a biome enemy can be drawn")
+	var probe := Dummy.new()
+	main.world.add_child(probe)
+	probe.apply_biome_enemy(frost_enemy, 1)
+	check(probe.display_name == String(frost_enemy["name"]), "a biome enemy names its dummy")
+	check(probe.ilvl >= 1 and probe.hp_max > 0.0 and probe.damage > 0.0, "a biome enemy scales its stats")
+	probe.queue_free()
+
 	var npc: Npc = main.npcs[0]
 	check(npc.animator != null, "scheduled NPCs own an animator")
 	await frames(3)

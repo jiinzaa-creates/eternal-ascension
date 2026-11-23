@@ -17,6 +17,8 @@ var speed := 60.0
 var attack_range := 48.0
 var damage := 7.0
 var aggressive := true
+var display_name := "Cultivator Dummy"
+var body_color := Color("#a85050")
 
 var animator := Animator.new()
 
@@ -37,6 +39,23 @@ func _ready() -> void:
 	poise_max = 40.0 + ilvl * 6.0
 	poise = poise_max
 	damage = 6.0 + ilvl * 2.0
+
+
+## Applies a biome enemy definition. Called after `_ready`, because `_ready`
+## derives the base stats from `ilvl` first.
+func apply_biome_enemy(entry: Dictionary, realm: int) -> void:
+	if entry.is_empty():
+		return
+	display_name = String(entry.get("name", display_name))
+	ilvl = maxi(1, realm + int(entry.get("ilvl_bonus", 0)))
+	hp_max = (70.0 + ilvl * 18.0) * float(entry.get("hp_mult", 1.0))
+	hp = hp_max
+	poise_max = (40.0 + ilvl * 6.0) * float(entry.get("poise_mult", 1.0))
+	poise = poise_max
+	damage = (6.0 + ilvl * 2.0) * float(entry.get("damage_mult", 1.0))
+	speed = float(entry.get("speed", speed))
+	body_color = Color(String(entry.get("color", "#a85050")))
+	queue_redraw()
 
 
 func _physics_process(delta: float) -> void:
@@ -121,7 +140,7 @@ func _die() -> void:
 
 func _draw() -> void:
 	draw_circle(Vector2(0, 6), RADIUS * 0.9, Color(0, 0, 0, 0.28))
-	var body := Color("#a85050")
+	var body := body_color
 	if _flash > 0.0:
 		body = Color("#ffffff")
 	if _stagger > 0.0:

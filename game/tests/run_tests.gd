@@ -25,6 +25,7 @@ func _ready() -> void:
 	_world_tests()
 	_chunk_delta_tests()
 	_continent_tests()
+	_biome_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -527,6 +528,87 @@ func _continent_tests() -> void:
 	check(east.position.x > first.position.x and south.position.y > first.position.y, "map cells advance east and south")
 	check(not first.intersects(east), "map cells do not overlap")
 	check(Continent.coord_of(Continent.index_of(Vector2i(3, 2))) == Vector2i(3, 2), "cell coordinates round trip")
+
+
+# ---------------------------------------------------------------- biomes ----
+
+func _biome_tests() -> void:
+	print("[biomes] definitions, chunk identity and tables")
+	check(DB.biomes.size() >= 4, "the registry holds biomes (%d)" % DB.biomes.size())
+	check(not DB.biome("biome.verdant").is_empty(), "biomes can be looked up by id")
+	check(DB.biome("biome.none").is_empty(), "an unknown biome returns nothing")
+	check(DB.biome_table().size() == DB.biomes.size(), "the biome snapshot covers every definition")
+
+	var seen_ids := {}
+	for biome in DB.biomes:
+		var id := String(biome["id"])
+		seen_ids[id] = true
+		check(String(biome["name"]) != "", "%s has a name" % id)
+		check(not (biome["palette"] as Array).is_empty(), "%s has a palette" % id)
+		check(not (biome["resources"] as Array).is_empty(), "%s has resources" % id)
+		check(not (biome["enemies"] as Array).is_empty(), "%s has enemies" % id)
+	check(seen_ids.size() == DB.biomes.size(), "biome ids are unique")
+
+	var coord := Vector2i(3, 2)
+	check(Biome.for_chunk(coord, 4242) == Biome.for_chunk(coord, 4242), "biome identity is deterministic")
+	check(Biome.for_chunk(Biome.HOME_CHUNK, 4242) == Biome.BANDS[0], "the settlement chunk is the starting biome")
+	check(Biome.for_chunk(Biome.HOME_CHUNK + Vector2i(Biome.HOME_RADIUS, 0), 4242) == Biome.BANDS[0], "the starting biome has a radius")
+
+	var bands := {}
+	for x in range(0, 12):
+		for y in range(0, 12):
+			bands[Biome.for_chunk(Vector2i(x, y), 4242)] = true
+	check(bands.size() >= 3, "the province contains several biomes (%d)" % bands.size())
+	var unknown_bands := 0
+	for id in bands.keys():
+		if DB.biome(String(id)).is_empty():
+			unknown_bands += 1
+	check(unknown_bands == 0, "every band id exists in the registry")
+
+	var layout_a := ""
+	var layout_b := ""
+	for x in range(0, 12):
+		layout_a += Biome.for_chunk(Vector2i(x, 0), 4242)
+		layout_b += Biome.for_chunk(Vector2i(x, 0), 4243)
+	check(layout_a != layout_b, "a different seed lays out different biomes")
+
+	var payload := ChunkGen.payload_for(Vector2i(2, 9), 4242, DB.biome_table())
+	check(String(payload["biome"]) == Biome.for_chunk(Vector2i(2, 9), 4242), "a payload carries its biome id")
+	check((payload["palette"] as Array).size() == 4, "a payload carries the biome palette")
+	var biome_def: Dictionary = DB.biome(String(payload["biome"]))
+	var allowed_features: Dictionary = biome_def["features"]
+	var kinds := {}
+	var bad_features := 0
+	for feature in payload["features"]:
+		var kind := String(feature["kind"])
+		kinds[kind] = true
+		if not allowed_features.has(kind):
+			bad_features += 1
+	check(bad_features == 0, "chunk props come from the biome's weight table")
+	check(kinds.size() >= 2, "chunk props still vary inside a biome (%d kinds)" % kinds.size())
+
+	var allowed_resources := {}
+	for entry in biome_def["resources"]:
+		allowed_resources[String(entry["name"])] = true
+	var bad_herbs := 0
+	for herb in payload["herbs"]:
+		if not allowed_resources.has(String(herb["label"])):
+			bad_herbs += 1
+	check(bad_herbs == 0, "chunk herbs come from the biome's resources")
+
+	var r := Rng.stream("biome_test", 2)
+	var enemy := Biome.pick_enemy(biome_def, r)
+	check(not enemy.is_empty(), "an enemy can be picked from a biome table")
+	var enemy_names := {}
+	for entry in biome_def["enemies"]:
+		enemy_names[String(entry["name"])] = true
+	check(enemy_names.has(String(enemy["name"])), "picked enemies come from the table")
+	check(Biome.pick_enemy({}, r).is_empty(), "an empty enemy table picks nothing")
+	check(Biome.pick_resource({}, r).is_empty(), "an empty resource table picks nothing")
+
+	var bare := ChunkGen.payload_for(Vector2i(1, 1), 4242)
+	check((bare["palette"] as Array).size() >= 1, "payloads fall back to a default palette")
+	check((bare["features"] as Array).size() == ChunkGen.FEATURES, "fallback payloads still hold every decoration")
 
 
 # -------------------------------------------------------------------- npc ----

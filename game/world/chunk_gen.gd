@@ -5,13 +5,27 @@ extends RefCounted
 ## Nothing here touches the scene tree, autoload state or a node, so a payload
 ## can be built on a worker thread. `ChunkManager` instantiates the nodes on the
 ## main thread when the payload arrives. Determinism is unchanged: a payload is
-## a pure function of (world_seed, chunk coordinate).
+## a pure function of (world_seed, chunk coordinate) plus the biome definition
+## snapshot the owner passes in.
+##
+## Biome identity comes from `Biome` (seed + coordinate). Its palette, prop
+## weights and resource table come from `data/biomes.json` through that snapshot,
+## which is why a worker never has to read the content registry.
 
 const SIZE := 1024.0
 const FEATURES := 36
 const HERB_CHANCE := 0.6
 const HERBS_MAX := 2
-const HERB_NAMES := ["Spirit Herb", "Azure Grass", "Blood Lotus", "Moon Dew Fern"]
+const FEATURE_KINDS := ["tuft", "bush", "rock", "tree"]
+const DEFAULT_FEATURES := {"tuft": 74, "bush": 10, "rock": 9, "tree": 7}
+const DEFAULT_PALETTE: Array[Color] = [
+	Color("#152218"), Color("#182619"), Color("#12201a"), Color("#1a241b"),
+]
+const DEFAULT_RESOURCES := [
+	{"name": "Spirit Herb", "weight": 6},
+	{"name": "Azure Grass", "weight": 3},
+	{"name": "Moon Dew Fern", "weight": 2},
+]
 
 
 static func signature_for(coord: Vector2i, seed_value: int) -> int:
@@ -23,18 +37,22 @@ static func herb_id(coord: Vector2i, index: int) -> String:
 
 
 ## Everything a chunk needs, as plain data. Safe to call off the main thread.
-static func payload_for(coord: Vector2i, seed_value: int) -> Dictionary:
+static func payload_for(coord: Vector2i, seed_value: int, biome_defs: Dictionary = {}) -> Dictionary:
+	var biome_id := Biome.for_chunk(coord, seed_value)
+	var def: Dictionary = biome_defs.get(biome_id, {})
+
 	var r := Rng.stream_from(seed_value, "chunk", coord.x * 31 + coord.y, 0)
+	var feature_table: Dictionary = def.get("features", DEFAULT_FEATURES)
+	var weights: Array = []
+	for kind in FEATURE_KINDS:
+		weights.append(maxi(0, int(feature_table.get(kind, 0))))
+	if _total(weights) <= 0:
+		for kind in FEATURE_KINDS:
+			weights.append(maxi(0, int(DEFAULT_FEATURES.get(kind, 0))))
+
 	var features: Array = []
 	for i in FEATURES:
-		var roll := r.randf()
-		var kind := "tuft"
-		if roll > 0.93:
-			kind = "tree"
-		elif roll > 0.84:
-			kind = "rock"
-		elif roll > 0.74:
-			kind = "bush"
+		var kind := String(FEATURE_KINDS[maxi(0, Rng.pick_weighted(weights, r))])
 		features.append({
 			"kind": kind,
 			"pos": Vector2(r.randf_range(24.0, SIZE - 24.0), r.randf_range(24.0, SIZE - 24.0)),
@@ -46,13 +64,17 @@ static func payload_for(coord: Vector2i, seed_value: int) -> Dictionary:
 	# Resources are a separate stream so adding them never reshuffles the
 	# decorations of an existing seed.
 	var hr := Rng.stream_from(seed_value, "chunk_herb", coord.x * 31 + coord.y, 0)
+	var resources: Array = def.get("resources", [])
+	if resources.is_empty():
+		resources = DEFAULT_RESOURCES
 	var herbs: Array = []
 	if hr.randf() < HERB_CHANCE:
 		var count := hr.randi_range(1, HERBS_MAX)
 		for i in count:
+			var entry := Biome.pick_resource({"resources": resources}, hr)
 			herbs.append({
 				"id": herb_id(coord, i),
-				"label": String(HERB_NAMES[hr.randi_range(0, HERB_NAMES.size() - 1)]),
+				"label": String(entry.get("name", "Spirit Herb")),
 				"pos": Vector2(hr.randf_range(96.0, SIZE - 96.0), hr.randf_range(96.0, SIZE - 96.0)),
 			})
 
@@ -61,4 +83,25 @@ static func payload_for(coord: Vector2i, seed_value: int) -> Dictionary:
 		"signature": signature_for(coord, seed_value),
 		"features": features,
 		"herbs": herbs,
+		"biome": biome_id,
+		"palette": _palette_for(def),
 	}
+
+
+static func _palette_for(def: Dictionary) -> Array:
+	var raw: Array = def.get("palette", [])
+	if raw.is_empty():
+		return DEFAULT_PALETTE.duplicate()
+	var out: Array = []
+	for entry in raw:
+		out.append(Color(String(entry)))
+	if out.is_empty():
+		return DEFAULT_PALETTE.duplicate()
+	return out
+
+
+static func _total(values: Array) -> int:
+	var total := 0
+	for value in values:
+		total += int(value)
+	return total
