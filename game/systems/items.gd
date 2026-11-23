@@ -178,6 +178,7 @@ static func _normalize_mods(value: Variant) -> Array:
 			"id": String(data.get("id", "")),
 			"stat": String(data.get("stat", "")),
 			"value": float(data.get("value", 0.0)),
+			"tier": maxi(1, int(data.get("tier", 1))),
 			"text": String(data.get("text", "")),
 		})
 	return out

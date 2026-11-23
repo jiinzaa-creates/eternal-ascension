@@ -800,6 +800,33 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Adding a new item field means adding it to `Items.FIELDS` and normalising it; that single change
   covers generation, pickup, shops, saves and loads.
 
+## Procedural generation
+
+- **One stream, nothing else.** `ItemGen.generate()` draws base, rarity, affixes and values from the
+  `Rng` stream for `(seed, key, counter)` and from nothing else. Affix selection used to call
+  `Array.shuffle()`, which consumes the *engine-global* RNG — the item you got depended on how many
+  items had been generated before it. The pool is now picked with `Rng.pick_weighted()` on the item's
+  own stream, so generation is reproducible in isolation and the unit suite asserts that a roll
+  repeated after a dozen other rolls is byte-identical.
+- **Tiers are data, not a formula.** Every affix in `data/items.json` carries `tiers`, each with its
+  own `ilvl` and `min`/`max`. `ItemGen.tier_for()` returns the highest tier the item's level has
+  unlocked (`tier_data()` reads it), the value is rolled inside that tier, and the mod records which
+  tier it came from. `describe()` appends `(T2)` for anything above the first. The legacy flat
+  `min`/`max` remain as the fallback for affix data written without tiers and are validated to agree
+  with tier one, so old data and new data cannot disagree silently.
+- **Weighting controls.** `weight` sets how often an affix is considered; an optional `slot_weights`
+  beats the base weight on the slots it names (`of the Tiger` favours weapons and rings over armour).
+  A weight of zero removes the affix from that pool entirely. Selection is weighted *without
+  replacement*, so six rolls never repeat an affix and a pool smaller than the requested count simply
+  yields what exists.
+- **Validation is the contract.** `DB._validate_affix()` rejects duplicate or missing ids, an unknown
+  kind/stat/slot, negative weights, malformed tiers, tiers out of order or weaker than the tier below,
+  a first tier below the affix's own unlock level, and a flat range that disagrees with tier one.
+  `DB.validate()` also requires every equipment slot to have at least one positive-weight prefix and
+  suffix, because a rarity's affix count is a promise the pool has to be able to keep.
+- **Tiers survive the save.** `Items.normalize_item()` keeps a mod's `tier` (defaulting to one for
+  legacy items), so the canonical save form and the item that generated are the same record.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.

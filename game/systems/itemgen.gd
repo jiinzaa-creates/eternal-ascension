@@ -87,19 +87,75 @@ func _roll_rarity(r: RandomNumberGenerator, ilvl: int) -> int:
 	return maxi(0, index)
 
 
+## How many tiers an affix defines. Data without tiers has exactly one, which is
+## how affixes written before tiers existed keep working.
+static func tier_count(affix: Dictionary) -> int:
+	var tiers: Array = affix.get("tiers", [])
+	return maxi(1, tiers.size())
+
+
+static func tiers_of(affix: Dictionary) -> Array:
+	var tiers: Array = affix.get("tiers", [])
+	if not tiers.is_empty():
+		return tiers
+	return [{
+		"ilvl": int(affix.get("ilvl", 1)),
+		"min": float(affix.get("min", 1.0)),
+		"max": float(affix.get("max", 1.0)),
+	}]
+
+
+## The highest tier the item's level has unlocked, 0-based. A level below the
+## first tier still reads the first: the affix itself is already level-gated.
+static func tier_for(affix: Dictionary, ilvl: int) -> int:
+	var tiers := tiers_of(affix)
+	var out := 0
+	for i in tiers.size():
+		if ilvl >= int((tiers[i] as Dictionary).get("ilvl", 1)):
+			out = i
+	return out
+
+
+static func tier_data(affix: Dictionary, index: int) -> Dictionary:
+	var tiers := tiers_of(affix)
+	return tiers[clampi(index, 0, tiers.size() - 1)]
+
+
+## Base selection weight, or the slot's override when the data names one. A
+## weight of zero removes the affix from that pool entirely.
+static func affix_weight(affix: Dictionary, slot: String) -> int:
+	var slot_weights: Dictionary = affix.get("slot_weights", {})
+	if slot_weights.has(slot):
+		return maxi(0, int(slot_weights[slot]))
+	return maxi(0, int(affix.get("weight", 10)))
+
+
+## Weighted and without replacement, drawn only from the item's own stream.
+## `Array.shuffle()` would have consumed the engine-global RNG here, which is
+## exactly the order-dependence the generator exists to avoid.
 func _pick_affixes(r: RandomNumberGenerator, slot: String, kind: String, count: int, ilvl: int) -> Array:
 	if count <= 0:
 		return []
 	var pool: Array = []
+	var weights: Array = []
 	for affix in db.affixes_for(slot, kind):
-		if int(affix.get("ilvl", 1)) <= ilvl + 2:
-			pool.append(affix)
-	pool.shuffle()
+		if int(affix.get("ilvl", 1)) > ilvl + 2:
+			continue
+		var weight := affix_weight(affix, slot)
+		if weight <= 0:
+			continue
+		pool.append(affix)
+		weights.append(weight)
 	var out: Array = []
-	for i in mini(count, pool.size()):
-		var affix: Dictionary = pool[i]
-		var lo := float(affix.get("min", 1.0))
-		var hi := float(affix.get("max", lo))
+	for _i in mini(count, pool.size()):
+		var index: int = Rng.pick_weighted(weights, r)
+		if index < 0 or index >= pool.size():
+			break
+		var affix: Dictionary = pool[index]
+		var tier_index := tier_for(affix, ilvl)
+		var tier := tier_data(affix, tier_index)
+		var lo := float(tier.get("min", affix.get("min", 1.0)))
+		var hi := float(tier.get("max", lo))
 		var value := lo + (hi - lo) * r.randf()
 		if value >= 10.0:
 			value = round(value)
@@ -109,8 +165,11 @@ func _pick_affixes(r: RandomNumberGenerator, slot: String, kind: String, count: 
 			"id": String(affix.get("id", "")),
 			"stat": String(affix.get("stat", "")),
 			"value": value,
+			"tier": tier_index + 1,
 			"text": _affix_text(affix, value),
 		})
+		pool.remove_at(index)
+		weights.remove_at(index)
 	return out
 
 
@@ -163,6 +222,10 @@ func describe(item: Dictionary) -> String:
 	if String(item.get("implicit", "")) != "":
 		lines.append(String(item.get("implicit", "")))
 	for mod in item.get("mods", []):
-		lines.append(String(mod.get("text", "")))
+		var line := String(mod.get("text", ""))
+		var tier := int(mod.get("tier", 1))
+		if tier > 1:
+			line += "  (T%d)" % tier
+		lines.append(line)
 	lines.append("Value: %d spirit stones" % int(item.get("value", 0)))
 	return "\n".join(lines)

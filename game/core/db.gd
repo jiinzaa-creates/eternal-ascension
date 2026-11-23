@@ -423,6 +423,23 @@ func validate() -> Array:
 			problems.append("weapon base %s names unknown weapon category '%s'" % [b.get("id", "?"), String(b.get("weapon_type", ""))])
 	if prefixes.is_empty() or suffixes.is_empty():
 		problems.append("item affix pools are empty")
+	var affix_ids: Dictionary = {}
+	for pool in [prefixes, suffixes]:
+		for a in pool:
+			_validate_affix(a, affix_ids, problems)
+	# Every equipment slot must be able to roll both halves, or a treasure item
+	# would come up short of the affix count its rarity promises.
+	for slot in ["weapon", "armor", "ring", "talisman"]:
+		for kind in ["prefix", "suffix"]:
+			var usable := false
+			for a in (prefixes if kind == "prefix" else suffixes):
+				var slots: Array = a.get("slots", [])
+				if int(a.get("weight", 10)) <= 0:
+					continue
+				if slots.is_empty() or slots.has(slot):
+					usable = true
+			if not usable:
+				problems.append("no %s can roll on %s" % [kind, slot])
 
 	if passives.is_empty():
 		problems.append("no passives defined")
@@ -707,6 +724,66 @@ func _validate_status_payload(payload: Variant, label: String, problems: Array) 
 	var stacks := int(data.get("stacks", 1))
 	if stacks < 1 or stacks > Status.MAX_STACKS:
 		problems.append("%s status %s has an out-of-range stack count" % [label, id])
+
+
+## An affix must be selectable (a weight), limited to real slots, and either
+## carry a usable flat range or an ordered, non-weakening ladder of tiers whose
+## first tier matches the flat range the older code still reads.
+func _validate_affix(affix: Dictionary, seen: Dictionary, problems: Array) -> void:
+	var affix_id := String(affix.get("id", ""))
+	if affix_id == "":
+		problems.append("affix without id")
+		return
+	if seen.has(affix_id):
+		problems.append("duplicate affix id " + affix_id)
+	seen[affix_id] = true
+	var kind := String(affix.get("kind", ""))
+	if kind != "prefix" and kind != "suffix":
+		problems.append("affix %s has invalid kind '%s'" % [affix_id, kind])
+	if String(affix.get("name", "")) == "":
+		problems.append("affix %s has no name" % affix_id)
+	var stat := String(affix.get("stat", ""))
+	if not (Attributes.KEYS.has(stat) or StatBlock.PERCENT_STATS.has(stat) or StatBlock.FLAT_STATS.has(stat)):
+		problems.append("affix %s uses unknown stat %s" % [affix_id, stat])
+	if int(affix.get("weight", 10)) < 0:
+		problems.append("affix %s has a negative weight" % affix_id)
+	var slot_weights: Dictionary = affix.get("slot_weights", {})
+	for slot_key in slot_weights.keys():
+		if not ["weapon", "armor", "ring", "talisman"].has(String(slot_key)):
+			problems.append("affix %s weights an unknown slot %s" % [affix_id, String(slot_key)])
+		if int(slot_weights[slot_key]) < 0:
+			problems.append("affix %s has a negative slot weight" % affix_id)
+	var tiers: Array = affix.get("tiers", [])
+	if tiers.is_empty():
+		if float(affix.get("max", 0.0)) < float(affix.get("min", 0.0)) or float(affix.get("max", 0.0)) <= 0.0:
+			problems.append("affix %s has no usable range" % affix_id)
+		return
+	var last_ilvl := 0
+	var last_max := -1.0
+	for i in tiers.size():
+		if typeof(tiers[i]) != TYPE_DICTIONARY:
+			problems.append("affix %s has a malformed tier" % affix_id)
+			continue
+		var tier: Dictionary = tiers[i]
+		var tier_ilvl := int(tier.get("ilvl", 0))
+		var lo := float(tier.get("min", 0.0))
+		var hi := float(tier.get("max", 0.0))
+		if tier_ilvl < 1:
+			problems.append("affix %s tier %d has no level" % [affix_id, i + 1])
+		if tier_ilvl < last_ilvl:
+			problems.append("affix %s tiers are out of order" % affix_id)
+		if lo <= 0.0 or hi < lo:
+			problems.append("affix %s tier %d has an invalid range" % [affix_id, i + 1])
+		if i > 0 and hi < last_max:
+			problems.append("affix %s tier %d is weaker than the tier below it" % [affix_id, i + 1])
+		last_ilvl = tier_ilvl
+		last_max = maxf(last_max, hi)
+	var first: Dictionary = tiers[0]
+	if not is_equal_approx(float(affix.get("min", 0.0)), float(first.get("min", -1.0))) \
+			or not is_equal_approx(float(affix.get("max", 0.0)), float(first.get("max", -1.0))):
+		problems.append("affix %s flat range disagrees with its first tier" % affix_id)
+	if int(first.get("ilvl", 1)) > int(affix.get("ilvl", 1)):
+		problems.append("affix %s unlocks below its first tier" % affix_id)
 
 
 func counts() -> Dictionary:

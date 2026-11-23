@@ -2392,6 +2392,22 @@ func _run() -> void:
 			m38_saved_ore = int((entry as Dictionary).get("count", 1))
 	check(m38_saved_ore == 2, "a save keeps a stack's count")
 
+	# --- procedural generation: tiers reach real loot --------------------------
+	var m39_generator := ItemGen.new(DB, Rng)
+	var m39_low := m39_generator.generate(1, 9100, 0, 3, "weapon")
+	var m39_high := m39_generator.generate(12, 9100, 0, 3, "weapon")
+	var m39_high_tier := 0
+	for mod in m39_high.get("mods", []):
+		m39_high_tier = maxi(m39_high_tier, int((mod as Dictionary).get("tier", 1)))
+	var m39_low_tier := 0
+	for mod in m39_low.get("mods", []):
+		m39_low_tier = maxi(m39_low_tier, int((mod as Dictionary).get("tier", 1)))
+	check(m39_high_tier == 3, "a level twelve treasure rolls the top tier")
+	check(m39_low_tier == 1, "level one treasure stays on the first tier")
+	check(JSON.stringify(m39_high) == JSON.stringify(m39_generator.generate(12, 9100, 0, 3, "weapon")), "a real loot roll reproduces exactly")
+	var m39_saved_mods: Dictionary = Items.to_save(m39_high)
+	check(JSON.stringify(Items.to_save(Items.from_save(m39_saved_mods))) == JSON.stringify(m39_saved_mods), "the canonical save keeps rolled tiers")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

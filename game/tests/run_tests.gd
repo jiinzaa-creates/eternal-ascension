@@ -42,6 +42,7 @@ func _ready() -> void:
 	_combat_polish_tests()
 	_rng_tests()
 	_item_tests()
+	_procedural_generation_tests()
 	_cultivation_tests()
 	_combat_tests()
 	_world_tests()
@@ -1825,6 +1826,108 @@ func _item_tests() -> void:
 	check(int(treasure.get("rarity", 0)) == 3, "rarity can be forced for special loot tables")
 	check((treasure.get("mods", []) as Array).size() == 6, "treasure items carry 3 prefixes and 3 suffixes")
 	check(String(generator.describe(treasure)).length() > 0, "items have a readable description")
+
+
+# -------------------------------------------------- procedural generation ----
+
+func _procedural_generation_tests() -> void:
+	print("[generation] affix tiers, weights and order independence")
+	var generator := ItemGen.new(DB, Rng)
+
+	var sharpened: Dictionary = DB.by_id("prefix", "prefix.sharpened")
+	check(not sharpened.is_empty(), "an affix is indexed by id")
+	check(ItemGen.tier_count(sharpened) == 3, "shipped affixes carry three tiers")
+	check(ItemGen.tier_for(sharpened, 1) == 0, "low gear reads the first tier")
+	check(ItemGen.tier_for(sharpened, 5) == 1, "level five unlocks the second tier")
+	check(ItemGen.tier_for(sharpened, 12) == 2, "high gear reads the last tier")
+	check(float(ItemGen.tier_data(sharpened, 2)["max"]) > float(ItemGen.tier_data(sharpened, 0)["max"]), "upper tiers roll higher")
+	check(ItemGen.tier_for({"tiers": [{"ilvl": 5, "min": 1, "max": 2}]}, 1) == 0, "a body below the first tier still reads tier one")
+	check(ItemGen.tier_count({}) == 1, "an affix without tiers has exactly one")
+	check(ItemGen.affix_weight(sharpened, "weapon") == 14, "an affix reads its base weight")
+	var tiger: Dictionary = DB.by_id("suffix", "suffix.tiger")
+	check(ItemGen.affix_weight(tiger, "weapon") == 18, "a slot override wins on its slot")
+	check(ItemGen.affix_weight(tiger, "ring") == 14, "a second slot can carry its own weight")
+	check(ItemGen.affix_weight(tiger, "talisman") == 12, "a slot without an override uses the base weight")
+	check(ItemGen.affix_weight({"weight": 0}, "weapon") == 0, "a zero weight removes an affix")
+
+	var low_weapon := generator.generate(1, 9001, 0, 3, "weapon")
+	var high_weapon := generator.generate(12, 9002, 0, 3, "weapon")
+	var low_mods: Array = low_weapon.get("mods", [])
+	var high_mods: Array = high_weapon.get("mods", [])
+	check(low_mods.size() == 6 and high_mods.size() == 6, "both levels roll a full treasure set")
+	var low_tier_ok := true
+	var low_upper := false
+	for mod in low_mods:
+		var tier := int((mod as Dictionary).get("tier", 0))
+		if tier < 1:
+			low_tier_ok = false
+		if tier > 1:
+			low_upper = true
+	check(low_tier_ok, "every rolled mod records its tier")
+	check(not low_upper, "level one gear cannot roll an upper tier")
+	var high_tiers: Dictionary = {}
+	var range_ok := true
+	for mod in high_mods:
+		var mod_data: Dictionary = mod
+		var tier := int(mod_data.get("tier", 1))
+		high_tiers[tier] = true
+		var affix: Dictionary = DB.by_id("prefix", String(mod_data["id"]))
+		if affix.is_empty():
+			affix = DB.by_id("suffix", String(mod_data["id"]))
+		var tier_data: Dictionary = ItemGen.tier_data(affix, tier - 1)
+		var value := float(mod_data["value"])
+		if value < float(tier_data["min"]) - 0.05 or value > float(tier_data["max"]) + 0.5:
+			range_ok = false
+	check(high_tiers.has(3), "a level twelve treasure reaches the last tier")
+	check(range_ok, "every rolled value sits inside its own tier")
+	check(String(generator.describe(high_weapon)).contains("(T3)"), "the description names an upper tier")
+
+	var first := generator.generate(9, 4242, 0, 3, "ring")
+	for i in 12:
+		generator.generate(9, 5000 + i, i, 3, "ring")
+	var again := generator.generate(9, 4242, 0, 3, "ring")
+	check(JSON.stringify(first) == JSON.stringify(again), "generation does not depend on call order")
+	check(JSON.stringify(first) == JSON.stringify(generator.generate(9, 4242, 0, 3, "ring")), "the same stream reproduces the same item twice")
+
+	var repeated := false
+	var off_slot := false
+	var over_level := false
+	var weighted: Dictionary = {"prefix.sharpened": 0, "prefix.ruinous": 0}
+	for i in 120:
+		var item := generator.generate(12, 6000 + i, 0, 3, "weapon")
+		var seen_ids: Dictionary = {}
+		for mod in item.get("mods", []):
+			var id := String((mod as Dictionary)["id"])
+			if seen_ids.has(id):
+				repeated = true
+			seen_ids[id] = true
+			if id == "prefix.spirit_bound" or id == "suffix.insight" or id == "suffix.command":
+				off_slot = true
+			if weighted.has(id):
+				weighted[id] = int(weighted[id]) + 1
+	check(not repeated, "an item never rolls the same affix twice")
+	check(not off_slot, "an affix only rolls on its own slots")
+	for i in 40:
+		var low := generator.generate(1, 7000 + i, 0, 3, "weapon")
+		for mod in low.get("mods", []):
+			var id := String((mod as Dictionary)["id"])
+			var affix: Dictionary = DB.by_id("prefix", id)
+			if affix.is_empty():
+				affix = DB.by_id("suffix", id)
+			if int(affix.get("ilvl", 1)) > 3:
+				over_level = true
+	check(not over_level, "an affix respects the item level gate")
+	check(int(weighted["prefix.sharpened"]) > int(weighted["prefix.ruinous"]), "weights steer what appears (%d vs %d)" % [int(weighted["prefix.sharpened"]), int(weighted["prefix.ruinous"])])
+
+	var tiered := Items.normalize_item({"id": "item.test.tier", "slot": "weapon", "name": "Tier Test", "mods": [
+		{"id": "prefix.sharpened", "stat": "physical_damage_pct", "value": 12.0, "tier": 2, "text": "+12% physical damage"},
+	]})
+	var tiered_mods: Array = tiered["mods"]
+	check(int((tiered_mods[0] as Dictionary)["tier"]) == 2, "the canonical item keeps an affix tier")
+	var untiered := Items.normalize_item({"id": "item.test.untiered", "slot": "weapon", "name": "Untiered", "mods": [
+		{"id": "prefix.swift", "stat": "attack_speed_pct", "value": 5.0, "text": "+5%"},
+	]})
+	check(int(((untiered["mods"] as Array)[0] as Dictionary)["tier"]) == 1, "a mod without a tier reads as tier one")
 
 
 # ------------------------------------------------------------ cultivation ----
