@@ -14,6 +14,12 @@ const RADIUS := 14.0
 const BASE_HP := 80.0
 const DODGE_SPEED := 520.0
 const CRIT_MULTIPLIER := 1.8
+## World units per second squared. The character reaches full speed in about a
+## tenth of a second and stops in less, which keeps turns responsive without
+## the instant velocity snap the first build shipped.
+const ACCELERATION := 2400.0
+const DECELERATION := 3000.0
+const AIM_DEADZONE := 0.25
 
 var display_name := "Wanderer"
 var attrs: Attributes
@@ -46,6 +52,7 @@ var _hurt_flash := 0.0
 var _hud_timer := 0.0
 var _peak_notified := false
 var _attack_counter := 0
+var _sprinting := false
 
 
 func _ready() -> void:
@@ -132,15 +139,22 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var speed := stats.move_speed()
+	_sprinting = Input.is_action_pressed("sprint") and input_dir != Vector2.ZERO and _attack_state == "idle"
+	speed = Motion.sprint_speed(speed, _sprinting)
 	if _attack_state != "idle":
 		speed *= 0.45
-	velocity = input_dir.normalized() * speed
+	var desired := input_dir.normalized() * speed
+	velocity = Motion.approach(velocity, desired, ACCELERATION, DECELERATION, delta)
 	if input_dir != Vector2.ZERO:
 		_facing = _aim_dir()
 	move_and_slide()
 
 
+## Aims with the right stick when one is pushed, otherwise with the mouse.
 func _aim_dir() -> Vector2:
+	var stick := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down")
+	if stick.length() > AIM_DEADZONE:
+		return stick.normalized()
 	var to_mouse := get_global_mouse_position() - global_position
 	if to_mouse.length() < 4.0:
 		return _facing
@@ -294,6 +308,10 @@ func toggle_meditation() -> void:
 
 func is_meditating() -> bool:
 	return _meditating
+
+
+func is_sprinting() -> bool:
+	return _sprinting
 
 
 func try_dodge(dir: Vector2) -> void:

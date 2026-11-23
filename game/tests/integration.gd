@@ -129,6 +129,33 @@ func _run() -> void:
 
 	player.global_position = main.settlement.position_for("plaza")
 
+	# --- controller: acceleration curve and sprint ---------------------------
+	player.global_position = main.settlement.position_for("plaza") + Vector2(0, 220)
+	player.velocity = Vector2.ZERO
+	check(InputMap.has_action("sprint"), "sprint is a registered action")
+	var stick_bound := false
+	for ev in InputMap.action_get_events("move_right"):
+		if ev is InputEventJoypadMotion and ev.axis == JOY_AXIS_LEFT_X:
+			stick_bound = true
+	check(stick_bound, "the left stick is bound to movement")
+	Input.action_press("move_right")
+	await frames(2)
+	var early_speed: float = player.velocity.length()
+	await frames(16)
+	var cruise: float = player.velocity.length()
+	check(early_speed > 0.0 and early_speed < cruise, "movement accelerates instead of snapping (%.0f -> %.0f)" % [early_speed, cruise])
+	check(approx(cruise, player.stats.move_speed(), 1.0), "cruising speed matches the stat block")
+	Input.action_press("sprint")
+	await frames(20)
+	check(player.velocity.length() > cruise * 1.2, "sprinting raises the top speed")
+	check(player.is_sprinting(), "the player reports sprinting")
+	Input.action_release("sprint")
+	Input.action_release("move_right")
+	await frames(20)
+	check(player.velocity.length() < cruise * 0.2, "releasing input decelerates the player")
+	check(not player.is_sprinting(), "sprint clears when input stops")
+	player.global_position = main.settlement.position_for("plaza")
+
 	# --- combat --------------------------------------------------------------
 	var dummy := Dummy.new()
 	dummy.ilvl = 1

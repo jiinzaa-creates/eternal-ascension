@@ -28,6 +28,8 @@ func _ready() -> void:
 	_lighting_tests()
 	_occlusion_tests()
 	_sorting_tests()
+	_motion_tests()
+	_controller_tests()
 	_npc_tests()
 	_quest_tests()
 	_hidden_realm_tests()
@@ -654,3 +656,73 @@ func _sorting_tests() -> void:
 	check(manager.props[0].visible == false, "props loaded while hidden stay hidden")
 	manager.queue_free()
 	holder.queue_free()
+
+
+# --------------------------------------------------------------- movement ----
+
+func _motion_tests() -> void:
+	print("[motion] acceleration curve, braking, sprint and stick shaping")
+	var target := Vector2(200, 0)
+	var velocity := Motion.approach(Vector2.ZERO, target, 1200.0, 2000.0, 0.05)
+	check(approx(velocity.x, 60.0, 0.01), "acceleration integrates at the given rate")
+	velocity = Motion.approach(velocity, target, 1200.0, 2000.0, 1.0)
+	check(approx(velocity.length(), 200.0, 0.01), "velocity never overshoots the target speed")
+	velocity = Motion.approach(velocity, Vector2.ZERO, 1200.0, 2000.0, 0.05)
+	check(approx(velocity.x, 100.0, 0.01), "releasing input decelerates at the deceleration rate")
+	velocity = Motion.approach(velocity, Vector2.ZERO, 1200.0, 2000.0, 1.0)
+	check(velocity == Vector2.ZERO, "deceleration stops exactly at rest")
+	var reversing := Motion.approach(Vector2(200, 0), Vector2(-200, 0), 1200.0, 2000.0, 0.05)
+	check(approx(reversing.x, 100.0, 0.01), "reversing brakes at the deceleration rate")
+	check(Motion.approach(Vector2(10, 0), target, 1200.0, 2000.0, 0.0) == Vector2(10, 0), "a zero-length frame changes nothing")
+	check(Motion.approach(Vector2.ZERO, target, 0.0, 0.0, 1.0) == Vector2.ZERO, "zero rates leave velocity alone")
+
+	check(approx(Motion.sprint_speed(100.0, true), 145.0, 0.01), "sprinting multiplies move speed")
+	check(approx(Motion.sprint_speed(100.0, false), 100.0), "walking uses the base speed")
+	check(Motion.SPRINT_MULTIPLIER > 1.0, "sprint is faster than walking")
+
+	check(Motion.deadzone(Vector2(0.1, 0.0), 0.2) == Vector2.ZERO, "stick noise inside the deadzone is ignored")
+	check(approx(Motion.deadzone(Vector2(1.0, 0.0), 0.2).x, 1.0), "a full stick reaches full strength")
+	var half := Motion.deadzone(Vector2(0.6, 0.0), 0.2)
+	check(half.x > 0.0 and half.x < 1.0, "stick travel is rescaled past the deadzone")
+	check(Motion.deadzone(Vector2(0.0, -0.6), 0.2).y < 0.0, "the deadzone keeps the stick direction")
+	check(Motion.deadzone(Vector2(2.0, 0.0), 0.2).length() <= 1.0, "stick output is capped at full strength")
+
+
+func _controller_tests() -> void:
+	print("[input] gamepad bindings beside the keyboard")
+	check(InputMap.has_action("sprint"), "sprint is a rebindable action")
+	check(InputMap.has_action("aim_right"), "aiming has its own actions")
+	var stick := false
+	for ev in InputMap.action_get_events("move_right"):
+		if ev is InputEventJoypadMotion and ev.axis == JOY_AXIS_LEFT_X and ev.axis_value > 0.0:
+			stick = true
+	check(stick, "the left stick drives movement")
+	var aim_stick := false
+	for ev in InputMap.action_get_events("aim_right"):
+		if ev is InputEventJoypadMotion and ev.axis == JOY_AXIS_RIGHT_X:
+			aim_stick = true
+	check(aim_stick, "the right stick drives aiming")
+
+	var pad_attack := false
+	var key_attack := false
+	for ev in InputMap.action_get_events("attack"):
+		if ev is InputEventJoypadButton:
+			pad_attack = true
+		elif ev is InputEventMouseButton:
+			key_attack = true
+	check(pad_attack and key_attack, "attack works from mouse and gamepad")
+
+	var pad_dodge := false
+	for ev in InputMap.action_get_events("dodge"):
+		if ev is InputEventJoypadButton:
+			pad_dodge = true
+	check(pad_dodge, "dodge has a gamepad button")
+
+	Settings.rebind("dodge", KEY_CTRL)
+	var kept_pad := false
+	for ev in InputMap.action_get_events("dodge"):
+		if ev is InputEventJoypadButton:
+			kept_pad = true
+	check(kept_pad, "rebinding a key keeps the gamepad button")
+	Settings.rebind("dodge", KEY_SPACE)
+	check(Settings.action_keycode("dodge") == OS.get_keycode_string(KEY_SPACE), "dodge is restored after the rebind probe")

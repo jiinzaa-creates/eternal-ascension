@@ -10,6 +10,7 @@ const KEY_BINDINGS := {
 	"move_down": [KEY_S],
 	"move_left": [KEY_A],
 	"move_right": [KEY_D],
+	"sprint": [KEY_SHIFT],
 	"attack": [],
 	"dodge": [KEY_SPACE],
 	"meditate": [KEY_F],
@@ -38,6 +39,28 @@ const MOUSE_BINDINGS := {
 	"attack": [MOUSE_BUTTON_LEFT],
 }
 
+## Gamepad axes. Each entry is [axis, direction]; `Input.get_vector` combines the
+## two halves of an axis into a stick direction.
+const JOY_AXIS_BINDINGS := {
+	"move_left": [[JOY_AXIS_LEFT_X, -1.0]],
+	"move_right": [[JOY_AXIS_LEFT_X, 1.0]],
+	"move_up": [[JOY_AXIS_LEFT_Y, -1.0]],
+	"move_down": [[JOY_AXIS_LEFT_Y, 1.0]],
+	"aim_left": [[JOY_AXIS_RIGHT_X, -1.0]],
+	"aim_right": [[JOY_AXIS_RIGHT_X, 1.0]],
+	"aim_up": [[JOY_AXIS_RIGHT_Y, -1.0]],
+	"aim_down": [[JOY_AXIS_RIGHT_Y, 1.0]],
+}
+
+const JOY_BUTTON_BINDINGS := {
+	"attack": [JOY_BUTTON_X],
+	"dodge": [JOY_BUTTON_A],
+	"interact": [JOY_BUTTON_B],
+	"meditate": [JOY_BUTTON_Y],
+	"sprint": [JOY_BUTTON_RIGHT_SHOULDER],
+	"breakthrough": [JOY_BUTTON_DPAD_UP],
+}
+
 ## Content toggles. Captivity is a moral/legal simulation, not an inventory system,
 ## and must be safe to disable on an existing save.
 var content := {
@@ -61,6 +84,14 @@ func register_defaults() -> void:
 		_ensure_action(action)
 		for button in MOUSE_BINDINGS[action]:
 			_add_mouse(action, button)
+	for action in JOY_AXIS_BINDINGS.keys():
+		_ensure_action(action)
+		for entry in JOY_AXIS_BINDINGS[action]:
+			_add_joy_axis(action, int(entry[0]), float(entry[1]))
+	for action in JOY_BUTTON_BINDINGS.keys():
+		_ensure_action(action)
+		for button in JOY_BUTTON_BINDINGS[action]:
+			_add_joy_button(action, int(button))
 
 
 func _ensure_action(action: String) -> void:
@@ -78,6 +109,21 @@ func _add_key(action: String, keycode: int) -> void:
 
 func _add_mouse(action: String, button: int) -> void:
 	var ev := InputEventMouseButton.new()
+	ev.button_index = button
+	if not _has_event(action, ev):
+		InputMap.action_add_event(action, ev)
+
+
+func _add_joy_axis(action: String, axis: int, direction: float) -> void:
+	var ev := InputEventJoypadMotion.new()
+	ev.axis = axis
+	ev.axis_value = direction
+	if not _has_event(action, ev):
+		InputMap.action_add_event(action, ev)
+
+
+func _add_joy_button(action: String, button: int) -> void:
+	var ev := InputEventJoypadButton.new()
 	ev.button_index = button
 	if not _has_event(action, ev):
 		InputMap.action_add_event(action, ev)

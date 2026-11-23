@@ -18,8 +18,9 @@ an inheritance, and a crash-safe save system.
 | Action | Key |
 |---|---|
 | Move | W A S D |
+| Sprint (hold) | Shift |
 | Attack with selected technique | Left mouse |
-| Aim | Mouse |
+| Aim | Mouse or right stick |
 | Dodge (i-frames) | Space |
 | Meditate / cultivate | F |
 | Realm breakthrough (at peak, full Qi) | G |
@@ -28,6 +29,9 @@ an inheritance, and a crash-safe save system.
 | Quick save / quick load | F5 / F9 |
 | Zoom camera in / out | Mouse wheel, `=` / `-` |
 | Toggle help | F1 |
+
+Gamepad: left stick moves, right stick aims, **X** attacks, **A** dodges, **B** interacts,
+**Y** meditates, **RB** sprints, **D-pad up** attempts a breakthrough.
 
 On the creation screen: **1–6** allocate a point to STR / DEX / AGI / INT / WIS / CHA,
 **Backspace** refunds the last point, **R** rerolls your spiritual root, **Enter** begins.
@@ -90,6 +94,9 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Deterministic item generation: 4 rarities, tiered prefixes/suffixes, stable IDs, auto-equip.
 - Equipment and passives feed real combat stats through `StatBlock`.
 - Seamless streaming over a 12×12-chunk province with deterministic chunk regeneration.
+- Acceleration-based movement (2 400 u/s² accelerating, 3 000 braking), so turns plant instead of snapping.
+- Hold-to-sprint at 1.45×, and right-stick aiming that falls back to the mouse.
+- One input layer for keyboard, mouse and gamepad; rebinding a key never drops its gamepad button.
 - Camera with world bounds (province and realm), five zoom levels, and smoothed follow.
 - Y-sorted world: trees, rocks, bushes, buildings, NPCs and the player draw in depth order.
 - Roof occlusion: a building fades while the player walks behind it, then returns to full opacity.

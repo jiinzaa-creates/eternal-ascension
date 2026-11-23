@@ -45,6 +45,21 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Input and movement
+
+- All bindings live in `core/settings.gd`: `KEY_BINDINGS`, `MOUSE_BINDINGS`, `JOY_AXIS_BINDINGS`
+  and `JOY_BUTTON_BINDINGS`. Actions are registered in code so headless runs have the same map.
+- `Settings.rebind()` replaces the keyboard event only and leaves mouse and gamepad events alone;
+  a test guards that.
+- Movement feel is `Motion` (pure): `approach()` accelerates at 2 400 u/s² and brakes at 3 000 u/s²,
+  treating a reversal as braking; `sprint_speed()` applies the 1.45× modifier; `deadzone()`
+  rescales stick travel so leaving the deadzone starts from zero.
+- The player never assigns velocity directly while walking — it asks `Motion.approach()`. Dodge is
+  the one deliberate exception (it sets a burst velocity, which then decelerates through the same
+  curve).
+- Aiming prefers the right stick when it is pushed past `AIM_DEADZONE`, then the mouse.
+- New movement rules belong in `Motion` with checks in `run_tests`, not inline in `Player`.
+
 ## Rendering and camera
 
 - The scene root builds a **`World` node with `y_sort_enabled`**. Everything that stands on the
@@ -104,7 +119,7 @@ working system. Reports must list unverified items as unverified.
 game/
   core/       bus, rng, db, clock, log, settings, save, game (autoloads)
   data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs)
-  systems/    attributes, stat_block, cultivation, damage, itemgen, quests
+  systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, camera_rig, lighting, display_policy
   entities/   player, dummy, npc, interactable
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud
