@@ -22,6 +22,7 @@ var passives: Array = []
 var quests: Array = []
 var npc_data: Dictionary = {}
 var biomes: Array = []
+var enemy_archetypes: Array = []
 var origins: Array = []
 var physiques: Array = []
 var weapon_types: Array = []
@@ -53,6 +54,7 @@ func load_all() -> void:
 	quests = _read("quests.json").get("quests", [])
 	npc_data = _read("npcs.json")
 	biomes = _read("biomes.json").get("biomes", [])
+	enemy_archetypes = _read("enemy_archetypes.json").get("archetypes", [])
 	origins = _read("origins.json").get("origins", [])
 	physiques = _read("physiques.json").get("physiques", [])
 	weapon_types = _read("weapons.json").get("weapon_types", [])
@@ -70,6 +72,7 @@ func load_all() -> void:
 	_index("passive", passives)
 	_index("quest", quests)
 	_index("biome", biomes)
+	_index("enemy_archetype", enemy_archetypes)
 	_index("origin", origins)
 	_index("physique", physiques)
 	_index("weapon_type", weapon_types)
@@ -153,6 +156,12 @@ func quest(id: String) -> Dictionary:
 
 func biome(id: String) -> Dictionary:
 	return by_id("biome", id)
+
+
+## Behaviour archetypes are not NPC archetypes: `archetypes()` reads the
+## settlement's npcs.json, while this reads the enemy behaviour table.
+func enemy_archetype(id: String) -> Dictionary:
+	return by_id("enemy_archetype", id)
 
 
 func origin(id: String) -> Dictionary:
@@ -432,6 +441,39 @@ func validate() -> Array:
 	if npc_data.is_empty() or npc_data.get("archetypes", []).is_empty():
 		problems.append("npc archetype data is missing")
 
+	if enemy_archetypes.size() < 4:
+		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())
+	var enemy_archetype_ids := {}
+	for a in enemy_archetypes:
+		var a_id := String(a.get("id", ""))
+		if a_id == "":
+			problems.append("enemy archetype without id")
+			continue
+		if enemy_archetype_ids.has(a_id):
+			problems.append("duplicate enemy archetype id " + a_id)
+		enemy_archetype_ids[a_id] = true
+		var behavior := EnemyAI.profile(a)
+		if String(behavior.get("name", "")) == "":
+			problems.append("enemy archetype %s has no name" % a_id)
+		if float(behavior.get("aggro_range", 0.0)) <= 0.0:
+			problems.append("enemy archetype %s has no aggro range" % a_id)
+		if float(behavior.get("leash", 0.0)) < float(behavior.get("aggro_range", 0.0)):
+			problems.append("enemy archetype %s has a leash shorter than its aggro range" % a_id)
+		if float(behavior.get("reach", 0.0)) <= 0.0 or float(behavior.get("arc", 0.0)) <= 0.0:
+			problems.append("enemy archetype %s has no strike geometry" % a_id)
+		if float(behavior.get("windup", 0.0)) <= 0.0 or float(behavior.get("cooldown", 0.0)) <= 0.0:
+			problems.append("enemy archetype %s has an invalid strike clock" % a_id)
+		if not EnemyAI.DELIVERIES.has(String(a.get("delivery", "melee"))):
+			problems.append("enemy archetype %s has unknown delivery '%s'" % [a_id, String(a.get("delivery", "melee"))])
+		if EnemyAI.is_ranged(behavior):
+			var bolt: Dictionary = behavior.get("projectile", {})
+			if float(bolt.get("speed", 0.0)) <= 0.0 or float(bolt.get("range", 0.0)) <= 0.0:
+				problems.append("ranged enemy archetype %s has no bolt speed or range" % a_id)
+			if float(bolt.get("radius", 0.0)) <= 0.0:
+				problems.append("ranged enemy archetype %s has no bolt radius" % a_id)
+			if float(behavior.get("keep_range", 0.0)) <= 0.0:
+				problems.append("ranged enemy archetype %s wants no distance from its target" % a_id)
+
 	if biomes.is_empty():
 		problems.append("no biomes defined")
 	for b in biomes:
@@ -455,6 +497,11 @@ func validate() -> Array:
 		for enemy in b.get("enemies", []):
 			if String(enemy.get("name", "")) == "":
 				problems.append("biome %s has an unnamed enemy" % id)
+			var enemy_archetype := String(enemy.get("archetype", ""))
+			if enemy_archetype == "":
+				problems.append("biome %s enemy %s has no archetype" % [id, String(enemy.get("name", "?"))])
+			elif not enemy_archetype_ids.has(enemy_archetype):
+				problems.append("biome %s enemy %s names unknown archetype %s" % [id, String(enemy.get("name", "?")), enemy_archetype])
 
 	if physiques.size() < 6:
 		problems.append("expected at least 6 physiques, found %d" % physiques.size())
@@ -580,6 +627,7 @@ func counts() -> Dictionary:
 		"quests": quests.size(),
 		"archetypes": archetypes().size(),
 		"biomes": biomes.size(),
+		"enemy_archetypes": enemy_archetypes.size(),
 		"origins": origins.size(),
 		"physiques": physiques.size(),
 		"weapon_types": weapon_types.size(),

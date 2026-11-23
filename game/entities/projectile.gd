@@ -18,6 +18,11 @@ var penetration := 0.0
 var lifesteal := 0.0
 var max_hits := 1
 var color := Color("#7fd3e0")
+## Which side fired this body. The player's arts scan enemies; an enemy's Qi
+## bolt scans the player. A bolt is still one delivery on one damage path.
+var faction := "player"
+## Where it was fired from, so the player's guard can face the blow.
+var origin := Vector2.ZERO
 
 var _life := 0.0
 var _hits := 0
@@ -56,28 +61,33 @@ func _physics_process(delta: float) -> void:
 
 func _scan() -> void:
 	var box := {"shape": "circle", "radius": radius, "angle": 360.0}
-	for body in get_tree().get_nodes_in_group("enemy"):
-		var enemy := body as Node2D
-		if enemy == null or not is_instance_valid(enemy):
+	var group := "enemy" if faction == "player" else "player"
+	for body in get_tree().get_nodes_in_group(group):
+		var target := body as Node2D
+		if target == null or not is_instance_valid(target):
 			continue
-		var id := enemy.get_instance_id()
+		var id := target.get_instance_id()
 		if _touched.has(id):
 			continue
-		if not Combat.in_hitbox(global_position, direction, box, enemy.global_position, 14.0):
+		if not Combat.in_hitbox(global_position, direction, box, target.global_position, 14.0):
 			continue
 		_touched[id] = true
 		_hits += 1
-		_land(enemy)
+		_land(target)
 		if _hits >= max_hits:
 			queue_free()
 			return
 
 
-func _land(enemy: Node2D) -> void:
+func _land(target: Node2D) -> void:
 	var final := Damage.resolve(amount, 0.0, power)
-	if enemy.has_method("take_hit"):
-		enemy.take_hit(final, direction * knock_force, poise_damage, penetration)
-	Bus.damage_dealt.emit(final, enemy)
+	if target.has_method("take_hit"):
+		if faction == "enemy":
+			# The player's `take_hit` takes the blow's source, not an impulse.
+			target.take_hit(final, origin, true, poise_damage, knock_force, null)
+		else:
+			target.take_hit(final, direction * knock_force, poise_damage, penetration)
+	Bus.damage_dealt.emit(final, target)
 	if lifesteal > 0.0:
 		var player := Game.player as Player
 		if player != null and is_instance_valid(player):

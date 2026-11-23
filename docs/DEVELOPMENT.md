@@ -642,6 +642,48 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   `default_layout(technique_ids)`; a corrupt or over-long layout is reconciled to known, unique arts.
   No schema bump and no migration step are needed.
 
+## Enemy AI
+
+- `EnemyAI` is pure and owns the whole mind: archetype profiles, perception, leash, group slots,
+  the state decision and steering. `Dummy` owns the node, the timers and the blow; it never decides
+  anything the tests cannot reproduce headlessly.
+- An archetype is a dictionary in `data/enemy_archetypes.json`, passed through
+  `EnemyAI.profile()` so a missing field takes a sane default and a malformed one is clamped.
+  `DB.validate` checks the ids, the geometries, the clocks and a ranged body's bolt, and every biome
+  enemy must name an existing archetype. NPC archetypes (`npcs.json`, `DB.archetypes()`) are a
+  different table — the enemy accessor is `DB.enemy_archetype(id)`.
+- States and the order `EnemyAI.think()` applies them:
+  1. `return` — past `leash` from `home`. This beats everything.
+  2. `flee` / `retreat` — a running clock is honoured before a new decision.
+  3. Unseen with no `memory` left: `patrol` at home, `return` away from it.
+  4. `flee` — a wounded body whose archetype has `flee_below` and that has not fled yet
+     (`flee_used` makes the courage one-shot, so a fight cannot become an endless chase).
+  5. `retreat` — a ranged body closer than its `keep_range`.
+  6. In reach: `windup` when ready and the group allows a turn, `recover` while cooling.
+  7. Out of reach: `circle` when the group's attack slots are full, otherwise `chase`.
+- Perception is `aggro_range` plus a `vision_degrees` cone (`perceives`). Damage sets `_provoked`, so
+  being shot from behind turns a body around even when the cone did not see it. `memory` is how long
+  it keeps walking to the last seen point after losing sight; reaching that point with nothing there
+  gives up and the body goes home.
+- Group coordination: `_allies_committed` counts enemies within `GROUP_RADIUS` already in `windup`,
+  and `may_commit` allows fewer than `group_limit`. Bodies also apply `EnemyAI.separation`, so five
+  bodies around a player cannot occupy one point.
+- `AT_HOME` is one constant used both for "this body is home" and for "this body has arrived". They
+  were once 8.0 and 6.0, which created a dead band: a returning body stepped inside 8, the brain chose
+  `patrol`, and it never reached the arrival branch to mend. Never give one rule two thresholds.
+- Facing is locked at the start of a wind-up, so the telegraph is a real dodge window: stepping out of
+  the arc avoids the blow. Poise still owns staggering: a stagger cancels the wind-up and overrides
+  every state for its duration, and a parry spoils it exactly as before.
+- A ranged archetype fires an enemy `Projectile` (`faction = "enemy"`), which scans the `player`
+  group instead of `enemy` and lands through the player's own `take_hit` with the bolt's origin, so a
+  raised guard or a parry meets it like a melee blow. The player's arts keep the default faction.
+- `aggressive = false` keeps a body inert (standing, still strikable) for scenario tests and sparring;
+  the training-dummy behaviour is preserved by that flag, not by a second code path.
+- Nothing new is saved. An enemy's archetype, state, memory, home, timers and flee courage are all
+  world state: they belong to a spawned body, and a reload spawns fresh ones from the biome table.
+- Any new archetype rule belongs in `EnemyAI` with checks in `run_tests`, plus a scene-level check in
+  `integration.gd` before it is called working.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.

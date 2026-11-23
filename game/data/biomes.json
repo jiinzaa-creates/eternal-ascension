@@ -12,8 +12,8 @@
 				{"id": "moon_dew_fern", "name": "Moon Dew Fern", "weight": 2}
 			],
 			"enemies": [
-				{"id": "ridge_boar", "name": "Ridge Boar", "ilvl_bonus": 0, "hp_mult": 1.0, "damage_mult": 1.0, "speed": 62.0, "color": "#a85050"},
-				{"id": "wild_cultivator", "name": "Wild Cultivator", "ilvl_bonus": 1, "hp_mult": 0.9, "damage_mult": 1.15, "speed": 72.0, "color": "#8a5aa8"}
+				{"id": "ridge_boar", "name": "Ridge Boar", "archetype": "brawler", "ilvl_bonus": 0, "hp_mult": 1.0, "damage_mult": 1.0, "speed": 62.0, "color": "#a85050"},
+				{"id": "wild_cultivator", "name": "Wild Cultivator", "archetype": "archer", "ilvl_bonus": 1, "hp_mult": 0.9, "damage_mult": 1.15, "speed": 72.0, "color": "#8a5aa8"}
 			]
 		},
 		{
@@ -27,8 +27,8 @@
 				{"id": "bitter_reed", "name": "Bitter Reed", "weight": 4}
 			],
 			"enemies": [
-				{"id": "marsh_boar", "name": "Marsh Boar", "ilvl_bonus": 0, "hp_mult": 1.15, "damage_mult": 0.95, "speed": 54.0, "color": "#4f7a6a"},
-				{"id": "bog_lurker", "name": "Bog Lurker", "ilvl_bonus": 2, "hp_mult": 1.3, "damage_mult": 1.0, "speed": 46.0, "color": "#3a5f6a"}
+				{"id": "marsh_boar", "name": "Marsh Boar", "archetype": "brawler", "ilvl_bonus": 0, "hp_mult": 1.15, "damage_mult": 0.95, "speed": 54.0, "color": "#4f7a6a"},
+				{"id": "bog_lurker", "name": "Bog Lurker", "archetype": "sentinel", "ilvl_bonus": 2, "hp_mult": 1.3, "damage_mult": 1.0, "speed": 46.0, "color": "#3a5f6a"}
 			]
 		},
 		{
@@ -42,8 +42,8 @@
 				{"id": "ash_bloom", "name": "Ash Bloom", "weight": 2}
 			],
 			"enemies": [
-				{"id": "cinder_hound", "name": "Cinder Hound", "ilvl_bonus": 1, "hp_mult": 0.85, "damage_mult": 1.2, "speed": 84.0, "color": "#a86a40"},
-				{"id": "scorch_ape", "name": "Scorch Ape", "ilvl_bonus": 2, "hp_mult": 1.4, "damage_mult": 1.1, "speed": 58.0, "color": "#8a4a2a"}
+				{"id": "cinder_hound", "name": "Cinder Hound", "archetype": "skirmisher", "ilvl_bonus": 1, "hp_mult": 0.85, "damage_mult": 1.2, "speed": 84.0, "color": "#a86a40"},
+				{"id": "scorch_ape", "name": "Scorch Ape", "archetype": "sentinel", "ilvl_bonus": 2, "hp_mult": 1.4, "damage_mult": 1.1, "speed": 58.0, "color": "#8a4a2a"}
 			]
 		},
 		{
@@ -57,8 +57,8 @@
 				{"id": "silver_moss", "name": "Silver Moss", "weight": 3}
 			],
 			"enemies": [
-				{"id": "frost_wolf", "name": "Frost Wolf", "ilvl_bonus": 1, "hp_mult": 0.95, "damage_mult": 1.1, "speed": 78.0, "color": "#6a8aa8"},
-				{"id": "rime_stalker", "name": "Rime Stalker", "ilvl_bonus": 3, "hp_mult": 1.25, "damage_mult": 1.25, "speed": 66.0, "color": "#8aa8c0"}
+				{"id": "frost_wolf", "name": "Frost Wolf", "archetype": "skirmisher", "ilvl_bonus": 1, "hp_mult": 0.95, "damage_mult": 1.1, "speed": 78.0, "color": "#6a8aa8"},
+				{"id": "rime_stalker", "name": "Rime Stalker", "archetype": "archer", "ilvl_bonus": 3, "hp_mult": 1.25, "damage_mult": 1.25, "speed": 66.0, "color": "#8aa8c0"}
 			]
 		}
 	]

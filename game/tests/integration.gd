@@ -1859,6 +1859,226 @@ func _run() -> void:
 	player.hp = player.hp_max
 	player.poise.reset()
 
+	# --- enemy AI -------------------------------------------------------------
+	# A clear patch far from the settlement, so a wandering spawn cannot land a
+	# blow in the middle of a scenario. Evasion is removed so a blow either lands
+	# or misses for a reason the check names.
+	player.global_position = main.settlement.position_for("plaza") + Vector2(0, 1600)
+	player.velocity = Vector2.ZERO
+	player.hp = player.hp_max
+	player.poise.reset()
+	player._knock = Vector2.ZERO
+	player._iframes = 0.0
+	var ai_dex := player.attrs.get_attr("dex")
+	var ai_agi := player.attrs.get_attr("agi")
+	player.attrs.add("dex", -ai_dex)
+	player.attrs.add("agi", -ai_agi)
+	player.rebuild_stats()
+	# Gear and passives also feed the evasion percent. Zero the rebuilt value
+	# instead of stripping the kit, so armour and damage stay realistic.
+	player.stats.add_pct["evasion"] = 0.0
+	player.stats.flat_attrs["agi"] = 0
+	check(approx(player.stats.evasion_chance(), 0.0), "the AI scenario strips evasion so a blow is deterministic")
+	await frames(2)
+
+	var ai_far := Dummy.new()
+	ai_far.ilvl = 2
+	ai_far.global_position = player.global_position + Vector2(700, 0)
+	main.add_child(ai_far)
+	ai_far.set_archetype("brawler")
+	ai_far.home = ai_far.global_position
+	await frames(20)
+	check(ai_far.memory == 0.0, "an enemy out of range has not seen the player")
+	check(ai_far.state == "patrol" or ai_far.state == "idle", "an unaware enemy patrols its home")
+
+	# Nudge the facing each frame so the cone cannot be what this check measures.
+	player.global_position = ai_far.global_position + Vector2(140, 0)
+	for i in 8:
+		ai_far._facing = Vector2.RIGHT
+		await get_tree().physics_frame
+	check(ai_far.memory > 0.0, "an enemy that sees the player remembers him")
+	check(ai_far.state in ["chase", "circle", "windup", "recover"], "a sighted enemy pursues")
+
+	ai_far.home = ai_far.global_position + Vector2(900, 0)
+	await frames(3)
+	check(ai_far.state == "return", "a body past its leash breaks off the fight")
+	await frames(10)
+	check(ai_far.state == "return", "a returning body keeps walking home")
+	ai_far.queue_free()
+
+	var ai_return := Dummy.new()
+	ai_return.ilvl = 1
+	ai_return.global_position = player.global_position + Vector2(500, 0)
+	main.add_child(ai_return)
+	ai_return.set_archetype("sentinel")
+	ai_return.home = ai_return.global_position + Vector2(20, 0)
+	ai_return.hp = 4.0
+	ai_return.memory = 0.0
+	await frames(110)
+	check(ai_return.hp == ai_return.hp_max, "a body that walks home mends its wounds")
+	check(ai_return.state == "patrol" or ai_return.state == "idle", "a body back at its post loses interest")
+	ai_return.queue_free()
+	await frames(2)
+
+	var ai_striker := Dummy.new()
+	ai_striker.ilvl = 1
+	ai_striker.global_position = player.global_position + Vector2(40, 0)
+	main.add_child(ai_striker)
+	ai_striker.set_archetype("brawler")
+	ai_striker._facing = Vector2.LEFT
+	ai_striker._cooldown = 0.0
+	ai_striker.memory = 5.0
+	ai_striker._last_seen = player.global_position
+	await frames(2)
+	check(ai_striker.state == "windup" and ai_striker._windup > 0.0, "an enemy in reach telegraphs its blow")
+
+	var ai_dodged_hp := player.hp
+	player.global_position = ai_striker.global_position + Vector2(240, 0)
+	await frames(40)
+	check(player.hp == ai_dodged_hp, "a telegraphed blow misses a body that steps out of reach")
+
+	player.global_position = ai_striker.global_position + Vector2(-36, 0)
+	player._iframes = 0.0
+	ai_striker._facing = Vector2.LEFT
+	ai_striker._cooldown = 0.0
+	ai_striker.memory = 5.0
+	ai_striker._provoked = true
+	ai_striker._last_seen = player.global_position
+	var ai_struck := false
+	var ai_hit_hp := player.hp
+	for i in 70:
+		await get_tree().physics_frame
+		if player.hp < ai_hit_hp:
+			ai_struck = true
+			break
+	check(ai_struck, "a wound-up blow lands on a body that stays in reach")
+
+	ai_striker._windup = 0.4
+	ai_striker.stagger(999.0)
+	check(ai_striker._windup == 0.0, "a stagger cancels a wind-up")
+	check(ai_striker.state == "recover", "a staggered body reports recovery")
+	ai_striker.queue_free()
+
+	var ai_skirmisher := Dummy.new()
+	ai_skirmisher.ilvl = 1
+	ai_skirmisher.global_position = player.global_position + Vector2(40, 0)
+	main.add_child(ai_skirmisher)
+	ai_skirmisher.set_archetype("skirmisher")
+	ai_skirmisher._facing = Vector2.LEFT
+	ai_skirmisher._cooldown = 0.0
+	ai_skirmisher.memory = 5.0
+	ai_skirmisher._last_seen = player.global_position
+	var ai_retreated := false
+	for i in 70:
+		await get_tree().physics_frame
+		if ai_skirmisher.retreat_left > 0.0:
+			ai_retreated = true
+			break
+	check(ai_retreated, "a skirmisher backs off after its blow")
+	ai_skirmisher.queue_free()
+
+	var ai_sentinel := Dummy.new()
+	ai_sentinel.ilvl = 1
+	ai_sentinel.global_position = player.global_position
+	main.add_child(ai_sentinel)
+	ai_sentinel.set_archetype("sentinel")
+	ai_sentinel.aggressive = false
+	ai_sentinel._facing = Vector2.RIGHT
+	player.hp = player.hp_max
+	player._iframes = 0.0
+	player._knock = Vector2.ZERO
+	player.global_position = ai_sentinel.global_position + Vector2(-36, 0)
+	var ai_behind_hp := player.hp
+	ai_sentinel._release_attack(player)
+	await frames(1)
+	check(approx(player.hp, ai_behind_hp), "a sentinel's frontal arc misses a body behind it")
+	player.global_position = ai_sentinel.global_position + Vector2(36, 0)
+	player._iframes = 0.0
+	ai_sentinel._cooldown = 0.0
+	ai_sentinel._release_attack(player)
+	await frames(1)
+	check(player.hp < ai_behind_hp, "a sentinel's arc lands in front of it")
+	ai_sentinel.queue_free()
+
+	var ai_archer := Dummy.new()
+	ai_archer.ilvl = 2
+	ai_archer.global_position = player.global_position + Vector2(260, 0)
+	main.add_child(ai_archer)
+	ai_archer.set_archetype("archer")
+	ai_archer._facing = Vector2.LEFT
+	ai_archer._cooldown = 0.0
+	ai_archer.memory = 5.0
+	ai_archer._last_seen = player.global_position
+	await frames(3)
+	check(ai_archer.state == "windup", "an archer winds up a bolt at range")
+	player.hp = player.hp_max
+	player._iframes = 0.0
+	var ai_ranged_hp := player.hp
+	var ai_saw_bolt := false
+	var ai_kept_distance := true
+	var ai_bolt_hit := false
+	for i in 150:
+		await get_tree().physics_frame
+		for ai_bolt_body in get_tree().get_nodes_in_group("projectile"):
+			if is_instance_valid(ai_bolt_body) and String(ai_bolt_body.faction) == "enemy":
+				ai_saw_bolt = true
+		if is_instance_valid(ai_archer) and ai_archer.global_position.distance_to(player.global_position) < 150.0:
+			ai_kept_distance = false
+		if player.hp < ai_ranged_hp:
+			ai_bolt_hit = true
+			break
+	check(ai_saw_bolt, "an archer fires a Qi bolt instead of closing")
+	check(ai_kept_distance, "an archer keeps its distance")
+	check(ai_bolt_hit, "an enemy bolt lands through the player's own take_hit")
+	ai_archer.queue_free()
+	await frames(2)
+
+	var ai_group: Array = []
+	for i in 5:
+		var ai_body := Dummy.new()
+		ai_body.ilvl = 1
+		var ai_angle := TAU * float(i) / 5.0
+		ai_body.global_position = player.global_position + Vector2(cos(ai_angle), sin(ai_angle)) * 40.0
+		main.add_child(ai_body)
+		ai_body.set_archetype("brawler")
+		ai_body.memory = 5.0
+		ai_body._cooldown = 0.0
+		ai_body._provoked = true
+		ai_group.append(ai_body)
+	await frames(6)
+	var ai_winding := 0
+	for ai_body in ai_group:
+		if is_instance_valid(ai_body) and String(ai_body.state) == "windup":
+			ai_winding += 1
+	check(ai_winding >= 1, "at least one body of a pack commits to a blow")
+	check(ai_winding <= 3, "no more than three bodies commit at once (%d)" % ai_winding)
+	for ai_body in ai_group:
+		if is_instance_valid(ai_body):
+			ai_body.queue_free()
+	await frames(2)
+
+	var ai_count_before := get_tree().get_nodes_in_group("enemy").size()
+	main._spawn_wild_dummy()
+	await frames(1)
+	var ai_spawned: Array = get_tree().get_nodes_in_group("enemy")
+	check(ai_spawned.size() == ai_count_before + 1, "the wilds spawn another enemy")
+	var ai_newest := ai_spawned[ai_spawned.size() - 1] as Dummy
+	check(ai_newest != null and DB.has("enemy_archetype", String(ai_newest.archetype)), "a wild spawn carries a biome archetype")
+	check(ai_newest != null and ai_newest.profile.size() > 0, "a wild spawn has a full behaviour profile")
+	if ai_newest != null:
+		ai_newest.queue_free()
+	await frames(2)
+
+	player.attrs.add("dex", ai_dex)
+	player.attrs.add("agi", ai_agi)
+	player.rebuild_stats()
+	player.hp = player.hp_max
+	player.poise.reset()
+	player._knock = Vector2.ZERO
+	player._iframes = 0.0
+	player.global_position = main.settlement.position_for("plaza")
+	await frames(2)
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

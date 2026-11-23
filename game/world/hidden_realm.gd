@@ -199,6 +199,11 @@ func _build_interactables() -> void:
 			interactables.append(chest)
 
 
+## The realm's guards are not one uniform body: the roster is fixed, so the mix
+## is the same on every visit to a given realm.
+const ENEMY_ROSTER: Array[String] = ["sentinel", "skirmisher", "archer", "brawler"]
+
+
 func _spawn_enemies(r: RandomNumberGenerator) -> void:
 	var ilvl := 2
 	for cell in cells:
@@ -213,6 +218,8 @@ func _spawn_enemies(r: RandomNumberGenerator) -> void:
 			var dummy := Dummy.new()
 			dummy.ilvl = ilvl
 			dummy.position = pos
+			var slot := (absi(cell.x) * 3 + absi(cell.y) * 5 + i) % ENEMY_ROSTER.size()
+			dummy.archetype = String(ENEMY_ROSTER[slot])
 			_attach(dummy)
 
 

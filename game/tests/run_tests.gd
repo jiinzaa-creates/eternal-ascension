@@ -36,6 +36,7 @@ func _ready() -> void:
 	_defense_tests()
 	_technique_combat_tests()
 	_skill_bar_tests()
+	_enemy_ai_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -3093,3 +3094,144 @@ func _skill_bar_tests() -> void:
 	check(SkillBar.cooldown_text(0.0) == "" and SkillBar.cooldown_text(0.02) == "", "a ready art shows no timer")
 	check(SkillBar.cooldown_text(1.24) == "1.2s", "a cooldown reads in tenths of a second")
 	check(SkillBar.cooldown_text(0.5) == "0.5s", "a short cooldown still reads")
+
+
+# ------------------------------------------------------------- enemy ai ----
+
+func _enemy_ai_tests() -> void:
+	print("[enemy ai] archetypes, perception, leashes, group slots and states")
+	check(DB.enemy_archetypes.size() >= 4, "at least four enemy archetypes are defined")
+	check(DB.has("enemy_archetype", "brawler"), "the registry indexes enemy archetypes by id")
+	check(DB.enemy_archetype("brawler").get("name", "") == "Brawler", "an archetype carries its display name")
+	check(DB.counts().has("enemy_archetypes"), "the registry counts enemy archetypes")
+	var every_biome_enemy_named := true
+	for biome in DB.biomes:
+		for enemy in biome.get("enemies", []):
+			if not DB.has("enemy_archetype", String(enemy.get("archetype", ""))):
+				every_biome_enemy_named = false
+	check(every_biome_enemy_named, "every biome enemy names a known archetype")
+
+	var brawler := EnemyAI.profile(DB.enemy_archetype("brawler"))
+	var skirmisher := EnemyAI.profile(DB.enemy_archetype("skirmisher"))
+	var sentinel := EnemyAI.profile(DB.enemy_archetype("sentinel"))
+	var archer := EnemyAI.profile(DB.enemy_archetype("archer"))
+	check(EnemyAI.is_ranged(archer), "an archer is a ranged body")
+	check(not EnemyAI.is_ranged(brawler) and not EnemyAI.is_ranged(skirmisher), "a brawler and a skirmisher are melee")
+	check(EnemyAI.keep_away(archer) > 0.0, "an archer holds a firing distance")
+	check(EnemyAI.keep_away(brawler) == 0.0, "a melee body wants no distance")
+	check(EnemyAI.reach(sentinel) > EnemyAI.reach(brawler), "a sentinel strikes further than a brawler")
+	check(float(EnemyAI.strike_hitbox(sentinel).get("angle", 0.0)) < 360.0, "a sentinel guards a frontal arc")
+	check(float(EnemyAI.strike_hitbox(brawler).get("angle", 0.0)) == 360.0, "a brawler swings all around")
+	check(approx(float(EnemyAI.strike_hitbox(brawler).get("radius", 0.0)), EnemyAI.reach(brawler)), "a strike reaches exactly its reach")
+	check(EnemyAI.windup_time(sentinel) > EnemyAI.windup_time(skirmisher), "a heavier body telegraphs longer")
+	check(EnemyAI.cooldown_time(archer) > EnemyAI.cooldown_time(brawler), "a ranged body reloads longer")
+	check(EnemyAI.ring_distance(brawler) > EnemyAI.reach(brawler), "a circling body stands just outside its reach")
+	check(approx(EnemyAI.ring_distance(archer), EnemyAI.keep_away(archer)), "an archer orbits at its firing band")
+	check(EnemyAI.telegraph_color(archer) != EnemyAI.telegraph_color(brawler), "archetypes telegraph in their own colours")
+	check(EnemyAI.label("return") == "Returning home" and EnemyAI.label("nope") == "Unknown", "states carry readable labels")
+
+	var fallback := EnemyAI.profile_by_id(DB.enemy_archetypes, "nope")
+	check(String(fallback.get("id", "")) == "nope" and float(fallback.get("aggro_range", 0.0)) == float(EnemyAI.DEFAULTS["aggro_range"]), "an unknown archetype falls back to the defaults")
+	var clamped := EnemyAI.profile({"aggro_range": -5.0, "vision_degrees": 900.0, "group_limit": 0, "delivery": "song", "windup": 0.0})
+	check(float(clamped.get("aggro_range", 0.0)) >= 1.0, "a negative aggro range is clamped")
+	check(approx(float(clamped.get("vision_degrees", 0.0)), 360.0), "a vision cone cannot exceed a full circle")
+	check(int(clamped.get("group_limit", 0)) == 1, "a group always allows at least one attacker")
+	check(String(clamped.get("delivery", "")) == "melee", "an unknown delivery falls back to melee")
+	check(float(clamped.get("windup", 0.0)) > 0.0, "a wind-up never collapses to zero")
+	check(int(EnemyAI.profile({"retreat_after": -2}).get("retreat_after", -1)) == 0, "a negative retreat count is clamped")
+
+	var sight := EnemyAI.profile({"aggro_range": 300.0, "vision_degrees": 120.0})
+	check(EnemyAI.perceives(100.0, Vector2.RIGHT, Vector2.RIGHT, sight), "a target ahead in range is seen")
+	check(not EnemyAI.perceives(400.0, Vector2.RIGHT, Vector2.RIGHT, sight), "a target beyond the aggro range is unseen")
+	check(not EnemyAI.perceives(100.0, Vector2.LEFT, Vector2.RIGHT, sight), "a target behind the vision cone is unseen")
+	check(EnemyAI.perceives(100.0, Vector2.RIGHT, Vector2.ZERO, sight), "a body with no facing is alert rather than blind")
+	check(EnemyAI.perceives(40.0, Vector2.LEFT, Vector2.RIGHT, EnemyAI.profile({"aggro_range": 50.0, "vision_degrees": 360.0})), "a full-circle cone sees behind")
+	check(not EnemyAI.perceives(-1.0, Vector2.RIGHT, Vector2.RIGHT, sight), "a negative distance perceives nothing")
+
+	check(EnemyAI.leash_broken(900.0, brawler), "a body dragged past its leash breaks off")
+	check(not EnemyAI.leash_broken(100.0, brawler), "a body near home holds its ground")
+	check(EnemyAI.wants_to_flee(0.1, skirmisher), "a wounded skirmisher wants to run")
+	check(not EnemyAI.wants_to_flee(0.1, brawler), "a brawler never runs")
+	check(not EnemyAI.wants_to_flee(1.0, skirmisher), "an unhurt skirmisher stands its ground")
+
+	var calm := {
+		"dist": 200.0, "home_dist": 10.0, "memory": 0.0, "hp_ratio": 1.0,
+		"flee_left": 0.0, "retreat_left": 0.0, "seen": false, "at_home": true,
+		"ready": true, "committed": true, "flee_used": false, "in_reach": false,
+	}
+	check(EnemyAI.think(calm, brawler) == "patrol", "an unaware body at home patrols")
+	var away := calm.duplicate()
+	away["at_home"] = false
+	away["home_dist"] = 120.0
+	check(EnemyAI.think(away, brawler) == "return", "an unaware body away from home walks back")
+	var chase := calm.duplicate()
+	chase["seen"] = true
+	chase["dist"] = 260.0
+	check(EnemyAI.think(chase, brawler) == "chase", "a seen target out of reach is chased")
+	var leashed := chase.duplicate()
+	leashed["home_dist"] = 900.0
+	check(EnemyAI.think(leashed, brawler) == "return", "a broken leash beats the target in sight")
+	var strike := chase.duplicate()
+	strike["in_reach"] = true
+	check(EnemyAI.think(strike, brawler) == "windup", "a ready body in reach winds up")
+	var cooling := strike.duplicate()
+	cooling["ready"] = false
+	check(EnemyAI.think(cooling, brawler) == "recover", "a body still cooling recovers")
+	var crowded := strike.duplicate()
+	crowded["committed"] = false
+	check(EnemyAI.think(crowded, brawler) == "circle", "a body that cannot commit circles")
+	var far_crowded := chase.duplicate()
+	far_crowded["committed"] = false
+	check(EnemyAI.think(far_crowded, brawler) == "circle", "a body without a slot circles instead of piling on")
+	var hurt := chase.duplicate()
+	hurt["hp_ratio"] = 0.1
+	check(EnemyAI.think(hurt, skirmisher) == "flee", "a cowardly body flees when wounded")
+	var already_ran := hurt.duplicate()
+	already_ran["flee_used"] = true
+	check(EnemyAI.think(already_ran, skirmisher) == "chase", "a body that already fled fights on")
+	var running := chase.duplicate()
+	running["flee_left"] = 2.0
+	check(EnemyAI.think(running, brawler) == "flee", "a flee clock keeps the body running")
+	var backing_off := strike.duplicate()
+	backing_off["retreat_left"] = 0.4
+	check(EnemyAI.think(backing_off, brawler) == "retreat", "a retreat clock backs the body off")
+	var close_archer := calm.duplicate()
+	close_archer["seen"] = true
+	close_archer["dist"] = 90.0
+	close_archer["in_reach"] = true
+	check(EnemyAI.think(close_archer, archer) == "retreat", "an archer backs off when a target closes in")
+	var ranged := calm.duplicate()
+	ranged["seen"] = true
+	ranged["dist"] = 300.0
+	ranged["in_reach"] = true
+	check(EnemyAI.think(ranged, archer) == "windup", "an archer in its band winds up a bolt")
+
+	check(EnemyAI.move_intent("chase", Vector2(3, 0), 50.0, brawler) == Vector2.RIGHT, "chasing walks toward the target")
+	check(EnemyAI.move_intent("flee", Vector2(3, 0), 50.0, brawler) == Vector2.LEFT, "fleeing walks away from the target")
+	check(EnemyAI.move_intent("retreat", Vector2(3, 0), 50.0, archer) == Vector2.LEFT, "retreating backs away")
+	check(EnemyAI.move_intent("return", Vector2.RIGHT, 50.0, brawler, 1.0, Vector2(0, 1)) == Vector2.DOWN, "returning walks toward home")
+	check(EnemyAI.move_intent("windup", Vector2.RIGHT, 50.0, brawler) == Vector2.ZERO, "a wind-up does not move")
+	check(EnemyAI.move_intent("recover", Vector2.RIGHT, 50.0, brawler) == Vector2.ZERO, "a recovery does not move")
+	var orbit_one := EnemyAI.move_intent("circle", Vector2.RIGHT, 300.0, archer, 1.0)
+	var orbit_two := EnemyAI.move_intent("circle", Vector2.RIGHT, 300.0, archer, -1.0)
+	check(orbit_one.y > 0.0 and orbit_two.y < 0.0, "the two strafe signs mirror the orbit")
+	var closing := EnemyAI.move_intent("circle", Vector2.RIGHT, 600.0, archer, 1.0)
+	check(closing.x > 0.0, "a circling body too far away still closes in")
+	check(EnemyAI.move_intent("idle", Vector2.RIGHT, 50.0, brawler) == Vector2.ZERO, "an idle body stands still")
+
+	var push := EnemyAI.separation(Vector2.ZERO, [Vector2(10, 0)], 30.0)
+	check(push.x < 0.0, "bodies push apart")
+	check(EnemyAI.separation(Vector2.ZERO, [Vector2(400, 0)], 30.0) == Vector2.ZERO, "distant bodies do not push")
+	check(EnemyAI.separation(Vector2.ZERO, [Vector2.ZERO], 30.0).length() > 0.0, "stacked bodies still separate")
+	check(EnemyAI.separation(Vector2.ZERO, [], 30.0) == Vector2.ZERO, "an empty crowd pushes nothing")
+	check(push.y == 0.0, "a push is straight away from the neighbour")
+
+	check(EnemyAI.may_commit(2, brawler), "a group of three allows two committed allies")
+	check(not EnemyAI.may_commit(3, brawler), "a full group takes no more attackers")
+	check(EnemyAI.may_commit(-1, brawler), "a negative count is treated as none")
+	check(not EnemyAI.may_commit(2, sentinel), "a sentinel's smaller group fills sooner")
+
+	var bolt := Projectile.new()
+	check(bolt.faction == "player", "a projectile defaults to the player's side")
+	check(bolt.origin == Vector2.ZERO, "a projectile records its origin")
+	bolt.free()
