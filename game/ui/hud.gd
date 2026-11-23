@@ -72,6 +72,7 @@ func _draw() -> void:
 	draw_quest(player)
 	draw_prompt()
 	draw_realm_banner()
+	draw_tribulation()
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -255,6 +256,23 @@ func draw_realm_banner() -> void:
 	_text(pos + Vector2(14.0, 19.0), text, 16, Color("#c8b8ff"))
 
 
+## The encounter banner: the trial's name, its colour, and where in it you are.
+func draw_tribulation() -> void:
+	var arena := host.tribulation_arena as TribulationArena
+	if arena == null or arena.tribulation == null:
+		return
+	var trial: Tribulation = arena.tribulation
+	var color := Color(Tribulation.color_of(trial.type_id))
+	var text := "TRIBULATION — %s · Wave %d/%d · Hits %d" % [
+		Tribulation.name_of(trial.type_id), trial.wave, trial.waves_total, trial.hits
+	]
+	var width := _text_width(text, 16) + 32.0
+	var pos := Vector2(size.x * 0.5 - width * 0.5, 56.0)
+	draw_rect(Rect2(pos, Vector2(width, 30.0)), Color("#120d18", 0.85))
+	draw_rect(Rect2(pos, Vector2(width, 30.0)), Color(color, 0.7), false, 1.5)
+	_text(pos + Vector2(16.0, 20.0), text, 16, color)
+
+
 func draw_toasts() -> void:
 	var y := size.y - 84.0
 	var x := size.x * 0.5
@@ -267,7 +285,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB attack · SPACE dodge · F meditate · G breakthrough · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB attack · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

@@ -84,6 +84,29 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   `from_dict` clamps a corrupt realm into 1–12. A successful attempt returns the new realm's `unlocks`
   and `ability`; `Player` turns them into an "Realm art awakened" toast.
 
+## Playable tribulations
+
+- **One pure state machine** (`game/systems/tribulation.gd`). `setup(type_id, scale, centre, rng)` builds the
+  trial from `data/tribulations.json`; `tick(delta, player_offset)` advances the schedule and returns
+  `{struck, wave_finished, finished, broken}`. The node (`game/world/tribulation_arena.gd`) only ticks it,
+  applies damage and draws, so the encounter is deterministic and testable without a display.
+- **Waves are movement tests.** Every bolt is telegraphed for `TELEGRAPH` (0.9 s) at a position scattered
+  within the trial's `radius` of the arena centre, and bolts inside a wave are staggered by `interval`.
+  A bolt hits if the player is within `BOLT_RADIUS` (44) when it resolves. A wave with no hits is
+  **perfect** and earns `COMPOSURE_PER_WAVE` (4%), capped at `MAX_COMPOSURE` (12%).
+- **Damage is heaven's, not physical.** `Player.take_tribulation_damage` skips armour and evasion but still
+  respects i-frames, so a well-timed dash slips between strikes. It does not call `_die`: hitting zero hp
+  aborts the trial, and `Player.fail_breakthrough()` applies the M26 failure fallout without a success roll.
+- **Flow.** `G` (`main._face_tribulation`) requires a peak, a non-apex realm and full Qi; it then starts the
+  trial, and `Bus.tribulation_finished` routes to `player.attempt_breakthrough(composure)` or
+  `player.fail_breakthrough()`. Below the peak or at the apex the key still falls through to
+  `attempt_breakthrough`, which keeps its M25/M26 refusals and apex guard.
+- **Not saved.** `_save` refuses while a trial runs ("The heavens do not pause for a save.") and `_load_game`
+  frees a live arena. The arena seed mixes the world seed, realm and attempt count.
+- Eleven trials are data: meridian (3×2) through lightning, heart demon, elemental, spatial, bloodline,
+  heavenly judgment, grand, dao, sovereign and primordial (7×7). `DB.validate` checks each realm's declared
+  tribulation exists; `Tribulation.for_realm` falls back to the meridian trial rather than an empty fight.
+
 ## Breakthrough preparation and method tribulations
 
 - **One formula.** `Cultivation.estimated_chance()` is what the HUD shows and what `attempt_breakthrough`

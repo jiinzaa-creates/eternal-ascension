@@ -28,6 +28,7 @@ func _ready() -> void:
 	_qi_meridian_tests()
 	_realm_tests()
 	_breakthrough_tests()
+	_tribulation_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1190,6 +1191,131 @@ func _probe_failed_breakthrough(prep: int, method_id: String = "method.tradition
 			result["contamination"] = cultivation.contamination
 			return result
 	return {}
+
+
+# ---------------------------------------------------------- tribulations ----
+
+func _tribulation_tests() -> void:
+	print("[tribulation] data, telegraphs, waves and composure")
+	check(DB.tribulations.size() >= 10, "at least ten tribulation types are registered")
+	var ids := {}
+	var used := {}
+	for entry in DB.tribulations:
+		var id := String(entry.get("id", ""))
+		check(id != "", "a tribulation has an id")
+		check(not ids.has(id), "tribulation %s is unique" % id)
+		ids[id] = true
+		check(String(entry.get("name", "")) != "", "%s is named" % id)
+		check(String(entry.get("color", "")).begins_with("#"), "%s has a colour" % id)
+		check(int(entry.get("waves", 0)) >= 1, "%s has waves" % id)
+		check(int(entry.get("bolts", 0)) >= 1, "%s has bolts" % id)
+		check(float(entry.get("interval", 0.0)) > 0.0 and float(entry.get("radius", 0.0)) > 0.0, "%s has a schedule" % id)
+		check(float(entry.get("damage_mult", 0.0)) > 0.0, "%s deals damage" % id)
+
+	for n in range(1, Realms.count() + 1):
+		var declared := String(Realms.find(n).get("tribulation", ""))
+		check(Tribulation.exists(declared), "realm %d names an existing tribulation" % n)
+		check(Tribulation.for_realm(n) == declared, "realm %d resolves its own trial" % n)
+		used[declared] = true
+	check(used.size() >= 7, "the ladder uses at least seven distinct trials (%d)" % used.size())
+	check(Tribulation.for_realm(0) == Tribulation.FALLBACK_ID, "an invalid realm falls back to the meridian trial")
+	check(Tribulation.name_of("primordial") == "Primordial Tribulation", "names come from data")
+	check(Tribulation.name_of("nope") == Tribulation.name_of(Tribulation.FALLBACK_ID), "unknown trials fall back")
+	check(Tribulation.color_of("lightning").begins_with("#"), "colours come from data")
+
+	var trial := Tribulation.new()
+	trial.setup("meridian", 0.5, Vector2(100, 100), Rng.stream("trib_test", 1, 0))
+	check(trial.type_id == "meridian", "setup keeps the type")
+	check(trial.waves_total == int(Tribulation.find("meridian").get("waves", 0)), "waves come from data")
+	check(trial.bolts_per_wave() == int(Tribulation.find("meridian").get("bolts", 0)), "bolts come from data")
+	check(trial.damage_per_bolt() > 0.0, "bolts deal damage")
+	check(String(trial.result()["outcome"]) == "unfinished", "a fresh trial is unfinished")
+	check(trial.strikes.size() == trial.bolts_per_wave(), "a wave telegraphs its bolts")
+	if trial.strikes.size() >= 2:
+		check(float(trial.strikes[0]["left"]) < float(trial.strikes[1]["left"]), "bolts inside a wave are staggered")
+
+	var first_seed := Tribulation.new()
+	first_seed.setup("lightning", 0.4, Vector2.ZERO, Rng.stream("trib_det", 7, 0))
+	var second_seed := Tribulation.new()
+	second_seed.setup("lightning", 0.4, Vector2.ZERO, Rng.stream("trib_det", 7, 0))
+	var same := true
+	for i in first_seed.strikes.size():
+		if (first_seed.strikes[i]["pos"] as Vector2) != (second_seed.strikes[i]["pos"] as Vector2):
+			same = false
+	check(same, "the same seed telegraphs the same first wave")
+
+	var hit_trial := Tribulation.new()
+	hit_trial.setup("meridian", 0.0, Vector2.ZERO, Rng.stream("trib_hit", 3, 0))
+	var target: Vector2 = hit_trial.strikes[0]["pos"]
+	var events: Dictionary = {}
+	for i in 40:
+		events = hit_trial.tick(0.1, target)
+		if not (events["struck"] as Array).is_empty():
+			break
+	check(not (events.get("struck", []) as Array).is_empty(), "a bolt resolves after its telegraph")
+	if not (events.get("struck", []) as Array).is_empty():
+		check(bool((events["struck"] as Array)[0]["hit"]), "standing on the telegraph is hit")
+	check(hit_trial.hits >= 1, "a landed bolt is counted")
+
+	var missed := Tribulation.new()
+	missed.setup("meridian", 0.0, Vector2.ZERO, Rng.stream("trib_miss", 3, 0))
+	var missed_events: Dictionary = {}
+	for i in 40:
+		missed_events = missed.tick(0.1, Vector2(9000, 9000))
+		if not (missed_events["struck"] as Array).is_empty():
+			break
+	if not (missed_events.get("struck", []) as Array).is_empty():
+		check(not bool((missed_events["struck"] as Array)[0]["hit"]), "stepping off the telegraph avoids the bolt")
+
+	var clean := Tribulation.new()
+	clean.setup("meridian", 0.0, Vector2.ZERO, Rng.stream("trib_clean", 5, 0))
+	var guard := 0
+	while not clean.finished and guard < 4000:
+		clean.tick(0.1, Vector2(9000, 9000))
+		guard += 1
+	check(clean.finished and not clean.broken, "a dodged trial completes")
+	check(clean.hits == 0 and clean.perfect_waves == clean.waves_total, "dodging every bolt is a perfect trial")
+	check(String(clean.result()["outcome"]) == "survived", "completing the waves means survival")
+	check(approx(float(clean.result()["composure"]), Tribulation.MAX_COMPOSURE), "perfect waves cap composure")
+	check((clean.tick(0.1, Vector2.ZERO)["struck"] as Array).is_empty(), "a finished trial reports nothing more")
+
+	check(approx(Tribulation.composure(0), 0.0), "no perfect waves, no composure")
+	check(Tribulation.composure(1) > 0.0, "one perfect wave helps")
+	check(Tribulation.composure(3) > Tribulation.composure(2), "composure rises per perfect wave")
+	check(approx(Tribulation.composure(99), Tribulation.MAX_COMPOSURE), "composure caps")
+
+	var broken := Tribulation.new()
+	broken.setup("grand", 0.2, Vector2.ZERO, Rng.stream("trib_broken", 2, 0))
+	broken.abort()
+	check(broken.finished and broken.broken, "aborting ends the trial as broken")
+	check(String(broken.result()["outcome"]) == "broken", "a broken trial reports it")
+	check(approx(float(broken.result()["composure"]), 0.0), "a broken trial earns no composure")
+
+	var light := Tribulation.new()
+	light.setup("meridian", 0.0, Vector2.ZERO, Rng.stream("dmg", 0, 0))
+	var heavy := Tribulation.new()
+	heavy.setup("meridian", 2.0, Vector2.ZERO, Rng.stream("dmg", 0, 0))
+	check(heavy.damage_per_bolt() > light.damage_per_bolt(), "a heavier heaven hits harder")
+	var grand := Tribulation.new()
+	grand.setup("grand", 0.0, Vector2.ZERO, Rng.stream("dmg", 0, 0))
+	check(grand.damage_per_bolt() > light.damage_per_bolt(), "later trials hit harder at the same scale")
+
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var failed := Cultivation.new()
+	failed.root_tier = 3
+	failed.sublevel = 10
+	failed.qi = failed.qi_max(stats)
+	failed.prepare()
+	var fallout := failed.break_through_failure(Rng.stream("break_test", 0, 0), 0, 0, {})
+	check(not bool(fallout["success"]) and bool(fallout.get("broken", false)), "a broken encounter is a failure")
+	check(failed.qi == 0.0 and failed.contamination > 0.0, "a broken encounter empties Qi and corrupts")
+	check(int(fallout["preparation"]) == 1 and failed.preparation == 0, "a broken encounter spends preparation")
+	check(float(fallout["hp_cost_ratio"]) > 0.0, "a broken encounter wounds")
+	check(failed.failures == 1, "a broken encounter counts as a failure")
+	var declarer := Cultivation.new()
+	declarer.realm = 3
+	check(declarer.tribulation_id() == "lightning", "a realm declares its trial")
 
 
 func _rng_tests() -> void:

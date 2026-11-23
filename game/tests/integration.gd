@@ -11,12 +11,14 @@ var _pass := 0
 var _fail := 0
 var _failures: Array = []
 var _toasts: Array = []
+var _tribulation_result: Dictionary = {}
 var main: Node2D
 
 
 func _ready() -> void:
 	print("=== Eternal Ascension — integration test ===")
 	Bus.toast.connect(_record_toast)
+	Bus.tribulation_finished.connect(_record_tribulation)
 	await _run()
 	print("-----------------------------------------------")
 	print("RESULT: PASS %d / FAIL %d" % [_pass, _fail])
@@ -43,6 +45,10 @@ func _find_interactable(nodes: Array, id: String) -> Interactable:
 
 func _record_toast(text: String) -> void:
 	_toasts.append(text)
+
+
+func _record_tribulation(result: Dictionary) -> void:
+	_tribulation_result = result.duplicate(true)
 
 
 func approx(a: float, b: float, eps: float = 0.001) -> bool:
@@ -1184,6 +1190,74 @@ func _run() -> void:
 	player.cultivation.preparation = 0
 	Game.spirit_stones = stones_for_prep
 	Save.delete_slot(91)
+
+	# --- playable tribulation --------------------------------------------------
+	player.attrs.add("wis", 20)
+	player.attrs.add("int", 20)
+	player.cultivation.realm = 1
+	player.cultivation.sublevel = 10
+	player.cultivation.method_id = "method.traditional"
+	player.cultivation.preparation = Cultivation.MAX_PREPARATION
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player.hp = player.hp_max
+	# Probe a breakthrough index whose roll succeeds, so the outcome of the
+	# encounter test does not depend on a coin flip.
+	var lucky_index := 0
+	for i in 400:
+		if float(Rng.stream("breakthrough", 1, i).randf()) < 0.97:
+			lucky_index = i
+			break
+	player.cultivation.breakthrough_attempts = lucky_index
+	_tribulation_result = {}
+	main._face_tribulation()
+	check(main.tribulation_arena != null, "G at the peak starts a playable tribulation")
+	check(main.tribulation_arena.tribulation != null, "the arena owns a trial")
+	check(main.tribulation_arena.tribulation.type_id == "meridian", "realm one faces the meridian trial")
+	check(main.tribulation_arena.tribulation.waves_total == 3, "the trial uses its data-driven wave count")
+
+	var arena: TribulationArena = main.tribulation_arena
+	var trial_guard := 0
+	while main.tribulation_arena != null and trial_guard < 4000:
+		player.global_position = arena.global_position + Vector2(900, 900)
+		arena._process(0.05)
+		trial_guard += 1
+	check(main.tribulation_arena == null, "a finished tribulation removes its arena")
+	check(String(_tribulation_result.get("outcome", "")) == "survived", "dodging every wave survives the trial")
+	check(int(_tribulation_result.get("perfect_waves", 0)) == int(_tribulation_result.get("waves_total", 0)), "the run was perfect")
+	check(float(_tribulation_result.get("composure", 0.0)) > 0.0, "a perfect run earns composure")
+	check(player.cultivation.realm == 2, "surviving the trial lets the breakthrough land")
+
+	player.cultivation.realm = 1
+	player.cultivation.sublevel = 10
+	player.cultivation.preparation = 0
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	player.hp = 1.0
+	_tribulation_result = {}
+	main._face_tribulation()
+	check(main.tribulation_arena != null, "a second tribulation can be started")
+	var broken_arena: TribulationArena = main.tribulation_arena
+	trial_guard = 0
+	while main.tribulation_arena != null and trial_guard < 4000:
+		player.global_position = broken_arena.global_position
+		player.hp = minf(player.hp, 1.0)
+		broken_arena._process(0.05)
+		trial_guard += 1
+	check(String(_tribulation_result.get("outcome", "")) == "broken", "standing in the fire breaks the cultivator")
+	check(player.cultivation.realm == 1, "a broken tribulation does not advance the realm")
+	check(player.cultivation.contamination > 0.0, "a broken tribulation corrupts the channels")
+	check(player.cultivation.qi == 0.0, "a broken tribulation empties Qi")
+	check(main.tribulation_arena == null, "a broken tribulation removes its arena")
+
+	# Leave the run in the state the rest of the suite expects.
+	player.cultivation.realm = 5
+	player.cultivation.sublevel = 3
+	player.cultivation.qi = 8.0
+	player.cultivation.preparation = 0
+	player.cultivation.contamination = 0.0
+	player.hp = player.hp_max
+	player.rebuild_stats()
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

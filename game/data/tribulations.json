@@ -1,0 +1,15 @@
+{
+  "tribulations": [
+    {"id": "meridian", "name": "Meridian Tribulation", "color": "#8fd3c7", "waves": 3, "bolts": 2, "interval": 0.7, "radius": 70, "damage_mult": 1.0, "desc": "Thin lances of heaven-testing Qi, aimed at the channels you just opened."},
+    {"id": "lightning", "name": "Lightning Tribulation", "color": "#e0c060", "waves": 3, "bolts": 4, "interval": 0.55, "radius": 80, "damage_mult": 1.0, "desc": "Four bolts a wave. The first real test of a golden core."},
+    {"id": "heart_demon", "name": "Heart Demon Tribulation", "color": "#a58fe0", "waves": 4, "bolts": 2, "interval": 0.9, "radius": 60, "damage_mult": 1.1, "desc": "Slow, patient strikes that follow what you regret."},
+    {"id": "elemental", "name": "Elemental Tribulation", "color": "#7aa7f0", "waves": 4, "bolts": 3, "interval": 0.7, "radius": 75, "damage_mult": 1.0, "desc": "Wind, water and fire in sequence, never the same twice."},
+    {"id": "spatial", "name": "Spatial Tribulation", "color": "#8f9ee0", "waves": 4, "bolts": 3, "interval": 0.6, "radius": 85, "damage_mult": 1.05, "desc": "The blow lands before the bolt is seen."},
+    {"id": "bloodline", "name": "Bloodline Tribulation", "color": "#d98f7a", "waves": 4, "bolts": 4, "interval": 0.5, "radius": 80, "damage_mult": 1.1, "desc": "Heaven tests the body you were born in, not the one you built."},
+    {"id": "heavenly_judgment", "name": "Heavenly Judgment", "color": "#e0a35c", "waves": 5, "bolts": 4, "interval": 0.55, "radius": 90, "damage_mult": 1.15, "desc": "A verdict, not a test. Five waves, four bolts each."},
+    {"id": "grand", "name": "Grand Tribulation", "color": "#e07070", "waves": 5, "bolts": 5, "interval": 0.5, "radius": 95, "damage_mult": 1.2, "desc": "The tribulation that ends most cultivators' stories."},
+    {"id": "dao", "name": "Dao Tribulation", "color": "#ffffff", "waves": 6, "bolts": 5, "interval": 0.45, "radius": 100, "damage_mult": 1.25, "desc": "Heaven asks whether your law is worth the sky it occupies."},
+    {"id": "sovereign", "name": "Sovereign Tribulation", "color": "#f0e0a0", "waves": 6, "bolts": 6, "interval": 0.4, "radius": 105, "damage_mult": 1.3, "desc": "Six bolts a wave, six waves: the arithmetic of mastery."},
+    {"id": "primordial", "name": "Primordial Tribulation", "color": "#c0a0ff", "waves": 7, "bolts": 7, "interval": 0.35, "radius": 110, "damage_mult": 1.35, "desc": "The first sky, remembering what it was before you."}
+  ]
+}

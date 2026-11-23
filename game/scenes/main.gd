@@ -52,6 +52,8 @@ var interactables: Array = []
 var ground_items: Array = []
 var quests: QuestLog
 var realm_instance: HiddenRealm = null
+## The active playable tribulation, if any. Never saved: a load abandons it.
+var tribulation_arena: TribulationArena = null
 var realm_seed := 0
 var realm_cleared := false
 var inheritance_taken := false
@@ -85,6 +87,7 @@ func _ready() -> void:
 	_spawn_player()
 	_build_hud()
 	Bus.enemy_died.connect(_on_enemy_died)
+	Bus.tribulation_finished.connect(_on_tribulation_finished)
 	Weather.changed.connect(_on_weather_changed)
 	Bus.toast.emit("A new path opens. Assign your attributes, then press ENTER.")
 
@@ -880,7 +883,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_help_visible = not _help_visible
 		Bus.help_toggled.emit(_help_visible)
 	elif event.is_action_pressed("breakthrough"):
-		player.attempt_breakthrough()
+		_face_tribulation()
 
 
 # ----------------------------------------------------------- interaction ----
@@ -976,6 +979,47 @@ func _prepare_tribulation() -> void:
 	Bus.toast.emit("Prepared for tribulation. (%d/%d)" % [player.cultivation.preparation, Cultivation.MAX_PREPARATION])
 	Bus.player_stats_changed.emit()
 	Bus.cultivation_changed.emit()
+
+
+## G at the peak starts the realm's playable tribulation; G anywhere else keeps
+## the old immediate refusals and apex guard.
+func _face_tribulation() -> void:
+	if tribulation_arena != null:
+		Bus.toast.emit("You are already standing in the tribulation.")
+		return
+	if not player.cultivation.is_peak() or player.cultivation.realm >= Realms.count():
+		player.attempt_breakthrough()
+		return
+	if not player.cultivation.is_full(player.stats):
+		Bus.toast.emit("Your Qi is not full. Heaven will not answer half a challenge.")
+		return
+	_start_tribulation()
+
+
+func _start_tribulation() -> void:
+	var type_id := player.cultivation.tribulation_id()
+	var scale := player.cultivation.tribulation_with(Game.kills, Game.karma, player.method_state())
+	var arena := TribulationArena.new()
+	tribulation_arena = arena
+	world.add_child(arena)
+	var seed_value := Game.world_seed + player.cultivation.realm * 131 + player.cultivation.breakthrough_attempts
+	arena.begin(player, type_id, scale, player.global_position, seed_value)
+	Bus.toast.emit("%s. Survive every wave." % Tribulation.name_of(type_id))
+	Bus.toast.emit("A perfect wave adds +4%% to the roll, up to +12%%.")
+
+
+func _on_tribulation_finished(result: Dictionary) -> void:
+	tribulation_arena = null
+	var outcome := String(result.get("outcome", ""))
+	if outcome == "survived":
+		Bus.toast.emit("The tribulation passes: %d/%d waves, %d hit%s." % [
+			int(result.get("waves_survived", 0)), int(result.get("waves_total", 0)),
+			int(result.get("hits", 0)), "" if int(result.get("hits", 0)) == 1 else "s"])
+		player.attempt_breakthrough(float(result.get("composure", 0.0)))
+	elif outcome == "broken":
+		player.fail_breakthrough()
+	else:
+		Bus.toast.emit("The tribulation fades unresolved.")
 
 
 func _cycle_method() -> void:
@@ -1465,6 +1509,9 @@ func _save(slot: int) -> void:
 	if phase == "realm":
 		Bus.toast.emit("You cannot anchor a save inside a hidden realm.")
 		return
+	if tribulation_arena != null:
+		Bus.toast.emit("The heavens do not pause for a save.")
+		return
 	var data := {
 		"version": "0.2.0",
 		"clock": Clock.to_dict(),
@@ -1494,6 +1541,12 @@ func _load_game(slot: int) -> void:
 	if data.is_empty():
 		Bus.toast.emit("No usable save in slot %d." % slot)
 		return
+	# An encounter is not in the save: loading abandons it rather than leaving a
+	# half-finished circle standing in a restored world.
+	if tribulation_arena != null:
+		tribulation_arena.queue_free()
+		tribulation_arena = null
+		Bus.toast.emit("The tribulation is left unfinished.")
 	if realm_instance != null:
 		realm_instance.cleanup()
 		realm_instance.queue_free()

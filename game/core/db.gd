@@ -12,6 +12,7 @@ var realms: Array = []
 var roots: Array = []
 var methods: Array = []
 var meridians: Array = []
+var tribulations: Array = []
 var techniques: Array = []
 var bases: Array = []
 var prefixes: Array = []
@@ -39,6 +40,7 @@ func load_all() -> void:
 	roots = _read("roots.json").get("roots", [])
 	methods = _read("methods.json").get("methods", [])
 	meridians = _read("meridians.json").get("meridians", [])
+	tribulations = _read("tribulations.json").get("tribulations", [])
 	techniques = _read("techniques.json").get("techniques", [])
 	var items := _read("items.json")
 	bases = items.get("bases", [])
@@ -55,6 +57,7 @@ func load_all() -> void:
 	_index("root", roots)
 	_index("method", methods)
 	_index("meridian", meridians)
+	_index("tribulation", tribulations)
 	_index("technique", techniques)
 	_index("base", bases)
 	_index("prefix", prefixes)
@@ -120,6 +123,10 @@ func meridian(id: String) -> Dictionary:
 
 func technique(id: String) -> Dictionary:
 	return by_id("technique", id)
+
+
+func tribulation(id: String) -> Dictionary:
+	return by_id("tribulation", id)
 
 
 func base_item(id: String) -> Dictionary:
@@ -235,6 +242,30 @@ func validate() -> Array:
 					problems.append("realm %d realm art has a mod without a stat" % n)
 				elif not (Attributes.KEYS.has(ability_stat) or StatBlock.PERCENT_STATS.has(ability_stat) or StatBlock.FLAT_STATS.has(ability_stat)):
 					problems.append("realm %d realm art uses unknown stat %s" % [n, ability_stat])
+
+	if tribulations.size() < 10:
+		problems.append("expected at least 10 tribulation types, found %d" % tribulations.size())
+	var tribulation_ids := {}
+	for t in tribulations:
+		var t_id := String(t.get("id", ""))
+		if t_id == "":
+			problems.append("tribulation without id")
+			continue
+		if tribulation_ids.has(t_id):
+			problems.append("duplicate tribulation id " + t_id)
+		tribulation_ids[t_id] = true
+		if String(t.get("name", "")) == "":
+			problems.append("tribulation %s has no name" % t_id)
+		if int(t.get("waves", 0)) < 1 or int(t.get("bolts", 0)) < 1:
+			problems.append("tribulation %s has no waves or bolts" % t_id)
+		if float(t.get("interval", 0.0)) <= 0.0 or float(t.get("radius", 0.0)) <= 0.0:
+			problems.append("tribulation %s has an invalid schedule" % t_id)
+		if float(t.get("damage_mult", 0.0)) <= 0.0:
+			problems.append("tribulation %s deals no damage" % t_id)
+	for n in range(1, realms.size() + 1):
+		var declared := String(realm(n).get("tribulation", ""))
+		if not tribulation_ids.has(declared):
+			problems.append("realm %d names unknown tribulation %s" % [n, declared])
 
 	if roots.size() != 12:
 		problems.append("expected 12 spiritual roots, found %d" % roots.size())
@@ -401,6 +432,7 @@ func counts() -> Dictionary:
 		"roots": roots.size(),
 		"methods": methods.size(),
 		"meridians": meridians.size(),
+		"tribulations": tribulations.size(),
 		"techniques": techniques.size(),
 		"bases": bases.size(),
 		"prefixes": prefixes.size(),

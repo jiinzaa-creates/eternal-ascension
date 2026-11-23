@@ -574,9 +574,9 @@ func try_dodge(dir: Vector2) -> void:
 
 
 ## Attempts the realm breakthrough. Returns the result dictionary for the HUD.
-func attempt_breakthrough() -> Dictionary:
+func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 	var r: RandomNumberGenerator = Rng.stream("breakthrough", cultivation.realm, cultivation.breakthrough_attempts)
-	var result := cultivation.attempt_breakthrough(stats, r, Game.kills, Game.karma, method_state())
+	var result := cultivation.attempt_breakthrough(stats, r, Game.kills, Game.karma, method_state(), composure)
 	if result.get("reason", "") != "":
 		var reason := String(result["reason"])
 		if reason == "not_at_peak":
@@ -603,6 +603,31 @@ func attempt_breakthrough() -> Dictionary:
 	rebuild_stats()
 	Bus.player_stats_changed.emit()
 	return result
+
+
+## The tribulation encounter was lost: real wounds, real corruption, no roll.
+func fail_breakthrough() -> Dictionary:
+	var r: RandomNumberGenerator = Rng.stream("tribulation_break", cultivation.realm, cultivation.failures)
+	var result := cultivation.break_through_failure(r, Game.kills, Game.karma, method_state())
+	hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
+	rebuild_stats()
+	Bus.toast.emit("The tribulation breaks you. Qi deviation. (%s)" % String(result.get("method_note", "")))
+	Bus.toast.emit("You crawl out of the circle. Prepare before you invite heaven again.")
+	Bus.player_stats_changed.emit()
+	return result
+
+
+## Heaven's bolts are not physical attacks: no armour, no evasion and no death
+## respawn. The arena owns the "broken" outcome, so this only reports it.
+func take_tribulation_damage(amount: float, _from: Vector2 = Vector2.ZERO) -> bool:
+	if hp <= 0.0:
+		return true
+	if _iframes > 0.0:
+		return false
+	hp = maxf(0.0, hp - maxf(0.0, amount))
+	_hurt_flash = 0.18
+	Bus.player_stats_changed.emit()
+	return hp <= 0.0
 
 
 ## The chance the HUD shows at the peak. Zero below the peak, where no attempt

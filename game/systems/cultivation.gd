@@ -113,6 +113,11 @@ func realm_ability() -> Dictionary:
 	return Realms.ability(realm)
 
 
+## What leaving this realm costs in Heaven's terms. Data-declared per realm.
+func tribulation_id() -> String:
+	return Tribulation.for_realm(realm)
+
+
 func qi_max(stats: StatBlock) -> float:
 	return (base_qi() * stats.max_qi_mult() * (0.75 + 0.5 * effective_purity()) + stats.qi_max_flat()) \
 		* Meridians.capacity_mult(meridians)
@@ -249,7 +254,7 @@ func breakthrough_chance(stats: StatBlock, trib_scale: float, resources: float =
 ## Attempts the realm breakthrough at peak. Always consumes Qi and always costs
 ## something: success wounds, failure injures and can regress a sublevel.
 func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, kills: int = 0, karma: int = 0,
-		method_state: Dictionary = {}) -> Dictionary:
+		method_state: Dictionary = {}, composure: float = 0.0) -> Dictionary:
 	if not is_peak():
 		return {"success": false, "reason": "not_at_peak", "chance": 0.0, "roll": 0.0}
 	if not is_full(stats):
@@ -267,7 +272,7 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 	var trib := tribulation_with(kills, karma, method_state)
 	var harm := failure_harm(method_state)
 	preparation = 0
-	var bonus := PREP_CHANCE * float(prep_used) + float(profile.get("chance", 0.0))
+	var bonus := PREP_CHANCE * float(prep_used) + float(profile.get("chance", 0.0)) + clampf(composure, 0.0, 1.0)
 	var chance := breakthrough_chance(stats, trib, bonus, 0.0)
 	var roll := generator.randf()
 	var success := roll < chance
@@ -312,6 +317,44 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		"method_note": String(profile.get("note", "")),
 		"unlocks": Realms.unlocks_at(realm) if success else [],
 		"ability": Realms.ability_name(realm) if success else "",
+	}
+	Bus.breakthrough_resolved.emit(result)
+	return result
+
+
+## The playable encounter was lost. Heaven already answered, so this applies the
+## failure fallout without a success roll; only the regression roll stays random.
+func break_through_failure(generator: RandomNumberGenerator, kills: int = 0, karma: int = 0,
+		method_state: Dictionary = {}) -> Dictionary:
+	var profile := Methods.breakthrough_profile(method_id, method_state)
+	var prep_used := preparation
+	var harm := failure_harm(method_state)
+	preparation = 0
+	failures += 1
+	qi = 0.0
+	add_contamination(Meridians.DEVIATION_CONTAMINATION * harm)
+	var hp_cost := clampf(0.35 * harm, 0.1, 0.6)
+	var consequences := ["qi_deviation", "tribulation_broken"]
+	if realm > 1 and generator != null and generator.randf() < 0.08 * (1.0 - 0.25 * float(prep_used)):
+		consequences.append("realm_regression")
+		realm = maxi(1, realm - 1)
+		sublevel = maxi(1, SUBLEVELS - 2)
+	var result := {
+		"success": false,
+		"broken": true,
+		"chance": 0.0,
+		"roll": 0.0,
+		"tribulation_scale": tribulation_with(kills, karma, method_state),
+		"consequences": consequences,
+		"hp_cost_ratio": hp_cost,
+		"realm": realm,
+		"sublevel": sublevel,
+		"reason": "",
+		"preparation": prep_used,
+		"method": method_id,
+		"method_note": String(profile.get("note", "")),
+		"unlocks": [],
+		"ability": "",
 	}
 	Bus.breakthrough_resolved.emit(result)
 	return result
