@@ -15,6 +15,9 @@ const PREP_COST := 60
 const PREP_CHANCE := 0.06
 const PREP_TRIBULATION := 0.10
 const PREP_HARM := 0.15
+## Accumulated understanding needed before an epiphany can strike. Sources are
+## real play: meditation, kills, a survived tribulation, a breakthrough.
+const ENLIGHTENMENT_GOAL := 100.0
 
 var realm: int = 1
 var sublevel: int = 1
@@ -37,6 +40,10 @@ var breakthrough_attempts: int = 0
 var failures: int = 0
 ## Banked preparations for the next breakthrough, 0..MAX_PREPARATION.
 var preparation: int = 0
+## Understanding, 0..ENLIGHTENMENT_GOAL. Full means an insight is due.
+var enlightenment_meter: float = 0.0
+## How many epiphanies have been rolled; also the deterministic pick's counter.
+var enlightenment_attempts: int = 0
 
 
 func realm_data() -> Dictionary:
@@ -235,6 +242,28 @@ func estimated_chance(stats: StatBlock, kills: int = 0, karma: int = 0, method_s
 	return breakthrough_chance(stats, tribulation_with(kills, karma, method_state), bonus, 0.0)
 
 
+## Adds understanding. Returns true when the meter is full and an insight is
+## due; the caller decides which insight and consumes the meter.
+func add_comprehension(amount: float) -> bool:
+	if amount <= 0.0:
+		return false
+	enlightenment_meter = minf(ENLIGHTENMENT_GOAL, enlightenment_meter + amount)
+	return is_enlightenment_ready()
+
+
+func is_enlightenment_ready() -> bool:
+	return enlightenment_meter >= ENLIGHTENMENT_GOAL - 0.001
+
+
+## Spends a full meter. Refused below the goal, so understanding is never lost
+## to an unlucky moment with nothing eligible.
+func take_enlightenment() -> bool:
+	if not is_enlightenment_ready():
+		return false
+	enlightenment_meter = 0.0
+	return true
+
+
 ## Banks one preparation. Payment (stones) is the caller's responsibility.
 func prepare() -> bool:
 	if preparation >= MAX_PREPARATION:
@@ -389,6 +418,8 @@ func to_dict() -> Dictionary:
 		"breakthrough_attempts": breakthrough_attempts,
 		"failures": failures,
 		"preparation": preparation,
+		"enlightenment_meter": enlightenment_meter,
+		"enlightenment_attempts": enlightenment_attempts,
 	}
 
 
@@ -410,3 +441,5 @@ func from_dict(data: Dictionary) -> void:
 	breakthrough_attempts = int(data.get("breakthrough_attempts", 0))
 	failures = int(data.get("failures", 0))
 	preparation = clampi(int(data.get("preparation", 0)), 0, MAX_PREPARATION)
+	enlightenment_meter = clampf(float(data.get("enlightenment_meter", 0.0)), 0.0, ENLIGHTENMENT_GOAL)
+	enlightenment_attempts = maxi(0, int(data.get("enlightenment_attempts", 0)))

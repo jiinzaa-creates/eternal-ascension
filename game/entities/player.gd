@@ -30,6 +30,8 @@ var stats: StatBlock
 var cultivation: Cultivation
 
 var passives: Array = []
+## Permanent insights. Each one adds its mods to the one pipeline.
+var enlightenments: Array = []
 var inventory: Array = []
 var equipment: Dictionary = {}
 var technique_ids: Array = []
@@ -111,7 +113,8 @@ func dormant_passives() -> Array:
 
 func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
-		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm))
+		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
+		Enlightenments.mods(enlightenments))
 	_recalc_vitals()
 
 
@@ -150,6 +153,39 @@ func try_learn_passive(id: String) -> Dictionary:
 	rebuild_stats()
 	Bus.player_stats_changed.emit()
 	return {"ok": true, "reason": ""}
+
+
+## What an epiphany roll reads: realm, practised method, attributes.
+func enlightenment_state() -> Dictionary:
+	return {"realm": cultivation.realm, "method": cultivation.method_id, "attrs": attrs}
+
+
+## Every source of understanding funnels here so one place decides when an
+## insight is due. Returns true only when an insight was actually learned.
+func gain_comprehension(amount: float) -> bool:
+	if not cultivation.add_comprehension(amount):
+		return false
+	if not cultivation.is_enlightenment_ready():
+		return false
+	var generator: RandomNumberGenerator = Rng.stream("enlightenment", cultivation.realm, cultivation.enlightenment_attempts)
+	var id := Enlightenments.pick(generator, enlightenment_state(), enlightenments)
+	if id == "":
+		# Nothing is in reach yet; keep the full meter for when it is.
+		return false
+	cultivation.enlightenment_attempts += 1
+	cultivation.take_enlightenment()
+	return add_enlightenment(id)
+
+
+func add_enlightenment(id: String) -> bool:
+	if not Enlightenments.learn(enlightenments, id):
+		return false
+	rebuild_stats()
+	var entry := Enlightenments.find(id)
+	Bus.toast.emit("Enlightenment: %s. %s" % [String(entry.get("name", id)), String(entry.get("desc", ""))])
+	Bus.enlightenment_gained.emit(id)
+	Bus.player_stats_changed.emit()
+	return true
 
 
 ## Grant path (starting kit, manuals, inheritances, quest rewards): no checks,
@@ -522,6 +558,8 @@ func meditate_tick(delta: float) -> float:
 	var factor := Methods.meditation_multiplier(cultivation.method_id, state)
 	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
 	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
+	# Sitting with a method is the slow, reliable road to understanding.
+	gain_comprehension(delta * clampf(factor, 0.0, 2.0))
 	if cultivation.method_id == "method.blood":
 		cultivation.consume_blood_charge(delta * 2.0)
 		cultivation.add_contamination(delta * Meridians.BLOOD_CONTAMINATION_PER_SECOND)
@@ -532,6 +570,8 @@ func meditate_tick(delta: float) -> float:
 func on_kill(ilvl: int = 1) -> void:
 	if cultivation.method_id == "method.blood":
 		cultivation.add_blood_charge(3.0 + float(maxi(1, ilvl)) * 2.0)
+	# Every death is a lesson, whether or not the character wanted it.
+	gain_comprehension(2.0)
 
 
 func toggle_meditation() -> void:
@@ -595,6 +635,8 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 		var ability_name := String(result.get("ability", ""))
 		if ability_name != "":
 			Bus.toast.emit("Realm art awakened: %s." % ability_name)
+		# A realm change is the largest single dose of understanding in the game.
+		gain_comprehension(30.0)
 	else:
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("The tribulation breaks you. Qi deviation. (%s)" % note)
@@ -731,6 +773,7 @@ func to_dict() -> Dictionary:
 		"attrs": attrs.to_dict(),
 		"cultivation": cultivation.to_dict(),
 		"passives": passives.duplicate(),
+		"enlightenments": enlightenments.duplicate(),
 		"inventory": inventory,
 		"equipment": equipped,
 		"technique_ids": technique_ids,
@@ -751,6 +794,13 @@ func from_dict(data: Dictionary) -> void:
 	attrs.from_dict(data.get("attrs", {}))
 	cultivation.from_dict(data.get("cultivation", {}))
 	passives = data.get("passives", []).duplicate()
+	# Saves only reference IDs; an unknown or duplicated insight is dropped rather
+	# than allowed to add phantom mods.
+	enlightenments = []
+	for id_value in data.get("enlightenments", []):
+		var insight_id := String(id_value)
+		if not Enlightenments.find(insight_id).is_empty() and not enlightenments.has(insight_id):
+			enlightenments.append(insight_id)
 	inventory = data.get("inventory", []).duplicate(true)
 	equipment = data.get("equipment", {}).duplicate(true)
 	var ids: Array = data.get("technique_ids", [])

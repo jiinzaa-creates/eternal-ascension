@@ -84,6 +84,27 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   `from_dict` clamps a corrupt realm into 1–12. A successful attempt returns the new realm's `unlocks`
   and `ability`; `Player` turns them into an "Realm art awakened" toast.
 
+## Enlightenment and comprehension
+
+- **Understanding is a meter** (`Cultivation.enlightenment_meter`, 0–`ENLIGHTENMENT_GOAL` = 100). It never
+  decays. Sources are real play, funnelled through `Player.gain_comprehension`: meditation adds
+  `delta * clamp(fit, 0, 2)`, every kill adds 2, surviving a tribulation adds 20, and a successful realm
+  breakthrough adds 30.
+- **One trigger.** When the meter fills, `gain_comprehension` rolls an epiphany: `Rng.stream("enlightenment",
+  realm, enlightenment_attempts)` feeds `Enlightenments.pick`, a weighted choice among insights that are
+  **eligible** (realm, method, and optional INT gate) and **not owned**. If nothing is in reach the meter
+  stays full — understanding is never wasted — and nothing is rolled.
+- **Insights are permanent and cumulative.** `data/enlightenments.json` holds thirteen insights with a
+  weight, requirements and mods. Every learned insight contributes through
+  `StatBlock.rebuild(..., enlightenment_mods)`; there is no activation state, because an insight cannot be
+  forgotten. Every stat name is validated against `Attributes.KEYS`, `PERCENT_STATS` and `FLAT_STATS`.
+- **Data integrity.** `DB.validate` checks ids, names/descriptions, weights, mods, stat names, realm gates
+  and that a `requires.method` exists. `Player.from_dict` drops unknown or duplicated insight ids, so a
+  corrupt save cannot inject phantom mods.
+- **Persistence and HUD.** `enlightenments` is an optional player save key; the meter and attempt counter are
+  optional cultivation keys (legacy saves start at zero). The HUD shows `Comprehension: N%   Insights: n/13`
+  plus the learned names.
+
 ## Playable tribulations
 
 - **One pure state machine** (`game/systems/tribulation.gd`). `setup(type_id, scale, centre, rng)` builds the

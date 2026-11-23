@@ -81,7 +81,7 @@ func _draw() -> void:
 func draw_vitals(player: Player) -> void:
 	var x := 24.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 262.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 292.0), PANEL_BG)
 
 	_text(Vector2(x, y), player.cultivation.stage_title(), 19, ACCENT)
 	y += 20.0
@@ -137,6 +137,14 @@ func draw_vitals(player: Player) -> void:
 	_text(Vector2(x, y), "Realm art: %s   Unlocks: %d" % [
 		String(player.cultivation.realm_ability().get("name", "—")), player.cultivation.unlock_ids().size()
 	], 11, Color("#d8c898"))
+	y += 18.0
+	var insight_text := "Comprehension: %d%%   Insights: %d/%d" % [
+		roundi(player.cultivation.enlightenment_meter), player.enlightenments.size(), Enlightenments.count_total()
+	]
+	var insight_names := Enlightenments.known_names(player.enlightenments)
+	if not insight_names.is_empty():
+		insight_text += " — " + ", ".join(insight_names)
+	_text(Vector2(x, y), insight_text, 11, Color("#c8d8a8"))
 	# The tribulation line only appears where an attempt is possible, so the HUD
 	# never advertises a roll the player cannot make.
 	if player.cultivation.is_peak() and player.cultivation.realm < Realms.count():

@@ -13,6 +13,7 @@ var roots: Array = []
 var methods: Array = []
 var meridians: Array = []
 var tribulations: Array = []
+var enlightenments: Array = []
 var techniques: Array = []
 var bases: Array = []
 var prefixes: Array = []
@@ -41,6 +42,7 @@ func load_all() -> void:
 	methods = _read("methods.json").get("methods", [])
 	meridians = _read("meridians.json").get("meridians", [])
 	tribulations = _read("tribulations.json").get("tribulations", [])
+	enlightenments = _read("enlightenments.json").get("enlightenments", [])
 	techniques = _read("techniques.json").get("techniques", [])
 	var items := _read("items.json")
 	bases = items.get("bases", [])
@@ -58,6 +60,7 @@ func load_all() -> void:
 	_index("method", methods)
 	_index("meridian", meridians)
 	_index("tribulation", tribulations)
+	_index("enlightenment", enlightenments)
 	_index("technique", techniques)
 	_index("base", bases)
 	_index("prefix", prefixes)
@@ -127,6 +130,10 @@ func technique(id: String) -> Dictionary:
 
 func tribulation(id: String) -> Dictionary:
 	return by_id("tribulation", id)
+
+
+func enlightenment(id: String) -> Dictionary:
+	return by_id("enlightenment", id)
 
 
 func base_item(id: String) -> Dictionary:
@@ -266,6 +273,39 @@ func validate() -> Array:
 		var declared := String(realm(n).get("tribulation", ""))
 		if not tribulation_ids.has(declared):
 			problems.append("realm %d names unknown tribulation %s" % [n, declared])
+
+	if enlightenments.size() < 10:
+		problems.append("expected at least 10 enlightenments, found %d" % enlightenments.size())
+	var enlightenment_ids := {}
+	for e in enlightenments:
+		var e_id := String(e.get("id", ""))
+		if e_id == "":
+			problems.append("enlightenment without id")
+			continue
+		if enlightenment_ids.has(e_id):
+			problems.append("duplicate enlightenment id " + e_id)
+		enlightenment_ids[e_id] = true
+		if String(e.get("name", "")) == "" or String(e.get("desc", "")) == "":
+			problems.append("enlightenment %s has no name or description" % e_id)
+		if int(e.get("weight", 0)) < 1:
+			problems.append("enlightenment %s has no weight" % e_id)
+		var insight_mods: Array = e.get("mods", [])
+		if insight_mods.is_empty():
+			problems.append("enlightenment %s has no mods" % e_id)
+		for mod in insight_mods:
+			if typeof(mod) != TYPE_DICTIONARY:
+				problems.append("enlightenment %s has a malformed mod" % e_id)
+				continue
+			var insight_stat := String((mod as Dictionary).get("stat", ""))
+			if not (Attributes.KEYS.has(insight_stat) or StatBlock.PERCENT_STATS.has(insight_stat) or StatBlock.FLAT_STATS.has(insight_stat)):
+				problems.append("enlightenment %s uses unknown stat %s" % [e_id, insight_stat])
+		var req: Dictionary = e.get("requires", {})
+		var req_realm := int(req.get("realm", 0))
+		if req_realm < 0 or req_realm > 12:
+			problems.append("enlightenment %s has an invalid realm" % e_id)
+		var req_method := String(req.get("method", ""))
+		if req_method != "" and not has("method", req_method):
+			problems.append("enlightenment %s requires unknown method %s" % [e_id, req_method])
 
 	if roots.size() != 12:
 		problems.append("expected 12 spiritual roots, found %d" % roots.size())
@@ -433,6 +473,7 @@ func counts() -> Dictionary:
 		"methods": methods.size(),
 		"meridians": meridians.size(),
 		"tribulations": tribulations.size(),
+		"enlightenments": enlightenments.size(),
 		"techniques": techniques.size(),
 		"bases": bases.size(),
 		"prefixes": prefixes.size(),

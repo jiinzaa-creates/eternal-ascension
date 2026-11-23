@@ -1259,6 +1259,39 @@ func _run() -> void:
 	player.hp = player.hp_max
 	player.rebuild_stats()
 
+	# --- enlightenment --------------------------------------------------------
+	player.enlightenments.clear()
+	player.cultivation.enlightenment_meter = 0.0
+	player.cultivation.enlightenment_attempts = 0
+	player.cultivation.realm = 1
+	player.cultivation.method_id = "method.traditional"
+	player.rebuild_stats()
+	check(player.enlightenments.is_empty(), "a run starts with no insights")
+	player.meditate_tick(1.0)
+	check(player.cultivation.enlightenment_meter > 0.0, "meditation builds understanding")
+	var understanding_after_meditation: float = player.cultivation.enlightenment_meter
+	player.on_kill(1)
+	check(player.cultivation.enlightenment_meter > understanding_after_meditation, "kills build understanding")
+	var learned := player.gain_comprehension(Cultivation.ENLIGHTENMENT_GOAL)
+	check(learned and player.enlightenments.size() == 1, "a full meter yields an insight")
+	check(player.cultivation.enlightenment_meter == 0.0, "the insight spends the meter")
+	if not player.enlightenments.is_empty():
+		var gained_id := String(player.enlightenments[0])
+		check(not Enlightenments.find(gained_id).is_empty(), "the learned insight exists in data")
+		check(bool(Enlightenments.eligible(gained_id, player.enlightenment_state())["ok"]), "the insight was eligible when learned")
+		check(not player.add_enlightenment(gained_id), "an insight is learned once")
+		main._save(92)
+		main._load_game(92)
+		await frames(2)
+		check(player.enlightenments.has(gained_id), "insights survive a save")
+		Save.delete_slot(92)
+	check(not player.add_enlightenment("enl.none"), "unknown insights are refused")
+
+	player.cultivation.realm = 5
+	player.cultivation.sublevel = 3
+	player.cultivation.qi = 8.0
+	player.rebuild_stats()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

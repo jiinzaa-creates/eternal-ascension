@@ -60,7 +60,8 @@ func reset() -> void:
 ## Rebuilds every modifier from equipment and passives. Called whenever the
 ## player equips something, gains a passive, or advances a realm.
 func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float,
-		physique_id: String = "", meridian_mods: Array = [], realm_ability_mods: Array = []) -> void:
+		physique_id: String = "", meridian_mods: Array = [], realm_ability_mods: Array = [],
+		enlightenment_mods: Array = []) -> void:
 	reset()
 	realm = realm_number
 	realm_mult = realm_attribute_mult
@@ -89,6 +90,11 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 	# mods can never stack; its behavioural flags are separate and cumulative.
 	if not realm_ability_mods.is_empty():
 		apply_mods(realm_ability_mods, "realm art")
+
+	# Insights are permanent and cumulative, so unlike realm arts every learned
+	# enlightenment contributes its mods here.
+	if not enlightenment_mods.is_empty():
+		apply_mods(enlightenment_mods, "enlightenment")
 
 	if not meridian_mods.is_empty():
 		apply_mods(meridian_mods, "meridians")

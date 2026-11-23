@@ -13,6 +13,8 @@ signal breakthrough_resolved(result: Dictionary)
 signal tribulation_started(type_id: String)
 signal tribulation_finished(result: Dictionary)
 
+signal enlightenment_gained(id: String)
+
 signal enemy_died(at: Vector2, ilvl: int)
 signal damage_dealt(total: float, target: Node)
 signal item_dropped(item: Dictionary, at: Vector2)

@@ -29,6 +29,7 @@ func _ready() -> void:
 	_realm_tests()
 	_breakthrough_tests()
 	_tribulation_tests()
+	_enlightenment_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1316,6 +1317,96 @@ func _tribulation_tests() -> void:
 	var declarer := Cultivation.new()
 	declarer.realm = 3
 	check(declarer.tribulation_id() == "lightning", "a realm declares its trial")
+
+
+# --------------------------------------------------------- enlightenment ----
+
+func _enlightenment_tests() -> void:
+	print("[enlightenment] data, eligibility, weighted picks, comprehension")
+	check(DB.enlightenments.size() >= 10, "at least ten insights are registered")
+	check(Enlightenments.count_total() == DB.enlightenments.size(), "the count matches the registry")
+	var ids := {}
+	for entry in DB.enlightenments:
+		var id := String(entry.get("id", ""))
+		check(id != "" and not ids.has(id), "insight %s is unique" % id)
+		ids[id] = true
+		check(String(entry.get("name", "")) != "" and String(entry.get("desc", "")) != "", "%s is named and described" % id)
+		check(int(entry.get("weight", 0)) >= 1, "%s has a weight" % id)
+		var mods: Array = entry.get("mods", [])
+		check(not mods.is_empty(), "%s grants something" % id)
+		for mod in mods:
+			if typeof(mod) != TYPE_DICTIONARY:
+				check(false, "%s has a malformed mod" % id)
+				continue
+			var stat := String((mod as Dictionary).get("stat", ""))
+			check(Attributes.KEYS.has(stat) or StatBlock.PERCENT_STATS.has(stat) or StatBlock.FLAT_STATS.has(stat), "%s uses a real stat (%s)" % [id, stat])
+		var req: Dictionary = entry.get("requires", {})
+		var req_realm := int(req.get("realm", 0))
+		check(req_realm >= 0 and req_realm <= 12, "%s has a valid realm gate" % id)
+		var req_method := String(req.get("method", ""))
+		check(req_method == "" or not DB.by_id("method", req_method).is_empty(), "%s gates a real method" % id)
+
+	var attrs := Attributes.new()
+	var state := {"realm": 1, "method": "method.traditional", "attrs": attrs}
+	check(bool(Enlightenments.eligible("enl.still_water", state)["ok"]), "a realm-one insight is in reach at realm one")
+	check(not bool(Enlightenments.eligible("enl.empty_mind", state)["ok"]), "a realm-two insight is out of reach at realm one")
+	check(not bool(Enlightenments.eligible("enl.rain_of_swords", state)["ok"]), "a method insight needs that method")
+	check(not bool(Enlightenments.eligible("enl.none", state)["ok"]), "an unknown insight is refused")
+	var sword_state := {"realm": 2, "method": "method.sword", "attrs": attrs}
+	check(bool(Enlightenments.eligible("enl.rain_of_swords", sword_state)["ok"]), "the practised method opens its insight")
+	var high := {"realm": 12, "method": "method.traditional", "attrs": attrs}
+	check(bool(Enlightenments.eligible("enl.primordial_glimpse", high)["ok"]), "high realms reach deep insights")
+	check(Enlightenments.available(state, []).has("enl.still_water"), "available lists reachable insights")
+	check(not Enlightenments.available(state, ["enl.still_water"]).has("enl.still_water"), "owned insights leave the pool")
+	check(Enlightenments.available(high, ids.keys()).is_empty(), "everything is exhausted once owned")
+
+	var pick_a := Enlightenments.pick(Rng.stream("enl_pick", 9, 0), high, [])
+	var pick_b := Enlightenments.pick(Rng.stream("enl_pick", 9, 0), high, [])
+	check(pick_a != "" and pick_a == pick_b, "the same seed and state pick the same insight")
+	check(bool(Enlightenments.eligible(pick_a, high)["ok"]), "the picked insight was eligible")
+	check(Enlightenments.pick(Rng.stream("enl_pick", 9, 0), high, ids.keys()) == "", "an exhausted pool picks nothing")
+	var seen := {}
+	for i in 60:
+		seen[Enlightenments.pick(Rng.stream("enl_pick", 9, i), high, [])] = true
+	check(seen.size() >= 2, "different rolls reveal different insights")
+	check(not seen.has(""), "a stocked pool always returns an insight")
+
+	var combined := Enlightenments.mods(["enl.still_water", "enl.empty_mind"])
+	check(combined.size() == 2, "mods aggregate across insights")
+	check(Enlightenments.mods(["enl.none"]).is_empty(), "unknown insights grant nothing")
+	var bare := StatBlock.new(Attributes.new())
+	bare.rebuild({}, [], 1, 1.0)
+	var insightful := StatBlock.new(Attributes.new())
+	insightful.rebuild({}, [], 1, 1.0, "", [], [], combined)
+	check(insightful.qi_regen_mult() > bare.qi_regen_mult(), "insight mods enter the stat pipeline")
+	check(insightful.max_qi_mult() > bare.max_qi_mult(), "every learned insight contributes")
+
+	var owned: Array = []
+	check(Enlightenments.learn(owned, "enl.still_water"), "an insight can be learned")
+	check(not Enlightenments.learn(owned, "enl.still_water"), "learning is idempotent")
+	check(not Enlightenments.learn(owned, "enl.none"), "unknown insights cannot be learned")
+	check(Enlightenments.known_names(owned) == ["Still Water Clarity"], "known names come from data")
+
+	var cultivation := Cultivation.new()
+	check(cultivation.enlightenment_meter == 0.0 and not cultivation.is_enlightenment_ready(), "a fresh cultivator understands nothing yet")
+	check(not cultivation.add_comprehension(40.0), "understanding below the goal is not an epiphany")
+	check(approx(cultivation.enlightenment_meter, 40.0), "understanding accumulates")
+	check(cultivation.add_comprehension(60.0), "a full meter is ready")
+	check(cultivation.is_enlightenment_ready(), "readiness is stable")
+	check(cultivation.add_comprehension(50.0) and approx(cultivation.enlightenment_meter, Cultivation.ENLIGHTENMENT_GOAL), "the meter caps")
+	check(cultivation.take_enlightenment() and cultivation.enlightenment_meter == 0.0, "an epiphany spends the meter")
+	check(not cultivation.take_enlightenment(), "a spent meter cannot be spent twice")
+	cultivation.add_comprehension(100.0)
+	var saved := cultivation.to_dict()
+	var restored := Cultivation.new()
+	restored.from_dict(saved)
+	check(approx(restored.enlightenment_meter, Cultivation.ENLIGHTENMENT_GOAL), "comprehension survives a save")
+	var legacy := Cultivation.new()
+	legacy.from_dict({})
+	check(legacy.enlightenment_meter == 0.0, "legacy saves start with no comprehension")
+	var corrupt := Cultivation.new()
+	corrupt.from_dict({"enlightenment_meter": 500.0})
+	check(approx(corrupt.enlightenment_meter, Cultivation.ENLIGHTENMENT_GOAL), "a corrupt meter is clamped")
 
 
 func _rng_tests() -> void:
