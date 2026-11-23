@@ -45,6 +45,22 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Attributes and extreme values
+
+- Raw attributes floor at **zero** in `Attributes.add`/`from_dict`. Debuffs can take a mortal to
+  nothing, but a negative primary would leak into every formula.
+- `StatBlock.factor(percent)` is the only percent conversion: `max(0, 1 + pct/100)`. A cursed item
+  can cripple a stat but must never invert it — negative movement walks backwards, negative Qi
+  capacity divides by a negative.
+- Every derived stat has a floor: damage x0.05, movement 24, attack speed 0.2, Qi capacity x0.1,
+  Qi regen 0, cultivation x0.05, comprehension/crafting x0.1. Caps: crit 0.95, resist 0.85
+  (also the incoming-resistance cap), lifesteal 0.5, recovery reduction 0.35, accuracy 1.0.
+- `Damage.mitigate_armor` ignores negative armour. The raw fraction would otherwise give a cursed
+  item up to 75% mitigation (`armor = -60` → `-60/1` → clamp 0.75).
+- `Attributes.attr_cost` clamps its exponent (level ≤ 400, price ≤ 9e15) so an absurd level cannot
+  overflow into a free or negative price.
+- Realm `attr_mult` must be positive; `DB.validate` rejects data that would zero every attribute.
+
 ## Character creation
 
 - Two screens, one flag: `main.creation_stage` 0 is formation points, 1 is identity. ENTER advances,

@@ -89,8 +89,15 @@ func apply_mods(mods: Array, source_name: String = "") -> void:
 			push_warning("[StatBlock] unknown modifier stat '%s' from %s" % [stat, source_name])
 
 
+## Every derived number separates base from gear, then floors. Cursed modifiers
+## can cripple a stat but must never invert it: negative movement walks backwards,
+## negative Qi capacity divides by a negative, negative armour becomes mitigation.
+static func factor(percent: float) -> float:
+	return maxf(0.0, 1.0 + percent / 100.0)
+
+
 func get_attr(key: String) -> int:
-	return base.get_attr(key) + int(flat_attrs.get(key, 0))
+	return maxi(0, base.get_attr(key) + int(flat_attrs.get(key, 0)))
 
 
 func attr_bonus(key: String) -> int:
@@ -108,20 +115,20 @@ func flat(key: String) -> float:
 # --- combat -----------------------------------------------------------------
 
 func physical_mult() -> float:
-	return (1.0 + Attributes.soft(float(get_attr("str")), 22.0) / 22.0) \
-		* (1.0 + pct("physical_damage_pct") / 100.0) * realm_mult
+	return maxf(0.05, (1.0 + Attributes.soft(float(get_attr("str")), 22.0) / 22.0) \
+		* factor(pct("physical_damage_pct")) * maxf(0.0, realm_mult))
 
 
 func weapon_damage() -> float:
-	return flat("weapon_damage")
+	return maxf(0.0, flat("weapon_damage"))
 
 
 func armor() -> float:
-	return flat("armor")
+	return maxf(0.0, flat("armor"))
 
 
 func accuracy() -> float:
-	return 0.78 + 0.22 * (1.0 - exp(-float(get_attr("dex")) / 45.0))
+	return clampf(0.78 + 0.22 * (1.0 - exp(-float(get_attr("dex")) / 45.0)), 0.0, 1.0)
 
 
 func crit_chance() -> float:
@@ -130,7 +137,7 @@ func crit_chance() -> float:
 
 
 func physical_resist() -> float:
-	return Attributes.soft(float(get_attr("str")), 40.0) / 40.0 * 0.35 + pct("physical_resist") / 100.0
+	return clampf(Attributes.soft(float(get_attr("str")), 40.0) / 40.0 * 0.35 + pct("physical_resist") / 100.0, 0.0, 0.85)
 
 
 func carry_slots() -> int:
@@ -144,13 +151,13 @@ func lifesteal() -> float:
 # --- mobility ---------------------------------------------------------------
 
 func move_speed() -> float:
-	return 96.0 * (1.0 + Attributes.soft(float(get_attr("agi")), 15.0) / 55.0) \
-		* (1.0 + pct("move_speed_pct") / 100.0)
+	return maxf(24.0, 96.0 * (1.0 + Attributes.soft(float(get_attr("agi")), 15.0) / 55.0) \
+		* factor(pct("move_speed_pct")))
 
 
 func attack_speed() -> float:
-	return (1.0 + Attributes.soft(float(get_attr("agi")), 18.0) / 45.0) \
-		* (1.0 + pct("attack_speed_pct") / 100.0)
+	return maxf(0.2, (1.0 + Attributes.soft(float(get_attr("agi")), 18.0) / 45.0) \
+		* factor(pct("attack_speed_pct")))
 
 
 func dodge_bonus_frames() -> int:
@@ -164,8 +171,8 @@ func recovery_reduction() -> float:
 # --- cultivation ------------------------------------------------------------
 
 func max_qi_mult() -> float:
-	return (1.0 + Attributes.soft(float(get_attr("wis")), 30.0) / 48.0) \
-		* (1.0 + pct("qi_max_pct") / 100.0)
+	return maxf(0.1, (1.0 + Attributes.soft(float(get_attr("wis")), 30.0) / 48.0) \
+		* factor(pct("qi_max_pct")))
 
 
 func qi_max_flat() -> float:
@@ -173,7 +180,7 @@ func qi_max_flat() -> float:
 
 
 func qi_regen_mult() -> float:
-	return 1.0 + Attributes.soft(float(get_attr("wis")), 25.0) / 60.0 + pct("qi_regen_pct") / 100.0
+	return maxf(0.0, 1.0 + Attributes.soft(float(get_attr("wis")), 25.0) / 60.0 + pct("qi_regen_pct") / 100.0)
 
 
 func qi_regen_flat() -> float:
@@ -181,16 +188,16 @@ func qi_regen_flat() -> float:
 
 
 func cultivation_rate_mult() -> float:
-	return (1.0 + Attributes.soft(float(get_attr("wis")), 40.0) / 70.0) \
-		* (1.0 + pct("cult_speed_pct") / 100.0)
+	return maxf(0.05, (1.0 + Attributes.soft(float(get_attr("wis")), 40.0) / 70.0) \
+		* factor(pct("cult_speed_pct")))
 
 
 func comprehension_mult() -> float:
-	return 1.0 + Attributes.soft(float(get_attr("int")), 25.0) / 25.0
+	return maxf(0.1, 1.0 + Attributes.soft(float(get_attr("int")), 25.0) / 25.0)
 
 
 func crafting_quality_mult() -> float:
-	return 1.0 + Attributes.soft(float(get_attr("int")), 30.0) / 30.0
+	return maxf(0.1, 1.0 + Attributes.soft(float(get_attr("int")), 30.0) / 30.0)
 
 
 func mental_resist() -> float:

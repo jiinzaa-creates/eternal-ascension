@@ -186,6 +186,8 @@ func validate() -> Array:
 			problems.append("realm %d has no id" % n)
 		if float(r.get("qi_mult", 0.0)) <= 0.0:
 			problems.append("realm %d has non-positive qi_mult" % n)
+		if float(r.get("attr_mult", 0.0)) <= 0.0:
+			problems.append("realm %d has non-positive attr_mult" % n)
 
 	if roots.size() != 12:
 		problems.append("expected 12 spiritual roots, found %d" % roots.size())

@@ -38,6 +38,9 @@ static func knockback(technique: Dictionary, stats: StatBlock) -> float:
 	return base * (0.75 + Attributes.soft(float(stats.get_attr("str")), 25.0) / 40.0)
 
 
-## Armour reduces incoming physical damage before the resistance curve.
+## Armour reduces incoming physical damage before the resistance curve. Negative
+## armour is treated as none: the raw fraction would otherwise turn a cursed item
+## into 75% mitigation (armor = -60 gives -60/1 -> clamped 0.75).
 static func mitigate_armor(raw: float, armor: float) -> float:
-	return raw * (1.0 - clampf(armor / maxf(armor + 60.0, 1.0), 0.0, 0.75))
+	var effective := maxf(0.0, armor)
+	return raw * (1.0 - clampf(effective / maxf(effective + 60.0, 1.0), 0.0, 0.75))

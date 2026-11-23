@@ -18,6 +18,7 @@ func _ready() -> void:
 	_db_tests()
 	_attribute_tests()
 	_stat_pipeline_tests()
+	_extreme_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -196,6 +197,146 @@ func _stat_pipeline_tests() -> void:
 
 
 # -------------------------------------------------------------------- rng ----
+
+# ---------------------------------------------------------------- extremes ----
+
+func _extreme_tests() -> void:
+	print("[extremes] cursed gear, absurd values and cross-attribute interactions")
+	var weak := Attributes.new()
+	for key in Attributes.KEYS:
+		weak.add(key, -50)
+		check(weak.get_attr(key) == 0, "%s floors at zero" % key)
+
+	var restored := Attributes.new()
+	restored.from_dict({"str": -40, "wis": -1, "agi": 999999})
+	check(restored.get_attr("str") == 0 and restored.get_attr("wis") == 0, "negative saved attributes are clamped")
+	check(restored.get_attr("agi") == 999999, "huge saved attributes survive")
+
+	check(Attributes.attr_cost(10000) > 0, "absurd attribute levels still cost something")
+	check(Attributes.attr_cost(10000) <= 9223372036854775807, "attribute cost cannot overflow")
+	check(Attributes.attr_cost(0) == Attributes.attr_cost(1), "cost is flat at the first level")
+	check(Attributes.soft(-10.0, 20.0) == 0.0, "negative attributes contribute nothing")
+
+	# Cursed gear: every derived number must stay usable.
+	var cursed := StatBlock.new(Attributes.new())
+	cursed.rebuild({"weapon": {
+		"name": "cursed", "base_damage": -500.0, "armor": -500.0,
+		"mods": [
+			{"stat": "move_speed_pct", "value": -500.0},
+			{"stat": "attack_speed_pct", "value": -500.0},
+			{"stat": "physical_damage_pct", "value": -500.0},
+			{"stat": "qi_max_pct", "value": -500.0},
+			{"stat": "qi_regen_pct", "value": -500.0},
+			{"stat": "cult_speed_pct", "value": -500.0},
+			{"stat": "crit_chance", "value": -500.0},
+			{"stat": "physical_resist", "value": -500.0},
+			{"stat": "str", "value": -100},
+		],
+	}}, [], 1, 1.0)
+	check(cursed.get_attr("str") == 0, "cursed gear floors attributes")
+	check(cursed.move_speed() >= 24.0, "cursed gear cannot reverse movement")
+	check(cursed.attack_speed() >= 0.2, "cursed gear cannot stop attacks")
+	check(cursed.physical_mult() >= 0.05, "cursed gear cannot invert damage")
+	check(cursed.max_qi_mult() >= 0.1, "cursed gear cannot erase Qi")
+	check(cursed.qi_regen_mult() >= 0.0, "cursed gear cannot make regen negative")
+	check(cursed.cultivation_rate_mult() >= 0.05, "cursed gear cannot stop cultivation")
+	check(cursed.crit_chance() == 0.0, "cursed gear zeroes crit rather than going negative")
+	check(cursed.physical_resist() == 0.0, "cursed gear cannot amplify damage through resistance")
+	check(cursed.weapon_damage() == 0.0 and cursed.armor() == 0.0, "negative equipment values floor at zero")
+	check(approx(Damage.mitigate_armor(100.0, -500.0), 100.0), "negative armour cannot become mitigation")
+	check(approx(Damage.mitigate_armor(100.0, -30.0), 100.0), "mild negative armour is no armour")
+
+	var finite := true
+	var cursed_stats := cursed.derived()
+	for key in cursed_stats.keys():
+		var value := float(cursed_stats[key])
+		if is_nan(value) or is_inf(value):
+			finite = false
+	check(finite, "every derived stat is finite under cursed gear")
+
+	# Absurd positive values: saturate, never overflow.
+	var huge := Attributes.new()
+	for key in Attributes.KEYS:
+		huge.add(key, 1000000)
+	var god := StatBlock.new(huge)
+	god.rebuild({}, [], 12, float(DB.realm(12).get("attr_mult", 1.0)))
+	var god_finite := true
+	var god_stats := god.derived()
+	for key in god_stats.keys():
+		var value := float(god_stats[key])
+		if is_nan(value) or is_inf(value):
+			god_finite = false
+	check(god_finite, "a million points in every attribute stays finite")
+	check(god.crit_chance() <= 0.95, "crit chance caps below certainty")
+	check(god.lifesteal() <= 0.5, "lifesteal caps")
+	check(god.recovery_reduction() <= 0.35, "recovery reduction caps")
+	check(god.physical_resist() <= 0.85, "resistance caps")
+	check(god.accuracy() <= 1.0, "accuracy caps at certainty")
+
+	# Cross-interactions: each attribute owns its own axis.
+	var plain := Attributes.new()
+	var stats := StatBlock.new(plain)
+	stats.rebuild({}, [], 1, 1.0)
+
+	var str_only := Attributes.new()
+	str_only.add("str", 40)
+	var s := StatBlock.new(str_only)
+	s.rebuild({}, [], 1, 1.0)
+	check(s.physical_mult() > stats.physical_mult(), "STR raises physical damage")
+	check(s.max_qi_mult() == stats.max_qi_mult(), "STR leaves Qi capacity alone")
+	check(s.accuracy() == stats.accuracy(), "STR leaves accuracy alone")
+
+	var wis_only := Attributes.new()
+	wis_only.add("wis", 40)
+	var w := StatBlock.new(wis_only)
+	w.rebuild({}, [], 1, 1.0)
+	check(w.max_qi_mult() > stats.max_qi_mult(), "WIS raises Qi capacity")
+	check(w.qi_regen_mult() > stats.qi_regen_mult(), "WIS raises Qi regeneration")
+	check(w.physical_mult() == stats.physical_mult(), "WIS leaves physical damage alone")
+
+	var int_only := Attributes.new()
+	int_only.add("int", 40)
+	var intel := StatBlock.new(int_only)
+	intel.rebuild({}, [], 1, 1.0)
+	check(intel.comprehension_mult() > stats.comprehension_mult(), "INT raises comprehension")
+	check(intel.crafting_quality_mult() > stats.crafting_quality_mult(), "INT raises crafting quality")
+	check(intel.physical_mult() == stats.physical_mult(), "INT leaves physical damage alone")
+
+	var agi_only := Attributes.new()
+	agi_only.add("agi", 40)
+	var agi := StatBlock.new(agi_only)
+	agi.rebuild({}, [], 1, 1.0)
+	check(agi.move_speed() > stats.move_speed() and agi.attack_speed() > stats.attack_speed(), "AGI raises speed")
+	check(agi.dodge_bonus_frames() > stats.dodge_bonus_frames(), "AGI raises dodge frames")
+	check(agi.physical_mult() == stats.physical_mult(), "AGI leaves physical damage alone")
+
+	var dex_only := Attributes.new()
+	dex_only.add("dex", 40)
+	var dex := StatBlock.new(dex_only)
+	dex.rebuild({}, [], 1, 1.0)
+	check(dex.accuracy() > stats.accuracy(), "DEX raises accuracy")
+	check(dex.crit_chance() > stats.crit_chance(), "DEX raises crit chance")
+	check(dex.move_speed() == stats.move_speed(), "DEX leaves movement alone")
+
+	var cha_only := Attributes.new()
+	cha_only.add("char", 40)
+	var cha := StatBlock.new(cha_only)
+	cha.rebuild({}, [], 1, 1.0)
+	check(cha.party_slots() > stats.party_slots(), "CHA raises party slots")
+	check(cha.social_score(0, 0) > stats.social_score(0, 0), "CHA raises social score")
+	check(cha.social_score(2, 1) > cha.social_score(0, 0), "reputation and rank add to social score")
+
+	# Equipment flat attributes feed the same formulas, and realm multiplies once.
+	var equipped := StatBlock.new(Attributes.new())
+	equipped.rebuild({"ring": {"name": "test ring", "mods": [{"stat": "str", "value": 10}]}}, [], 1, 1.0)
+	check(equipped.get_attr("str") == 20, "equipment adds flat attributes")
+	check(equipped.physical_mult() > stats.physical_mult(), "equipment STR feeds the damage formula")
+
+	var realm_two := StatBlock.new(Attributes.new())
+	realm_two.rebuild({}, [], 1, 2.0)
+	check(approx(realm_two.physical_mult(), stats.physical_mult() * 2.0), "realm multiplier applies once, multiplicatively")
+	check(realm_two.crit_chance() == stats.crit_chance(), "realm does not change crit chance")
+
 
 func _rng_tests() -> void:
 	print("[rng] determinism of generation streams")

@@ -506,7 +506,7 @@ func _run() -> void:
 
 	var chunk_herb: Interactable = null
 	for node in main.interactables:
-		if is_instance_valid(node) and node is Interactable and node.chunk_owned:
+		if is_instance_valid(node) and node is Interactable and String(node.id).begins_with("herb.chunk."):
 			chunk_herb = node as Interactable
 			break
 	check(chunk_herb != null, "streamed chunks grow herbs (%d resources)" % main.chunks.resource_count())
@@ -724,6 +724,30 @@ func _run() -> void:
 	check(player.appearance.robe == 4 and player.appearance.hair == 2, "appearance survives a save")
 	check(player.appearance.skin == 3 and player.appearance.pronouns() == Appearance.PRESENTATIONS[2], "skin and presentation survive a save")
 	check(Game.origin_id == "origin.merchant_child", "the origin survives a save")
+
+	# --- extreme attribute states ---------------------------------------------
+	var previous_weapon: Variant = player.equipment.get("weapon", null)
+	player.equipment["weapon"] = {
+		"id": "item.test.cursed", "name": "Cursed Test Blade", "slot": "weapon",
+		"base_damage": -80.0, "armor": -40.0,
+		"mods": [
+			{"stat": "move_speed_pct", "value": -500.0},
+			{"stat": "attack_speed_pct", "value": -500.0},
+		],
+	}
+	player.rebuild_stats()
+	check(player.stats.move_speed() > 0.0, "cursed gear cannot stop the player moving")
+	check(player.stats.attack_speed() > 0.0, "cursed gear cannot stop attacks")
+	check(player.stats.physical_mult() > 0.0, "cursed gear cannot invert damage")
+	check(player.weapon_damage() >= 0.0, "a negative weapon reads as unarmed")
+	var cursed_hit := Damage.technique_damage(DB.technique("tech.fist.iron_bone"), player.stats)
+	check(cursed_hit > 0.0, "a technique still deals damage under cursed gear")
+	if previous_weapon == null:
+		player.equipment.erase("weapon")
+	else:
+		player.equipment["weapon"] = previous_weapon
+	player.rebuild_stats()
+	check(player.stats.weapon_damage() >= 0.0, "removing the curse restores a sane weapon slot")
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
