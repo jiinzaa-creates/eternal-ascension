@@ -1688,6 +1688,7 @@ func _claim_inheritance() -> void:
 		Bus.toast.emit("The altar's body is no greater than the one you already carry.")
 	if not learned and not gained:
 		Bus.toast.emit("The altar yields nothing you can still use.")
+	_grant_unique(Uniques.ALTAR_SOURCE)
 	Bus.cultivation_changed.emit()
 
 
@@ -1815,6 +1816,27 @@ func _on_boss_phase_changed(boss: Node, index: int, phase_name: String) -> void:
 		realm_instance.spawn_beast(String(ids[i]), at, 2)
 
 
+## Authored relics are one per save. The boss and the altar ask for their
+## source's relic, and an id already worn or bagged is never granted twice.
+func _grant_unique(source: String) -> void:
+	if player == null:
+		return
+	var owned := Uniques.owned_ids(player.equipment, player.inventory)
+	var rules := Uniques.new(DB)
+	for entry in DB.uniques:
+		if String(entry.get("source", "")) != source:
+			continue
+		var unique_id := String(entry.get("id", ""))
+		if owned.has(unique_id):
+			continue
+		var relic := rules.make(unique_id)
+		if relic.is_empty():
+			continue
+		player.pick_up(relic)
+		Bus.toast.emit("Relic — %s. %s" % [String(relic.get("name", "?")), String(relic.get("lore", ""))])
+		return
+
+
 ## Paid once per stable boss id. The reward is the boss' own, not the ordinary
 ## loot roll: stones and one guaranteed piece at the declared rarity.
 func _on_boss_defeated(id: String, _at: Vector2) -> void:
@@ -1836,6 +1858,8 @@ func _on_boss_defeated(id: String, _at: Vector2) -> void:
 	else:
 		player.pick_up(item)
 		Bus.toast.emit("%s falls. You take the %s." % [name, String(item.get("name", "spoils"))])
+	# Boss ids are already stable `boss.*` keys, matching the relic's source.
+	_grant_unique(id)
 	Bus.player_stats_changed.emit()
 
 

@@ -2451,6 +2451,58 @@ func _run() -> void:
 	player.equipment["talisman"] = m40_prev_talisman
 	player.rebuild_stats()
 
+	# --- uniques: authored relics, granted once, effective when worn -----------
+	var m41_rules := Uniques.new(DB)
+	var m41_blade := m41_rules.make("item.unique.hollow_moon_blade")
+	var m41_sash := m41_rules.make("item.unique.cloudstep_sash")
+	check(not m41_blade.is_empty() and not m41_sash.is_empty(), "both relics are authored")
+	var m41_owned := Uniques.owned_ids(player.equipment, player.inventory)
+	check(m41_owned.has("item.unique.hollow_moon_blade"), "the warden's fall granted its relic")
+	check(m41_owned.has("item.unique.cloudstep_sash"), "the altar granted its relic")
+
+	var m41_count_before := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("id", "")) == "item.unique.hollow_moon_blade":
+			m41_count_before += 1
+	for slot in Items.EQUIP_SLOTS:
+		var m41_worn: Dictionary = player.equipment.get(slot, {})
+		if String(m41_worn.get("id", "")) == "item.unique.hollow_moon_blade":
+			m41_count_before += 1
+	check(m41_count_before == 1, "a relic exists exactly once")
+	main._grant_unique("boss.tomb_warden")
+	var m41_count_after := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("id", "")) == "item.unique.hollow_moon_blade":
+			m41_count_after += 1
+	for slot in Items.EQUIP_SLOTS:
+		var m41_worn_again: Dictionary = player.equipment.get(slot, {})
+		if String(m41_worn_again.get("id", "")) == "item.unique.hollow_moon_blade":
+			m41_count_after += 1
+	check(m41_count_after == 1, "granting the same relic again does not duplicate it")
+
+	var m41_prev_weapon: Dictionary = player.equipment.get("weapon", {})
+	var m41_prev_armor: Dictionary = player.equipment.get("armor", {})
+	var m41_prev_hp := player.hp
+	var m41_prev_qi := player.cultivation.qi
+	player.equipment["weapon"] = m41_blade
+	player.rebuild_stats()
+	player.hp = 40.0
+	player.cultivation.qi = 0.0
+	player.on_kill(1)
+	check(player.cultivation.qi > 0.0, "the Hollow Moon Blade returns Qi on a kill")
+	check(approx(player.hp, 40.0), "and no health")
+	player.equipment["armor"] = m41_sash
+	player.rebuild_stats()
+	player.hp = 40.0
+	player.on_kill(1)
+	check(player.hp > 40.0, "the Cloudstep Sash returns health on a kill")
+	check(bool(Items.to_save(m41_blade).get("unique", false)), "a save carries the relic flag")
+	player.equipment["weapon"] = m41_prev_weapon
+	player.equipment["armor"] = m41_prev_armor
+	player.hp = m41_prev_hp
+	player.cultivation.qi = m41_prev_qi
+	player.rebuild_stats()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

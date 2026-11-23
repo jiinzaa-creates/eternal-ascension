@@ -1,0 +1,38 @@
+{
+  "uniques": [
+    {
+      "id": "item.unique.hollow_moon_blade",
+      "name": "Hollow Moon Blade",
+      "base": "base.sword.iron_jian",
+      "slot": "weapon",
+      "ilvl": 7,
+      "rarity": 3,
+      "value": 480,
+      "source": "boss.tomb_warden",
+      "lore": "Ground from the warden's shadow, it remembers every oath the tomb broke.",
+      "effect": {"id": "qi_on_kill", "amount": 12.0, "text": "Restores 12 Qi for every kill"},
+      "mods": [
+        {"id": "prefix.sharpened", "stat": "physical_damage_pct", "value": 38.0, "text": "+38% physical damage"},
+        {"id": "prefix.ruinous", "stat": "crit_damage", "value": 45.0, "text": "+45% critical damage"},
+        {"id": "suffix.tiger", "stat": "str", "value": 6.0, "text": "+6 STR"}
+      ]
+    },
+    {
+      "id": "item.unique.cloudstep_sash",
+      "name": "Cloudstep Sash",
+      "base": "base.robe.cloud_silk",
+      "slot": "armor",
+      "ilvl": 6,
+      "rarity": 3,
+      "value": 380,
+      "source": "site.inheritance_altar",
+      "lore": "Woven by a body that never touched the floor of the tomb it died in.",
+      "effect": {"id": "mend_on_kill", "amount": 5.0, "text": "Restores 5 health for every kill"},
+      "mods": [
+        {"id": "prefix.flowing", "stat": "move_speed_pct", "value": 16.0, "text": "+16% movement speed"},
+        {"id": "suffix.evasion", "stat": "evasion", "value": 14.0, "text": "+14% evasion"},
+        {"id": "suffix.cloud", "stat": "agi", "value": 4.0, "text": "+4 AGI"}
+      ]
+    }
+  ]
+}

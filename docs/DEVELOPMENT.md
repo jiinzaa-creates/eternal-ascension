@@ -853,6 +853,32 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   attribute or `realm` and be positive, tags and conflicts must be non-empty, and every conflict tag
   must be carried by some base, so a restriction cannot silently refer to nothing.
 
+## Uniques
+
+- **Authored, not generated.** `data/uniques.json` holds hand-written relics: a stable
+  `item.unique.*` id, a base, a fixed set of affixes and values, a value, lore, one acquisition
+  source and one effect. `Uniques.make()` builds the canonical item from the base's numbers and the
+  data's affixes, so the same relic is byte-identical every time and `ItemGen` never produces one
+  (the unit suite rolls 80 items and asserts none is unique).
+- **One source each, one per save.** Sources are named strings: a boss id (`boss.tomb_warden`) or
+  `site.inheritance_altar`. `main._grant_unique(source)` is the single grant path; it collects the
+  ids already worn and bagged (`Uniques.owned_ids`) and returns without granting if the relic is
+  owned. The Warden's fall calls it with its own id, the inheritance altar with its source constant,
+  and the existing `bosses_slain` / `inheritance_taken` flags mean neither place can be farmed.
+- **Effects are real, and broken relics are not.** `effect.id` is one of `Uniques.EFFECTS`
+  (`qi_on_kill`, `mend_on_kill`) with an amount and a player-facing line. `Uniques.kill_effects()`
+  sums the effects of worn relics and `Player.on_kill()` applies them — health is capped at
+  `hp_max`, Qi at the body's capacity — and a relic with zero durability contributes nothing, the
+  same rule its stats follow. Adding an effect means adding it to `EFFECTS`, to `kill_effects()` and
+  to a call site; the data cannot name an effect the code does not implement (`DB.validate()`).
+- **They save and they read as relics.** `Items.FIELDS` gained `unique` and `lore`, so a relic keeps
+  both through a save, and `Items.label()` prefixes a diamond. The HUD draws relic names gold in the
+  satchel, the gear screen and the worn list, and the gear comparison shows the lore line above the
+  deltas. Schema stays 2: both fields are optional and default to `false`/`""` for older items.
+- **Validation.** Every unique must be a stable `item.unique.*` id with a name and lore, a base whose
+  slot agrees, a known source (a real boss id or the altar), a known effect with a positive amount,
+  real mods and a positive value.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.

@@ -34,7 +34,7 @@ const REPAIR_RATE := 0.18
 const FIELDS: Array[String] = [
 	"id", "seed", "base", "base_name", "slot", "weapon_type", "ilvl", "rarity",
 	"rarity_name", "name", "implicit", "base_damage", "armor", "mods", "value",
-	"count", "durability",
+	"unique", "lore", "count", "durability",
 ]
 
 
@@ -159,6 +159,8 @@ static func normalize_item(value: Variant) -> Dictionary:
 	out["armor"] = maxf(0.0, float(data.get("armor", 0.0)))
 	out["mods"] = _normalize_mods(data.get("mods", []))
 	out["value"] = maxi(0, int(data.get("value", 0)))
+	out["unique"] = bool(data.get("unique", false))
+	out["lore"] = String(data.get("lore", ""))
 	out["count"] = clampi(int(data.get("count", 1)), 1, 999)
 	if DURABLE_SLOTS.has(String(out["slot"])):
 		var maximum := max_durability(String(out["slot"]))
@@ -310,8 +312,11 @@ static func total_count(inventory: Array) -> int:
 	return total
 
 
-## "Spirit Herb x3" for a stack, the plain name for a single item.
+## "Spirit Herb x3" for a stack, the plain name for a single item, and a diamond
+## for an authored relic so it reads as unique in every list.
 static func label(item: Dictionary) -> String:
 	var name := String(item.get("name", "?"))
+	if bool(item.get("unique", false)):
+		name = "◆ " + name
 	var count := int(item.get("count", 1))
 	return name if count <= 1 else "%s x%d" % [name, count]

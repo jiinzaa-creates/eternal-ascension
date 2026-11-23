@@ -25,6 +25,7 @@ var biomes: Array = []
 var enemy_archetypes: Array = []
 var spirit_beasts: Array = []
 var bosses: Array = []
+var uniques: Array = []
 var origins: Array = []
 var physiques: Array = []
 var weapon_types: Array = []
@@ -59,6 +60,7 @@ func load_all() -> void:
 	enemy_archetypes = _read("enemy_archetypes.json").get("archetypes", [])
 	spirit_beasts = _read("spirit_beasts.json").get("beasts", [])
 	bosses = _read("bosses.json").get("bosses", [])
+	uniques = _read("uniques.json").get("uniques", [])
 	origins = _read("origins.json").get("origins", [])
 	physiques = _read("physiques.json").get("physiques", [])
 	weapon_types = _read("weapons.json").get("weapon_types", [])
@@ -79,6 +81,7 @@ func load_all() -> void:
 	_index("enemy_archetype", enemy_archetypes)
 	_index("spirit_beast", spirit_beasts)
 	_index("boss", bosses)
+	_index("unique", uniques)
 	_index("origin", origins)
 	_index("physique", physiques)
 	_index("weapon_type", weapon_types)
@@ -447,6 +450,44 @@ func validate() -> Array:
 				problems.append("item base %s conflicts with unused tag %s" % [b.get("id", "?"), String(tag)])
 	if prefixes.is_empty() or suffixes.is_empty():
 		problems.append("item affix pools are empty")
+
+	# Authored relics: an id a save can reference, a base whose slot agrees, one
+	# real acquisition source, one known effect with an amount, and real mods.
+	if uniques.is_empty():
+		problems.append("no unique items defined")
+	for u in uniques:
+		var unique_id := String(u.get("id", ""))
+		if not Items.is_stable_id(unique_id) or not unique_id.begins_with("item.unique."):
+			problems.append("unique %s is not an item.unique.* id" % unique_id)
+		if String(u.get("name", "")) == "" or String(u.get("lore", "")) == "":
+			problems.append("unique %s has no name or lore" % unique_id)
+		var unique_base := by_id("base", String(u.get("base", "")))
+		if unique_base.is_empty():
+			problems.append("unique %s names unknown base %s" % [unique_id, String(u.get("base", ""))])
+		elif String(unique_base.get("slot", "")) != String(u.get("slot", "")):
+			problems.append("unique %s slot disagrees with its base" % unique_id)
+		var source := String(u.get("source", ""))
+		var source_ok := source == Uniques.ALTAR_SOURCE \
+			or (source.begins_with("boss.") and not by_id("boss", source).is_empty())
+		if not source_ok:
+			problems.append("unique %s has unknown source %s" % [unique_id, source])
+		var effect: Dictionary = u.get("effect", {})
+		if not Uniques.EFFECTS.has(String(effect.get("id", ""))):
+			problems.append("unique %s has no known effect" % unique_id)
+		elif float(effect.get("amount", 0.0)) <= 0.0:
+			problems.append("unique %s effect has no amount" % unique_id)
+		var unique_mods: Array = u.get("mods", [])
+		if unique_mods.is_empty():
+			problems.append("unique %s has no mods" % unique_id)
+		for mod in unique_mods:
+			if typeof(mod) != TYPE_DICTIONARY:
+				problems.append("unique %s has a malformed mod" % unique_id)
+				continue
+			var mod_stat := String((mod as Dictionary).get("stat", ""))
+			if not (Attributes.KEYS.has(mod_stat) or StatBlock.PERCENT_STATS.has(mod_stat) or StatBlock.FLAT_STATS.has(mod_stat)):
+				problems.append("unique %s uses unknown stat %s" % [unique_id, mod_stat])
+		if int(u.get("value", 0)) <= 0:
+			problems.append("unique %s has no value" % unique_id)
 	var affix_ids: Dictionary = {}
 	for pool in [prefixes, suffixes]:
 		for a in pool:

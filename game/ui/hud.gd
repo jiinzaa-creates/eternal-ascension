@@ -56,6 +56,16 @@ func _fit(text: String, font_size: int, max_width: float) -> String:
 	return cut + ".."
 
 
+## Relics read gold, broken gear reads red, everything else by rarity.
+func _item_color(item: Dictionary) -> Color:
+	if bool(item.get("unique", false)):
+		return Color("#f0d080")
+	if Items.is_broken(item):
+		return Color("#d06060")
+	var rarity := clampi(int(item.get("rarity", 0)), 0, ItemGen.RARITY_COLORS.size() - 1)
+	return Color(ItemGen.RARITY_COLORS[rarity])
+
+
 func _bar(pos: Vector2, bar_size: Vector2, ratio: float, color: Color, label: String) -> void:
 	draw_rect(Rect2(pos, bar_size), Color("#000000", 0.55))
 	draw_rect(Rect2(pos, Vector2(bar_size.x * clampf(ratio, 0.0, 1.0), bar_size.y)), color)
@@ -404,10 +414,7 @@ func draw_inventory(player: Player) -> void:
 	y += 20.0
 	var recent: Array = player.inventory.slice(maxi(0, player.inventory.size() - 6))
 	for item in recent:
-		var color := Color(ItemGen.RARITY_COLORS[int(item.get("rarity", 0))])
-		if Items.is_broken(item):
-			color = Color("#d06060")
-		_text(Vector2(w - 316.0, y), Items.label(item), 12, color)
+		_text(Vector2(w - 316.0, y), Items.label(item), 12, _item_color(item))
 		y += 17.0
 	if player.inventory.is_empty():
 		_text(Vector2(w - 316.0, y), "Empty. Kill something.", 12, MUTED)
@@ -438,8 +445,7 @@ func draw_gear(player: Player) -> void:
 		var color := Color("#5c6b73")
 		if not worn.is_empty():
 			label = Items.label(worn)
-			var rarity := clampi(int(worn.get("rarity", 0)), 0, ItemGen.RARITY_COLORS.size() - 1)
-			color = Color(ItemGen.RARITY_COLORS[rarity])
+			color = _item_color(worn)
 		_text(origin + Vector2(94.0, y), _fit(label, 12, 250.0), 12, color)
 		y += 22.0
 
@@ -453,9 +459,8 @@ func draw_gear(player: Player) -> void:
 	var first := maxi(0, selected - 6)
 	for i in range(first, mini(rows.size(), first + 9)):
 		var item: Dictionary = rows[i]
-		var rarity := clampi(int(item.get("rarity", 0)), 0, ItemGen.RARITY_COLORS.size() - 1)
 		var text := "%s %s" % [">" if i == selected else " ", _fit(Items.label(item), 12, 250.0)]
-		_text(origin + Vector2(370.0, list_y), text, 12, ACCENT if i == selected else Color(ItemGen.RARITY_COLORS[rarity]))
+		_text(origin + Vector2(370.0, list_y), text, 12, ACCENT if i == selected else _item_color(item))
 		list_y += 19.0
 
 	if rows.is_empty():
@@ -468,8 +473,12 @@ func draw_gear(player: Player) -> void:
 	draw_line(Vector2(cx, cy - 16.0), Vector2(panel.position.x + panel.size.x - 22.0, cy - 16.0), Color("#243039"), 1.0)
 	var worn_slot: Dictionary = player.equipment.get(String(chosen.get("slot", "")), {})
 	var against := "no piece worn there" if worn_slot.is_empty() else "against %s" % String(worn_slot.get("name", "?"))
-	_text(Vector2(cx, cy), _fit("%s  (ilvl %d)  — %s" % [String(chosen.get("name", "?")), int(chosen.get("ilvl", 1)), against], 13, 740.0), 13, INK)
+	_text(Vector2(cx, cy), _fit("%s  (ilvl %d)  — %s" % [String(chosen.get("name", "?")), int(chosen.get("ilvl", 1)), against], 13, 740.0), 13, _item_color(chosen))
 	cy += 24.0
+	var lore := String(chosen.get("lore", ""))
+	if lore != "":
+		_text(Vector2(cx, cy), _fit(lore, 11, 740.0), 11, Color("#d8c070"))
+		cy += 20.0
 	var deltas: Array = info.get("deltas", [])
 	if deltas.is_empty():
 		_text(Vector2(cx, cy), "Identical numbers.", 12, MUTED)

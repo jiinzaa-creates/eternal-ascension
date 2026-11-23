@@ -1085,12 +1085,21 @@ func meditate_tick(delta: float) -> float:
 	return gained
 
 
-## Kills feed the blood method; other methods ignore them.
+## Kills feed the blood method; other methods ignore them. Worn relics can also
+## return health or Qi per kill, and a broken relic returns nothing.
 func on_kill(ilvl: int = 1) -> void:
 	if cultivation.method_id == "method.blood":
 		cultivation.add_blood_charge(3.0 + float(maxi(1, ilvl)) * 2.0)
 	# Every death is a lesson, whether or not the character wanted it.
 	gain_comprehension(2.0)
+	var relic := Uniques.kill_effects(equipment, DB)
+	var healed := float(relic.get("hp", 0.0))
+	if healed > 0.0 and hp > 0.0:
+		hp = minf(hp_max, hp + healed)
+	var qi_gain := float(relic.get("qi", 0.0))
+	if qi_gain > 0.0 and cultivation.qi < cultivation.qi_max(stats):
+		cultivation.qi = minf(cultivation.qi_max(stats), cultivation.qi + qi_gain)
+		Bus.cultivation_changed.emit()
 
 
 func toggle_meditation() -> void:

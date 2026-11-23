@@ -44,6 +44,7 @@ func _ready() -> void:
 	_item_tests()
 	_procedural_generation_tests()
 	_equipment_rules_tests()
+	_unique_tests()
 	_cultivation_tests()
 	_combat_tests()
 	_world_tests()
@@ -1990,6 +1991,70 @@ func _equipment_rules_tests() -> void:
 	check(approx(float(rules.stat_map(modded)["str"]), 5.0), "affixes of the same stat sum")
 	check(Equipment.unit_for("physical_damage_pct") == "%", "percent affixes compare in percent")
 	check(Equipment.label_for("qi_max_flat") == "maximum Qi", "comparison labels are readable")
+
+
+# ---------------------------------------------------------------- uniques ----
+
+func _unique_tests() -> void:
+	print("[uniques] authored relics, effects and one-per-save ids")
+	var rules := Uniques.new(DB)
+	var blade := rules.make("item.unique.hollow_moon_blade")
+	check(not blade.is_empty(), "a relic is authored")
+	check(bool(blade.get("unique", false)), "a relic marks itself unique")
+	check(String(blade.get("lore", "")) != "", "a relic carries lore")
+	check(String(blade["slot"]) == "weapon" and float(blade["base_damage"]) > 0.0, "its base numbers come from the base")
+	check(int(blade["rarity"]) == ItemGen.RARITY_NAMES.size() - 1, "relics sit at the top shipped rarity")
+	check(Items.is_stable_id(String(blade["id"])), "its id is stable")
+	check(JSON.stringify(blade) == JSON.stringify(rules.make("item.unique.hollow_moon_blade")), "the same relic is always identical")
+	var mods: Array = blade["mods"]
+	check(mods.size() == 3, "fixed mods are authored, not rolled")
+	check(String((mods[0] as Dictionary)["stat"]) == "physical_damage_pct", "the first mod is fixed")
+	check(approx(float((mods[0] as Dictionary)["value"]), 38.0), "the mod value is fixed")
+	var plain := Items.normalize_item({"id": "item.test.plain", "slot": "weapon", "name": "Plain"})
+	check(not bool(plain.get("unique", false)), "ordinary items are not relics")
+	check(Items.label(blade).begins_with("◆ "), "a relic is marked in every list")
+	check(Items.label(plain) == "Plain", "ordinary labels are unchanged")
+	check(bool(Items.to_save(blade).get("unique", false)), "the save form keeps the relic flag")
+	check(String(Items.to_save(blade).get("lore", "")) != "", "the save form keeps the lore")
+	check(rules.is_unique(blade), "the registry recognises a relic")
+	check(not rules.is_unique(plain), "it does not claim ordinary gear")
+	check(rules.make("item.unique.missing").is_empty(), "an unknown relic cannot be made")
+	check(rules.make("item.test.plain").is_empty(), "an ordinary id cannot be made as a relic")
+
+	var sash := rules.make("item.unique.cloudstep_sash")
+	check(not sash.is_empty(), "the second relic is authored")
+	var qi_only := Uniques.kill_effects({"weapon": blade}, DB)
+	check(approx(float(qi_only["qi"]), 12.0), "a blade returns Qi per kill")
+	check(approx(float(qi_only["hp"]), 0.0), "and no health")
+	var both := Uniques.kill_effects({"weapon": blade, "armor": sash}, DB)
+	check(approx(float(both["hp"]), 5.0), "a sash returns health per kill")
+	check(approx(float(both["qi"]), 12.0), "effects add up across slots")
+	var broken := blade.duplicate(true)
+	broken["durability"] = 0.0
+	check(approx(float(Uniques.kill_effects({"weapon": broken}, DB)["qi"]), 0.0), "a broken relic returns nothing")
+	check(approx(float(Uniques.kill_effects({"weapon": plain}, DB)["qi"]), 0.0), "ordinary gear has no kill effect")
+	var effects_known := true
+	for entry in DB.uniques:
+		var effect: Dictionary = entry.get("effect", {})
+		if not Uniques.EFFECTS.has(String(effect.get("id", ""))):
+			effects_known = false
+	check(effects_known, "every authored effect is implemented")
+
+	check(rules.for_source("boss.tomb_warden").size() == 1, "the warden has one relic")
+	check(rules.for_source(Uniques.ALTAR_SOURCE).size() == 1, "the altar has one relic")
+	check(rules.for_source("site.nowhere").is_empty(), "an unknown source has none")
+	check(Uniques.owned_ids({}, [blade]).has("item.unique.hollow_moon_blade"), "ownership reads the satchel")
+	check(Uniques.owned_ids({"armor": sash}, []).has("item.unique.cloudstep_sash"), "ownership reads worn gear")
+	check(String(rules.effect_text("item.unique.hollow_moon_blade")) != "", "the effect has a readable line")
+
+	var generator := ItemGen.new(DB, Rng)
+	var spurious := false
+	for i in 80:
+		var item := generator.generate(5, 8100 + i, 0)
+		if bool(item.get("unique", false)):
+			spurious = true
+	check(not spurious, "ordinary generation never produces a relic")
+	check(DB.uniques.size() >= 2, "relic content is loaded")
 
 
 # ------------------------------------------------------------ cultivation ----
