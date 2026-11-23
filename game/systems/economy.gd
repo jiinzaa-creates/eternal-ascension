@@ -1,0 +1,36 @@
+class_name Economy
+extends RefCounted
+## Prices, as pure functions.
+##
+## An item already carries a `value` from generation (base value × rarity × ilvl),
+## so the economy does not invent a second worth scale: merchants buy at value and
+## pay a fraction of it. That keeps loot, rewards and shop prices on one curve.
+
+const SELL_RATE := 0.4
+const REST_COST := 14
+## Selling is deliberately lossy; buying and selling the same item must never be a
+## profit loop.
+const MIN_SELL := 1
+
+
+static func buy_price(item: Dictionary) -> int:
+	return maxi(1, int(ceil(float(item.get("value", 1)))))
+
+
+static func sell_price(item: Dictionary) -> int:
+	return maxi(MIN_SELL, int(floor(float(item.get("value", 1)) * SELL_RATE)))
+
+
+static func rest_cost() -> int:
+	return REST_COST
+
+
+static func can_afford(stones: int, price: int) -> bool:
+	return stones >= price
+
+
+## Stones left after a purchase, or -1 when it cannot be afforded.
+static func after_purchase(stones: int, price: int) -> int:
+	if not can_afford(stones, price):
+		return -1
+	return stones - price

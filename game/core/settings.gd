@@ -29,6 +29,7 @@ const KEY_BINDINGS := {
 	"quick_load": [KEY_F9],
 	"toggle_help": [KEY_F1],
 	"map": [KEY_M],
+	"shop_mode": [KEY_TAB],
 	"zoom_in": [KEY_EQUAL],
 	"zoom_out": [KEY_MINUS],
 	"accept": [KEY_ENTER],
@@ -61,6 +62,7 @@ const JOY_BUTTON_BINDINGS := {
 	"sprint": [JOY_BUTTON_RIGHT_SHOULDER],
 	"breakthrough": [JOY_BUTTON_DPAD_UP],
 	"map": [JOY_BUTTON_BACK],
+	"shop_mode": [JOY_BUTTON_LEFT_SHOULDER],
 }
 
 ## Content toggles. Captivity is a moral/legal simulation, not an inventory system,

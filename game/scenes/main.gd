@@ -25,6 +25,12 @@ var lighting: WorldLighting
 ## Continent geography, derived from the seed and never saved.
 var continent: Dictionary = {}
 var world_map: WorldMap
+## Settlement services: the merchant's stock and the shop overlay.
+var merchant := Merchant.new()
+var shop_panel: ShopPanel
+var shop_open := false
+var _shop_mode := "buy"
+var _sell_base := 0
 var interactables: Array = []
 var ground_items: Array = []
 var quests: QuestLog
@@ -130,6 +136,8 @@ func _build_hud() -> void:
 	world_map = WorldMap.new()
 	layer.add_child(world_map)
 	world_map.setup(continent, Continent.region_for_world_position(player.global_position))
+	shop_panel = ShopPanel.new()
+	layer.add_child(shop_panel)
 
 
 func _spawn_npcs() -> void:
@@ -268,6 +276,19 @@ func _spawn_interactables() -> void:
 	world.add_child(board)
 	interactables.append(board)
 
+	# Settlement services: a merchant stall and an inn counter.
+	var stall := Interactable.new()
+	stall.setup(Interactable.Kind.SHOP, "shop.market", "Merchant stall — trade")
+	stall.position = settlement.position_for("market") + Vector2(74, 42)
+	world.add_child(stall)
+	interactables.append(stall)
+
+	var inn := Interactable.new()
+	inn.setup(Interactable.Kind.INN, "inn.tavern", "Inn counter — rest")
+	inn.position = settlement.position_for("tavern") + Vector2(-74, 46)
+	world.add_child(inn)
+	interactables.append(inn)
+
 
 func _roll_root() -> int:
 	var weights: Array = []
@@ -326,7 +347,7 @@ func _process(delta: float) -> void:
 		return
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
-	if world_map != null and world_map.visible:
+	if (world_map != null and world_map.visible) or shop_open:
 		return
 	# The province is hidden inside a realm: streaming there would load chunks
 	# for tomb coordinates and spawn props under the tomb floor.
@@ -397,6 +418,98 @@ func _on_window_resized() -> void:
 	DisplayPolicy.apply(get_window())
 
 
+# --------------------------------------------------------------- services ----
+
+func _open_shop() -> void:
+	if shop_panel == null or player == null:
+		return
+	merchant.refresh(DB, Rng, Clock.day)
+	shop_open = true
+	player.set_physics_process(false)
+	player.set_process(false)
+	_show_shop("buy")
+
+
+func _close_shop() -> void:
+	shop_open = false
+	if shop_panel != null:
+		shop_panel.hide_panel()
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+func _show_shop(mode: String) -> void:
+	if shop_panel == null or player == null:
+		return
+	_shop_mode = mode
+	var rows: Array = []
+	if mode == "buy":
+		for item in merchant.stock:
+			rows.append({
+				"name": String(item.get("name", "?")),
+				"price": Economy.buy_price(item),
+				"color": ItemGen.RARITY_COLORS[int(item.get("rarity", 0))],
+			})
+		_sell_base = 0
+	else:
+		_sell_base = maxi(0, player.inventory.size() - 6)
+		for i in range(_sell_base, player.inventory.size()):
+			var item: Dictionary = player.inventory[i]
+			rows.append({
+				"name": String(item.get("name", "?")),
+				"price": Economy.sell_price(item),
+				"color": ItemGen.RARITY_COLORS[int(item.get("rarity", 0))],
+			})
+	shop_panel.setup(mode, "Azure Cloud Market — Merchant", rows, Game.spirit_stones)
+
+
+func _buy_index(index: int) -> void:
+	if index < 0 or index >= merchant.stock.size():
+		return
+	var item: Dictionary = merchant.stock[index]
+	var price := Economy.buy_price(item)
+	if not Economy.can_afford(Game.spirit_stones, price):
+		Bus.toast.emit("Not enough spirit stones: %d needed." % price)
+		return
+	Game.spirit_stones -= price
+	merchant.take(index)
+	player.pick_up(item)
+	Bus.toast.emit("Bought %s for %d spirit stones." % [String(item.get("name", "item")), price])
+	_show_shop("buy")
+
+
+func _sell_index(index: int) -> void:
+	if index < 0 or index >= player.inventory.size():
+		return
+	var item: Dictionary = player.inventory[index]
+	var price := Economy.sell_price(item)
+	player.inventory.remove_at(index)
+	# Selling worn gear must not leave the stat pipeline holding a ghost.
+	var slot := String(item.get("slot", ""))
+	var worn: Dictionary = player.equipment.get(slot, {})
+	if not worn.is_empty() and String(worn.get("id", "")) == String(item.get("id", "")):
+		player.equipment.erase(slot)
+		player.rebuild_stats()
+	Game.spirit_stones += price
+	Bus.player_stats_changed.emit()
+	Bus.toast.emit("Sold %s for %d spirit stones." % [String(item.get("name", "item")), price])
+	_show_shop("sell")
+
+
+func _rest_at_inn() -> void:
+	var cost := Economy.rest_cost()
+	if not Economy.can_afford(Game.spirit_stones, cost):
+		Bus.toast.emit("A night at the inn costs %d spirit stones. You have %d." % [cost, Game.spirit_stones])
+		return
+	Game.spirit_stones -= cost
+	player.hp = player.hp_max
+	cultivation_restore()
+	Clock.advance(8.0)
+	Bus.player_stats_changed.emit()
+	Bus.toast.emit("You sleep for eight hours and wake restored. (-%d stones)" % cost)
+
+
 func toggle_map() -> void:
 	if world_map == null or player == null or phase == "creation":
 		return
@@ -423,6 +536,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			for i in Attributes.KEYS.size():
 				if event.is_action_pressed("skill_%d" % (i + 1)):
 					allocate_attribute(Attributes.KEYS[i])
+		return
+
+	if shop_open:
+		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
+			_close_shop()
+			return
+		if event.is_action_pressed("shop_mode"):
+			_show_shop("sell" if _shop_mode == "buy" else "buy")
+			return
+		for i in 6:
+			if event.is_action_pressed("skill_%d" % (i + 1)):
+				if _shop_mode == "buy":
+					_buy_index(i)
+				else:
+					_sell_index(_sell_base + i)
+				return
 		return
 
 	if event.is_action_pressed("quick_save"):
@@ -569,6 +698,10 @@ func _use_interactable(node: Interactable) -> void:
 				Bus.toast.emit("You already know what this manual teaches.")
 		Interactable.Kind.EXAMINE:
 			Bus.toast.emit(node.examine_text)
+		Interactable.Kind.SHOP:
+			_open_shop()
+		Interactable.Kind.INN:
+			_rest_at_inn()
 
 
 ## One-shot loot shared by chests and containers. The item is generated from the
@@ -756,6 +889,7 @@ func _save(slot: int) -> void:
 		"quests": quests.to_dict(),
 		"used_interactables": used_interactables.duplicate(),
 		"chunk_deltas": world_delta.to_dict(),
+		"shop": merchant.to_dict(),
 		"realm_seed": realm_seed,
 		"realm_cleared": realm_cleared,
 		"inheritance_taken": inheritance_taken,
@@ -790,6 +924,7 @@ func _load_game(slot: int) -> void:
 	inheritance_taken = bool(data.get("inheritance_taken", false))
 	world_delta = WorldDelta.from_dict(data.get("chunk_deltas", {}))
 	chunks.delta = world_delta
+	merchant.from_dict(data.get("shop", {}))
 	for node in interactables:
 		if used_interactables.has(node.id):
 			node.used = true

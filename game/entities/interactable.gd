@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -78,6 +78,8 @@ func display_label() -> String:
 		return "%s — close" % label if open else "%s — open" % label
 	if kind == Kind.CONTAINER and used:
 		return "Searched %s" % label
+	if kind == Kind.INN:
+		return "%s — %d stones" % [label, Economy.rest_cost()]
 	return label
 
 
@@ -143,6 +145,19 @@ func _draw() -> void:
 			draw_rect(Rect2(-7, -6, 14, 10), Color("#4a4a44"))
 			draw_rect(Rect2(-4, -26, 8, 20), Color("#5c5c54"))
 			draw_circle(Vector2(0, -30), 4.0, Color("#c0b090", 0.5 + pulse * 0.4))
+		Kind.SHOP:
+			# A market stall: counter, striped awning, a lantern over the goods.
+			draw_rect(Rect2(-20, -8, 40, 12), Color("#4a3a28"))
+			draw_rect(Rect2(-22, -28, 44, 8), Color("#8a4a4a"))
+			draw_rect(Rect2(-22, -28, 14, 8), Color("#c8b090"))
+			draw_rect(Rect2(6, -28, 14, 8), Color("#c8b090"))
+			draw_circle(Vector2(0, -36), 3.0, Color("#d8c070", 0.55 + pulse * 0.35))
+		Kind.INN:
+			# A lit counter under the tavern's eaves.
+			draw_rect(Rect2(-18, -10, 36, 16), Color("#4a3a2a"))
+			draw_rect(Rect2(-22, -14, 44, 6), Color("#6a5638"))
+			draw_circle(Vector2(0, -26), 5.0, Color("#ffd9a0", 0.5 + pulse * 0.4))
+			draw_line(Vector2(0, -21), Vector2(0, -14), Color("#6a5638"), 2.0)
 
 
 func display_label_short() -> String:

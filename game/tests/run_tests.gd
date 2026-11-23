@@ -26,6 +26,7 @@ func _ready() -> void:
 	_chunk_delta_tests()
 	_continent_tests()
 	_biome_tests()
+	_economy_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -609,6 +610,70 @@ func _biome_tests() -> void:
 	var bare := ChunkGen.payload_for(Vector2i(1, 1), 4242)
 	check((bare["palette"] as Array).size() >= 1, "payloads fall back to a default palette")
 	check((bare["features"] as Array).size() == ChunkGen.FEATURES, "fallback payloads still hold every decoration")
+
+
+# --------------------------------------------------------------- economy ----
+
+func _economy_tests() -> void:
+	print("[economy] prices, merchant stock and services")
+	var cheap := {"value": 10, "rarity": 0}
+	var rich := {"value": 100, "rarity": 3}
+	check(Economy.buy_price(cheap) == 10, "buying costs an item's value")
+	check(Economy.buy_price(rich) > Economy.buy_price(cheap), "better items cost more")
+	check(Economy.sell_price(cheap) == 4, "selling pays a fraction of the value")
+	check(Economy.sell_price(cheap) < Economy.buy_price(cheap), "buying and selling cannot round-trip for profit")
+	check(Economy.sell_price({"value": 0}) >= 1, "worthless items still sell for something")
+	check(Economy.rest_cost() > 0, "resting has a price")
+	check(Economy.can_afford(10, 10) and not Economy.can_afford(9, 10), "affordability is inclusive at the price")
+	check(Economy.after_purchase(10, 10) == 0, "a purchase can spend everything")
+	check(Economy.after_purchase(5, 10) == -1, "an unaffordable purchase returns -1")
+
+	var a := Merchant.new()
+	a.id = "merchant.test"
+	a.refresh(DB, Rng, 4)
+	check(a.stock.size() == Merchant.STOCK_SIZE, "a merchant stocks %d items" % a.stock.size())
+	check(a.day == 4, "the merchant remembers its stock day")
+	var bad_prices := 0
+	for item in a.stock:
+		if Economy.buy_price(item) <= 0:
+			bad_prices += 1
+	check(bad_prices == 0, "every stock item has a price")
+
+	var ids_a: Array = []
+	for item in a.stock:
+		ids_a.append(String(item["id"]))
+	var b := Merchant.new()
+	b.id = "merchant.test"
+	b.refresh(DB, Rng, 4)
+	var ids_b: Array = []
+	for item in b.stock:
+		ids_b.append(String(item["id"]))
+	check(ids_a == ids_b, "the same merchant and day stock the same goods")
+
+	var first: Dictionary = a.stock[0]
+	var taken := a.take(0)
+	check(String(taken["id"]) == String(first["id"]), "taking an item returns it")
+	check(a.stock.size() == Merchant.STOCK_SIZE - 1, "taking an item removes it from stock")
+	check(a.sold.has(String(first["id"])), "bought goods are remembered")
+	check(a.take(99).is_empty(), "an out-of-range purchase returns nothing")
+
+	var restored := Merchant.new()
+	restored.id = "merchant.test"
+	restored.from_dict(a.to_dict())
+	restored.refresh(DB, Rng, 4)
+	var restored_ids: Array = []
+	for item in restored.stock:
+		restored_ids.append(String(item["id"]))
+	check(not restored_ids.has(String(first["id"])), "bought goods stay sold after a reload")
+	check(restored.stock.size() == Merchant.STOCK_SIZE - 1, "a reload restores the rest of the stock")
+
+	restored.refresh(DB, Rng, 5)
+	check(not restored.sold.has(String(first["id"])), "a new day clears the purchase record")
+	check(restored.stock.size() == Merchant.STOCK_SIZE, "a new day stocks a full shop")
+	restored_ids.clear()
+	for item in restored.stock:
+		restored_ids.append(String(item["id"]))
+	check(restored_ids != ids_a, "the next day's stock differs")
 
 
 # -------------------------------------------------------------------- npc ----

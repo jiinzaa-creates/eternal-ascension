@@ -28,6 +28,7 @@ an inheritance, and a crash-safe save system.
 | Select technique (slots 1–6) | 1 – 6 |
 | Quick save / quick load | F5 / F9 |
 | Zoom camera in / out | Mouse wheel, `=` / `-` |
+| Shop: buy / switch mode / close | 1–6 / TAB / E |
 | Continent map | M |
 | Toggle help | F1 |
 
@@ -97,6 +98,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Seamless streaming over a 12×12-chunk province: pure payload generation on worker threads, nodes built on the main thread, and a deterministic seed identity for every chunk.
 - Chunk deltas: harvested resources are remembered per chunk with the day they were taken, saved with the run, and restored when the chunk streams back in.
 - Background regrowth: chunk herbs return a few days after being harvested, evaluated from the clock when the chunk reloads rather than ticked per frame.
+- Settlement services and economy: a merchant with deterministic daily stock and remembered purchases, buy/sell pricing on one value curve (sell pays 40%), a code-drawn shop overlay (1–6, TAB, E), and an inn that sells eight hours of rest for spirit stones.
 - Biomes: four defined biomes in `data/biomes.json` (palette, prop weights, herb resources, enemy tables), assigned per chunk by smooth value noise seeded from the world, with the settlement's surroundings pinned to the starting biome; chunk props, herb species and the creatures that spawn nearby all come from the biome under them.
 - Continent geography: a seeded 5×4 lattice of named land regions with terrain, distance tiers from the capital, enforced connectivity, and a code-drawn map (M) that shows where the playable province sits; nothing about it is stored.
 - Weather and seasons: four 30-day seasons, six weather kinds drawn from a per-season table, deterministic weather per six-hour block of a given seed, weather-driven ambient light and storm flashes, and a cultivation rate that rain thins and storms charge.

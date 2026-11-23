@@ -132,6 +132,84 @@ func _run() -> void:
 	check(probe.ilvl >= 1 and probe.hp_max > 0.0 and probe.damage > 0.0, "a biome enemy scales its stats")
 	probe.queue_free()
 
+	# --- settlement services -------------------------------------------------
+	var stall: Interactable = null
+	var inn: Interactable = null
+	for node in main.interactables:
+		if not is_instance_valid(node) or not node is Interactable:
+			continue
+		if node.kind == Interactable.Kind.SHOP:
+			stall = node as Interactable
+		elif node.kind == Interactable.Kind.INN:
+			inn = node as Interactable
+	check(stall != null, "the market has a merchant stall")
+	check(inn != null, "the tavern has an inn counter")
+
+	Game.spirit_stones = 500
+	main._open_shop()
+	check(main.shop_open, "the shop opens")
+	check(main.shop_panel.visible, "the shop panel is shown")
+	check(not player.is_physics_processing(), "the shop freezes the player")
+	check(main.merchant.stock.size() > 0, "the merchant has stock")
+
+	var stones_before: int = Game.spirit_stones
+	var bag_before: int = player.inventory.size()
+	var price: int = Economy.buy_price(main.merchant.stock[0])
+	main._buy_index(0)
+	check(Game.spirit_stones == stones_before - price, "buying deducts the price")
+	check(player.inventory.size() == bag_before + 1, "buying adds the item")
+	var stock_after: int = main.merchant.stock.size()
+	main._buy_index(0)
+	check(main.merchant.stock.size() == stock_after - 1, "each purchase removes one item")
+
+	Game.spirit_stones = 0
+	var blocked_before: int = player.inventory.size()
+	main._buy_index(0)
+	check(player.inventory.size() == blocked_before, "an unaffordable purchase changes nothing")
+
+	main._show_shop("sell")
+	check(main.shop_panel.mode == "sell", "the shop switches to selling")
+	var sell_stones: int = Game.spirit_stones
+	var sell_index: int = player.inventory.size() - 1
+	var sell_expected := Economy.sell_price(player.inventory[sell_index])
+	main._sell_index(sell_index)
+	check(Game.spirit_stones == sell_stones + sell_expected, "selling pays the sell price")
+	check(player.inventory.size() == sell_index, "selling removes the item")
+	main._close_shop()
+	check(not main.shop_open and not main.shop_panel.visible, "the shop closes")
+	check(player.is_physics_processing(), "closing the shop restores the player")
+
+	# The inn: pay, heal, lose eight hours.
+	Game.spirit_stones = Economy.rest_cost() * 2
+	player.hp = 10.0
+	var rest_day: int = Clock.day
+	var rest_hour: float = Clock.hour
+	main._rest_at_inn()
+	check(player.hp == player.hp_max, "resting restores health")
+	check(Game.spirit_stones == Economy.rest_cost(), "resting costs spirit stones")
+	check(Clock.day > rest_day or Clock.hour > rest_hour, "resting advances the clock")
+	Clock.day = rest_day
+	Clock.hour = rest_hour
+
+	# The purchase record travels with the save.
+	Game.spirit_stones = 300
+	main._open_shop()
+	main._buy_index(0)
+	var bought_id := String(player.inventory[player.inventory.size() - 1].get("id", ""))
+	main._close_shop()
+	main._save(94)
+	main._load_game(94)
+	await frames(2)
+	main._open_shop()
+	check(main.merchant.sold.has(bought_id), "bought goods stay sold across a save")
+	var still_listed := false
+	for item in main.merchant.stock:
+		if String(item.get("id", "")) == bought_id:
+			still_listed = true
+	check(not still_listed, "a reloaded shop does not list what was bought")
+	main._close_shop()
+	Game.spirit_stones = 500
+
 	var npc: Npc = main.npcs[0]
 	check(npc.animator != null, "scheduled NPCs own an animator")
 	await frames(3)

@@ -45,6 +45,24 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Settlement services and economy
+
+- **One value curve**: `ItemGen` already stamps `value` (base × rarity × ilvl). `Economy` only derives
+  `buy_price` (that value) and `sell_price` (40%, minimum 1). Do not add a second worth scale; add
+  to item generation instead.
+- Selling is always lossy, so buy→sell can never be a profit loop. Keep `SELL_RATE < 1`.
+- `Merchant` stock is a pure function of (world seed, merchant id, day) through `ItemGen`. Only
+  **sold item ids for the current day** are saved (`shop.day` + `shop.sold`); the goods themselves
+  are regenerated. A new day clears the record and stocks a full shop.
+- Buying goes through `Player.pick_up`, so auto-equip and stat rebuild happen as with any loot.
+  Selling must erase the equipment entry when the sold item is the worn one — otherwise the stat
+  pipeline keeps a budget for an item the player no longer owns.
+- Services are ordinary `Interactable`s (`SHOP`, `INN`) so the prompt, distance rule and one-shot
+  state keep working. The shop overlay freezes the player like the map does; never open a modal
+  overlay without restoring both player loops on close.
+- Resting advances `Clock.advance(8.0)`; schedules, weather and regrowth all follow from that, so do
+  not add a separate "sleep" timer.
+
 ## Biomes
 
 - Definitions live in `data/biomes.json` and are validated by `DB.validate()`: id, name, palette,
