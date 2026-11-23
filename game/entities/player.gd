@@ -98,6 +98,8 @@ var _was_wounded := false
 var _last_karma := 0
 ## Guard meter shared with every enemy; a break staggers the body.
 var poise := Poise.new(40.0)
+## Live combat statuses (burn, bleed, chill, shock). Transient, never saved.
+var statuses: Array = []
 var _knock := Vector2.ZERO
 
 
@@ -357,6 +359,12 @@ func _attack_swing() -> float:
 
 
 func _physics_process(delta: float) -> void:
+	# A landed blow freezes the fight for a few hundredths of a second. The timer
+	# is ticked by the run in real time, so no engine clock is involved and the
+	# body simply stands still.
+	if Game.hitstop.is_frozen():
+		velocity = Vector2.ZERO
+		return
 	_tick_timers(delta)
 
 	# A broken guard overrides input: the body is carried by the blow until it
@@ -410,7 +418,9 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
-	var speed := stats.move_speed()
+	# Chill is a movement rule, not a stat: the stat pipeline is untouched and
+	# the slow ends with the status.
+	var speed := stats.move_speed() * Status.speed_multiplier(statuses)
 	_sprinting = Input.is_action_pressed("sprint") and input_dir != Vector2.ZERO \
 		and _attack_state == "idle" and not is_guarding()
 	speed = Motion.sprint_speed(speed, _sprinting)
@@ -467,6 +477,7 @@ func _tick_timers(delta: float) -> void:
 			Bus.player_stats_changed.emit()
 		else:
 			active_buffs = living
+	_tick_statuses(delta)
 	if _guard_held:
 		_guard_time += delta
 	poise.tick(delta)
@@ -714,6 +725,8 @@ func try_attack() -> void:
 	_attack_phase_total = _attack_timer
 	_facing = _aim_dir()
 	cultivation_changed()
+	Bus.technique_cast.emit(tech_id, TechniqueCombat.kind_of(tech))
+	Bus.swing_made.emit(true)
 
 
 ## The equipped weapon's own strike: free, chained and available at any realm.
@@ -740,6 +753,7 @@ func try_light_attack() -> bool:
 	_attack_timer = Combat.phase_seconds(frames, "startup", _attack_speed())
 	_attack_phase_total = _attack_timer
 	_facing = _aim_dir()
+	Bus.swing_made.emit(false)
 	return true
 
 
@@ -768,6 +782,11 @@ func _resolve_strike(attack: Dictionary) -> Dictionary:
 		"knock": Damage.knockback(attack, stats),
 		"penetration": stats.penetration_fraction(),
 		"lifesteal": float(attack.get("lifesteal", 0.0)) + stats.lifesteal(),
+		# Carried by every delivery so a projectile or a spell lands the same
+		# critical flag, status payload and weight as a melee blow.
+		"critical": is_crit,
+		"heavy": not is_light,
+		"status": attack.get("status", {}),
 	}
 
 
@@ -819,14 +838,22 @@ func _strike() -> void:
 func _resolve_melee(attack: Dictionary, strike: Dictionary) -> void:
 	var box: Dictionary = attack.get("hitbox", {})
 	var lifesteal := float(strike.get("lifesteal", 0.0))
+	var critical := bool(strike.get("critical", false))
+	var heavy := bool(strike.get("heavy", false))
+	var status_payload: Dictionary = strike.get("status", {})
 	for enemy in Combat.targets(global_position, _facing, box, get_tree().get_nodes_in_group("enemy"), RADIUS):
 		var final := Damage.resolve(float(strike["amount"]), 0.0, float(strike["power"]))
+		var dealt := 0.0
 		if enemy.has_method("take_hit"):
-			enemy.take_hit(final, _facing.normalized() * float(strike["knock"]),
-				float(strike["poise"]), float(strike["penetration"]))
-		Bus.damage_dealt.emit(final, enemy)
+			dealt = float(enemy.take_hit(final, _facing.normalized() * float(strike["knock"]),
+				float(strike["poise"]), float(strike["penetration"]), status_payload))
+		if dealt <= 0.0:
+			continue
+		Bus.damage_dealt.emit(dealt, enemy)
+		Bus.hit_landed.emit(enemy, dealt, critical, Status.id_of(status_payload))
+		Game.hitstop.punch(dealt, critical, heavy)
 		if lifesteal > 0.0:
-			heal(final * lifesteal)
+			heal(dealt * lifesteal)
 			break
 
 
@@ -875,10 +902,14 @@ func armor() -> float:
 ## `poise_damage` and `knock_force` come from the attacker's blow, so a heavy
 ## strike can stagger and throw the body while a light one cannot. `attacker` is
 ## optional and only used by a parry, which throws the blow back at its source.
+## Returns the damage actually dealt (0.0 when the blow was dodged, parried or
+## the body was invulnerable), so the attacker can show and sound a real hit
+## instead of a swing that never connected.
 func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = true,
-		poise_damage: float = 0.0, knock_force: float = 0.0, attacker: Node = null) -> void:
+		poise_damage: float = 0.0, knock_force: float = 0.0, attacker: Node = null,
+		status_payload: Dictionary = {}) -> float:
 	if _iframes > 0.0 or hp <= 0.0:
-		return
+		return 0.0
 	_combat_timer = 6.0
 	_meditating = false
 	if can_evade and stats.evasion_chance() > 0.0:
@@ -886,7 +917,7 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 		var roll := float(Rng.roll_float("evade", Game.kills * 977 + _evade_counter, cultivation.realm))
 		if stats.evades(roll):
 			Bus.toast.emit("You slip aside.")
-			return
+			return 0.0
 
 	# Guarding only meets real blows head-on: a hazard with no poise behind it, or
 	# anything arriving from behind the ward, goes through untouched.
@@ -897,10 +928,11 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 	if facing_blow and state == "parry":
 		_parry_flash = 0.25
 		Bus.toast.emit("Parried.")
+		Bus.guard_met.emit("parry")
 		if attacker != null and is_instance_valid(attacker) and attacker.has_method("stagger"):
 			attacker.stagger(Defense.reflected_poise(stats))
 		Bus.player_stats_changed.emit()
-		return
+		return 0.0
 
 	var absorbed := false
 	var guard_broke := false
@@ -910,6 +942,7 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 			absorbed = true
 			cultivation.qi = maxf(0.0, cultivation.qi - Defense.qi_cost(amount, state))
 			amount_mult = Defense.damage_multiplier("block")
+			Bus.guard_met.emit("block")
 			Bus.cultivation_changed.emit()
 		else:
 			# The ward cannot pay, so it fails. The blow lands with interest and
@@ -922,10 +955,14 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 			amount_mult = Defense.damage_multiplier("broken")
 			knock_force *= Defense.GUARD_BREAK_MULT
 			Bus.toast.emit("Your guard breaks.")
+			Bus.guard_met.emit("broken")
 			Bus.cultivation_changed.emit()
 	elif facing_blow and state == "broken":
 		amount_mult = Defense.damage_multiplier("broken")
 
+	# Shock multiplies the blow before the ward and the armour, so a shocked body
+	# takes more of everything, not just of unblockable damage.
+	amount *= Status.taken_multiplier(statuses)
 	var raw := Damage.mitigate_armor(amount * amount_mult, stats.armor())
 	var final := Damage.resolve(raw, stats.physical_resist() * 100.0, 1.0)
 	hp = maxf(0.0, hp - final)
@@ -941,9 +978,38 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 			_attack_timer = 0.0
 			_attack_phase_total = 0.0
 			_current_attack = {}
+	if not status_payload.is_empty():
+		statuses = Status.apply(statuses, status_payload)
 	Bus.player_stats_changed.emit()
 	if hp <= 0.0:
 		_die()
+	return final
+
+
+## DoT ticks are deliberately unblockable: armour, evasion and a raised guard
+## are for blows, not for fire already in the blood. Each tick reports through
+## its own signal so it shows a number without sounding like a fresh hit.
+func _tick_statuses(delta: float) -> void:
+	if statuses.is_empty():
+		return
+	var result := Status.advance(statuses, delta)
+	statuses = result["active"]
+	for hit in result["hits"]:
+		if hp <= 0.0:
+			break
+		var amount := float(hit["amount"])
+		if amount <= 0.0:
+			continue
+		hp = maxf(0.0, hp - amount)
+		Bus.status_ticked.emit(self, String(hit["id"]), amount)
+		Bus.player_stats_changed.emit()
+	if hp <= 0.0:
+		_die()
+
+
+## Labels the HUD shows for live statuses.
+func status_labels() -> Array:
+	return Status.labels(statuses)
 
 
 func heal(amount: float) -> void:
@@ -953,6 +1019,8 @@ func heal(amount: float) -> void:
 
 func _die() -> void:
 	Bus.toast.emit("Your body fails. You wake at the edge of the clearing, weaker.")
+	statuses.clear()
+	Game.hitstop.clear()
 	if not active_buffs.is_empty():
 		active_buffs.clear()
 		rebuild_stats()
@@ -1309,6 +1377,8 @@ func from_dict(data: Dictionary) -> void:
 		bars = SkillBar.reconcile(saved_bars, technique_ids)
 	active_bar = clampi(int(data.get("active_bar", 0)), 0, SkillBar.BAR_COUNT - 1)
 	tech_cooldowns.clear()
+	statuses.clear()
+	Game.hitstop.clear()
 	rebuild_stats()
 	hp = float(data.get("hp", hp_max))
 	spawn_point = global_position

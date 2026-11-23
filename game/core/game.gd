@@ -3,6 +3,9 @@ extends Node
 ## play time, discovered content. Systems that need it read it from here.
 
 var player: Node = null
+## Impact freeze shared by both sides of a fight. Ticked here in real time, so
+## a freeze pauses combat without touching the engine clock.
+var hitstop := Hitstop.new()
 
 var world_seed: int = 8814237719
 var kills: int = 0
@@ -26,6 +29,7 @@ var age_warning_stage: int = 0
 
 
 func _process(delta: float) -> void:
+	hitstop.tick(delta)
 	if running:
 		play_time += delta
 
@@ -43,6 +47,7 @@ func new_run(seed_value: int = 0) -> void:
 	born_day = Clock.day
 	dead = false
 	age_warning_stage = 0
+	hitstop.clear()
 
 
 func _fresh_seed() -> int:

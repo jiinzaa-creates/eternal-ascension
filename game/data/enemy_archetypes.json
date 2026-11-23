@@ -48,6 +48,7 @@
 			"flee_time": 2.5,
 			"patrol_radius": 110.0,
 			"delivery": "melee",
+			"status": {"id": "bleed", "duration": 3.0, "magnitude": 3.0},
 			"telegraph_color": "#e0c050"
 		},
 		{
@@ -73,6 +74,7 @@
 			"flee_time": 2.5,
 			"patrol_radius": 45.0,
 			"delivery": "melee",
+			"status": {"id": "shock", "duration": 2.5, "magnitude": 0.12},
 			"telegraph_color": "#d06060"
 		},
 		{
@@ -98,6 +100,7 @@
 			"flee_time": 2.5,
 			"patrol_radius": 70.0,
 			"delivery": "bolt",
+			"status": {"id": "chill", "duration": 2.0, "magnitude": 0.2},
 			"telegraph_color": "#7fd3e0",
 			"projectile": {"speed": 420.0, "range": 380.0, "radius": 7.0, "pierce": 0}
 		}

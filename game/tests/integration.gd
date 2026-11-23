@@ -12,6 +12,8 @@ var _fail := 0
 var _failures: Array = []
 var _toasts: Array = []
 var _tribulation_result: Dictionary = {}
+## Status ids reported by the damage-over-time path, for the polish checks.
+var _status_ticks: Array = []
 var main: Node2D
 
 
@@ -19,6 +21,7 @@ func _ready() -> void:
 	print("=== Eternal Ascension — integration test ===")
 	Bus.toast.connect(_record_toast)
 	Bus.tribulation_finished.connect(_record_tribulation)
+	Bus.status_ticked.connect(_record_status_tick)
 	await _run()
 	print("-----------------------------------------------")
 	print("RESULT: PASS %d / FAIL %d" % [_pass, _fail])
@@ -49,6 +52,10 @@ func _record_toast(text: String) -> void:
 
 func _record_tribulation(result: Dictionary) -> void:
 	_tribulation_result = result.duplicate(true)
+
+
+func _record_status_tick(_target: Node, id: String, _amount: float) -> void:
+	_status_ticks.append(id)
 
 
 func approx(a: float, b: float, eps: float = 0.001) -> bool:
@@ -2078,6 +2085,127 @@ func _run() -> void:
 	player._iframes = 0.0
 	player.global_position = main.settlement.position_for("plaza")
 	await frames(2)
+
+	# --- combat polish ---------------------------------------------------------
+	player.global_position = main.settlement.position_for("plaza") + Vector2(0, 1600)
+	player.hp = player.hp_max
+	player.poise.reset()
+	player._knock = Vector2.ZERO
+	player._iframes = 0.0
+	player.statuses.clear()
+	Game.hitstop.clear()
+	await frames(2)
+
+	check(main.damage_numbers != null and main.combat_audio != null, "the run builds its feedback nodes")
+	check(main.combat_audio.streams.size() == Sfx.kinds().size(), "every combat sound is synthesized at startup")
+	check(main.combat_audio.play("hit"), "a sound can be dispatched")
+	var m37_played: int = main.combat_audio.played
+	main.combat_audio.set_muted(true)
+	check(not main.combat_audio.play("crit"), "a muted run dispatches no sound")
+	check(main.combat_audio.played == m37_played + 1, "a muted dispatch is still counted")
+	main.combat_audio.set_muted(false)
+	check(not main.combat_audio.is_muted(), "sound can be unmuted")
+	main.combat_audio.play("nope")
+	check(main.combat_audio.played == m37_played + 1, "an unknown sound is not counted")
+
+	var m37_dummy := Dummy.new()
+	m37_dummy.ilvl = 1
+	m37_dummy.global_position = player.global_position + Vector2(36, 0)
+	main.add_child(m37_dummy)
+	m37_dummy.aggressive = false
+	m37_dummy.hp_max = 5000.0
+	m37_dummy.hp = 5000.0
+	main.damage_numbers.entries.clear()
+	Game.hitstop.clear()
+	player._facing = Vector2.RIGHT
+	player._current_attack = DB.technique("tech.sword.azure_cleave")
+	player._strike()
+	check(main.damage_numbers.entries.size() > 0, "a landed blow spawns a damage number")
+	check(Game.hitstop.is_frozen(), "a landed blow freezes the fight for a moment")
+	var m37_frozen_at := m37_dummy.global_position
+	var m37_frozen_left := Game.hitstop.remaining
+	await frames(1)
+	check(m37_dummy.global_position == m37_frozen_at, "a frozen enemy does not move")
+	check(Game.hitstop.remaining < m37_frozen_left or not Game.hitstop.is_frozen(), "the freeze clock runs in real time")
+	Game.hitstop.clear()
+
+	main.damage_numbers.entries.clear()
+	player._facing = Vector2.LEFT
+	player._strike()
+	await frames(1)
+	check(main.damage_numbers.entries.is_empty(), "a blow that hits nothing shows no number")
+	check(not Game.hitstop.is_frozen(), "a blow that hits nothing does not freeze")
+
+	m37_dummy.statuses.clear()
+	var m37_hp_before: float = m37_dummy.hp
+	var m37_applied: float = m37_dummy.take_hit(10.0, Vector2.ZERO, 0.0, 0.0,
+		{"id": "burn", "duration": 2.0, "magnitude": 4.0})
+	check(m37_applied > 0.0 and Status.has(m37_dummy.statuses, "burn"), "a blow can apply a status")
+	var m37_ticks_before := _status_ticks.size()
+	m37_dummy._tick_statuses(0.5)
+	check(m37_dummy.hp < m37_hp_before, "a burning body loses health over time")
+	check(_status_ticks.size() == m37_ticks_before + 1 and String(_status_ticks[-1]) == "burn", "a status tick reports itself")
+	check(not Status.has(m37_dummy.statuses, "chill"), "an unrelated status is not applied")
+
+	player.statuses.clear()
+	var m37_player_hp := player.hp
+	player.take_hit(5.0, player.global_position + Vector2(40, 0), false, 0.0, 0.0, null,
+		{"id": "chill", "duration": 2.0, "magnitude": 0.4})
+	check(Status.has(player.statuses, "chill"), "an enemy blow can chill the player")
+	check(approx(Status.speed_multiplier(player.statuses), 0.6), "chill slows the player")
+	check(player.hp < m37_player_hp, "the blow that carried the status still hurt")
+	player.statuses = Status.apply(player.statuses, {"id": "shock", "duration": 2.0, "magnitude": 0.2})
+	check(approx(Status.taken_multiplier(player.statuses), 1.2), "shock raises damage taken on the player")
+	player.statuses.clear()
+
+	player.statuses = Status.apply([], {"id": "burn", "duration": 2.0, "magnitude": 6.0})
+	var m37_burn_hp := player.hp
+	player._tick_statuses(0.5)
+	check(player.hp < m37_burn_hp, "a burning player loses health over time")
+	check(player.status_labels().size() == 1, "the HUD can list live statuses")
+	player.statuses.clear()
+	check(player.status_labels().is_empty(), "a clean body has no status labels")
+	player.hp = player.hp_max
+
+	player.global_position = main.settlement.position_for("plaza") + Vector2(0, 1600)
+	player.velocity = Vector2.ZERO
+	Game.hitstop.clear()
+	Input.action_press("move_right")
+	await frames(20)
+	var m37_plain_speed := player.velocity.length()
+	player.statuses = Status.apply([], {"id": "chill", "duration": 4.0, "magnitude": 0.5})
+	await frames(20)
+	var m37_chilled_speed := player.velocity.length()
+	Input.action_release("move_right")
+	check(m37_chilled_speed < m37_plain_speed * 0.75, "chill slows real movement (%.0f -> %.0f)" % [m37_plain_speed, m37_chilled_speed])
+	player.statuses.clear()
+	await frames(3)
+
+	var m37_kills_before := Game.kills
+	var m37_doomed := Dummy.new()
+	m37_doomed.ilvl = 1
+	m37_doomed.global_position = player.global_position + Vector2(600, 0)
+	main.add_child(m37_doomed)
+	m37_doomed.aggressive = false
+	m37_doomed.hp = 1.0
+	m37_doomed.statuses = Status.apply([], {"id": "bleed", "duration": 2.0, "magnitude": 20.0})
+	m37_doomed._tick_statuses(0.5)
+	await frames(2)
+	check(Game.kills == m37_kills_before + 1, "a status tick can finish an enemy")
+
+	main.damage_numbers.entries.clear()
+	main.damage_numbers.add(12.0, player.global_position)
+	check(main.damage_numbers.entries.size() == 1, "the number layer accepts an entry")
+	main.damage_numbers._process(2.0)
+	check(main.damage_numbers.entries.is_empty(), "a damage number expires")
+
+	m37_dummy.queue_free()
+	await frames(2)
+	player.hp = player.hp_max
+	player.poise.reset()
+	player._knock = Vector2.ZERO
+	player.statuses.clear()
+	Game.hitstop.clear()
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

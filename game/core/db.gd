@@ -363,6 +363,7 @@ func validate() -> Array:
 		if String(t.get("id", "")) == "":
 			problems.append("technique without id")
 		_validate_technique_kind(t, problems)
+		_validate_status_payload(t.get("status", {}), "technique %s" % String(t.get("id", "?")), problems)
 
 	if weapon_types.size() < 4:
 		problems.append("expected at least 4 weapon categories, found %d" % weapon_types.size())
@@ -463,6 +464,7 @@ func validate() -> Array:
 			problems.append("enemy archetype %s has no strike geometry" % a_id)
 		if float(behavior.get("windup", 0.0)) <= 0.0 or float(behavior.get("cooldown", 0.0)) <= 0.0:
 			problems.append("enemy archetype %s has an invalid strike clock" % a_id)
+		_validate_status_payload(a.get("status", {}), "enemy archetype %s" % a_id, problems)
 		if not EnemyAI.DELIVERIES.has(String(a.get("delivery", "melee"))):
 			problems.append("enemy archetype %s has unknown delivery '%s'" % [a_id, String(a.get("delivery", "melee"))])
 		if EnemyAI.is_ranged(behavior):
@@ -609,6 +611,29 @@ func _validate_technique_kind(technique: Dictionary, problems: Array) -> void:
 		"movement":
 			if float(data.get("distance", 0.0)) <= 0.0:
 				problems.append("movement technique %s does not move" % technique_id)
+
+
+## A status payload is optional. When present it must name a real status with a
+## positive clock and magnitude, or a technique would promise an effect the
+## fight never applies.
+func _validate_status_payload(payload: Variant, label: String, problems: Array) -> void:
+	if typeof(payload) != TYPE_DICTIONARY:
+		problems.append("%s has a malformed status" % label)
+		return
+	var data: Dictionary = payload
+	if data.is_empty():
+		return
+	var id := String(data.get("id", ""))
+	if not Status.is_valid(id):
+		problems.append("%s names unknown status '%s'" % [label, id])
+		return
+	if float(data.get("duration", 0.0)) <= 0.0:
+		problems.append("%s status %s has no duration" % [label, id])
+	if float(data.get("magnitude", 0.0)) <= 0.0:
+		problems.append("%s status %s has no magnitude" % [label, id])
+	var stacks := int(data.get("stacks", 1))
+	if stacks < 1 or stacks > Status.MAX_STACKS:
+		problems.append("%s status %s has an out-of-range stack count" % [label, id])
 
 
 func counts() -> Dictionary:

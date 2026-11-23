@@ -23,6 +23,11 @@ var color := Color("#7fd3e0")
 var faction := "player"
 ## Where it was fired from, so the player's guard can face the blow.
 var origin := Vector2.ZERO
+## The resolved strike's flags, carried so a bolt reports and sounds like the
+## blow it is: a critical shows a critical number, a status tints it.
+var critical := false
+var heavy := false
+var status: Dictionary = {}
 
 var _life := 0.0
 var _hits := 0
@@ -41,6 +46,10 @@ func setup(dir: Vector2, spec: Dictionary, strike: Dictionary, tint: Color) -> v
 	knock_force = float(strike.get("knock", 0.0))
 	penetration = float(strike.get("penetration", 0.0))
 	lifesteal = float(strike.get("lifesteal", 0.0))
+	critical = bool(strike.get("critical", false))
+	heavy = bool(strike.get("heavy", false))
+	var status_value: Variant = strike.get("status", {})
+	status = status_value if typeof(status_value) == TYPE_DICTIONARY else {}
 	max_hits = TechniqueCombat.max_hits(spec)
 	color = tint
 	z_index = 2
@@ -49,6 +58,8 @@ func setup(dir: Vector2, spec: Dictionary, strike: Dictionary, tint: Color) -> v
 
 
 func _physics_process(delta: float) -> void:
+	if Game.hitstop.is_frozen():
+		return
 	if _life <= 0.0:
 		queue_free()
 		return
@@ -81,17 +92,22 @@ func _scan() -> void:
 
 func _land(target: Node2D) -> void:
 	var final := Damage.resolve(amount, 0.0, power)
+	var dealt := 0.0
 	if target.has_method("take_hit"):
 		if faction == "enemy":
 			# The player's `take_hit` takes the blow's source, not an impulse.
-			target.take_hit(final, origin, true, poise_damage, knock_force, null)
+			dealt = float(target.take_hit(final, origin, true, poise_damage, knock_force, null, status))
 		else:
-			target.take_hit(final, direction * knock_force, poise_damage, penetration)
-	Bus.damage_dealt.emit(final, target)
+			dealt = float(target.take_hit(final, direction * knock_force, poise_damage, penetration, status))
+	if dealt <= 0.0:
+		return
+	Bus.damage_dealt.emit(dealt, target)
+	Bus.hit_landed.emit(target, dealt, critical, Status.id_of(status))
+	Game.hitstop.punch(dealt, critical, heavy)
 	if lifesteal > 0.0:
 		var player := Game.player as Player
 		if player != null and is_instance_valid(player):
-			player.heal(final * lifesteal)
+			player.heal(dealt * lifesteal)
 
 
 func _draw() -> void:

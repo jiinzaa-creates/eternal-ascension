@@ -21,6 +21,9 @@ var lifetime := 8.0
 var lifetime_max := 8.0
 var color := Color("#d0b060")
 var label := "Spirit Beast"
+var critical := false
+var heavy := false
+var status: Dictionary = {}
 
 var _cooldown := 0.0
 var _swing := 0.0
@@ -34,6 +37,10 @@ func setup(spec: Dictionary, strike: Dictionary, tint: Color, title: String) -> 
 	poise_damage = float(strike.get("poise", 0.0)) * mult
 	knock_force = float(strike.get("knock", 0.0))
 	penetration = float(strike.get("penetration", 0.0))
+	critical = bool(strike.get("critical", false))
+	heavy = bool(strike.get("heavy", false))
+	var status_value: Variant = strike.get("status", {})
+	status = status_value if typeof(status_value) == TYPE_DICTIONARY else {}
 	speed = maxf(0.0, float(spec.get("speed", 140.0)))
 	reach = maxf(1.0, float(spec.get("reach", 34.0)))
 	interval = maxf(0.05, float(spec.get("interval", 1.0)))
@@ -47,6 +54,8 @@ func setup(spec: Dictionary, strike: Dictionary, tint: Color, title: String) -> 
 
 
 func _physics_process(delta: float) -> void:
+	if Game.hitstop.is_frozen():
+		return
 	if lifetime <= 0.0:
 		queue_free()
 		return
@@ -86,9 +95,14 @@ func _strike(dir: Vector2) -> void:
 		return
 	var final := Damage.resolve(amount, 0.0, power)
 	var push: Vector2 = dir.normalized() * knock_force if dir.length_squared() > 0.0001 else Vector2.ZERO
+	var dealt := 0.0
 	if _target.has_method("take_hit"):
-		_target.take_hit(final, push, poise_damage, penetration)
-	Bus.damage_dealt.emit(final, _target)
+		dealt = float(_target.take_hit(final, push, poise_damage, penetration, status))
+	if dealt <= 0.0:
+		return
+	Bus.damage_dealt.emit(dealt, _target)
+	Bus.hit_landed.emit(_target, dealt, critical, Status.id_of(status))
+	Game.hitstop.punch(dealt, critical, heavy)
 
 
 func _draw() -> void:

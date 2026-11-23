@@ -32,6 +32,7 @@ const KEY_BINDINGS := {
 	"quick_save": [KEY_F5],
 	"quick_load": [KEY_F9],
 	"toggle_help": [KEY_F1],
+	"mute_audio": [KEY_F2],
 	"map": [KEY_M],
 	"shop_mode": [KEY_TAB],
 	"open_travel": [KEY_T],

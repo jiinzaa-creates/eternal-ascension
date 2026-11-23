@@ -81,6 +81,7 @@ func _draw() -> void:
 		return
 
 	draw_vitals(player)
+	draw_statuses(player)
 	draw_world_panel(player)
 	draw_waypoint(player)
 	draw_techniques(player)
@@ -189,6 +190,29 @@ func draw_vitals(player: Player) -> void:
 		_text(Vector2(x, y), "Tribulation %d%%   Prep %d/%d   %s" % [
 			roundi(chance * 100.0), player.cultivation.preparation, Cultivation.MAX_PREPARATION, note
 		], 11, Color("#e0c880"))
+
+
+## Live combat statuses, in their own colours, just above the skill bar. Kept out
+## of the vitals panel so a status can never push the stat lines off it.
+func draw_statuses(player: Player) -> void:
+	var labels := Status.labels(player.statuses)
+	if labels.is_empty():
+		return
+	var x := 24.0
+	var y := size.y - 132.0
+	_text(Vector2(x, y), "Status:", 11, MUTED)
+	var cursor := x + _text_width("Status: ", 11)
+	var index := 0
+	for entry in player.statuses:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var status_id := String((entry as Dictionary).get("id", ""))
+		if not Status.is_valid(status_id):
+			continue
+		var label := String(labels[index]) if index < labels.size() else Status.name_of(status_id)
+		_text(Vector2(cursor, y), label, 11, Status.color(status_id))
+		cursor += _text_width(label, 11) + 14.0
+		index += 1
 
 
 func draw_world_panel(player: Player) -> void:
@@ -382,7 +406,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · M map · F5 save · F9 load · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

@@ -51,6 +51,9 @@ var flee_left := 0.0
 ## A body only runs once; after that it fights to the end.
 var flee_used := false
 var retreat_left := 0.0
+## Live combat statuses (burn, bleed, chill, shock). Transient by nature: a
+## spawned body starts clean and nothing about them is saved.
+var statuses: Array = []
 
 var animator := Animator.new()
 
@@ -125,7 +128,15 @@ func set_archetype(id: String) -> void:
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
+	# A landed blow freezes both sides of a fight while the freeze timer, which
+	# ticks in real time, counts down.
+	if Game.hitstop.is_frozen():
+		velocity = Vector2.ZERO
+		return
 	_flash = maxf(0.0, _flash - delta)
+	_tick_statuses(delta)
+	if _dead:
+		return
 	_alert = maxf(0.0, _alert - delta)
 	poise.tick(delta)
 	_cooldown = maxf(0.0, _cooldown - delta)
@@ -255,7 +266,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			_facing = intent.normalized()
 
-	var steer := intent.normalized() * speed if intent.length_squared() > 0.0001 else Vector2.ZERO
+	var move_speed := speed * Status.speed_multiplier(statuses)
+	var steer := intent.normalized() * move_speed if intent.length_squared() > 0.0001 else Vector2.ZERO
 	steer += EnemyAI.separation(global_position, _ally_positions(), EnemyAI.SEPARATION_RADIUS) * speed * 0.8
 	velocity = steer + _knock
 	if state == "circle" and is_on_wall() and _circle_time > 0.3:
@@ -321,14 +333,21 @@ func _ally_positions() -> Array:
 func _release_attack(target: Node2D) -> void:
 	_cooldown = EnemyAI.cooldown_time(profile)
 	_strikes += 1
+	var status_payload: Dictionary = profile.get("status", {})
 	if target != null:
 		if EnemyAI.is_ranged(profile):
 			_fire_bolt(target)
 		else:
 			var box := EnemyAI.strike_hitbox(profile)
 			if Combat.in_hitbox(global_position, _facing, box, target.global_position, 18.0):
+				var dealt := 0.0
 				if target.has_method("take_hit"):
-					target.take_hit(damage, global_position, true, strike_poise, knockback, self)
+					dealt = float(target.take_hit(damage, global_position, true, strike_poise,
+						knockback, self, status_payload))
+				if dealt > 0.0:
+					Bus.damage_dealt.emit(dealt, target)
+					Bus.hit_landed.emit(target, dealt, false, Status.id_of(status_payload))
+					Game.hitstop.punch(dealt, false, damage >= 10.0)
 	var after := int(profile.get("retreat_after", 0))
 	if after > 0 and _strikes >= after:
 		retreat_left = float(profile.get("retreat_time", 0.0))
@@ -344,7 +363,10 @@ func _fire_bolt(target: Node2D) -> void:
 	var dir := global_position.direction_to(target.global_position)
 	if dir.length_squared() < 0.0001:
 		dir = _facing
-	var strike := {"amount": damage, "power": 1.0, "poise": strike_poise, "knock": knockback}
+	var strike := {
+		"amount": damage, "power": 1.0, "poise": strike_poise, "knock": knockback,
+		"critical": false, "heavy": damage >= 10.0, "status": profile.get("status", {}),
+	}
 	var bolt := Projectile.new()
 	bolt.faction = "enemy"
 	bolt.origin = global_position
@@ -369,11 +391,15 @@ func stagger(poise_damage: float) -> void:
 
 
 ## `penetration` is the attacker's fraction of ignored armour (0..0.6).
-func take_hit(amount: float, knock: Vector2, poise_damage: float, penetration: float = 0.0) -> void:
+## Returns the damage actually dealt (0.0 for a body that is already dead), so
+## an attacker can show and sound a hit only when one landed.
+func take_hit(amount: float, knock: Vector2, poise_damage: float, penetration: float = 0.0,
+		status_payload: Dictionary = {}) -> float:
 	if _dead:
-		return
+		return 0.0
 	var effective_armor := armor_value * (1.0 - clampf(penetration, 0.0, 0.9))
-	hp -= Damage.mitigate_armor(amount, effective_armor)
+	var final := Damage.mitigate_armor(amount * Status.taken_multiplier(statuses), effective_armor)
+	hp -= final
 	_knock += knock * 0.12
 	_flash = 0.14
 	# Being hit is its own alarm: a shot from behind turns the body around.
@@ -384,9 +410,31 @@ func take_hit(amount: float, knock: Vector2, poise_damage: float, penetration: f
 		_knock += knock * 0.2
 		_windup = 0.0
 		state = "recover"
+	if not status_payload.is_empty():
+		statuses = Status.apply(statuses, status_payload)
 	if hp <= 0.0:
 		_die()
 	queue_redraw()
+	return final
+
+
+## Status ticks on an enemy are the player's doing, so a kill earned by burn or
+## bleeding still registers through the ordinary death path.
+func _tick_statuses(delta: float) -> void:
+	if statuses.is_empty():
+		return
+	var result := Status.advance(statuses, delta)
+	statuses = result["active"]
+	for hit in result["hits"]:
+		if _dead or hp <= 0.0:
+			break
+		var amount := float(hit["amount"])
+		if amount <= 0.0:
+			continue
+		hp = maxf(0.0, hp - amount)
+		Bus.status_ticked.emit(self, String(hit["id"]), amount)
+		if hp <= 0.0:
+			_die()
 
 
 func _die() -> void:
@@ -394,6 +442,7 @@ func _die() -> void:
 		return
 	_dead = true
 	state = "dead"
+	statuses.clear()
 	Game.register_kill()
 	Bus.enemy_died.emit(global_position, ilvl)
 	queue_free()
@@ -436,3 +485,13 @@ func _draw() -> void:
 	var ratio := clampf(hp / hp_max, 0.0, 1.0)
 	draw_rect(Rect2(-18, -RADIUS - 12, 36, 4), Color("#241a1a"))
 	draw_rect(Rect2(-18, -RADIUS - 12, 36 * ratio, 4), Color("#d05050"))
+	# Live statuses read at a glance as coloured marks above the bar.
+	var dot_x := -18.0
+	for entry in statuses:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var status_id := String((entry as Dictionary).get("id", ""))
+		if not Status.is_valid(status_id):
+			continue
+		draw_circle(Vector2(dot_x + 3.0, -RADIUS - 18), 2.5, Status.color(status_id))
+		dot_x += 9.0

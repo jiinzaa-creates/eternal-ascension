@@ -15,6 +15,10 @@ var phase := "creation"  # creation | play | realm
 var creation_stage := 0
 var player: Player
 var hud: Hud
+## Floating damage numbers live in the world layer so they sit over bodies.
+var damage_numbers: DamageNumbers
+## Combat sound. Streams are synthesized; the pool is played from bus signals.
+var combat_audio: CombatAudio
 var chunks: ChunkManager
 var settlement: Settlement
 var npcs: Array = []
@@ -90,6 +94,7 @@ func _ready() -> void:
 	_build_world()
 	_spawn_player()
 	_build_hud()
+	_build_feedback()
 	Bus.enemy_died.connect(_on_enemy_died)
 	Bus.tribulation_finished.connect(_on_tribulation_finished)
 	Weather.changed.connect(_on_weather_changed)
@@ -172,6 +177,17 @@ func _build_hud() -> void:
 	layer.add_child(travel_panel)
 	skill_bar_panel = SkillBarPanel.new()
 	layer.add_child(skill_bar_panel)
+
+
+## Combat feedback nodes. Both listen on the bus, so no combat code knows they
+## exist and either can be removed without changing a rule.
+func _build_feedback() -> void:
+	damage_numbers = DamageNumbers.new()
+	damage_numbers.name = "DamageNumbers"
+	world.add_child(damage_numbers)
+	combat_audio = CombatAudio.new()
+	combat_audio.name = "CombatAudio"
+	add_child(combat_audio)
 
 
 func _spawn_npcs() -> void:
@@ -909,6 +925,10 @@ func toggle_map() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Muting is a reading preference, not a game action: it works on every screen.
+	if event.is_action_pressed("mute_audio"):
+		_toggle_audio()
+		return
 	if String(phase) == "ended":
 		if event.is_action_pressed("accept"):
 			get_tree().reload_current_scene()
@@ -1678,7 +1698,17 @@ func _save(slot: int) -> void:
 		Bus.toast.emit("Save failed.")
 
 
+## F2 toggles combat sound. Decided here rather than in a settings file because
+## the run rebuilds every node and the choice is per sitting.
+func _toggle_audio() -> void:
+	if combat_audio == null:
+		return
+	combat_audio.set_muted(not combat_audio.is_muted())
+	Bus.toast.emit("Combat sound %s." % ("off" if combat_audio.is_muted() else "on"))
+
+
 func _load_game(slot: int) -> void:
+	Game.hitstop.clear()
 	var data: Dictionary = Save.load_game(slot)
 	if data.is_empty():
 		Bus.toast.emit("No usable save in slot %d." % slot)

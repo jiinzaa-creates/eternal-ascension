@@ -684,6 +684,48 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Any new archetype rule belongs in `EnemyAI` with checks in `run_tests`, plus a scene-level check in
   `integration.gd` before it is called working.
 
+## Combat polish
+
+- **Hitstop** (`Hitstop`) is a real-time timer, not `Engine.time_scale` and not
+  `get_tree().paused`: a global clock change would stall the HUD and make a headless suite wait on
+  frames that never tick. `Game.hitstop` is ticked in `Game._process`; `Player`, `Dummy`,
+  `Projectile`, `SpellZone` and `Summon` return early while it is frozen. Attack timers, cooldowns,
+  statuses and the AI pause with the bodies, which is what a freeze frame is. `duration_for()` is pure
+  (damage plus critical/heavy bonuses, clamped to `[MIN, MAX]`), `request()` keeps the longest freeze
+  and never shortens a running one, and `clear()` runs on death and on load. A hitstop must not freeze
+  input for long; the cap is `0.12 s`.
+- **Damage numbers** are split into pure rules (`CombatText`) and a world-space node (`DamageNumbers`).
+  `CombatText` formats (rounding, `12k` above ten thousand, nothing below half a point), picks the tint
+  (`""` ink, `crit` gold, or a status colour), and owns the rise/fade (`offset`, `alpha`). The node
+  listens to `Bus.hit_landed` and `Bus.status_ticked`, stores entries with a world position and draws
+  with `ThemeDB.fallback_font`; the entry cap is 48.
+- **Statuses** (`Status`) are pure: `apply()` returns a new array, refreshes a status' clock and
+  magnitude, adds one stack (cap 3) and never mutates its input; `advance()` returns the survivors plus
+  one hit per due damage tick. Burn and bleed tick unblockable damage every `TICK` (0.5 s); chill
+  reduces movement (`speed_multiplier`), shock raises damage taken (`taken_multiplier`), both capped.
+  DoT bypasses armour, evasion and guard by design: those are for blows. Entries are transient and
+  never saved; death, load and a dead body clear them.
+- Status payloads are data: `"status": {"id", "duration", "magnitude", "stacks"}` on a technique or an
+  enemy archetype. `DB.validate` (`_validate_status_payload`) rejects an unknown id, a zero clock or
+  magnitude and an out-of-range stack count. `Player._tick_statuses` and `Dummy._tick_statuses` are the
+  only tick sites; they report through `Bus.status_ticked`, which is why a burn shows numbers without
+  sounding like a fresh hit.
+- One damage path still holds: `Player.take_hit()` and `Dummy.take_hit()` now **return the damage
+  actually dealt** (`0.0` on a dodge, parry, i-frame or dead body) and take an optional final status
+  payload. Every attacker emits `Bus.hit_landed(target, dealt, critical, tint)` only when that return
+  is above zero, so a parried or evaded blow produces neither a number nor a sound. Do not emit from
+  inside `take_hit`: the attacker is the only side that knows whether the blow was an art and how heavy
+  it was.
+- **Audio** (`Sfx` + `CombatAudio`) ships no assets. `Sfx.build(kind)` synthesizes a 22 050 Hz 16-bit
+  mono `AudioStreamWAV` from a deterministic noise generator and one or two sine partials; the same kind
+  always yields identical bytes. `CombatAudio` prebuilds every kind at startup, keeps an eight-voice
+  pool and listens to `Bus.hit_landed`, `enemy_died`, `swing_made`, `technique_cast` and `guard_met`.
+  `play()` returns false when muted or unknown and still counts a muted dispatch; `F2` (`mute_audio`)
+  toggles mute. A headless run has no output device, so tests can only assert stream shape, determinism
+  and dispatch — never that a sound was heard.
+- Any new combat feel belongs in these pure layers with unit checks, plus one scene-level check that the
+  node exists and a real blow produces the effect.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.
@@ -726,10 +768,11 @@ game/
   data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs,
               biomes, enemy_archetypes)
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, animator,
-              camera_rig, lighting, display_policy, technique_combat, enemy_ai
+              camera_rig, lighting, display_policy, technique_combat, enemy_ai, hitstop, status, sfx
   entities/   player, dummy, npc, interactable, projectile, spell_zone, summon
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
-  ui/         hud
+  ui/         hud, world_map, shop_panel, travel_panel, skill_bar_panel, damage_numbers,
+              combat_text, combat_audio
   scenes/     main
   tests/      run_tests (unit + content), integration (real scene)
 ```

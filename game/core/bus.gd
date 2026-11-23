@@ -17,6 +17,16 @@ signal enlightenment_gained(id: String)
 
 signal enemy_died(at: Vector2, ilvl: int)
 signal damage_dealt(total: float, target: Node)
+## A blow that actually connected. `tint` is the status it applied, "" if none.
+## Every damage path reports this, so numbers and sound need no combat code.
+signal hit_landed(target: Node, amount: float, critical: bool, tint: String)
+## One damage-over-time tick. Numbers only: a burning body is not hit again.
+signal status_ticked(target: Node, id: String, amount: float)
+## A body committed to a swing. `heavy` distinguishes an art from a weapon.
+signal swing_made(heavy: bool)
+signal technique_cast(id: String, kind: String)
+## The player's ward met a blow: "parry", "block" or "broken".
+signal guard_met(kind: String)
 signal item_dropped(item: Dictionary, at: Vector2)
 signal item_picked(item: Dictionary)
 

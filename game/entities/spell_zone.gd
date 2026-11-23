@@ -14,6 +14,9 @@ var poise_damage := 0.0
 var knock_force := 0.0
 var penetration := 0.0
 var lifesteal := 0.0
+var critical := false
+var heavy := false
+var status: Dictionary = {}
 var color := Color("#c0a0ff")
 
 var _delay := 0.35
@@ -32,6 +35,10 @@ func setup(spec: Dictionary, strike: Dictionary, tint: Color) -> void:
 	knock_force = float(strike.get("knock", 0.0))
 	penetration = float(strike.get("penetration", 0.0))
 	lifesteal = float(strike.get("lifesteal", 0.0))
+	critical = bool(strike.get("critical", false))
+	heavy = bool(strike.get("heavy", false))
+	var status_value: Variant = strike.get("status", {})
+	status = status_value if typeof(status_value) == TYPE_DICTIONARY else {}
 	color = tint
 	z_index = 1
 	add_to_group("spell_zone")
@@ -39,6 +46,8 @@ func setup(spec: Dictionary, strike: Dictionary, tint: Color) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if Game.hitstop.is_frozen():
+		return
 	if not _armed:
 		_burst -= delta
 		if _burst <= 0.0:
@@ -63,15 +72,20 @@ func _explode() -> void:
 		if not Combat.in_hitbox(global_position, Vector2.RIGHT, area, enemy.global_position, 14.0):
 			continue
 		var final := Damage.resolve(amount, 0.0, power)
+		var dealt := 0.0
 		if enemy.has_method("take_hit"):
 			var push := global_position.direction_to(enemy.global_position) * knock_force
-			enemy.take_hit(final, push, poise_damage, penetration)
-		Bus.damage_dealt.emit(final, enemy)
+			dealt = float(enemy.take_hit(final, push, poise_damage, penetration, status))
+		if dealt <= 0.0:
+			continue
+		Bus.damage_dealt.emit(dealt, enemy)
+		Bus.hit_landed.emit(enemy, dealt, critical, Status.id_of(status))
+		Game.hitstop.punch(dealt, critical, heavy)
 		if lifesteal > 0.0 and not leeched:
 			leeched = true
 			var player := Game.player as Player
 			if player != null and is_instance_valid(player):
-				player.heal(final * lifesteal)
+				player.heal(dealt * lifesteal)
 
 
 func _draw() -> void:
