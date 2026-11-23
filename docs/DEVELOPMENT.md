@@ -723,9 +723,10 @@ working system. Reports must list unverified items as unverified.
 ```
 game/
   core/       bus, rng, db, clock, log, settings, save, game (autoloads)
-  data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs)
+  data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs,
+              biomes, enemy_archetypes)
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, animator,
-              camera_rig, lighting, display_policy, technique_combat
+              camera_rig, lighting, display_policy, technique_combat, enemy_ai
   entities/   player, dummy, npc, interactable, projectile, spell_zone, summon
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud
