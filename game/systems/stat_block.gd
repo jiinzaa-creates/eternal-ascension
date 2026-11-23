@@ -1,0 +1,238 @@
+class_name StatBlock
+extends RefCounted
+## The single stat pipeline.
+##
+## Order, fixed and non-negotiable:
+##   base attributes -> flat attribute bonuses (affixes/passives)
+##   -> percentage modifiers (affixes/passives)
+##   -> equipment base values (weapon damage, armour)
+##   -> realm multiplier
+##
+## Nothing else in the game computes a derived stat. That is what lets hundreds
+## of affixes, passives and 12 realms coexist without multiplying into nonsense.
+
+const PERCENT_STATS: Array[String] = [
+	"physical_damage_pct", "attack_speed_pct", "crit_chance", "qi_max_pct",
+	"physical_resist", "move_speed_pct", "cult_speed_pct", "qi_regen_pct",
+	"lightning_damage_pct",
+]
+const FLAT_STATS: Array[String] = [
+	"qi_regen_flat", "qi_max_flat", "armor", "weapon_damage", "lifesteal",
+]
+
+var base: Attributes
+var realm: int = 1
+var realm_mult: float = 1.0
+
+var flat_attrs: Dictionary = {}
+var add_pct: Dictionary = {}
+var flat_stats: Dictionary = {}
+var passives: Array = []
+var sources: Array = []
+
+
+func _init(base_attributes: Attributes = null) -> void:
+	base = base_attributes if base_attributes != null else Attributes.new()
+	reset()
+
+
+func reset() -> void:
+	flat_attrs.clear()
+	for key in Attributes.KEYS:
+		flat_attrs[key] = 0
+	add_pct.clear()
+	flat_stats.clear()
+	passives.clear()
+	sources.clear()
+
+
+## Rebuilds every modifier from equipment and passives. Called whenever the
+## player equips something, gains a passive, or advances a realm.
+func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float) -> void:
+	reset()
+	realm = realm_number
+	realm_mult = realm_attribute_mult
+
+	for slot in equipment.keys():
+		var item: Dictionary = equipment[slot]
+		if item.is_empty():
+			continue
+		flat_stats["weapon_damage"] = flat("weapon_damage") + float(item.get("base_damage", 0.0))
+		flat_stats["armor"] = flat("armor") + float(item.get("armor", 0.0))
+		apply_mods(item.get("mods", []), String(item.get("name", "item")))
+
+	for id in passive_ids:
+		var passive: Dictionary = DB.by_id("passive", String(id))
+		if passive.is_empty():
+			continue
+		passives.append(String(id))
+		apply_mods(passive.get("mods", []), String(passive.get("name", "passive")))
+
+
+func apply_mods(mods: Array, source_name: String = "") -> void:
+	if mods.is_empty():
+		return
+	if source_name != "":
+		sources.append(source_name)
+	for mod in mods:
+		var stat := String(mod.get("stat", ""))
+		var value := float(mod.get("value", 0.0))
+		if value == 0.0 or stat == "":
+			continue
+		if Attributes.KEYS.has(stat):
+			flat_attrs[stat] = int(flat_attrs.get(stat, 0)) + int(value)
+		elif PERCENT_STATS.has(stat):
+			add_pct[stat] = float(add_pct.get(stat, 0.0)) + value
+		elif FLAT_STATS.has(stat):
+			flat_stats[stat] = float(flat_stats.get(stat, 0.0)) + value
+		else:
+			push_warning("[StatBlock] unknown modifier stat '%s' from %s" % [stat, source_name])
+
+
+func get_attr(key: String) -> int:
+	return base.get_attr(key) + int(flat_attrs.get(key, 0))
+
+
+func attr_bonus(key: String) -> int:
+	return int(flat_attrs.get(key, 0))
+
+
+func pct(key: String) -> float:
+	return float(add_pct.get(key, 0.0))
+
+
+func flat(key: String) -> float:
+	return float(flat_stats.get(key, 0.0))
+
+
+# --- combat -----------------------------------------------------------------
+
+func physical_mult() -> float:
+	return (1.0 + Attributes.soft(float(get_attr("str")), 22.0) / 22.0) \
+		* (1.0 + pct("physical_damage_pct") / 100.0) * realm_mult
+
+
+func weapon_damage() -> float:
+	return flat("weapon_damage")
+
+
+func armor() -> float:
+	return flat("armor")
+
+
+func accuracy() -> float:
+	return 0.78 + 0.22 * (1.0 - exp(-float(get_attr("dex")) / 45.0))
+
+
+func crit_chance() -> float:
+	var curve := 1.0 - exp(-(float(get_attr("dex")) * 0.45) / 130.0)
+	return clampf(curve + pct("crit_chance") / 100.0, 0.0, 0.95)
+
+
+func physical_resist() -> float:
+	return Attributes.soft(float(get_attr("str")), 40.0) / 40.0 * 0.35 + pct("physical_resist") / 100.0
+
+
+func carry_slots() -> int:
+	return 8 + int(Attributes.soft(float(get_attr("str")), 15.0) / 3.0)
+
+
+func lifesteal() -> float:
+	return clampf(flat("lifesteal"), 0.0, 0.5)
+
+
+# --- mobility ---------------------------------------------------------------
+
+func move_speed() -> float:
+	return 96.0 * (1.0 + Attributes.soft(float(get_attr("agi")), 15.0) / 55.0) \
+		* (1.0 + pct("move_speed_pct") / 100.0)
+
+
+func attack_speed() -> float:
+	return (1.0 + Attributes.soft(float(get_attr("agi")), 18.0) / 45.0) \
+		* (1.0 + pct("attack_speed_pct") / 100.0)
+
+
+func dodge_bonus_frames() -> int:
+	return int(Attributes.soft(float(get_attr("agi")), 20.0) / 8.0)
+
+
+func recovery_reduction() -> float:
+	return minf(0.35, Attributes.soft(float(get_attr("agi")), 30.0) / 30.0 * 0.4)
+
+
+# --- cultivation ------------------------------------------------------------
+
+func max_qi_mult() -> float:
+	return (1.0 + Attributes.soft(float(get_attr("wis")), 30.0) / 48.0) \
+		* (1.0 + pct("qi_max_pct") / 100.0)
+
+
+func qi_max_flat() -> float:
+	return flat("qi_max_flat")
+
+
+func qi_regen_mult() -> float:
+	return 1.0 + Attributes.soft(float(get_attr("wis")), 25.0) / 60.0 + pct("qi_regen_pct") / 100.0
+
+
+func qi_regen_flat() -> float:
+	return flat("qi_regen_flat")
+
+
+func cultivation_rate_mult() -> float:
+	return (1.0 + Attributes.soft(float(get_attr("wis")), 40.0) / 70.0) \
+		* (1.0 + pct("cult_speed_pct") / 100.0)
+
+
+func comprehension_mult() -> float:
+	return 1.0 + Attributes.soft(float(get_attr("int")), 25.0) / 25.0
+
+
+func crafting_quality_mult() -> float:
+	return 1.0 + Attributes.soft(float(get_attr("int")), 30.0) / 30.0
+
+
+func mental_resist() -> float:
+	return Attributes.soft(float(get_attr("wis")), 35.0) / 35.0 * 0.5
+
+
+# --- social -----------------------------------------------------------------
+
+func social_score(reputation_tier: int = 0, sect_rank: int = 0) -> float:
+	return Attributes.soft(float(get_attr("char")), 25.0) + float(reputation_tier) * 4.0 + float(sect_rank) * 2.0
+
+
+func party_slots() -> int:
+	return 3 + int(Attributes.soft(float(get_attr("char")), 40.0) / 18.0)
+
+
+func derived() -> Dictionary:
+	return {
+		"move_speed": move_speed(),
+		"attack_speed": attack_speed(),
+		"physical_mult": physical_mult(),
+		"accuracy": accuracy(),
+		"crit_chance": crit_chance(),
+		"physical_resist": physical_resist(),
+		"armor": armor(),
+		"weapon_damage": weapon_damage(),
+		"max_qi_mult": max_qi_mult(),
+		"qi_regen_mult": qi_regen_mult(),
+		"cultivation_rate_mult": cultivation_rate_mult(),
+		"comprehension_mult": comprehension_mult(),
+		"mental_resist": mental_resist(),
+		"party_slots": party_slots(),
+		"carry_slots": carry_slots(),
+	}
+
+
+func summary() -> String:
+	var parts: Array[String] = []
+	for key in Attributes.KEYS:
+		var bonus := attr_bonus(key)
+		if bonus == 0:
+			parts.append("%s %d" % [Attributes.LABELS[key], get_attr(key)])
+		else:
+			parts.append("%s %d (%+d)" % [Attributes.LABELS[key], get_attr(key), bonus])
+	return "  ".join(parts)

@@ -1,0 +1,11 @@
+{
+  "methods": [
+    {"id": "method.traditional", "name": "Traditional Qi Refinement", "cult_mult": 1.0, "mechanic": "qi_accumulation", "requirement": "none", "risk": "slow, bottleneck-prone", "desc": "Meditate, accumulate Qi, force bottlenecks. The baseline every other path is measured against."},
+    {"id": "method.body", "name": "Body Tempering Art", "cult_mult": 0.75, "mechanic": "physical_conditioning", "requirement": "STR 18", "risk": "permanent injury on overreach", "desc": "Cultivation comes from surviving conditioning, not sitting. Gains scale with STR and pain."},
+    {"id": "method.sword", "name": "Sword Heart Method", "cult_mult": 0.9, "mechanic": "sword_intent", "requirement": "DEX 16, WIS 14", "risk": "stagnates without real combat", "desc": "Sword intent accrued through duels and practice. Meditation alone does almost nothing."},
+    {"id": "method.blood", "name": "Blood Sea Scripture", "cult_mult": 1.4, "mechanic": "blood_essence", "requirement": "Physique or corrupted meridian", "risk": "corruption is permanent", "desc": "Absorb compatible blood essence from supernatural creatures. Fast, and it changes you."},
+    {"id": "method.slaughter", "name": "Slaughter Dao", "cult_mult": 1.25, "mechanic": "kills", "requirement": "kill count 50", "risk": "karmic backlash, heart demons", "desc": "Every kill feeds the dao. Tribulations grow heavier with every corpse behind you."},
+    {"id": "method.dual", "name": "Dual Cultivation", "cult_mult": 1.15, "mechanic": "partner", "requirement": "compatible partner, CHAR 20", "risk": "dependency, trust", "desc": "Progress through mutual circulation with a compatible partner. Relationships are the resource."},
+    {"id": "method.heavenly", "name": "Heavenly Star Absorption", "cult_mult": 1.6, "mechanic": "celestial", "requirement": "Night sky, rare materials", "risk": "celestial tribulations", "desc": "Draw on stellar alignments and rare celestial materials during specific windows."}
+  ]
+}

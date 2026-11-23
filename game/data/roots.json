@@ -1,0 +1,17 @@
+{
+  "affinities": ["fire", "water", "wood", "metal", "earth", "wind", "lightning", "ice", "yin", "yang", "space", "time", "chaos"],
+  "roots": [
+    {"id": "root.mortal", "tier": 1, "name": "Mortal Root", "cult_mult": 0.60, "purity": 0.35, "slots": 1, "weight": 3000, "affinities": ["fire"]},
+    {"id": "root.low_grade", "tier": 2, "name": "Low-Grade Root", "cult_mult": 0.80, "purity": 0.45, "slots": 1, "weight": 2200, "affinities": ["water"]},
+    {"id": "root.ordinary", "tier": 3, "name": "Ordinary Root", "cult_mult": 1.00, "purity": 0.55, "slots": 2, "weight": 1800, "affinities": ["metal", "wood"]},
+    {"id": "root.superior", "tier": 4, "name": "Superior Root", "cult_mult": 1.30, "purity": 0.65, "slots": 2, "weight": 1200, "affinities": ["wind", "water"]},
+    {"id": "root.profound", "tier": 5, "name": "Profound Root", "cult_mult": 1.70, "purity": 0.72, "slots": 3, "weight": 800, "affinities": ["lightning", "metal"]},
+    {"id": "root.earth", "tier": 6, "name": "Earth Root", "cult_mult": 2.20, "purity": 0.79, "slots": 3, "weight": 500, "affinities": ["earth", "wood", "water"]},
+    {"id": "root.heaven", "tier": 7, "name": "Heaven Root", "cult_mult": 2.90, "purity": 0.85, "slots": 4, "weight": 300, "affinities": ["lightning", "wind", "fire"]},
+    {"id": "root.spiritual", "tier": 8, "name": "Spiritual Root", "cult_mult": 3.80, "purity": 0.89, "slots": 4, "weight": 140, "affinities": ["ice", "water", "yin"]},
+    {"id": "root.divine", "tier": 9, "name": "Divine Root", "cult_mult": 5.00, "purity": 0.93, "slots": 5, "weight": 40, "affinities": ["yang", "fire", "lightning"]},
+    {"id": "root.saint", "tier": 10, "name": "Saint Root", "cult_mult": 6.60, "purity": 0.96, "slots": 5, "weight": 12, "affinities": ["space", "time", "metal"]},
+    {"id": "root.immortal", "tier": 11, "name": "Immortal Root", "cult_mult": 8.60, "purity": 0.98, "slots": 6, "weight": 5, "affinities": ["space", "time", "yang", "yin"]},
+    {"id": "root.primordial", "tier": 12, "name": "Primordial Root", "cult_mult": 11.00, "purity": 1.00, "slots": 7, "weight": 1, "affinities": ["chaos", "space", "time", "yin", "yang"]}
+  ]
+}

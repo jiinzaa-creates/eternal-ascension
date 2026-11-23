@@ -1,0 +1,22 @@
+{
+  "quests": [
+    {
+      "id": "quest.azure_cloud.initiation",
+      "title": "The Azure Cloud Invitation",
+      "sect": "sect.azure_cloud",
+      "giver": "elder_bai",
+      "steps": [
+        {"kind": "talk", "target": "elder_bai", "text": "Seek Elder Bai at the Azure Cloud hall"},
+        {"kind": "kill", "target": "beast", "count": 3, "text": "Slay 3 spirit beasts beyond the market"},
+        {"kind": "collect", "target": "spirit_herb", "count": 2, "text": "Gather 2 spirit herbs from the garden"},
+        {"kind": "channel", "target": "shrine", "text": "Attune at the Azure Cloud shrine"},
+        {"kind": "return", "target": "elder_bai", "text": "Return to Elder Bai"}
+      ],
+      "reward": {
+        "technique": "tech.palm.azure_cloud",
+        "passive": "passive.heavenly_qi_absorption",
+        "spirit_stones": 120
+      }
+    }
+  ]
+}

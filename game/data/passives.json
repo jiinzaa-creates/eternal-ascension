@@ -1,0 +1,14 @@
+{
+  "passives": [
+    {"id": "passive.heavenly_qi_absorption", "name": "Heavenly Qi Absorption", "category": "Cultivation", "source": "Manual", "desc": "Your meridians pull at the world's Qi without being asked.", "mods": [{"stat": "cult_speed_pct", "value": 15}, {"stat": "qi_regen_flat", "value": 0.8}]},
+    {"id": "passive.iron_bone", "name": "Iron Bone Constitution", "category": "Physical", "source": "Training", "desc": "Bones like poured iron. Blows land softer.", "mods": [{"stat": "physical_resist", "value": 8}, {"stat": "str", "value": 3}]},
+    {"id": "passive.spiritual_perception", "name": "Spiritual Perception", "category": "Spiritual", "source": "Enlightenment", "desc": "You see the shape of Qi before it moves.", "mods": [{"stat": "crit_chance", "value": 4}, {"stat": "wis", "value": 2}]},
+    {"id": "passive.sword_heart", "name": "Sword Heart", "category": "Combat", "source": "Inheritance", "desc": "The blade is an extension of intent, not of the arm.", "mods": [{"stat": "physical_damage_pct", "value": 12}, {"stat": "attack_speed_pct", "value": 5}]},
+    {"id": "passive.regenerative_meridian", "name": "Regenerative Meridian", "category": "Cultivation", "source": "Physique", "desc": "Torn channels knit themselves shut.", "mods": [{"stat": "qi_max_pct", "value": 10}, {"stat": "qi_regen_pct", "value": 20}]},
+    {"id": "passive.natural_formation_affinity", "name": "Natural Formation Affinity", "category": "Crafting", "source": "Bloodline", "desc": "Lines of force arrange themselves to your convenience.", "mods": [{"stat": "int", "value": 4}, {"stat": "cult_speed_pct", "value": 5}]},
+    {"id": "passive.beast_taming_instinct", "name": "Beast Taming Instinct", "category": "Social", "source": "Rare encounter", "desc": "Beasts read your intent and choose not to test it.", "mods": [{"stat": "char", "value": 5}, {"stat": "move_speed_pct", "value": 4}]},
+    {"id": "passive.swift_steps", "name": "Swift Steps", "category": "Exploration", "source": "Training", "desc": "Years on mountain paths, never once slipping.", "mods": [{"stat": "move_speed_pct", "value": 10}, {"stat": "agi", "value": 3}]},
+    {"id": "passive.void_affinity", "name": "Void Affinity", "category": "Special", "source": "Hidden realm", "desc": "Distance is a suggestion you have learned to decline.", "mods": [{"stat": "attack_speed_pct", "value": 8}, {"stat": "qi_regen_pct", "value": 15}]},
+    {"id": "passive.bloodline_suppression", "name": "Bloodline Suppression", "category": "Spiritual", "source": "Bloodline", "desc": "Lesser bloodlines lower their eyes before yours.", "mods": [{"stat": "physical_damage_pct", "value": 8}, {"stat": "mental_resist", "value": 0}]}
+  ]
+}

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.4.1
+
+jobs:
+  test:
+    name: Headless test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unzip libfontconfig1
+          curl -sSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /opt/godot
+          sudo ln -sf "/opt/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --headless --version
+
+      - name: Import project
+        run: godot --headless --path game --editor --quit 2>&1 | tail -40
+
+      - name: Unit and content tests
+        run: godot --headless --path game res://tests/run_tests.tscn
+
+      - name: Integration tests
+        run: godot --headless --path game res://tests/integration.tscn
+
+      - name: Boot smoke test
+        run: godot --headless --path game --quit-after 240

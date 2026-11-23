@@ -1,0 +1,236 @@
+class_name HiddenRealm
+extends Node2D
+## Tomb of the Hollow Moon — the first hidden realm.
+##
+## A handcrafted template (5x4 room grid, entry at one corner, inheritance at
+## the far corner) filled from a seed: room roles, a spanning-tree of corridors
+## plus a few loops, hazards, enemies, chests. Connectivity is guaranteed by
+## construction, and the unit suite flood-fills it to prove that.
+
+const ROOM_W := 420.0
+const ROOM_H := 340.0
+const GAP := 110.0
+const COLS := 5
+const ROWS := 4
+const HAZARD_DPS := 7.0
+
+var realm_seed: int = 0
+var realm_name: String = "Tomb of the Hollow Moon"
+var cells: Array[Vector2i] = []
+var links: Array = []
+var kinds: Dictionary = {}
+var hazards: Array = []
+var interactables: Array = []
+var spawn_points: Array = []
+var entry_cell := Vector2i(0, 3)
+var altar_cell := Vector2i(4, 0)
+var cleared := false
+
+
+func generate(seed_value: int) -> void:
+	realm_seed = seed_value
+	var r: RandomNumberGenerator = Rng.stream("hidden_realm", seed_value, 0)
+	cells.clear()
+	links.clear()
+	kinds.clear()
+	hazards.clear()
+	interactables.clear()
+	spawn_points.clear()
+
+	for y in ROWS:
+		for x in COLS:
+			cells.append(Vector2i(x, y))
+	entry_cell = Vector2i(0, ROWS - 1)
+	altar_cell = Vector2i(COLS - 1, 0)
+
+	_assign_kinds(r)
+	_build_links(r)
+	_build_hazards(r)
+	_build_interactables()
+	_spawn_enemies(r)
+	queue_redraw()
+
+
+func _assign_kinds(r: RandomNumberGenerator) -> void:
+	for cell in cells:
+		kinds[cell] = "combat"
+	kinds[entry_cell] = "entry"
+	kinds[altar_cell] = "inheritance"
+	var treasure_candidates: Array[Vector2i] = []
+	for cell in cells:
+		if String(kinds[cell]) == "combat":
+			treasure_candidates.append(cell)
+	# Determinism: pick from the seeded stream. Array.shuffle() would consume the
+	# engine-global RNG, so two realms generated from the same seed would differ.
+	for _i in mini(2, treasure_candidates.size()):
+		var pick := r.randi_range(0, treasure_candidates.size() - 1)
+		kinds[treasure_candidates[pick]] = "treasure"
+		treasure_candidates.remove_at(pick)
+
+
+func _build_links(r: RandomNumberGenerator) -> void:
+	var visited: Dictionary = {entry_cell: true}
+	var stack: Array[Vector2i] = [entry_cell]
+	while not stack.is_empty():
+		var current: Vector2i = stack[stack.size() - 1]
+		var options: Array[Vector2i] = []
+		for offset in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var neighbor: Vector2i = current + offset
+			if neighbor.x < 0 or neighbor.y < 0 or neighbor.x >= COLS or neighbor.y >= ROWS:
+				continue
+			if visited.has(neighbor):
+				continue
+			options.append(neighbor)
+		if options.is_empty():
+			stack.pop_back()
+			continue
+		var pick: Vector2i = options[r.randi_range(0, options.size() - 1)]
+		links.append([current, pick])
+		visited[pick] = true
+		stack.append(pick)
+
+	# A few extra edges turn the maze into a looping tomb rather than a tree.
+	for i in 4:
+		var a: Vector2i = cells[r.randi_range(0, cells.size() - 1)]
+		var b: Vector2i = cells[r.randi_range(0, cells.size() - 1)]
+		if a != b and not are_linked(a, b):
+			links.append([a, b])
+
+
+func are_linked(a: Vector2i, b: Vector2i) -> bool:
+	for link in links:
+		if (link[0] == a and link[1] == b) or (link[0] == b and link[1] == a):
+			return true
+	return false
+
+
+func cell_center(cell: Vector2i) -> Vector2:
+	return Vector2(float(cell.x) * (ROOM_W + GAP), float(cell.y) * (ROOM_H + GAP))
+
+
+func entry_position() -> Vector2:
+	return cell_center(entry_cell)
+
+
+func altar_position() -> Vector2:
+	return cell_center(altar_cell)
+
+
+## Flood fill over the corridor graph. The unit suite asserts this is true for
+## every generated realm, which is what stops a loot room spawning unreachable.
+func all_rooms_reachable() -> bool:
+	if cells.is_empty():
+		return false
+	var seen: Dictionary = {entry_cell: true}
+	var queue: Array[Vector2i] = [entry_cell]
+	while not queue.is_empty():
+		var current: Vector2i = queue.pop_front()
+		for link in links:
+			var next: Vector2i = link[1] if link[0] == current else (link[0] if link[1] == current else Vector2i(-99, -99))
+			if next == Vector2i(-99, -99) or seen.has(next):
+				continue
+			seen[next] = true
+			queue.append(next)
+	return seen.size() == cells.size()
+
+
+func _build_hazards(r: RandomNumberGenerator) -> void:
+	for cell in cells:
+		if String(kinds[cell]) != "combat":
+			continue
+		var center := cell_center(cell)
+		var offset := Vector2(r.randf_range(-90.0, 90.0), r.randf_range(-70.0, 70.0))
+		hazards.append({
+			"rect": Rect2(center + offset - Vector2(48, 48), Vector2(96, 96)),
+			"dps": HAZARD_DPS,
+		})
+
+
+func _build_interactables() -> void:
+	var exit := Interactable.new()
+	exit.setup(Interactable.Kind.PORTAL, "realm.exit", "Return to the Verdant Fringe")
+	exit.position = cell_center(entry_cell) + Vector2(0, 90)
+	add_child(exit)
+	interactables.append(exit)
+
+	var altar := Interactable.new()
+	altar.setup(Interactable.Kind.ALTAR, "realm.altar", "Inheritance Altar")
+	altar.position = cell_center(altar_cell)
+	add_child(altar)
+	interactables.append(altar)
+
+	for cell in cells:
+		if String(kinds[cell]) == "treasure":
+			var chest := Interactable.new()
+			chest.setup(Interactable.Kind.CHEST, "realm.chest.%d.%d" % [cell.x, cell.y], "Sealed Chest")
+			chest.position = cell_center(cell) + Vector2(0, -40)
+			add_child(chest)
+			interactables.append(chest)
+
+
+func _spawn_enemies(r: RandomNumberGenerator) -> void:
+	var ilvl := 2
+	for cell in cells:
+		var kind := String(kinds[cell])
+		if kind != "combat" and kind != "treasure":
+			continue
+		var count := 2 if kind == "combat" else 1
+		for i in count:
+			var offset := Vector2(r.randf_range(-120.0, 120.0), r.randf_range(-90.0, 90.0))
+			var pos: Vector2 = cell_center(cell) + offset
+			spawn_points.append(pos)
+			var dummy := Dummy.new()
+			dummy.ilvl = ilvl
+			dummy.position = pos
+			add_child(dummy)
+
+
+func mark_cleared() -> void:
+	cleared = true
+	for node in interactables:
+		if node.id == "realm.altar":
+			node.used = true
+	queue_redraw()
+
+
+## Total damage per second from hazards covering a world position.
+func hazard_dps_at(world_position: Vector2) -> float:
+	for hazard in hazards:
+		var rect: Rect2 = hazard["rect"]
+		if rect.has_point(world_position):
+			return float(hazard["dps"])
+	return 0.0
+
+
+func _draw() -> void:
+	# Corridors first, rooms on top: openings read as doorways.
+	for link in links:
+		var a: Vector2 = cell_center(link[0])
+		var b: Vector2 = cell_center(link[1])
+		draw_line(a, b, Color("#2a2438"), 56.0)
+		draw_line(a, b, Color("#171320"), 40.0)
+
+	for cell in cells:
+		var center: Vector2 = cell_center(cell)
+		var rect := Rect2(center - Vector2(ROOM_W, ROOM_H) * 0.5, Vector2(ROOM_W, ROOM_H))
+		var kind := String(kinds[cell])
+		var floor_color := Color("#241f30")
+		if kind == "entry":
+			floor_color = Color("#1c2a2a")
+		elif kind == "inheritance":
+			floor_color = Color("#2b2440")
+		elif kind == "treasure":
+			floor_color = Color("#2a2620")
+		draw_rect(rect, floor_color)
+		draw_rect(rect, Color("#3b3350"), false, 6.0)
+
+	for hazard in hazards:
+		var rect: Rect2 = hazard["rect"]
+		draw_rect(rect, Color("#5a2030", 0.55))
+		draw_rect(rect, Color("#c06070", 0.7), false, 2.0)
+
+	for cell in cells:
+		if String(kinds[cell]) == "inheritance":
+			var center := cell_center(cell)
+			draw_arc(center, 150.0, 0.0, TAU, 48, Color("#8f7fd0", 0.4), 2.0)
+			draw_arc(center, 110.0, 0.0, TAU, 40, Color("#8f7fd0", 0.25), 1.5)

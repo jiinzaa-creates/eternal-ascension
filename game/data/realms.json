@@ -1,0 +1,16 @@
+{
+  "realms": [
+    {"id": "realm.qi_condensation", "n": 1, "name": "Qi Condensation", "lifespan": 120, "qi_mult": 1.0, "attr_mult": 1.0, "sublevels": 10, "unlock": "Qi sense, first techniques, spirit-stone absorption", "tribulation": "none", "color": "#8fd3c7"},
+    {"id": "realm.foundation", "n": 2, "name": "Foundation Establishment", "lifespan": 220, "qi_mult": 2.5, "attr_mult": 1.35, "sublevels": 10, "unlock": "Dantian, meridians, dash cancel", "tribulation": "meridian", "color": "#7fc7a3"},
+    {"id": "realm.core_formation", "n": 3, "name": "Core Formation", "lifespan": 380, "qi_mult": 6.0, "attr_mult": 1.8, "sublevels": 10, "unlock": "Golden Core, elemental conversion", "tribulation": "lightning", "color": "#e0c060"},
+    {"id": "realm.nascent_soul", "n": 4, "name": "Nascent Soul", "lifespan": 650, "qi_mult": 15.0, "attr_mult": 2.5, "sublevels": 10, "unlock": "Spirit infant, out-of-body scouting", "tribulation": "heart_demon", "color": "#a58fe0"},
+    {"id": "realm.spirit_transformation", "n": 5, "name": "Spirit Transformation", "lifespan": 1100, "qi_mult": 35.0, "attr_mult": 3.4, "sublevels": 10, "unlock": "Divine sense, flight, technique weaving", "tribulation": "elemental", "color": "#7aa7f0"},
+    {"id": "realm.void_refinement", "n": 6, "name": "Void Refinement", "lifespan": 1900, "qi_mult": 80.0, "attr_mult": 4.6, "sublevels": 10, "unlock": "Space folding, hidden-realm creation, recall", "tribulation": "spatial", "color": "#8f9ee0"},
+    {"id": "realm.body_integration", "n": 7, "name": "Body Integration", "lifespan": 3200, "qi_mult": 180.0, "attr_mult": 6.2, "sublevels": 10, "unlock": "Physique awakening II, body and dao fusion", "tribulation": "bloodline", "color": "#d98f7a"},
+    {"id": "realm.mahayana", "n": 8, "name": "Mahayana", "lifespan": 5500, "qi_mult": 400.0, "attr_mult": 8.4, "sublevels": 10, "unlock": "Domain projection, sect-wide auras", "tribulation": "heavenly_judgment", "color": "#e0a35c"},
+    {"id": "realm.tribulation_transcendence", "n": 9, "name": "Tribulation Transcendence", "lifespan": 9500, "qi_mult": 900.0, "attr_mult": 11.0, "sublevels": 10, "unlock": "Grand tribulation, first ascension attempt", "tribulation": "grand", "color": "#e07070"},
+    {"id": "realm.true_immortal", "n": 10, "name": "True Immortal", "lifespan": 30000, "qi_mult": 2000.0, "attr_mult": 15.0, "sublevels": 10, "unlock": "Immortal body, law comprehension", "tribulation": "dao", "color": "#ffffff"},
+    {"id": "realm.mystic_sovereign", "n": 11, "name": "Mystic Sovereign", "lifespan": 100000, "qi_mult": 5000.0, "attr_mult": 20.0, "sublevels": 10, "unlock": "Law mastery, plane manipulation", "tribulation": "sovereign", "color": "#f0e0a0"},
+    {"id": "realm.primordial_dao", "n": 12, "name": "Primordial Dao", "lifespan": 0, "qi_mult": 12000.0, "attr_mult": 27.0, "sublevels": 10, "unlock": "Endgame paths: ascension or transcendence", "tribulation": "primordial", "color": "#c0a0ff"}
+  ]
+}

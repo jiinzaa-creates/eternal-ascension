@@ -1,0 +1,47 @@
+{
+  "surnames": ["Bai", "Yun", "Lin", "Shen", "Mo", "Xiao", "Gu", "Han", "Qiu", "Tang", "Su", "Wei"],
+  "given": ["Qing", "Lian", "Zhao", "Fei", "Yan", "Jue", "Rou", "Shan", "Tian", "Xue", "Yi", "Zhu"],
+  "archetypes": [
+    {"id": "sect_master", "role": "Sect Master", "realm": 5, "weight": 1, "schedule": "elder", "sect": "sect.azure_cloud"},
+    {"id": "elder", "role": "Elder", "realm": 4, "weight": 1, "schedule": "elder", "sect": "sect.azure_cloud"},
+    {"id": "inner_disciple", "role": "Inner Disciple", "realm": 2, "weight": 5, "schedule": "disciple", "sect": "sect.azure_cloud"},
+    {"id": "outer_disciple", "role": "Outer Disciple", "realm": 1, "weight": 8, "schedule": "disciple", "sect": "sect.azure_cloud"},
+    {"id": "merchant", "role": "Merchant", "realm": 1, "weight": 3, "schedule": "merchant", "sect": ""},
+    {"id": "guard", "role": "Guard", "realm": 2, "weight": 2, "schedule": "guard", "sect": "sect.azure_cloud"},
+    {"id": "farmer", "role": "Farmer", "realm": 1, "weight": 3, "schedule": "farmer", "sect": ""}
+  ],
+  "schedules": {
+    "elder": [
+      {"from": 5, "to": 9, "location": "shrine", "activity": "meditate"},
+      {"from": 9, "to": 17, "location": "sect_hall", "activity": "teach"},
+      {"from": 17, "to": 20, "location": "market", "activity": "socialize"},
+      {"from": 20, "to": 5, "location": "sect_hall", "activity": "sleep"}
+    ],
+    "disciple": [
+      {"from": 5, "to": 8, "location": "shrine", "activity": "meditate"},
+      {"from": 8, "to": 12, "location": "training", "activity": "train"},
+      {"from": 12, "to": 14, "location": "market", "activity": "socialize"},
+      {"from": 14, "to": 18, "location": "sect_hall", "activity": "cultivate"},
+      {"from": 18, "to": 21, "location": "tavern", "activity": "socialize"},
+      {"from": 21, "to": 5, "location": "dorms", "activity": "sleep"}
+    ],
+    "merchant": [
+      {"from": 6, "to": 9, "location": "fields", "activity": "sell"},
+      {"from": 9, "to": 19, "location": "market", "activity": "sell"},
+      {"from": 19, "to": 22, "location": "tavern", "activity": "socialize"},
+      {"from": 22, "to": 6, "location": "dorms", "activity": "sleep"}
+    ],
+    "guard": [
+      {"from": 6, "to": 12, "location": "gate", "activity": "patrol"},
+      {"from": 12, "to": 18, "location": "plaza", "activity": "patrol"},
+      {"from": 18, "to": 22, "location": "training", "activity": "train"},
+      {"from": 22, "to": 6, "location": "dorms", "activity": "sleep"}
+    ],
+    "farmer": [
+      {"from": 5, "to": 12, "location": "fields", "activity": "work"},
+      {"from": 12, "to": 15, "location": "market", "activity": "sell"},
+      {"from": 15, "to": 19, "location": "fields", "activity": "work"},
+      {"from": 19, "to": 5, "location": "dorms", "activity": "sleep"}
+    ]
+  }
+}
