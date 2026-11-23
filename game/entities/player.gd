@@ -50,7 +50,13 @@ var animator := Animator.new()
 var _attack_state := "idle"  # idle | startup | active | recovery
 var _attack_timer := 0.0
 var _attack_phase_total := 0.0
-var _current_technique: Dictionary = {}
+## The attack the frame machine is running. Techniques and weapon strikes produce
+## the same payload shape, so phase timing, hitboxes and poise stay one path.
+var _current_attack: Dictionary = {}
+## Weapon chain cursor: -1 opens a fresh chain, and the timer measures how long
+## ago the last strike began so a late press restarts the sequence.
+var _combo_index := -1
+var _combo_elapsed := 100.0
 var _cooldown := 0.0
 var _dodge_timer := 0.0
 var _dodge_cooldown := 0.0
@@ -365,6 +371,8 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("attack"):
 		try_attack()
+	if Input.is_action_just_pressed("light_attack"):
+		try_light_attack()
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
 	if Input.is_action_just_pressed("meditate"):
@@ -405,6 +413,7 @@ func _tick_timers(delta: float) -> void:
 	_iframes = maxf(0.0, _iframes - delta)
 	poise.tick(delta)
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
+	_combo_elapsed += delta
 	_tick_attack(delta)
 
 
@@ -414,20 +423,31 @@ func _tick_attack(delta: float) -> void:
 	_attack_timer -= delta
 	if _attack_timer > 0.0:
 		return
-	var frames: Dictionary = _current_technique.get("frames", {})
+	var frames: Dictionary = _current_attack.get("frames", {})
+	var speed := _attack_speed()
 	_attack_state = Combat.next_phase(_attack_state)
 	match _attack_state:
 		"active":
-			_attack_timer = Combat.phase_seconds(frames, "active", stats.attack_speed())
+			_attack_timer = Combat.phase_seconds(frames, "active", speed)
 			_attack_phase_total = _attack_timer
 			_strike()
 		"recovery":
-			_attack_timer = Combat.phase_seconds(frames, "recovery", stats.attack_speed(),
+			_attack_timer = Combat.phase_seconds(frames, "recovery", speed,
 				stats.recovery_reduction())
 			_attack_phase_total = _attack_timer
-			var tech_id := String(_current_technique.get("id", ""))
-			_cooldown = float(_current_technique.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction()) \
-				* Mastery.cooldown_mult(mastery_tier(tech_id)) * Realms.technique_mult(cultivation.realm)
+			if bool(_current_attack.get("light", false)):
+				# A weapon chain is free, so its only gate is the short swing pause.
+				_cooldown = float(_current_attack.get("cooldown", 0.06))
+			else:
+				var tech_id := String(_current_attack.get("id", ""))
+				_cooldown = float(_current_attack.get("cooldown", 0.4)) * (1.0 - stats.cooldown_reduction()) \
+					* Mastery.cooldown_mult(mastery_tier(tech_id)) * Realms.technique_mult(cultivation.realm)
+
+
+## Phase speed for the running attack. A weapon category's own speed multiplier
+## stacks with attack speed, so a saber winds up slower and a fist faster.
+func _attack_speed() -> float:
+	return stats.attack_speed() * maxf(0.1, float(_current_attack.get("speed_mult", 1.0)))
 
 
 func current_technique() -> Dictionary:
@@ -435,6 +455,41 @@ func current_technique() -> Dictionary:
 		return {}
 	var index := clampi(selected_technique, 0, technique_ids.size() - 1)
 	return DB.technique(String(technique_ids[index]))
+
+
+## The equipped weapon's category. Unarmed is a real moveset, not a fallback.
+func weapon_type_id() -> String:
+	return Weapons.type_id_for(equipment.get("weapon", {}))
+
+
+func weapon_type() -> Dictionary:
+	return Weapons.find(weapon_type_id())
+
+
+func weapon_type_name() -> String:
+	return String(weapon_type().get("name", "Unarmed"))
+
+
+## The chain step the next light strike would take, for the HUD.
+func next_combo_step() -> int:
+	var type := weapon_type()
+	var list: Array = type.get("moves", [])
+	if list.is_empty():
+		return 0
+	var window := float(type.get("combo_window", 0.75))
+	return Weapons.next_combo(_combo_index, _combo_elapsed, window, list.size())
+
+
+## Name of the strike the next press would perform, including the live chain
+## window, so the HUD never promises a step a late press would not take.
+func next_move_name() -> String:
+	var type := weapon_type()
+	var list: Array = type.get("moves", [])
+	if list.is_empty():
+		return ""
+	var index := next_combo_step()
+	var entry: Variant = list[clampi(index, 0, list.size() - 1)]
+	return String((entry as Dictionary).get("name", "")) if typeof(entry) == TYPE_DICTIONARY else ""
 
 
 func try_attack() -> void:
@@ -453,7 +508,10 @@ func try_attack() -> void:
 		Bus.toast.emit("Not enough Qi.")
 		return
 	cultivation.qi -= cost
-	_current_technique = tech
+	_current_attack = tech
+	# A technique ends a weapon chain: the two attacks never blur together.
+	_combo_index = -1
+	_combo_elapsed = 100.0
 	_attack_state = "startup"
 	var frames: Dictionary = tech.get("frames", {})
 	_attack_timer = Combat.phase_seconds(frames, "startup", stats.attack_speed())
@@ -462,27 +520,59 @@ func try_attack() -> void:
 	cultivation_changed()
 
 
+## The equipped weapon's own strike: free, chained and available at any realm.
+## Light strikes and techniques share the frame machine but never the same press,
+## so a weapon is a real alternative to spending Qi.
+func try_light_attack() -> bool:
+	if _attack_state != "idle" or _cooldown > 0.0 or _dodge_timer > 0.0:
+		return false
+	if _meditating:
+		toggle_meditation()
+		return false
+	var type := weapon_type()
+	var list: Array = type.get("moves", [])
+	if list.is_empty():
+		return false
+	var window := float(type.get("combo_window", 0.75))
+	_combo_index = Weapons.next_combo(_combo_index, _combo_elapsed, window, list.size())
+	_combo_elapsed = 0.0
+	_current_attack = Weapons.attack_payload(type, _combo_index)
+	if _current_attack.is_empty():
+		return false
+	_attack_state = "startup"
+	var frames: Dictionary = _current_attack.get("frames", {})
+	_attack_timer = Combat.phase_seconds(frames, "startup", _attack_speed())
+	_attack_phase_total = _attack_timer
+	_facing = _aim_dir()
+	return true
+
+
 func _strike() -> void:
-	var tech := _current_technique
-	if tech.is_empty():
+	var attack := _current_attack
+	if attack.is_empty():
 		return
-	var box: Dictionary = tech.get("hitbox", {})
+	var box: Dictionary = attack.get("hitbox", {})
 	var radius := float(box.get("radius", 70.0))
 	var arc := deg_to_rad(float(box.get("angle", 120.0)))
+	var is_light := bool(attack.get("light", false))
 
 	_attack_counter += 1
 	var crit_roll := float(Rng.roll_float("crit", Game.kills * 1000 + _attack_counter, cultivation.realm))
 	var is_crit := crit_roll < stats.crit_chance()
 
-	var tech_id := String(tech.get("id", ""))
-	var raw := Damage.technique_damage(tech, stats, stats.weapon_damage(),
-		Mastery.damage_mult(mastery_tier(tech_id)))
-	add_technique_xp(tech_id, Mastery.XP_PER_HIT)
+	var tech_id := String(attack.get("id", ""))
+	var raw := 0.0
+	if is_light:
+		raw = Damage.weapon_strike(attack, stats, stats.weapon_damage())
+	else:
+		raw = Damage.technique_damage(attack, stats, stats.weapon_damage(),
+			Mastery.damage_mult(mastery_tier(tech_id)))
+		add_technique_xp(tech_id, Mastery.XP_PER_HIT)
 	if is_crit:
 		raw *= stats.crit_multiplier()
-	var poise := Damage.poise_damage(tech, stats)
-	var knock := Damage.knockback(tech, stats)
-	var lifesteal := float(tech.get("lifesteal", 0.0)) + stats.lifesteal()
+	var poise_hit := Damage.poise_damage(attack, stats)
+	var knock := Damage.knockback(attack, stats)
+	var lifesteal := float(attack.get("lifesteal", 0.0)) + stats.lifesteal()
 
 	_combat_timer = 6.0
 	_arc_flash = 0.13
@@ -492,7 +582,7 @@ func _strike() -> void:
 	for enemy in Combat.targets(global_position, _facing, box, get_tree().get_nodes_in_group("enemy"), RADIUS):
 		var final := Damage.resolve(raw, 0.0, float(cultivation.realm))
 		if enemy.has_method("take_hit"):
-			enemy.take_hit(final, _facing.normalized() * knock, poise, stats.penetration_fraction())
+			enemy.take_hit(final, _facing.normalized() * knock, poise_hit, stats.penetration_fraction())
 		Bus.damage_dealt.emit(final, enemy)
 		if lifesteal > 0.0:
 			heal(final * lifesteal)
@@ -532,7 +622,7 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 			_attack_state = "idle"
 			_attack_timer = 0.0
 			_attack_phase_total = 0.0
-			_current_technique = {}
+			_current_attack = {}
 	Bus.player_stats_changed.emit()
 	if hp <= 0.0:
 		_die()
@@ -626,7 +716,7 @@ func try_dodge(dir: Vector2) -> void:
 			return
 		_attack_state = "idle"
 		_attack_timer = 0.0
-		_current_technique = {}
+		_current_attack = {}
 	if _meditating:
 		toggle_meditation()
 	var dash_dir := dir.normalized()
@@ -732,6 +822,10 @@ func pick_up(item: Dictionary) -> void:
 		var current: Dictionary = equipment.get(slot, {})
 		if current.is_empty() or int(item.get("ilvl", 1)) >= int(current.get("ilvl", 1)):
 			equipment[slot] = item
+			if slot == "weapon":
+				# A new weapon opens its own chain; the old one's cursor is meaningless.
+				_combo_index = -1
+				_combo_elapsed = 100.0
 			rebuild_stats()
 	Bus.item_picked.emit(item)
 	Bus.player_stats_changed.emit()

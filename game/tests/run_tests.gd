@@ -32,6 +32,7 @@ func _ready() -> void:
 	_enlightenment_tests()
 	_aging_tests()
 	_combat_arch_tests()
+	_weapon_tests()
 	_rng_tests()
 	_item_tests()
 	_cultivation_tests()
@@ -1466,6 +1467,67 @@ func _combat_arch_tests() -> void:
 	check(Combat.interrupts("startup"), "startup can be interrupted")
 	check(not Combat.interrupts("active"), "an active swing is committed")
 	check(not Combat.interrupts("recovery") and not Combat.interrupts("idle"), "recovery and idle are not attacks to spoil")
+
+
+# ------------------------------------------------------------- weapons ----
+
+func _weapon_tests() -> void:
+	print("[weapons] categories, movesets, chains and scaling")
+	check(DB.weapon_types.size() >= 4, "the weapon framework ships its categories")
+	for id in ["sword", "saber", "staff", "whip", "fist"]:
+		var type := Weapons.find(String(id))
+		check(not type.is_empty(), "%s is a weapon category" % id)
+		check((type.get("moves", []) as Array).size() >= 2, "%s owns more than one strike" % id)
+		check(float(type.get("reach_mult", 0.0)) > 0.0, "%s reaches" % id)
+		check(float(type.get("speed_mult", 0.0)) > 0.0, "%s has a speed" % id)
+	check(Weapons.find("bogus").is_empty(), "an unknown category resolves to nothing")
+	check(Weapons.moves("bogus").is_empty(), "an unknown category has no moves")
+	var last_sword: Dictionary = (Weapons.moves("sword") as Array)[-1]
+	check(String(Weapons.move("sword", 99).get("name", "")) == String(last_sword.get("name", "")), "a move index is clamped")
+	check(Weapons.attack_payload(Weapons.find("bogus"), 0).is_empty(), "an unknown category has no payload")
+
+	check(Weapons.type_id_for({}) == Weapons.DEFAULT_TYPE, "an empty weapon is unarmed")
+	check(Weapons.type_id_for({"weapon_type": "staff"}) == "staff", "an explicit category wins")
+	check(Weapons.type_id_for({"weapon_type": "nonsense"}) == Weapons.DEFAULT_TYPE, "an unknown explicit category falls back")
+	check(Weapons.type_id_for({"base": "base.saber.heavy_saber"}) == "saber", "a legacy base id names the category")
+	check(Weapons.type_id_for({"id": "base.whip.spirit_silk"}) == "whip", "an item id names the category")
+	check(Weapons.type_id_for({"name": "Cursed Test Blade", "slot": "weapon"}) == Weapons.DEFAULT_TYPE, "an unlabelled weapon is safe")
+
+	check(Weapons.next_combo(-1, 0.0, 0.75, 3) == 0, "a fresh chain opens at the first strike")
+	check(Weapons.next_combo(0, 0.1, 0.75, 3) == 1, "an in-time press advances the chain")
+	check(Weapons.next_combo(1, 0.1, 0.75, 3) == 2, "the chain reaches its last strike")
+	check(Weapons.next_combo(2, 0.1, 0.75, 3) == 0, "the chain wraps to the first strike")
+	check(Weapons.next_combo(1, 5.0, 0.75, 3) == 0, "a late press restarts the chain")
+	check(Weapons.next_combo(1, 0.1, 0.75, 0) == 0, "an empty chain is harmless")
+
+	var sword_box := Weapons.scaled_hitbox(Weapons.move("sword", 0), Weapons.find("sword"))
+	var whip_box := Weapons.scaled_hitbox(Weapons.move("whip", 0), Weapons.find("whip"))
+	check(float(whip_box["radius"]) > float(sword_box["radius"]), "a whip outranges a sword")
+	check(approx(float(sword_box["angle"]), float((Weapons.move("sword", 0).get("hitbox", {}) as Dictionary).get("angle", 0.0))), "reach scaling leaves the arc alone")
+	check(Combat.in_hitbox(Vector2.ZERO, Vector2.RIGHT, whip_box, Vector2(100, 0)), "the whip's reach is real geometry")
+
+	var stats := StatBlock.new(Attributes.new())
+	stats.rebuild({}, [], 1, 1.0)
+	var light := Weapons.attack_payload(Weapons.find("sword"), 0)
+	var heavy := Weapons.attack_payload(Weapons.find("sword"), 2)
+	var unarmed := Weapons.attack_payload(Weapons.find("fist"), 0)
+	check(Damage.weapon_strike(light, stats, 8.0) > 0.0, "a weapon strike deals damage")
+	check(Damage.weapon_strike(light, stats, 16.0) > Damage.weapon_strike(light, stats, 8.0), "a stronger weapon hits harder")
+	check(Damage.weapon_strike(heavy, stats, 8.0) > Damage.weapon_strike(light, stats, 8.0), "a later chain step hits harder")
+	check(Damage.weapon_strike(unarmed, stats, 0.0) > 0.0, "bare hands still hurt")
+	check(Damage.weapon_strike(light, stats, -5.0) >= 0.0, "a cursed weapon cannot deal negative damage")
+	check(float(Weapons.attack_payload(Weapons.find("saber"), 0)["poise_damage"]) > float(light["poise_damage"]), "a saber carries more poise damage")
+	check(float(Weapons.attack_payload(Weapons.find("saber"), 0)["knockback"]) > float(light["knockback"]), "a saber throws further")
+	check(Combat.phase_seconds(light["frames"], "startup", float(light["speed_mult"])) > Combat.phase_seconds(unarmed["frames"], "startup", float(unarmed["speed_mult"])), "a fist winds up faster than a sword")
+
+	for base in DB.bases:
+		if String(base.get("slot", "")) == "weapon":
+			check(not Weapons.find(String(base.get("weapon_type", ""))).is_empty(), "weapon base %s declares a real category" % base.get("id", "?"))
+
+	var generator := ItemGen.new(DB, Rng)
+	var blade := generator.generate(20, 501, 0, 3, "weapon")
+	check(String(blade.get("weapon_type", "")) != "", "a generated weapon carries its category")
+	check(not Weapons.find(Weapons.type_id_for(blade)).is_empty(), "a generated weapon resolves to a real moveset")
 
 
 # -------------------------------------------------------------- aging ----

@@ -24,6 +24,7 @@ var npc_data: Dictionary = {}
 var biomes: Array = []
 var origins: Array = []
 var physiques: Array = []
+var weapon_types: Array = []
 
 var _by_id: Dictionary = {}
 
@@ -54,6 +55,7 @@ func load_all() -> void:
 	biomes = _read("biomes.json").get("biomes", [])
 	origins = _read("origins.json").get("origins", [])
 	physiques = _read("physiques.json").get("physiques", [])
+	weapon_types = _read("weapons.json").get("weapon_types", [])
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -70,6 +72,7 @@ func load_all() -> void:
 	_index("biome", biomes)
 	_index("origin", origins)
 	_index("physique", physiques)
+	_index("weapon_type", weapon_types)
 
 
 func _read(file: String) -> Dictionary:
@@ -158,6 +161,10 @@ func origin(id: String) -> Dictionary:
 
 func physique(id: String) -> Dictionary:
 	return by_id("physique", id)
+
+
+func weapon_type(id: String) -> Dictionary:
+	return by_id("weapon_type", id)
 
 
 ## Snapshot of every biome by id. Passed to worker threads, so it is detached
@@ -347,11 +354,48 @@ func validate() -> Array:
 		if String(t.get("id", "")) == "":
 			problems.append("technique without id")
 
+	if weapon_types.size() < 4:
+		problems.append("expected at least 4 weapon categories, found %d" % weapon_types.size())
+	var weapon_type_ids: Dictionary = {}
+	for w in weapon_types:
+		var w_id := String(w.get("id", ""))
+		if w_id == "":
+			problems.append("weapon category without id")
+			continue
+		if weapon_type_ids.has(w_id):
+			problems.append("duplicate weapon category id " + w_id)
+		weapon_type_ids[w_id] = true
+		if String(w.get("name", "")) == "":
+			problems.append("weapon category %s has no name" % w_id)
+		if float(w.get("reach_mult", 0.0)) <= 0.0 or float(w.get("speed_mult", 0.0)) <= 0.0:
+			problems.append("weapon category %s has an invalid reach or speed" % w_id)
+		var weapon_moves: Array = w.get("moves", [])
+		if weapon_moves.is_empty():
+			problems.append("weapon category %s has no moves" % w_id)
+		for wm in weapon_moves:
+			if typeof(wm) != TYPE_DICTIONARY:
+				problems.append("weapon category %s has a malformed move" % w_id)
+				continue
+			var wm_name := String((wm as Dictionary).get("name", "?"))
+			var wm_frames: Dictionary = (wm as Dictionary).get("frames", {})
+			for frame_key in ["startup", "active", "recovery"]:
+				if not wm_frames.has(frame_key) or int(wm_frames[frame_key]) <= 0:
+					problems.append("weapon move %s in %s has an invalid '%s' frame" % [wm_name, w_id, frame_key])
+			var wm_box: Dictionary = (wm as Dictionary).get("hitbox", {})
+			if float(wm_box.get("radius", 0.0)) <= 0.0:
+				problems.append("weapon move %s in %s has no reach" % [wm_name, w_id])
+			if float(wm_box.get("angle", 0.0)) <= 0.0:
+				problems.append("weapon move %s in %s has no arc" % [wm_name, w_id])
+			if float((wm as Dictionary).get("damage_mult", 0.0)) <= 0.0:
+				problems.append("weapon move %s in %s deals no damage" % [wm_name, w_id])
+
 	if bases.is_empty():
 		problems.append("no item bases defined")
 	for b in bases:
 		if String(b.get("slot", "")) == "":
 			problems.append("item base %s has no slot" % b.get("id", "?"))
+		if String(b.get("slot", "")) == "weapon" and not weapon_type_ids.has(String(b.get("weapon_type", ""))):
+			problems.append("weapon base %s names unknown weapon category '%s'" % [b.get("id", "?"), String(b.get("weapon_type", ""))])
 	if prefixes.is_empty() or suffixes.is_empty():
 		problems.append("item affix pools are empty")
 
@@ -454,7 +498,7 @@ func validate() -> Array:
 
 	# Duplicate IDs across the whole registry would corrupt save references.
 	var seen: Dictionary = {}
-	for kind in ["realm", "root", "method", "technique", "base", "prefix", "suffix", "passive", "quest"]:
+	for kind in ["realm", "root", "method", "technique", "base", "prefix", "suffix", "passive", "quest", "weapon_type"]:
 		for key in _by_id.keys():
 			if String(key).begins_with(kind + ":"):
 				var id := String(key).split(":", false, 1)[1]
@@ -484,4 +528,5 @@ func counts() -> Dictionary:
 		"biomes": biomes.size(),
 		"origins": origins.size(),
 		"physiques": physiques.size(),
+		"weapon_types": weapon_types.size(),
 	}

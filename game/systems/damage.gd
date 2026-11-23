@@ -29,6 +29,14 @@ static func technique_damage(technique: Dictionary, stats: StatBlock, weapon_dam
 	return raw * maxf(0.0, mastery_mult)
 
 
+## A weapon's light strike. The weapon supplies the body of the blow, the move's
+## multiplier makes each chain step distinct, and physical_mult (STR, affixes,
+## realm) applies once, exactly as it does to a technique.
+static func weapon_strike(move: Dictionary, stats: StatBlock, weapon_damage: float = 0.0) -> float:
+	var base := maxf(0.0, weapon_damage) + maxf(0.0, float(move.get("base_damage", 0.0)))
+	return base * stats.physical_mult() * maxf(0.0, float(move.get("damage_mult", 1.0)))
+
+
 static func poise_damage(technique: Dictionary, stats: StatBlock) -> float:
 	var base := float(technique.get("poise_damage", 10.0))
 	return base * (0.7 + Attributes.soft(float(stats.get_attr("str")), 22.0) / 30.0)

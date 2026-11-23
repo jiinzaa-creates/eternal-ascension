@@ -50,6 +50,7 @@ func generate(ilvl: int = 1, key: int = 0, counter: int = 0, force_rarity: int =
 		"base": String(base.get("id", "")),
 		"base_name": String(base.get("name", "Unknown")),
 		"slot": slot,
+		"weapon_type": String(base.get("weapon_type", "")),
 		"ilvl": ilvl,
 		"rarity": rarity,
 		"rarity_name": RARITY_NAMES[rarity],

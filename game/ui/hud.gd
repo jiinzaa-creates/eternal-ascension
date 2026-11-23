@@ -192,12 +192,19 @@ func draw_world_panel(player: Player) -> void:
 	_text(Vector2(x, y), "Spirit stones: %d" % Game.spirit_stones, 13, Color("#d8c070"))
 	y += 18.0
 	var weapon: Dictionary = player.equipment.get("weapon", {})
+	var category := player.weapon_type_name()
 	if weapon.is_empty():
-		_text(Vector2(x, y), "Weapon: unarmed", 12, MUTED)
+		_text(Vector2(x, y), "Weapon: unarmed · %s" % category, 12, MUTED)
 	else:
-		_text(Vector2(x, y), String(weapon.get("name", "?")), 12, Color(ItemGen.RARITY_COLORS[int(weapon.get("rarity", 0))]))
+		_text(Vector2(x, y), "%s · %s" % [String(weapon.get("name", "?")), category], 12, Color(ItemGen.RARITY_COLORS[int(weapon.get("rarity", 0))]))
 	y += 18.0
 	_text(Vector2(x, y), "Weapon dmg %d   Armor %d" % [int(player.weapon_damage()), int(player.armor())], 12, MUTED)
+	y += 18.0
+	var next_move := player.next_move_name()
+	if next_move != "":
+		_text(Vector2(x, y), "Next strike: %s  (%d/%d)" % [
+			next_move, player.next_combo_step() + 1, Weapons.moves(player.weapon_type_id()).size()
+		], 11, MUTED)
 
 
 ## Compass to the chosen waypoint, with the distance to it.
@@ -236,7 +243,7 @@ func draw_techniques(player: Player) -> void:
 	var y := size.y - 96.0
 	var slot_size := Vector2(112.0, 46.0)
 	draw_rect(Rect2(x - 12.0, y - 24.0, slot_size.x * 6.0 + 24.0, 92.0), PANEL_BG)
-	_text(Vector2(x, y - 8.0), "Technique Bar  (1-6 select, LMB execute)", 12, MUTED)
+	_text(Vector2(x, y - 8.0), "Technique Bar  (1-6 select · LMB execute · RMB weapon chain)", 12, MUTED)
 	y += 2.0
 	for i in mini(6, player.technique_ids.size()):
 		var tech: Dictionary = DB.technique(String(player.technique_ids[i]))
@@ -317,7 +324,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB attack · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · SPACE dodge · F meditate · G tribulation · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

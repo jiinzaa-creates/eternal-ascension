@@ -345,7 +345,7 @@ func _run() -> void:
 	main._try_interact()
 	check(main.quests.step_index == 1, "talking to Elder Bai starts the quest")
 
-	player._current_technique = DB.technique("tech.sword.azure_cleave")
+	player._current_attack = DB.technique("tech.sword.azure_cleave")
 	var kills_before := Game.kills
 	for n in 3:
 		var target := Dummy.new()
@@ -618,7 +618,9 @@ func _run() -> void:
 		check(Game.discovered.has(poi_id), "discoveries survive save and load")
 		check(main.world_delta.is_spent(poi_coord, poi_id, Clock.day), "a searched site stays spent after loading")
 
-		var step: int = mini(poi_window, 5000)
+		# A ruin never returns, so there is no window to wait out; jumping the
+		# clock for its sentinel value would age the run to death mid-suite.
+		var step: int = 0 if poi_window == WorldDelta.PERMANENT else mini(poi_window, 5000)
 		Clock.day += step
 		player.global_position = Vector2(12200, 12200)
 		await frames(2)
@@ -1389,6 +1391,87 @@ func _run() -> void:
 	player.attrs.add("dex", dex_before)
 	player.rebuild_stats()
 	brawler.queue_free()
+	player.hp = player.hp_max
+	player.poise.reset()
+
+	# --- weapon framework ------------------------------------------------------
+	player.equipment["weapon"] = {
+		"id": "item.test.jian", "base": "base.sword.iron_jian", "weapon_type": "sword",
+		"name": "Test Iron Jian", "slot": "weapon", "ilvl": 1, "rarity": 1,
+		"base_damage": 8.0, "armor": 0.0, "mods": [],
+	}
+	player.rebuild_stats()
+	check(player.weapon_type_id() == "sword", "an equipped jian selects the sword moveset")
+	check(player.weapon_type_name() == "Sword", "the weapon category is named")
+	check(player.next_move_name() != "", "a weapon offers a first strike")
+
+	player._facing = Vector2.RIGHT
+	var strike_dir: Vector2 = player._aim_dir()
+	var sparring := Dummy.new()
+	sparring.ilvl = 1
+	sparring.aggressive = false
+	main.add_child(sparring)
+	# The player is mid-realm here; a normal dummy would die to three strikes.
+	sparring.hp_max = 5000.0
+	sparring.hp = 5000.0
+	sparring.global_position = player.global_position + strike_dir * 42.0
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._combo_index = -1
+	player._combo_elapsed = 100.0
+	var qi_before_strike := player.cultivation.qi
+	var dummy_hp_before := sparring.hp
+	check(player.try_light_attack(), "a light strike starts")
+	check(approx(player.cultivation.qi, qi_before_strike), "a weapon strike spends no Qi")
+	await frames(20)
+	check(sparring.hp < dummy_hp_before, "the weapon strike lands on a dummy in reach")
+	check(player._combo_index == 0, "the first strike marks the chain's first step")
+
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._combo_elapsed = 0.05
+	var second_move := String((Weapons.moves("sword") as Array)[1].get("name", ""))
+	check(player.next_move_name() == second_move, "an in-time press previews the second strike")
+	player.try_light_attack()
+	check(player._combo_index == 1, "the chain advances on the second strike")
+	await frames(20)
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._combo_elapsed = 100.0
+	player.try_light_attack()
+	check(player._combo_index == 0, "a late press restarts the chain")
+	await frames(20)
+
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player.equipment["weapon"] = {
+		"id": "item.test.rod", "base": "base.staff.azure_rod", "weapon_type": "staff",
+		"name": "Test Azure Rod", "slot": "weapon", "ilvl": 3, "rarity": 2,
+		"base_damage": 6.0, "armor": 0.0, "mods": [],
+	}
+	player.rebuild_stats()
+	check(player.weapon_type_id() == "staff", "swapping to a rod selects the staff moveset")
+	var staff_reach := float((Weapons.attack_payload(Weapons.find("staff"), 0).get("hitbox", {}) as Dictionary).get("radius", 0.0))
+	var sword_reach := float((Weapons.attack_payload(Weapons.find("sword"), 0).get("hitbox", {}) as Dictionary).get("radius", 0.0))
+	check(staff_reach > sword_reach, "the staff moveset reaches further")
+	sparring.global_position = player.global_position + strike_dir * 110.0
+	var far_hp := sparring.hp
+	player._combo_index = -1
+	player._combo_elapsed = 100.0
+	player.try_light_attack()
+	await frames(20)
+	check(sparring.hp < far_hp, "the staff reaches a dummy a sword could not")
+	if is_instance_valid(sparring):
+		sparring.queue_free()
+
+	player.equipment.erase("weapon")
+	player.rebuild_stats()
+	check(player.weapon_type_id() == Weapons.DEFAULT_TYPE, "an empty weapon slot is unarmed")
+	check(Weapons.moves(player.weapon_type_id()).size() >= 2, "bare hands have a real chain")
+	player._attack_state = "idle"
+	player._cooldown = 0.0
+	player._combo_index = -1
+	player._combo_elapsed = 100.0
 	player.hp = player.hp_max
 	player.poise.reset()
 

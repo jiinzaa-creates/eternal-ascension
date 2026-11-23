@@ -533,6 +533,31 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **Rule:** a visual system must expose its decision as a static pure function and get checks in
   `run_tests`. Rendering output itself cannot be verified headlessly; the report must say so.
 
+## Weapons
+
+- Every weapon category lives in `data/weapons.json` and owns a **light-attack moveset**.
+  `Weapons` is pure: it resolves categories, chains, scaled hitboxes and the attack payload;
+  `Player` only owns the cursor and feeds the payload to the shared frame machine.
+- A weapon item declares `weapon_type`. **Old saves predate that key**, so resolution falls back
+  to the base id (`base.sword.iron_jian` -> sword) and then to `fist`. Never add a save-schema
+  bump for a new weapon category; add a base prefix or the explicit key instead.
+- `Weapons.attack_payload()` returns the same shape a technique does (`frames`, `hitbox`,
+  `base_damage`, `damage_mult`, `poise_damage`, `knockback`, `speed_mult`, `lifesteal`).
+  Keep it that way: a light strike must not grow a second timing or hitbox path.
+- The payload bakes the category's `poise_mult` and `knock_mult` into the move so
+  `Damage.poise_damage()` and `Damage.knockback()` stay weapon-agnostic. Damage is
+  `(weapon_damage + move.base_damage) * physical_mult * move.damage_mult` via
+  `Damage.weapon_strike()`; unarmed moves carry their own small `base_damage`.
+- Chains: `Weapons.next_combo(cursor, since_last, window, length)` is the one rule. A cursor of
+  `-1`, or a press after the window, starts at strike one; otherwise it advances and wraps.
+  A technique cancels the chain, and equipping a different weapon resets the cursor.
+- Inputs are deliberately separate: `attack` (LMB / gamepad X) is the selected technique and
+  `light_attack` (RMB / D-pad right) is the weapon chain. Do not merge them.
+- The HUD reads `Player.weapon_type_name()`, `next_move_name()` and `next_combo_step()`; it never
+  duplicates chain logic.
+- Any new mechanic here belongs in `Weapons` with checks in `run_tests`, and a scene-level check
+  in `integration.gd` before it is called working.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.
