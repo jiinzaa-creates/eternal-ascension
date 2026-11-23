@@ -99,6 +99,7 @@ func _draw() -> void:
 	draw_gear(player)
 	draw_storage(player)
 	draw_forge(player)
+	draw_alchemy(player)
 	draw_quest(player)
 	draw_prompt()
 	draw_realm_banner()
@@ -438,7 +439,7 @@ func draw_gear(player: Player) -> void:
 	draw_rect(panel, Color("#7fd3e0", 0.45), false, 1.5)
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "SATCHEL", 18, ACCENT)
-	_text(origin + Vector2(112.0, 32.0), "sort: %s (R)    I — close    arrows — choose    ENTER — wear" % Inventory.sort_label(player.inventory_sort), 11, MUTED)
+	_text(origin + Vector2(112.0, 32.0), "sort: %s (R)    I — close    arrows — choose    ENTER — wear    U — use" % Inventory.sort_label(player.inventory_sort), 11, MUTED)
 
 	var rows: Array = host.inventory_rows()
 	var count := rows.size()
@@ -497,6 +498,21 @@ func draw_gear(player: Player) -> void:
 	if lore != "":
 		_text(Vector2(cx, cy), _fit(lore, 11, 358.0), 11, Color("#d8c070"))
 		cy += 19.0
+
+	if String(chosen.get("slot", "")) == "consumable":
+		var alchemy_rules: Alchemy = host.alchemy
+		var effect: Dictionary = alchemy_rules.effect_for(chosen) if alchemy_rules != null else {}
+		if effect.is_empty():
+			_text(Vector2(cx, cy), "No effect you know how to draw out.", 11, MUTED)
+			return
+		var amount := Alchemy.effect_amount(effect, chosen)
+		var effect_id := String(effect.get("id", ""))
+		var line := ("Purges %.0f contamination" % amount) if effect_id == "cleanse" \
+			else ("Restores %.0f %s" % [amount, String(Alchemy.EFFECT_LABELS.get(effect_id, effect_id))])
+		_text(Vector2(cx, cy), line, 12, ACCENT)
+		cy += 20.0
+		_text(Vector2(cx, cy), "Potency x%.2f.  U drinks it." % Alchemy.potency_of(chosen), 11, Color("#8fd8a0"))
+		return
 
 	if not Items.is_equipment(String(chosen.get("slot", ""))):
 		_text(Vector2(cx, cy), "Not wearable. Keep it, sell it, or store it.", 11, MUTED)
@@ -605,6 +621,62 @@ func draw_forge(player: Player) -> void:
 		_text(Vector2(cx, cy), "ENTER breaks it down for good.", 12, ACCENT)
 
 
+## The cauldron: potions, their effects and exactly what they will cost. The
+## panel never brews silently — ENTER is the commitment.
+func draw_alchemy(player: Player) -> void:
+	if host == null or not bool(host.alchemy_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
+	var panel := Rect2(view * 0.5 - Vector2(370.0, 215.0), Vector2(740.0, 430.0))
+	draw_rect(panel, Color("#0b1014", 0.97))
+	draw_rect(panel, Color("#8fd8a0", 0.45), false, 1.5)
+	var origin := panel.position
+	_text(origin + Vector2(22.0, 32.0), "HERB-GARDEN CAULDRON", 18, Color("#9fe0a8"))
+	_text(origin + Vector2(272.0, 32.0), "↑/↓ choose    ENTER brew    E — close", 11, MUTED)
+
+	var rows: Array = host.alchemy_rows()
+	var selected := clampi(int(host.alchemy_index), 0, maxi(0, rows.size() - 1))
+	var list_y := origin.y + 66.0
+	if rows.is_empty():
+		_text(Vector2(origin.x + 22.0, list_y), "Nothing can be brewed here.", 12, MUTED)
+		return
+	for i in rows.size():
+		var entry: Dictionary = rows[i]
+		var check: Dictionary = Crafting.check(entry, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		var line := "%s %s" % [">" if i == selected else " ", _fit(String(entry.get("name", "?")), 12, 290.0)]
+		var color := ACCENT if i == selected else Color("#9fc8a8")
+		if not bool(check.get("ok", false)) and i != selected:
+			color = Color("#6b7b84")
+		_text(Vector2(origin.x + 22.0, list_y), line, 12, color)
+		list_y += 22.0
+
+	var chosen: Dictionary = rows[selected]
+	var base: Dictionary = DB.base_item(String(chosen.get("base", "")))
+	var rules_check: Dictionary = Crafting.check(chosen, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	var cx := origin.x + 360.0
+	var cy := origin.y + 66.0
+	_text(Vector2(cx, cy), String(chosen.get("name", "?")), 14, ACCENT)
+	cy += 22.0
+	_text(Vector2(cx, cy), _fit("Brews: %s (ilvl %d+)" % [String(base.get("name", "?")), maxi(int(base.get("ilvl", 1)), player.cultivation.realm)], 12, 350.0), 12, MUTED)
+	cy += 20.0
+	_text(Vector2(cx, cy), Alchemy.effect_text(chosen), 12, Color("#8fd8a0"))
+	cy += 20.0
+	var potency := Alchemy.potency_for(player.stats.crafting_quality_mult(), false)
+	_text(Vector2(cx, cy), "Your insight: potency x%.2f" % potency, 11, Color("#7f9098"))
+	cy += 20.0
+	_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(chosen), 11, 350.0), 11, Color("#d8c070"))
+	cy += 20.0
+	_text(Vector2(cx, cy), _fit(String(chosen.get("desc", "")), 11, 350.0), 11, Color("#7f9098"))
+	cy += 34.0
+	if bool(rules_check.get("ok", false)):
+		_text(Vector2(cx, cy), "Ready.  ENTER brews one.", 12, ACCENT)
+	else:
+		_text(Vector2(cx, cy), _fit("Refused — %s" % String(rules_check.get("reason", "not enough")), 11, 350.0), 11, Color("#e08f8f"))
+	cy += 26.0
+	_text(Vector2(cx, cy), "Pills are drunk from the satchel (I, then U).", 11, Color("#7f9098"))
+
+
 ## The storehouse: the satchel on the left, the shelves on the right. The cursor
 ## sits on one side and ENTER moves that stack across whole.
 func draw_storage(player: Player) -> void:
@@ -704,7 +776,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

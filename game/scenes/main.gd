@@ -69,6 +69,10 @@ var forge_open := false
 var forge_mode := 0
 var forge_index := 0
 const FORGE_MODES: Array[String] = ["forge", "refine", "disassemble"]
+## Alchemy: one cauldron, one list of potions, frozen play for the same reason.
+var alchemy: Alchemy
+var alchemy_open := false
+var alchemy_index := 0
 var waypoint_name := ""
 var waypoint_position := Vector2.ZERO
 ## Discovered sites, recorded with a position so they stay travel destinations
@@ -113,6 +117,7 @@ var _physique_rolls := 0
 func _ready() -> void:
 	Game.new_run()
 	crafting = Crafting.new(DB)
+	alchemy = Alchemy.new(DB)
 	continent = Continent.generate(Game.world_seed)
 	DisplayPolicy.apply(get_window())
 	get_window().size_changed.connect(_on_window_resized)
@@ -361,6 +366,13 @@ func _spawn_interactables() -> void:
 	world.add_child(forge)
 	interactables.append(forge)
 
+	# The cauldron: herbs and cores in, pills out, beside the herb garden.
+	var cauldron := Interactable.new()
+	cauldron.setup(Interactable.Kind.ALCHEMY, "alchemy.cauldron", "Herb-Garden Cauldron — brew")
+	cauldron.position = settlement.position_for("herb_garden") + Vector2(0, 56)
+	world.add_child(cauldron)
+	interactables.append(cauldron)
+
 	# A manual teaches a technique that is otherwise hidden from character start.
 	var manual := Interactable.new()
 	manual.setup_manual("manual.crimson_moon", "Forbidden manual — Crimson Moon Devour", "tech.blood.crimson_moon")
@@ -592,7 +604,8 @@ func _process(delta: float) -> void:
 			DB.biome(Biome.for_chunk(chunks.world_to_chunk(player.global_position), Game.world_seed)))
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
-	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open:
+	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
+			or alchemy_open:
 		return
 
 	_simulate_npcs()
@@ -835,7 +848,7 @@ func toggle_gear() -> void:
 	if gear_open:
 		close_gear()
 		return
-	if bars_open or travel_open or shop_open or storage_open or forge_open or (world_map != null and world_map.visible):
+	if bars_open or travel_open or shop_open or storage_open or forge_open or alchemy_open or (world_map != null and world_map.visible):
 		return
 	gear_open = true
 	gear_index = 0
@@ -907,7 +920,7 @@ func storage_move() -> void:
 func _open_storage() -> void:
 	if player == null or phase == "creation" or String(phase) == "ended":
 		return
-	if gear_open or forge_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+	if gear_open or forge_open or alchemy_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
 		return
 	storage_open = true
 	storage_side = 0
@@ -1046,7 +1059,7 @@ func _forge_disassemble(item: Dictionary) -> void:
 func _open_forge() -> void:
 	if player == null or phase == "creation" or String(phase) == "ended":
 		return
-	if gear_open or storage_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+	if gear_open or storage_open or alchemy_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
 		return
 	forge_open = true
 	forge_mode = 0
@@ -1060,6 +1073,114 @@ func close_forge() -> void:
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process(true)
+
+
+# ---------------------------------------------------------------- alchemy ----
+
+func alchemy_rows() -> Array:
+	return alchemy.recipes() if alchemy != null else []
+
+
+func alchemy_selected() -> Dictionary:
+	var rows: Array = alchemy_rows()
+	if alchemy_index < 0 or alchemy_index >= rows.size():
+		return {}
+	return rows[alchemy_index] as Dictionary
+
+
+func alchemy_act() -> void:
+	_brew(alchemy_selected())
+
+
+## Brewing shares the forge's attempt counter and its spend path: a failed brew
+## costs its herbs, and the next try must roll a fresh stream.
+func _brew(recipe: Dictionary) -> void:
+	if player == null or alchemy == null or recipe.is_empty():
+		return
+	var check := Crafting.check(recipe, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("The cauldron refuses: %s." % String(check.get("reason", "not enough")))
+		return
+	var base: Dictionary = DB.base_item(String(recipe.get("base", "")))
+	var ilvl := maxi(int(base.get("ilvl", 1)), player.cultivation.realm)
+	var attempt := Game.crafts_made
+	Game.crafts_made += 1
+	var result := alchemy.brew(recipe, ilvl, 70000 + attempt, 0, player.stats.crafting_quality_mult())
+	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
+		Bus.toast.emit(String(result.get("reason", "the cauldron cannot make that")).capitalize() + ".")
+		return
+	_spend_craft(recipe)
+	if bool(result.get("failed", false)):
+		Bus.toast.emit("The brew spoils; the herbs are lost.")
+		return
+	var pill: Dictionary = result["item"]
+	player.pick_up(pill)
+	var flourish := " (exceptional brew)" if bool(result.get("quality", false)) else ""
+	Bus.toast.emit("Brewed %s at potency x%.2f%s." % [String(pill.get("name", "a pill")), Alchemy.potency_of(pill), flourish])
+
+
+func _open_alchemy() -> void:
+	if player == null or phase == "creation" or String(phase) == "ended":
+		return
+	if gear_open or storage_open or forge_open or bars_open or travel_open or shop_open or (world_map != null and world_map.visible):
+		return
+	alchemy_open = true
+	alchemy_index = 0
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func close_alchemy() -> void:
+	alchemy_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## Drinks the selected satchel stack. The pill is spent even at full health or
+## Qi: a cultivator who swallows one at the wrong moment has still swallowed it.
+func use_selected_item() -> void:
+	if player == null or alchemy == null:
+		return
+	var rows: Array = inventory_rows()
+	if gear_index < 0 or gear_index >= rows.size():
+		return
+	var item: Dictionary = rows[gear_index]
+	if String(item.get("slot", "")) != "consumable":
+		Bus.toast.emit("%s is not a pill." % String(item.get("name", "item")))
+		return
+	var effect: Dictionary = alchemy.effect_for(item)
+	if effect.is_empty():
+		Bus.toast.emit("%s has no effect you know how to draw out." % String(item.get("name", "item")))
+		return
+	var amount := Alchemy.effect_amount(effect, item)
+	var effect_id := String(effect.get("id", ""))
+	match effect_id:
+		"qi":
+			player.cultivation.qi = minf(player.cultivation.qi_max(player.stats), player.cultivation.qi + amount)
+		"heal":
+			player.heal(amount)
+		"cleanse":
+			player.cultivation.cleanse(amount)
+	var item_id := String(item.get("id", ""))
+	for i in player.inventory.size():
+		var entry: Dictionary = player.inventory[i]
+		if String(entry.get("id", "")) != item_id:
+			continue
+		var left := int(entry.get("count", 1)) - 1
+		if left <= 0:
+			player.inventory.remove_at(i)
+		else:
+			entry["count"] = left
+			player.inventory[i] = entry
+		break
+	gear_index = clampi(gear_index, 0, maxi(0, inventory_rows().size() - 1))
+	var label := String(Alchemy.EFFECT_LABELS.get(effect_id, effect_id))
+	var line := ("purged %.0f contamination" % amount) if effect_id == "cleanse" \
+		else ("restored %.0f %s" % [amount, label])
+	Bus.player_stats_changed.emit()
+	Bus.cultivation_changed.emit()
+	Bus.toast.emit("Used %s — %s." % [Items.label(item), line])
 
 
 # ---------------------------------------------------------- simulation ----
@@ -1340,6 +1461,22 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		return
 
+	if alchemy_open:
+		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
+			close_alchemy()
+			return
+		var potion_list: Array = alchemy_rows()
+		if event.is_action_pressed("ui_down"):
+			alchemy_index = mini(alchemy_index + 1, maxi(0, potion_list.size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			alchemy_index = maxi(0, alchemy_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			alchemy_act()
+			return
+		return
+
 	if forge_open:
 		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
 			close_forge()
@@ -1391,6 +1528,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("sort_inventory"):
 			cycle_inventory_sort()
 			gear_index = 0
+			return
+		if event.is_action_pressed("use_item"):
+			use_selected_item()
 			return
 		if event.is_action_pressed("ui_down"):
 			gear_index = Inventory.move_cursor(gear_index, Inventory.COLS, rows.size())
@@ -1761,6 +1901,8 @@ func _use_interactable(node: Interactable) -> void:
 			_open_storage()
 		Interactable.Kind.FORGE:
 			_open_forge()
+		Interactable.Kind.ALCHEMY:
+			_open_alchemy()
 		Interactable.Kind.RUIN:
 			if node.used:
 				return

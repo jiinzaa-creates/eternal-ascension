@@ -913,6 +913,36 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **Save.** Crafted items are ordinary canonical items. The only new state is `Game.crafts_made`,
   an optional save key defaulting to 0; schema stays 2.
 
+## Alchemy at the cauldron
+
+- **Recipes are data.** `data/alchemy.json` holds one station (`station.alchemy`, at the herb
+  garden) and three potions, each naming a consumable base, its materials, a stone cost, a realm
+  gate, a failure chance and exactly one effect (`qi`, `heal` or `cleanse`). `DB.validate()`
+  rejects a missing or unknown station location, a missing name, a potion whose base is absent
+  or not a consumable, a base two potions share, an unknown or non-positive effect, and a
+  negative cost.
+- **Brewing is a pure roll.** `Alchemy.brew()` is a function of
+  `(recipe, ilvl, key, counter, quality_mult)`. The scene keys it on `Game.crafts_made` with a
+  `70000 +` offset, advances that counter on every attempt (failures included) and shares the
+  forge's spend path, so a failed brew costs its herbs and the retry rolls a fresh stream.
+- **Potency carries quality.** A consumable has no rarity, so INT's `crafting_quality_mult()`
+  becomes potency: `1 + max(0, mult - 1) * 0.35`, plus a discrete `0.25` when the quality roll
+  lands. Potency is clamped to `0.1…5.0` and written to the item, so a brew keeps its strength
+  through a save.
+- **Pills do not blend.** `Items.stack_key()` appends potency for consumables, so a strong pill
+  never merges into a weak stack. Two pills of identical base, name and potency still stack.
+- **Effects are looked up by base.** `Alchemy.recipe_for_item()` finds the potion for any
+  consumable of that base, so a pill found in the world is drinkable with the same rule as a
+  brewed one. `Alchemy.effect_amount()` scales the recipe amount by the item's potency.
+- **Drinking.** `U` in the satchel turns the selected stack into its effect: Qi is raised toward
+  the cap, health goes through `Player.heal()`, contamination through `Cultivation.cleanse()`.
+  One unit is spent even at full health or Qi — a pill swallowed at the wrong moment is still
+  swallowed.
+- **The screen freezes play.** `E` at the cauldron opens `draw_alchemy()` with the effect, the
+  potency your insight would produce, the exact cost and the refusal reason; ENTER brews.
+- **Save.** No new run state: potency is ordinary item data and the attempt counter is the one
+  the forge already uses. Schema stays 2.
+
 ## Loot tables
 
 - **One table per source, all in data.** `data/loot_tables.json` holds `kill.wild`,

@@ -47,6 +47,7 @@ func _ready() -> void:
 	_unique_tests()
 	_inventory_tests()
 	_crafting_tests()
+	_alchemy_tests()
 	_loot_tests()
 	_cultivation_tests()
 	_combat_tests()
@@ -4149,3 +4150,65 @@ func _combat_polish_tests() -> void:
 		check(peak <= 32767, "the %s sound does not clip" % kind)
 		check(Sfx.build(kind).data == stream.data, "the %s sound is deterministic" % kind)
 
+
+
+## Alchemy: one station, three potions, every potion a consumable whose effect
+## is known, a brew that is pure in its stream, and potency that carries quality.
+func _alchemy_tests() -> void:
+	var station: Dictionary = DB.alchemy_brewery()
+	check(String(station.get("id", "")) == Alchemy.STATION, "the cauldron is a real station")
+	check(Settlement.LOCATIONS.has(String(station.get("location", ""))), "the cauldron stands somewhere real")
+	check(DB.potions.size() == 3, "three potions are authored")
+	var rules := Alchemy.new(DB)
+	for entry in DB.potions:
+		var potion: Dictionary = entry
+		var base: Dictionary = DB.base_item(String(potion.get("base", "")))
+		check(not base.is_empty() and String(base.get("slot", "")) == "consumable",
+			"%s brews a consumable" % String(potion.get("id", "")))
+		check(Alchemy.is_effect(String((potion.get("effect", {}) as Dictionary).get("id", ""))),
+			"%s has a known effect" % String(potion.get("id", "")))
+
+	# A pill found in the world is drinkable exactly like a brewed one.
+	var world_pill := Items.normalize_item({
+		"id": "item.alchemy.world", "base": "base.pill.qi_gathering", "slot": "consumable",
+		"name": "Qi Gathering Pill", "ilvl": 1})
+	check(String(rules.effect_for(world_pill).get("id", "")) == "qi", "a found pill is drinkable")
+	check(String(rules.recipe_for_item(world_pill).get("id", "")) == "potion.qi_gathering", "a found pill knows its recipe")
+	check(rules.effect_for(Items.normalize_item({"id": "item.alchemy.ore", "slot": "material", "material": "ore"})).is_empty(),
+		"ore is not a pill")
+
+	# Potency: default, scaling, bounds, stacking.
+	check(is_equal_approx(Alchemy.potency_of(world_pill), 1.0), "a plain pill has plain potency")
+	check(Alchemy.potency_for(1.0, false) == 1.0, "an ordinary brewer gains nothing")
+	check(Alchemy.potency_for(2.0, true) > Alchemy.potency_for(2.0, false), "luck raises potency further")
+	check(Alchemy.potency_for(100.0, true) <= Alchemy.MAX_POTENCY, "potency stays bounded")
+	var effect: Dictionary = rules.effect_for(world_pill)
+	check(is_equal_approx(Alchemy.effect_amount(effect, world_pill), float(effect.get("amount", 0.0))),
+		"a plain pill restores its base amount")
+	var strong := world_pill.duplicate()
+	strong["potency"] = 1.5
+	check(Alchemy.effect_amount(effect, strong) > Alchemy.effect_amount(effect, world_pill), "a stronger pill restores more")
+	check(not Items.can_stack(world_pill, strong), "pills of different potency never merge")
+	check(Items.can_stack(world_pill, world_pill.duplicate()), "pills of the same potency stack")
+	check(is_equal_approx(float(Items.normalize_item({"slot": "consumable", "potency": 99.0})["potency"]), 5.0),
+		"potency is clamped on the way in")
+
+	# Brewing is pure in its stream and makes the authored base.
+	var recipe: Dictionary = DB.potion("potion.qi_gathering")
+	var first: Dictionary = rules.brew(recipe, 1, 70000, 0, 1.0)
+	var again: Dictionary = rules.brew(recipe, 1, 70000, 0, 1.0)
+	check(bool(first.get("ok", false)) and not bool(first.get("failed", false)), "the qi potion brews")
+	check(String((first["item"] as Dictionary).get("id", "")) == String((again["item"] as Dictionary).get("id", "")),
+		"brewing repeats from the same stream")
+	check(String((first["item"] as Dictionary).get("base", "")) == "base.pill.qi_gathering",
+		"the cauldron makes the authored pill")
+	check(is_equal_approx(Alchemy.potency_of(first["item"] as Dictionary), 1.0), "an ordinary brewer gets plain potency")
+	var learned: Dictionary = rules.brew(recipe, 5, 70000, 1, 1.6)
+	check(Alchemy.potency_of(learned["item"] as Dictionary) > 1.0, "insight makes a stronger brew")
+	check(int((learned["item"] as Dictionary).get("ilvl", 0)) == 5, "a brew keeps its level")
+	var spoiled: Dictionary = recipe.duplicate()
+	spoiled["failure_chance"] = 1.0
+	var failed: Dictionary = rules.brew(spoiled, 1, 70000, 2, 1.0)
+	check(bool(failed.get("failed", false)) and (failed["item"] as Dictionary).is_empty(), "a spoiled brew makes nothing")
+	check(not bool(rules.brew({}, 1, 0, 0).get("ok", true)), "an unknown potion is refused")
+	check(DB.has("potion", "potion.cleansing"), "potions are indexed")

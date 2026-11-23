@@ -2682,6 +2682,114 @@ func _run() -> void:
 	main.close_forge()
 	check(not main.forge_open and player.is_physics_processing(), "closing the forge resumes play")
 
+	# --- alchemy: brew at the cauldron, then drink what comes out ---------------
+	var m45_cauldron := _find_interactable(main.interactables, "alchemy.cauldron")
+	check(m45_cauldron != null and m45_cauldron.kind == Interactable.Kind.ALCHEMY, "the settlement has a cauldron")
+	Game.spirit_stones = maxi(Game.spirit_stones, 500)
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m45.herb", "slot": "material", "name": "Spirit Herb", "material": "herb", "count": 8}))
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m45.core", "slot": "material", "name": "Beast Core", "material": "core", "count": 3}))
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m45.marrow", "slot": "material", "name": "Root Marrow", "material": "marrow", "count": 2}))
+
+	main._open_alchemy()
+	check(main.alchemy_open, "the cauldron opens")
+	check(not player.is_physics_processing(), "the cauldron freezes play")
+	var m45_rows: Array = main.alchemy_rows()
+	check(m45_rows.size() == DB.potions.size(), "the cauldron lists every potion")
+	var m45_index := -1
+	for i in m45_rows.size():
+		if String((m45_rows[i] as Dictionary).get("id", "")) == "potion.qi_gathering":
+			m45_index = i
+	check(m45_index >= 0, "the qi potion is on the list")
+	main.alchemy_index = m45_index
+	var m45_herbs: int = int(Crafting.material_counts(player.inventory).get("herb", 0))
+	var m45_stones := Game.spirit_stones
+	var m45_pills_before := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("base", "")) == "base.pill.qi_gathering":
+			m45_pills_before += int((entry as Dictionary).get("count", 1))
+	main.alchemy_act()
+	var m45_pills_after := 0
+	for entry in player.inventory:
+		if String((entry as Dictionary).get("base", "")) == "base.pill.qi_gathering":
+			m45_pills_after += int((entry as Dictionary).get("count", 1))
+	check(m45_pills_after == m45_pills_before + 1, "the cauldron produces a pill")
+	check(int(Crafting.material_counts(player.inventory).get("herb", 0)) == m45_herbs - 2, "brewing spends its herbs")
+	check(Game.spirit_stones == m45_stones - 30, "brewing charges its stones")
+	main.close_alchemy()
+	check(not main.alchemy_open and player.is_physics_processing(), "closing the cauldron resumes play")
+
+	# A pill at a known strength, drunk from the satchel. Each remedy carries a
+	# distinct potency so shop stock of the same base cannot merge with it.
+	const M45_QI_POTENCY := 1.13
+	const M45_MEND_POTENCY := 1.11
+	const M45_CLEANSE_POTENCY := 1.12
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m45.pill", "base": "base.pill.qi_gathering", "slot": "consumable",
+		"name": "Qi Gathering Pill", "ilvl": 1, "potency": M45_QI_POTENCY}))
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m45.mend", "base": "base.pill.mending", "slot": "consumable",
+		"name": "Mending Pill", "potency": M45_MEND_POTENCY}))
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m45.cleanse", "base": "base.pill.cleansing", "slot": "consumable",
+		"name": "Cleansing Pill", "potency": M45_CLEANSE_POTENCY}))
+	player.cultivation.qi = 0.0
+	player.hp = 10.0
+	player.cultivation.contamination = 60.0
+	main.toggle_gear()
+	check(main.gear_open, "the satchel opens for the pills")
+	var m45_pill_index := -1
+	var m45_mend_index := -1
+	var m45_cleanse_index := -1
+	for i in main.inventory_rows().size():
+		var row: Dictionary = main.inventory_rows()[i]
+		var row_base := String(row.get("base", ""))
+		var row_potency := float(row.get("potency", 1.0))
+		if row_base == "base.pill.qi_gathering" and is_equal_approx(row_potency, M45_QI_POTENCY):
+			m45_pill_index = i
+		if row_base == "base.pill.mending" and is_equal_approx(row_potency, M45_MEND_POTENCY):
+			m45_mend_index = i
+		if row_base == "base.pill.cleansing" and is_equal_approx(row_potency, M45_CLEANSE_POTENCY):
+			m45_cleanse_index = i
+	check(m45_pill_index >= 0 and m45_mend_index >= 0 and m45_cleanse_index >= 0, "all three remedies are carried")
+	main.gear_index = m45_pill_index
+	main.use_selected_item()
+	var m45_cap := player.cultivation.qi_max(player.stats)
+	check(player.cultivation.qi > 0.0, "a qi pill restores Qi")
+	check(is_equal_approx(player.cultivation.qi, minf(m45_cap, 45.0 * M45_QI_POTENCY)), "potency decides how much")
+	var m45_pill_left := false
+	for entry in player.inventory:
+		var remaining_entry: Dictionary = entry
+		if String(remaining_entry.get("base", "")) == "base.pill.qi_gathering" \
+				and is_equal_approx(float(remaining_entry.get("potency", 1.0)), M45_QI_POTENCY):
+			m45_pill_left = true
+	check(not m45_pill_left, "a drunk pill leaves the satchel")
+
+	# Drinking removes a stack, so each remedy is found again just before use.
+	m45_mend_index = -1
+	for i in main.inventory_rows().size():
+		var mend_row: Dictionary = main.inventory_rows()[i]
+		if String(mend_row.get("base", "")) == "base.pill.mending" \
+				and is_equal_approx(float(mend_row.get("potency", 1.0)), M45_MEND_POTENCY):
+			m45_mend_index = i
+	check(m45_mend_index >= 0, "the mending pill is still carried")
+	main.gear_index = m45_mend_index
+	main.use_selected_item()
+	check(is_equal_approx(player.hp, minf(player.hp_max, 10.0 + 50.0 * M45_MEND_POTENCY)), "a mending pill closes wounds")
+	m45_cleanse_index = -1
+	for i in main.inventory_rows().size():
+		var cleanse_row: Dictionary = main.inventory_rows()[i]
+		if String(cleanse_row.get("base", "")) == "base.pill.cleansing" \
+				and is_equal_approx(float(cleanse_row.get("potency", 1.0)), M45_CLEANSE_POTENCY):
+			m45_cleanse_index = i
+	check(m45_cleanse_index >= 0, "the cleansing pill is still carried")
+	main.gear_index = m45_cleanse_index
+	main.use_selected_item()
+	check(is_equal_approx(player.cultivation.contamination, 60.0 - 35.0 * M45_CLEANSE_POTENCY), "a cleansing pill purges contamination")
+	main.close_gear()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

@@ -33,6 +33,8 @@ var weapon_types: Array = []
 var crafting_stations: Array = []
 var recipes: Array = []
 var crafting_actions: Array = []
+var potions: Array = []
+var alchemy_station: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -73,6 +75,10 @@ func load_all() -> void:
 	crafting_stations = crafting.get("stations", [])
 	recipes = crafting.get("recipes", [])
 	crafting_actions = crafting.get("actions", [])
+	var alchemy := _read("alchemy.json")
+	potions = alchemy.get("potions", [])
+	var station_value: Variant = alchemy.get("station", {})
+	alchemy_station = station_value if typeof(station_value) == TYPE_DICTIONARY else {}
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -98,6 +104,7 @@ func load_all() -> void:
 	_index("station", crafting_stations)
 	_index("recipe", recipes)
 	_index("action", crafting_actions)
+	_index("potion", potions)
 
 
 func _read(file: String) -> Dictionary:
@@ -144,6 +151,14 @@ func recipe(id: String) -> Dictionary:
 
 func crafting_action(id: String) -> Dictionary:
 	return by_id("action", id)
+
+
+func potion(id: String) -> Dictionary:
+	return by_id("potion", id)
+
+
+func alchemy_brewery() -> Dictionary:
+	return alchemy_station
 
 
 func has(kind: String, id: String) -> bool:
@@ -733,6 +748,7 @@ func validate() -> Array:
 	# Loot tables are the whole drop economy: a bad weight would skew every kill.
 	_validate_loot(problems)
 	_validate_crafting(problems)
+	_validate_alchemy(problems)
 
 	# Duplicate IDs across the whole registry would corrupt save references.
 	var seen: Dictionary = {}
@@ -746,6 +762,56 @@ func validate() -> Array:
 				seen[full] = true
 
 	return problems
+
+
+## A potion that names a missing base, an unknown effect or a negative cost would
+## only fail when a player had already spent herbs on it.
+func _validate_alchemy(problems: Array) -> void:
+	if alchemy_station.is_empty():
+		problems.append("alchemy has no station")
+	else:
+		if String(alchemy_station.get("id", "")) == "" or String(alchemy_station.get("name", "")) == "":
+			problems.append("alchemy station needs an id and a name")
+		var location := String(alchemy_station.get("location", ""))
+		if not Settlement.LOCATIONS.has(location):
+			problems.append("alchemy station names unknown location %s" % location)
+	if potions.is_empty():
+		problems.append("no potions are authored")
+	var seen: Dictionary = {}
+	var bases_seen: Dictionary = {}
+	for entry in potions:
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("potion is not an object")
+			continue
+		var potion: Dictionary = entry
+		var potion_id := String(potion.get("id", ""))
+		if potion_id == "":
+			problems.append("potion without id")
+			continue
+		if seen.has(potion_id):
+			problems.append("duplicate potion " + potion_id)
+		seen[potion_id] = true
+		if String(potion.get("name", "")) == "":
+			problems.append("potion %s has no name" % potion_id)
+		var base_id := String(potion.get("base", ""))
+		if base_id == "":
+			problems.append("potion %s has no base" % potion_id)
+		elif not has("base", base_id):
+			problems.append("potion %s names unknown base %s" % [potion_id, base_id])
+		elif String(by_id("base", base_id).get("slot", "")) != "consumable":
+			problems.append("potion %s does not brew a consumable" % potion_id)
+		if bases_seen.has(base_id):
+			problems.append("two potions share the base %s" % base_id)
+		bases_seen[base_id] = true
+		var effect: Variant = potion.get("effect", {})
+		if typeof(effect) != TYPE_DICTIONARY:
+			problems.append("potion %s has no effect" % potion_id)
+		else:
+			if not Alchemy.is_effect(String((effect as Dictionary).get("id", ""))):
+				problems.append("potion %s has an unknown effect" % potion_id)
+			if float((effect as Dictionary).get("amount", 0.0)) <= 0.0:
+				problems.append("potion %s has a non-positive effect" % potion_id)
+		_validate_craft_cost(potion, "potion " + potion_id, problems, true)
 
 
 func _base_exists_for_slot(slot: String) -> bool:

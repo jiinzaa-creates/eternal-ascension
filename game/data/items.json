@@ -9,7 +9,9 @@
     {"id": "base.ring.jade", "name": "Jade Ring", "slot": "ring", "ilvl": 1, "weight": 18, "value": 10, "tags": ["jade"], "implicit": "+2% critical chance"},
     {"id": "base.ring.spirit_iron", "name": "Spirit Iron Ring", "slot": "ring", "ilvl": 3, "weight": 9, "value": 28, "tags": ["jade"], "requires": {"realm": 2}, "implicit": "+6% cultivation speed"},
     {"id": "base.talisman.wind_charm", "name": "Wind Charm", "slot": "talisman", "ilvl": 1, "weight": 15, "value": 14, "tags": ["wind"], "conflicts": ["heavy"], "implicit": "+4% movement speed"},
-    {"id": "base.pill.qi_gathering", "name": "Qi Gathering Pill", "slot": "consumable", "ilvl": 1, "weight": 22, "value": 6, "implicit": "Restores 25% Qi"}
+    {"id": "base.pill.qi_gathering", "name": "Qi Gathering Pill", "slot": "consumable", "ilvl": 1, "weight": 22, "value": 6, "implicit": "Restores Qi"},
+    {"id": "base.pill.mending", "name": "Mending Pill", "slot": "consumable", "ilvl": 1, "weight": 14, "value": 7, "implicit": "Mends wounds"},
+    {"id": "base.pill.cleansing", "name": "Cleansing Pill", "slot": "consumable", "ilvl": 2, "weight": 10, "value": 9, "implicit": "Purges Qi contamination"}
   ],
   "prefixes": [
     {"id": "prefix.sharpened", "name": "Sharpened", "kind": "prefix", "stat": "physical_damage_pct", "stat_label": "physical damage", "unit": "%", "ilvl": 1, "slots": ["weapon"], "weight": 14, "min": 8, "max": 22,

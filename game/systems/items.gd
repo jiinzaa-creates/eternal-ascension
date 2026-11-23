@@ -34,7 +34,7 @@ const REPAIR_RATE := 0.18
 const FIELDS: Array[String] = [
 	"id", "seed", "base", "base_name", "slot", "weapon_type", "ilvl", "rarity",
 	"rarity_name", "name", "implicit", "base_damage", "armor", "mods", "value",
-	"unique", "lore", "material", "count", "durability",
+	"unique", "lore", "material", "potency", "count", "durability",
 ]
 
 
@@ -126,6 +126,10 @@ static func stack_limit(item: Dictionary) -> int:
 static func stack_key(item: Dictionary) -> String:
 	if stack_limit(item) <= 1:
 		return ""
+	# Pills of different potency are not interchangeable, so they never merge:
+	# a swallowed pill must be the strength it was brewed at.
+	if String(item.get("slot", "")) == "consumable":
+		return "%s|%s|%s|%.2f" % [String(item.get("slot", "")), String(item.get("base", "")), String(item.get("name", "")), clampf(float(item.get("potency", 1.0)), 0.1, 5.0)]
 	return "%s|%s|%s" % [String(item.get("slot", "")), String(item.get("base", "")), String(item.get("name", ""))]
 
 
@@ -162,6 +166,7 @@ static func normalize_item(value: Variant) -> Dictionary:
 	out["unique"] = bool(data.get("unique", false))
 	out["lore"] = String(data.get("lore", ""))
 	out["material"] = String(data.get("material", ""))
+	out["potency"] = clampf(float(data.get("potency", 1.0)), 0.1, 5.0)
 	out["count"] = clampi(int(data.get("count", 1)), 1, 999)
 	if DURABLE_SLOTS.has(String(out["slot"])):
 		var maximum := max_durability(String(out["slot"]))

@@ -1,0 +1,42 @@
+{
+	"station": {
+		"id": "station.alchemy",
+		"name": "Herb-Garden Cauldron",
+		"location": "herb_garden"
+	},
+	"potions": [
+		{
+			"id": "potion.qi_gathering",
+			"name": "Qi Gathering Pill",
+			"base": "base.pill.qi_gathering",
+			"materials": [{"material": "herb", "count": 2}],
+			"stones": 30,
+			"realm": 1,
+			"failure_chance": 0.0,
+			"effect": {"id": "qi", "amount": 45},
+			"desc": "Two spirit herbs steeped until the Qi in them can be drunk."
+		},
+		{
+			"id": "potion.mending",
+			"name": "Mending Pill",
+			"base": "base.pill.mending",
+			"materials": [{"material": "herb", "count": 2}, {"material": "core", "count": 1}],
+			"stones": 40,
+			"realm": 1,
+			"failure_chance": 0.05,
+			"effect": {"id": "heal", "amount": 50},
+			"desc": "Herb fibre bound with a beast core, so the body remembers how to close."
+		},
+		{
+			"id": "potion.cleansing",
+			"name": "Cleansing Pill",
+			"base": "base.pill.cleansing",
+			"materials": [{"material": "herb", "count": 3}, {"material": "marrow", "count": 1}],
+			"stones": 80,
+			"realm": 2,
+			"failure_chance": 0.1,
+			"effect": {"id": "cleanse", "amount": 35},
+			"desc": "Marrow draws the impurity out; the herb carries it away."
+		}
+	]
+}
