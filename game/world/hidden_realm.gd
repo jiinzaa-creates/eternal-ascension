@@ -25,6 +25,11 @@ var spawn_points: Array = []
 var entry_cell := Vector2i(0, 3)
 var altar_cell := Vector2i(4, 0)
 var cleared := false
+## Where entities are parented. The main scene points this at the Y-sorted world
+## layer so realm enemies and chests sort against the player; standalone tests
+## leave it null and entities stay children of the realm.
+var entity_parent: Node = null
+var detached: Array = []
 
 
 func generate(seed_value: int) -> void:
@@ -104,6 +109,32 @@ func are_linked(a: Vector2i, b: Vector2i) -> bool:
 	return false
 
 
+## The world rectangle the room grid occupies, used for camera bounds.
+func world_bounds() -> Rect2:
+	var width := float(COLS - 1) * (ROOM_W + GAP) + ROOM_W
+	var height := float(ROWS - 1) * (ROOM_H + GAP) + ROOM_H
+	return Rect2(Vector2(-ROOM_W * 0.5, -ROOM_H * 0.5), Vector2(width, height))
+
+
+func _entity_owner() -> Node:
+	return entity_parent if entity_parent != null else self
+
+
+func _attach(node: Node) -> void:
+	var owner_node := _entity_owner()
+	owner_node.add_child(node)
+	if owner_node != self:
+		detached.append(node)
+
+
+## Frees entities that live outside the realm node (the Y-sorted world layer).
+func cleanup() -> void:
+	for node in detached:
+		if is_instance_valid(node):
+			node.queue_free()
+	detached.clear()
+
+
 func cell_center(cell: Vector2i) -> Vector2:
 	return Vector2(float(cell.x) * (ROOM_W + GAP), float(cell.y) * (ROOM_H + GAP))
 
@@ -150,13 +181,13 @@ func _build_interactables() -> void:
 	var exit := Interactable.new()
 	exit.setup(Interactable.Kind.PORTAL, "realm.exit", "Return to the Verdant Fringe")
 	exit.position = cell_center(entry_cell) + Vector2(0, 90)
-	add_child(exit)
+	_attach(exit)
 	interactables.append(exit)
 
 	var altar := Interactable.new()
 	altar.setup(Interactable.Kind.ALTAR, "realm.altar", "Inheritance Altar")
 	altar.position = cell_center(altar_cell)
-	add_child(altar)
+	_attach(altar)
 	interactables.append(altar)
 
 	for cell in cells:
@@ -164,7 +195,7 @@ func _build_interactables() -> void:
 			var chest := Interactable.new()
 			chest.setup(Interactable.Kind.CHEST, "realm.chest.%d.%d" % [cell.x, cell.y], "Sealed Chest")
 			chest.position = cell_center(cell) + Vector2(0, -40)
-			add_child(chest)
+			_attach(chest)
 			interactables.append(chest)
 
 
@@ -182,7 +213,7 @@ func _spawn_enemies(r: RandomNumberGenerator) -> void:
 			var dummy := Dummy.new()
 			dummy.ilvl = ilvl
 			dummy.position = pos
-			add_child(dummy)
+			_attach(dummy)
 
 
 func mark_cleared() -> void:

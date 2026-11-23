@@ -45,6 +45,25 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Rendering and camera
+
+- The scene root builds a **`World` node with `y_sort_enabled`**. Everything that stands on the
+  ground — props, buildings, NPCs, enemies, interactables, the player — is a child of it, so draw
+  order follows world Y, not node creation order. Ground layers use `z_index` instead
+  (province chunks `-20`, settlement apron `-15`).
+- A new visual must therefore join the `World` layer to sort correctly. If it belongs to a chunk
+  (props), the chunk manager owns it so unloading frees it.
+- Camera framing lives in `CameraRig`: world bounds become `Camera2D` limits and `clamp_center()`
+  is the pure rule; zoom is a fixed ladder (`0.75 → 2.0`), never a free float.
+- Occlusion is `Occluder.alpha_for()`: a pure function of player position, footprint and roof
+  height. Buildings apply it; nothing about the rule needs a GPU.
+- Lighting is `WorldLighting` (a `CanvasModulate`): ambient tint and point-light energy are pure
+  functions of the clock hour, so night is testable at 23:00 in a headless run.
+- Resolution scaling is `DisplayPolicy`: authored at 1280×720, integer stretch on exact multiples,
+  fractional + `EXPAND` otherwise. Re-applied on every window resize.
+- **Rule:** a visual system must expose its decision as a static pure function and get checks in
+  `run_tests`. Rendering output itself cannot be verified headlessly; the report must say so.
+
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.
@@ -87,7 +106,7 @@ game/
   data/       JSON content (realms, roots, methods, techniques, items, passives, quests, npcs)
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests
   entities/   player, dummy, npc, interactable
-  world/      chunk_manager, settlement, hidden_realm
+  world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud
   scenes/     main
   tests/      run_tests (unit + content), integration (real scene)

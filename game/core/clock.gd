@@ -46,11 +46,17 @@ func is_night() -> bool:
 
 ## Light tint for the current hour: dawn, day, dusk, night.
 func ambient_tint() -> Color:
-	if hour >= 6.0 and hour < 8.0:
+	return ambient_for_hour(hour)
+
+
+## Pure form of `ambient_tint`, so lighting can be tested at any hour.
+static func ambient_for_hour(value: float) -> Color:
+	var h := fposmod(value, 24.0)
+	if h >= 6.0 and h < 8.0:
 		return Color(1.0, 0.86, 0.72)
-	if hour >= 8.0 and hour < 17.0:
+	if h >= 8.0 and h < 17.0:
 		return Color(1.0, 1.0, 1.0)
-	if hour >= 17.0 and hour < 20.0:
+	if h >= 17.0 and h < 20.0:
 		return Color(1.0, 0.72, 0.62)
 	return Color(0.55, 0.63, 0.86)
 

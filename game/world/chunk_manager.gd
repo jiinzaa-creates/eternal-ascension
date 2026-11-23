@@ -15,6 +15,11 @@ const PROVINCE_CHUNKS := 12
 var world_seed: int = 0
 var chunks: Dictionary = {}
 var streamed_chunks: int = 0
+## Where streamed props are parented. Props must share a parent with the player
+## to Y-sort against it, so they live in the world layer rather than the chunk.
+var prop_parent: Node = null
+var props: Array = []
+var props_visible := true
 var _last_center := Vector2i(-9999, -9999)
 
 
@@ -26,10 +31,9 @@ func configure(seed_value: int) -> void:
 
 func clear_all() -> void:
 	for coord in chunks.keys():
-		var node: Node = chunks[coord]
-		if is_instance_valid(node):
-			node.queue_free()
+		_free_chunk(coord)
 	chunks.clear()
+	props.clear()
 	streamed_chunks = 0
 
 
@@ -53,10 +57,7 @@ func stream_around(world_position: Vector2) -> void:
 
 	for coord in chunks.keys():
 		if not needed.has(coord):
-			var node: Node = chunks[coord]
-			if is_instance_valid(node):
-				node.queue_free()
-			chunks.erase(coord)
+			_free_chunk(coord)
 
 
 func _load_chunk(coord: Vector2i) -> void:
@@ -65,7 +66,48 @@ func _load_chunk(coord: Vector2i) -> void:
 	chunk.position = Vector2(coord) * CHUNK_SIZE
 	add_child(chunk)
 	chunks[coord] = chunk
+	_spawn_props(chunk)
 	streamed_chunks += 1
+
+
+## Places a chunk's decorations in the Y-sorted layer. Without a prop parent
+## (content tests, headless probes) no nodes are created.
+func _spawn_props(chunk) -> void:
+	if prop_parent == null:
+		return
+	var origin := Vector2(chunk.coord) * CHUNK_SIZE
+	for feature in chunk.features:
+		var prop := Prop.new()
+		prop.setup(String(feature["kind"]), float(feature["scale"]))
+		prop_parent.add_child(prop)
+		prop.global_position = origin + (feature["pos"] as Vector2)
+		prop.visible = props_visible
+		chunk.props.append(prop)
+		props.append(prop)
+
+
+func _free_chunk(coord: Vector2i) -> void:
+	if not chunks.has(coord):
+		return
+	var chunk = chunks[coord]
+	if is_instance_valid(chunk):
+		for prop in chunk.props:
+			props.erase(prop)
+			if is_instance_valid(prop):
+				prop.queue_free()
+		chunk.queue_free()
+	chunks.erase(coord)
+
+
+func set_prop_parent(node: Node) -> void:
+	prop_parent = node
+
+
+func set_props_visible(value: bool) -> void:
+	props_visible = value
+	for prop in props:
+		if is_instance_valid(prop):
+			prop.visible = value
 
 
 func world_to_chunk(world_position: Vector2) -> Vector2i:
@@ -78,6 +120,12 @@ func in_province(coord: Vector2i) -> bool:
 
 func chunk_count() -> int:
 	return chunks.size()
+
+
+## The whole province in world coordinates, for camera bounds.
+static func world_bounds() -> Rect2:
+	var span := CHUNK_SIZE * PROVINCE_CHUNKS
+	return Rect2(Vector2.ZERO, Vector2(span, span))
 
 
 func signature_at(coord: Vector2i) -> int:
@@ -97,6 +145,7 @@ class ProvinceChunk:
 	extends Node2D
 
 	const SIZE := 1024.0
+	const FEATURES := 36
 	const PALETTES: Array[Color] = [
 		Color("#152218"), Color("#182619"), Color("#12201a"), Color("#1a241b"),
 	]
@@ -104,13 +153,14 @@ class ProvinceChunk:
 	var coord: Vector2i = Vector2i.ZERO
 	var signature: int = 0
 	var features: Array = []
+	var props: Array = []
 
 
 	func setup(chunk_coord: Vector2i, seed_value: int) -> void:
 		coord = chunk_coord
 		signature = Rng.mix(seed_value, chunk_coord.x * 7919 + chunk_coord.y * 104729)
 		var r := Rng.stream("chunk", chunk_coord.x * 31 + chunk_coord.y, 0)
-		for i in 36:
+		for i in FEATURES:
 			var roll := r.randf()
 			var kind := "tuft"
 			if roll > 0.93:
@@ -133,21 +183,6 @@ class ProvinceChunk:
 		# A faint boundary makes streaming invisible glitches obvious during play.
 		draw_rect(Rect2(Vector2.ZERO, Vector2(SIZE, SIZE)), Color(1, 1, 1, 0.015), false, 1.0)
 
-		for feature in features:
-			var pos: Vector2 = feature["pos"]
-			var scale: float = float(feature["scale"])
-			match String(feature["kind"]):
-				"tree":
-					draw_line(pos, pos + Vector2(0, 16.0 * scale), Color("#2a2118"), 4.0)
-					draw_circle(pos + Vector2(0, -6.0 * scale), 16.0 * scale, Color("#1d3a26"))
-					draw_circle(pos + Vector2(-5.0, -10.0 * scale), 9.0 * scale, Color("#25492f"))
-				"rock":
-					draw_colored_polygon(PackedVector2Array([
-						pos + Vector2(-10, 6) * scale, pos + Vector2(-4, -8) * scale,
-						pos + Vector2(9, -5) * scale, pos + Vector2(11, 5) * scale,
-					]), Color("#2c3335"))
-				"bush":
-					draw_circle(pos, 8.0 * scale, Color("#20361f"))
-				_:
-					draw_line(pos, pos + Vector2(-3, -7) * scale, Color("#2b4a2b"), 1.5)
-					draw_line(pos, pos + Vector2(2, -8) * scale, Color("#2b4a2b"), 1.5)
+		# Decorations are separate Y-sorted nodes (see Prop): a whole 1024x1024
+		# chunk must not sort as one object, or the player would always draw
+		# over the trees in front of him and under the ones behind.

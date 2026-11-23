@@ -32,6 +32,10 @@ func check(condition: bool, label: String) -> void:
 		push_error("FAIL: " + label)
 
 
+func approx(a: float, b: float, eps: float = 0.001) -> bool:
+	return absf(a - b) <= eps
+
+
 func frames(count: int) -> void:
 	for i in count:
 		await get_tree().physics_frame
@@ -81,6 +85,48 @@ func _run() -> void:
 	await frames(2)
 	check(main.chunks.world_to_chunk(player.global_position) != start_chunk, "walking streams a different part of the province")
 	check(main.chunks.chunk_count() == 25, "streaming stays bounded while travelling")
+	# --- rendering: camera, sorting, occlusion, lighting, scaling ------------
+	check(main.world != null and main.world.y_sort_enabled, "the world root Y-sorts its children")
+	check(player.get_parent() == main.world, "the player sorts with the world")
+	check(main.camera_rig != null, "the player owns a camera rig")
+	check(main.camera_rig.limit_right == int(ChunkManager.world_bounds().end.x), "camera bounds cover the whole province")
+	check(main.camera_rig.limit_bottom == int(ChunkManager.world_bounds().end.y), "camera bounds cover the province vertically")
+	check(main.camera_rig.zoom.x >= CameraRig.MIN_ZOOM and main.camera_rig.zoom.x <= CameraRig.MAX_ZOOM, "camera zoom starts inside its range")
+	var zoom_before: float = main.camera_rig.zoom.x
+	main.camera_rig.zoom_in()
+	check(main.camera_rig.zoom.x > zoom_before, "zooming in changes the camera")
+	main.camera_rig.zoom_out()
+	check(approx(main.camera_rig.zoom.x, zoom_before), "zooming back out restores the camera")
+	check(main.chunks.props.size() == 25 * ChunkManager.ProvinceChunk.FEATURES, "streamed props are live in the world (%d)" % main.chunks.props.size())
+	check(main.settlement.buildings.size() == main.settlement.BUILDINGS.size(), "every settlement building is its own node")
+	check(main.settlement.buildings[0].get_parent() == main.world, "buildings sort with the player")
+
+	var building: Building = main.settlement.buildings[0]
+	var behind := building.world_footprint().get_center()
+	player.global_position = behind
+	await frames(20)
+	check(building.modulate.a < 0.6, "a roof fades while the player stands behind it (a=%.2f)" % building.modulate.a)
+	player.global_position = behind + Vector2(0, 900)
+	await frames(20)
+	check(building.modulate.a > 0.9, "the roof is opaque again when the player leaves")
+
+	check(main.lighting != null, "the world has a lighting rig")
+	Clock.hour = 23.0
+	await frames(2)
+	check(main.lighting.color == Clock.ambient_for_hour(23.0), "ambient light follows the clock")
+	check(main.lighting.lights.size() >= 2, "shrine and rift lights exist")
+	var dimmest := 1.0
+	for light in main.lighting.lights:
+		dimmest = minf(dimmest, float(light.energy))
+	check(dimmest > 0.5, "point lights are lit at night")
+	Clock.hour = 12.0
+	await frames(2)
+	check(approx(float(main.lighting.lights[0].energy), 0.0), "point lights switch off at noon")
+	Clock.hour = 10.0
+
+	check(get_window().content_scale_size == DisplayPolicy.BASE_SIZE, "resolution scaling uses the authored base size")
+	check(get_window().content_scale_mode == Window.CONTENT_SCALE_MODE_CANVAS_ITEMS, "resolution scaling stretches canvas items")
+
 	player.global_position = main.settlement.position_for("plaza")
 
 	# --- combat --------------------------------------------------------------
@@ -158,6 +204,9 @@ func _run() -> void:
 	check(String(main.phase) == "realm", "the rift enters the hidden realm")
 	check(main.realm_instance != null, "a hidden realm instance exists")
 	check(not main.chunks.visible, "the overworld is hidden inside the realm")
+	check(not main.chunks.props[0].visible, "streamed props hide with the overworld")
+	check(not main.settlement.buildings[0].visible, "buildings hide inside the realm")
+	check(main.camera_rig.limit_right == int(main.realm_instance.world_bounds().end.x), "camera bounds follow the realm")
 
 	var exit_node: Interactable = null
 	var altar: Interactable = null
@@ -168,6 +217,7 @@ func _run() -> void:
 			altar = node
 	check(exit_node != null, "the realm has an exit")
 	check(altar != null, "the realm has an inheritance altar")
+	check(exit_node.get_parent() == main.world, "realm interactables sort with the world")
 	check(main.realm_instance.all_rooms_reachable(), "every room of the generated realm is reachable")
 
 	player.global_position = altar.global_position
@@ -182,6 +232,8 @@ func _run() -> void:
 	check(String(main.phase) == "play", "the exit returns to the overworld")
 	check(main.realm_instance == null, "the realm instance is released")
 	check(main.chunks.visible, "the overworld is visible again")
+	check(main.chunks.props[0].visible, "streamed props return with the overworld")
+	check(main.camera_rig.limit_right == int(ChunkManager.world_bounds().end.x), "camera bounds return to the province")
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

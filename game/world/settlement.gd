@@ -30,6 +30,9 @@ const BUILDINGS := [
 ]
 
 
+var buildings: Array = []
+
+
 func position_for(location: String) -> Vector2:
 	var offset: Vector2 = LOCATIONS.get(location, Vector2.ZERO)
 	return global_position + offset
@@ -37,6 +40,30 @@ func position_for(location: String) -> Vector2:
 
 func has_location(location: String) -> bool:
 	return LOCATIONS.has(location)
+
+
+## Buildings become their own nodes in the Y-sorted world layer, so they can
+## sort against the player and fade when he walks behind a roof. Call after the
+## settlement is in the tree (it needs its world position).
+func build_buildings(parent: Node) -> void:
+	for spec in BUILDINGS:
+		var building := Building.new()
+		building.setup(
+			global_position + (LOCATIONS[String(spec["location"])] as Vector2),
+			spec["size"] as Vector2,
+			Color(String(spec["wall"])),
+			Color(String(spec["roof"])),
+			String(spec["location"])
+		)
+		parent.add_child(building)
+		buildings.append(building)
+
+
+func set_buildings_visible(value: bool) -> void:
+	for building in buildings:
+		if is_instance_valid(building):
+			building.visible = value
+			building.set_process(value)
 
 
 func _draw() -> void:
@@ -53,18 +80,7 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO, 150.0, 0.0, TAU, 48, Color("#45543f"), 3.0)
 	draw_circle(Vector2.ZERO, 18.0, Color("#4a5c46"))
 
-	for building in BUILDINGS:
-		var center: Vector2 = LOCATIONS[String(building["location"])]
-		var size: Vector2 = building["size"]
-		var rect := Rect2(center - size * 0.5, size)
-		draw_rect(rect, Color(String(building["wall"])))
-		var roof := PackedVector2Array([
-			rect.position + Vector2(-10, 0),
-			rect.position + Vector2(size.x + 10, 0),
-			rect.position + Vector2(size.x * 0.5, -size.y * 0.45),
-		])
-		draw_colored_polygon(roof, Color(String(building["roof"])))
-		draw_rect(Rect2(rect.position + Vector2(size.x * 0.45, size.y * 0.5), Vector2(size.x * 0.1, size.y * 0.5)), Color("#20261f"))
+	# Buildings are drawn by Building nodes in the Y-sorted layer, not here.
 
 	# Market stalls
 	for i in 4:

@@ -23,6 +23,11 @@ func _ready() -> void:
 	_cultivation_tests()
 	_combat_tests()
 	_world_tests()
+	_camera_tests()
+	_display_tests()
+	_lighting_tests()
+	_occlusion_tests()
+	_sorting_tests()
 	_npc_tests()
 	_quest_tests()
 	_hidden_realm_tests()
@@ -441,6 +446,11 @@ func _hidden_realm_tests() -> void:
 	check(has_exit, "an exit always exists")
 	check(chests >= 2, "treasure rooms hold chests")
 
+	var bounds: Rect2 = realm.world_bounds()
+	check(bounds.size.x >= HiddenRealm.ROOM_W * HiddenRealm.COLS, "realm bounds cover the whole room grid")
+	check(bounds.position.x <= -HiddenRealm.ROOM_W * 0.5, "realm bounds include the leftmost room")
+	check(realm.interactables[0].get_parent() == realm, "standalone realms own their entities")
+
 	var twin := HiddenRealm.new()
 	add_child(twin)
 	twin.generate(4242)
@@ -502,3 +512,145 @@ func _save_tests() -> void:
 	check(approx(float(migrated.get("player", {}).get("hp", 0.0)), 55.0), "migration preserves existing data")
 	Save.delete_slot(legacy_slot)
 	check(not Save.has_save(legacy_slot), "migration test slot is cleaned up")
+
+
+# --------------------------------------------------------------- rendering ----
+
+func _camera_tests() -> void:
+	print("[camera] bounds clamping and zoom levels")
+	var area := Rect2(0, 0, 12288, 12288)
+	var view := Vector2(1280, 720)
+	check(CameraRig.clamp_center(Vector2(6000, 6000), view, 1.0, area) == Vector2(6000, 6000), "a centre inside the bounds is untouched")
+	var edge := CameraRig.clamp_center(Vector2(-500, 20000), view, 1.0, area)
+	check(approx(edge.x, 640.0), "the camera stops half a screen from the left edge")
+	check(approx(edge.y, 12288.0 - 360.0), "the camera stops half a screen from the bottom edge")
+	var zoomed := CameraRig.clamp_center(Vector2(-500, 20000), view, 2.0, area)
+	check(approx(zoomed.x, 320.0), "zooming in shrinks the clamp margin")
+	var small := CameraRig.clamp_center(Vector2(900, -900), view, 1.0, Rect2(0, 0, 400, 300))
+	check(small == Vector2(200, 150), "an area smaller than the view is centred")
+	check(CameraRig.clamp_center(Vector2(-500, -500), view, 0.75, area).x > 640.0, "zooming out keeps the larger view inside the bounds")
+
+	var rig := CameraRig.new()
+	add_child(rig)
+	rig.set_bounds(area)
+	check(rig.limit_left == 0 and rig.limit_right == 12288, "bounds become horizontal camera limits")
+	check(rig.limit_top == 0 and rig.limit_bottom == 12288, "bounds become vertical camera limits")
+	check(approx(rig.zoom.x, 1.0), "the default zoom is the authored field of view")
+	rig.zoom_in()
+	check(approx(rig.zoom.x, 1.25), "zoom_in steps to the next level")
+	rig.zoom_out()
+	check(approx(rig.zoom.x, 1.0), "zoom_out steps back")
+	rig.set_zoom_index(999)
+	check(approx(rig.zoom.x, CameraRig.MAX_ZOOM), "zoom clamps at the maximum level")
+	rig.set_zoom_index(-999)
+	check(approx(rig.zoom.x, CameraRig.MIN_ZOOM), "zoom clamps at the minimum level")
+	rig.set_bounds(Rect2(100, 50, 800, 600))
+	check(rig.limit_left == 100 and rig.limit_bottom == 650, "bounds can be swapped for another context")
+	rig.queue_free()
+
+
+func _display_tests() -> void:
+	print("[display] resolution scaling policy")
+	check(DisplayPolicy.BASE_SIZE == Vector2i(1280, 720), "the game is authored at 1280x720")
+	check(DisplayPolicy.integer_scale(Vector2i(2560, 1440)) == 2, "1440p is an exact 2x multiple")
+	check(DisplayPolicy.integer_scale(Vector2i(3840, 2160)) == 3, "4K is an exact 3x multiple")
+	check(DisplayPolicy.integer_scale(Vector2i(1920, 1080)) == 1, "1.5x is not an integer multiple")
+	check(DisplayPolicy.integer_scale(Vector2i(640, 360)) == 1, "a small window never scales to zero")
+	check(DisplayPolicy.uses_integer_stretch(Vector2i(2560, 1440)), "exact multiples use integer stretching")
+	check(not DisplayPolicy.uses_integer_stretch(Vector2i(1920, 1080)), "fractional sizes do not")
+	check(not DisplayPolicy.uses_integer_stretch(Vector2i(1280, 720)), "1x does not need integer stretching")
+	check(DisplayPolicy.stretch_for(Vector2i(2560, 1440)) == Window.CONTENT_SCALE_STRETCH_INTEGER, "the stretch mode follows the multiple")
+	check(DisplayPolicy.stretch_for(Vector2i(1600, 900)) == Window.CONTENT_SCALE_STRETCH_FRACTIONAL, "odd sizes stretch fractionally")
+	check(DisplayPolicy.min_window_size() == Vector2i(960, 540), "the window has a playable minimum size")
+
+	var window := get_window()
+	DisplayPolicy.apply(window)
+	check(window.content_scale_size == DisplayPolicy.BASE_SIZE, "apply sets the canvas base size")
+	check(window.content_scale_mode == Window.CONTENT_SCALE_MODE_CANVAS_ITEMS, "apply keeps canvas_items stretching")
+	check(window.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_EXPAND, "apply shows more world instead of bars")
+	check(window.min_size == DisplayPolicy.min_window_size(), "apply sets the minimum window size")
+
+
+func _lighting_tests() -> void:
+	print("[lighting] clock-driven ambient light and point lights")
+	var was_paused := Clock.paused
+	Clock.paused = true
+	check(Clock.ambient_for_hour(12.0) == Color(1, 1, 1), "midday ambient light is neutral")
+	check(Clock.ambient_for_hour(23.0).b > Clock.ambient_for_hour(23.0).r, "night ambient light is cold")
+	check(Clock.ambient_for_hour(19.0).r > Clock.ambient_for_hour(19.0).b, "dusk ambient light is warm")
+	check(Clock.ambient_for_hour(30.0) == Clock.ambient_for_hour(6.0), "the tint wraps past midnight")
+	check(WorldLighting.light_energy_for_hour(12.0) == 0.0, "point lights are off at noon")
+	check(WorldLighting.light_energy_for_hour(23.0) == 1.0, "point lights are full at midnight")
+	var dawn := WorldLighting.light_energy_for_hour(6.0)
+	check(dawn > 0.0 and dawn < 1.0, "point lights fade out through dawn")
+	var dusk := WorldLighting.light_energy_for_hour(18.5)
+	check(dusk > 0.0 and dusk < 1.0, "point lights fade in through dusk")
+
+	Clock.hour = 23.0
+	var lighting := WorldLighting.new()
+	add_child(lighting)
+	lighting.refresh()
+	check(lighting.color == Clock.ambient_for_hour(23.0), "the canvas modulate follows the clock")
+	var holder := Node2D.new()
+	add_child(holder)
+	var light := lighting.add_light(holder, Vector2(40, 40), Color("#ffd9a0"), 200.0, 1.0)
+	check(lighting.lights.size() == 1, "lights register with the lighting rig")
+	check(approx(light.energy, 1.0), "a light takes the night energy")
+	check(light.texture != null, "point lights have a generated falloff texture")
+	Clock.hour = 12.0
+	lighting.refresh()
+	check(approx(light.energy, 0.0), "point lights switch off by day")
+	Clock.hour = 8.0
+	lighting.queue_free()
+	holder.queue_free()
+	Clock.paused = was_paused
+
+
+func _occlusion_tests() -> void:
+	print("[occlusion] roofs fade for a player behind them")
+	var footprint := Rect2(Vector2(100, 100), Vector2(160, 90))
+	check(Occluder.occlusion_region(footprint, 40.0) == Rect2(Vector2(100, 60), Vector2(160, 130)), "the occlusion region includes the roof slope")
+	check(approx(Occluder.alpha_for(Vector2(180, 140), footprint, 40.0), Occluder.MIN_ALPHA), "a player inside the footprint sees through the roof")
+	check(approx(Occluder.alpha_for(Vector2(180, 80), footprint, 40.0), Occluder.MIN_ALPHA), "a player under the roof slope is occluded")
+	check(approx(Occluder.alpha_for(Vector2(180, 700), footprint, 40.0), 1.0), "a player below the building is not occluded")
+	check(approx(Occluder.alpha_for(Vector2(180, 10), footprint, 40.0), 1.0), "a player well above the roof is not occluded")
+	var edge := Occluder.alpha_for(Vector2(180, 48), footprint, 40.0)
+	check(edge > Occluder.MIN_ALPHA and edge < 1.0, "the fade ramps across the margin")
+	check(Occluder.alpha_for(Vector2(180, 52), footprint, 40.0) < Occluder.alpha_for(Vector2(180, 40), footprint, 40.0), "the ramp gets more opaque with distance")
+
+
+func _sorting_tests() -> void:
+	print("[sorting] streamed props are Y-sorted siblings of the world")
+	var holder := Node2D.new()
+	holder.name = "SortHolder"
+	holder.y_sort_enabled = true
+	add_child(holder)
+	var manager := ChunkManager.new()
+	add_child(manager)
+	manager.configure(12345)
+	manager.set_prop_parent(holder)
+	manager.stream_around(Vector2(5632, 5632))
+	check(manager.chunk_count() == 25, "chunks still stream in a ring with props enabled")
+	check(manager.props.size() == 25 * ChunkManager.ProvinceChunk.FEATURES, "every chunk feature becomes a prop (%d)" % manager.props.size())
+	var first_prop = manager.props[0]
+	check(first_prop.get_parent() == holder, "props live in the Y-sorted layer, not inside a chunk")
+	check(String(first_prop.kind) != "", "props keep their drawn kind")
+	var chunks_with_props := 0
+	for coord in manager.chunks.keys():
+		var chunk = manager.chunks[coord]
+		if chunk.props.size() > 0:
+			chunks_with_props += 1
+	check(chunks_with_props == 25, "each chunk owns its props so unloading frees them")
+	manager.stream_around(Vector2(5632 + 3072, 5632))
+	check(manager.props.size() == 25 * ChunkManager.ProvinceChunk.FEATURES, "unloading a chunk frees exactly its own props")
+	check(manager.streamed_chunks == 40, "prop streaming does not change chunk load counts")
+	manager.set_props_visible(false)
+	var visible_props := 0
+	for prop in manager.props:
+		if prop.visible:
+			visible_props += 1
+	check(visible_props == 0, "props hide with the overworld")
+	manager.stream_around(Vector2(5632 + 6144, 5632))
+	check(manager.props[0].visible == false, "props loaded while hidden stay hidden")
+	manager.queue_free()
+	holder.queue_free()

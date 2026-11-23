@@ -17,6 +17,11 @@ var chunks: ChunkManager
 var settlement: Settlement
 var npcs: Array = []
 var elder: Npc
+## Y-sorted layer: props, buildings, NPCs, the player and enemies all share it
+## so draw order follows world Y instead of node creation order.
+var world: Node2D
+var camera_rig: CameraRig
+var lighting: WorldLighting
 var interactables: Array = []
 var ground_items: Array = []
 var quests: QuestLog
@@ -40,6 +45,8 @@ var _npc_index := 0
 
 func _ready() -> void:
 	Game.new_run()
+	DisplayPolicy.apply(get_window())
+	get_window().size_changed.connect(_on_window_resized)
 	_root_rng = Rng.stream("root_roll", 0)
 	_name_rng = Rng.stream("npc_names", 0)
 	quests = QuestLog.new()
@@ -53,16 +60,31 @@ func _ready() -> void:
 # ---------------------------------------------------------------- world ----
 
 func _build_world() -> void:
+	world = Node2D.new()
+	world.name = "World"
+	world.y_sort_enabled = true
+	add_child(world)
+
+	lighting = WorldLighting.new()
+	lighting.name = "Lighting"
+	add_child(lighting)
+
+	# Ground layers sort below everything by z_index; the Y-sort only orders
+	# things that stand on the ground.
 	chunks = ChunkManager.new()
 	chunks.name = "Province"
-	add_child(chunks)
+	chunks.z_index = -20
+	world.add_child(chunks)
 	chunks.configure(Game.world_seed)
+	chunks.set_prop_parent(world)
 	chunks.stream_around(SPAWN)
 
 	settlement = Settlement.new()
 	settlement.name = "AzureCloudMarket"
 	settlement.position = SPAWN
-	add_child(settlement)
+	settlement.z_index = -15
+	world.add_child(settlement)
+	settlement.build_buildings(world)
 
 	_spawn_npcs()
 	_spawn_interactables()
@@ -71,15 +93,15 @@ func _build_world() -> void:
 func _spawn_player() -> void:
 	player = Player.new()
 	player.position = SPAWN + Vector2(0, 60)
-	add_child(player)
+	world.add_child(player)
 	player.display_name = _random_name()
 	player.cultivation.root_tier = _roll_root()
 	player.spawn_point = player.position
 
-	var camera := Camera2D.new()
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 8.0
-	player.add_child(camera)
+	camera_rig = CameraRig.new()
+	camera_rig.name = "Camera"
+	camera_rig.set_bounds(ChunkManager.world_bounds())
+	player.add_child(camera_rig)
 
 
 func _build_hud() -> void:
@@ -135,7 +157,7 @@ func _make_npc(id: String, display: String, role: String, sect: String, realm: i
 	npc.name = "Npc_" + id
 	npc.setup(id, display, role, sect, realm, schedule, settlement)
 	npc.root_tier = int(_name_rng.randi_range(2, 7))
-	add_child(npc)
+	world.add_child(npc)
 	npc.global_position = settlement.position_for("plaza") + offset
 	npcs.append(npc)
 	_npc_index += 1
@@ -159,22 +181,26 @@ func _spawn_interactables() -> void:
 	var shrine := Interactable.new()
 	shrine.setup(Interactable.Kind.SHRINE, "shrine.azure", "Azure Cloud Shrine — attune")
 	shrine.position = settlement.position_for("shrine")
-	add_child(shrine)
+	world.add_child(shrine)
 	interactables.append(shrine)
 
 	for i in 3:
 		var herb := Interactable.new()
 		herb.setup(Interactable.Kind.HERB, "herb.%d" % i, "Spirit Herb")
 		herb.position = settlement.position_for("herb_garden") + Vector2(-40.0 + float(i) * 40.0, 0.0)
-		add_child(herb)
+		world.add_child(herb)
 		interactables.append(herb)
 
 	portal_position = SPAWN + Vector2(820, -520)
 	var portal := Interactable.new()
 	portal.setup(Interactable.Kind.PORTAL, "portal.hollow_moon", "Rift — Tomb of the Hollow Moon")
 	portal.position = portal_position
-	add_child(portal)
+	world.add_child(portal)
 	interactables.append(portal)
+
+	# Night lighting: the shrine and the rift stay readable after dusk.
+	lighting.add_light(world, shrine.position, Color("#ffd9a0"), 220.0, 0.9)
+	lighting.add_light(world, portal.position, Color("#b48cff"), 260.0, 1.0)
 
 
 func _roll_root() -> int:
@@ -232,7 +258,10 @@ func _begin_run() -> void:
 func _process(delta: float) -> void:
 	if player == null:
 		return
-	chunks.stream_around(player.global_position)
+	# The province is hidden inside a realm: streaming there would load chunks
+	# for tomb coordinates and spawn props under the tomb floor.
+	if realm_instance == null:
+		chunks.stream_around(player.global_position)
 	if phase == "creation":
 		return
 
@@ -278,7 +307,11 @@ func _spawn_wild_dummy() -> void:
 	var dummy := Dummy.new()
 	dummy.ilvl = maxi(1, player.cultivation.realm)
 	dummy.position = settlement.position_for("plaza") + Vector2(cos(angle), sin(angle)) * distance
-	add_child(dummy)
+	world.add_child(dummy)
+
+
+func _on_window_resized() -> void:
+	DisplayPolicy.apply(get_window())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -492,7 +525,9 @@ func _claim_inheritance() -> void:
 
 func _set_overworld_active(active: bool) -> void:
 	chunks.visible = active
+	chunks.set_props_visible(active)
 	settlement.visible = active
+	settlement.set_buildings_visible(active)
 	for npc in npcs:
 		if is_instance_valid(npc):
 			npc.visible = active
@@ -511,25 +546,32 @@ func _enter_realm() -> void:
 	_set_overworld_active(false)
 	realm_instance = HiddenRealm.new()
 	realm_instance.name = "HiddenRealm"
-	add_child(realm_instance)
+	realm_instance.entity_parent = world
+	world.add_child(realm_instance)
 	realm_instance.generate(realm_seed)
 	if realm_cleared:
 		realm_instance.mark_cleared()
 	player.global_position = realm_instance.entry_position() + Vector2(0, 60)
 	player.spawn_point = player.global_position
 	phase = "realm"
+	camera_rig.set_bounds(realm_instance.world_bounds())
+	camera_rig.reset_smoothing()
+	lighting.add_light(realm_instance, realm_instance.altar_position(), Color("#c9b6ff"), 320.0, 1.0)
 	Bus.toast.emit("The rift closes behind you. The tomb does not want you here.")
 
 
 func _exit_realm() -> void:
 	if realm_instance == null:
 		return
+	realm_instance.cleanup()
 	realm_instance.queue_free()
 	realm_instance = null
 	_set_overworld_active(true)
 	phase = "play"
 	player.global_position = portal_position + Vector2(-80, 40)
 	player.spawn_point = player.global_position
+	camera_rig.set_bounds(ChunkManager.world_bounds())
+	camera_rig.reset_smoothing()
 	Bus.toast.emit("You return to the Verdant Fringe.")
 
 
@@ -597,6 +639,7 @@ func _load_game(slot: int) -> void:
 		Bus.toast.emit("No usable save in slot %d." % slot)
 		return
 	if realm_instance != null:
+		realm_instance.cleanup()
 		realm_instance.queue_free()
 		realm_instance = null
 		_set_overworld_active(true)

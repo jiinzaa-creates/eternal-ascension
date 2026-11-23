@@ -26,6 +26,7 @@ an inheritance, and a crash-safe save system.
 | Interact / talk / pick up | E |
 | Select technique (slots 1–6) | 1 – 6 |
 | Quick save / quick load | F5 / F9 |
+| Zoom camera in / out | Mouse wheel, `=` / `-` |
 | Toggle help | F1 |
 
 On the creation screen: **1–6** allocate a point to STR / DEX / AGI / INT / WIS / CHA,
@@ -89,6 +90,11 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Deterministic item generation: 4 rarities, tiered prefixes/suffixes, stable IDs, auto-equip.
 - Equipment and passives feed real combat stats through `StatBlock`.
 - Seamless streaming over a 12×12-chunk province with deterministic chunk regeneration.
+- Camera with world bounds (province and realm), five zoom levels, and smoothed follow.
+- Y-sorted world: trees, rocks, bushes, buildings, NPCs and the player draw in depth order.
+- Roof occlusion: a building fades while the player walks behind it, then returns to full opacity.
+- Day/night lighting: `CanvasModulate` ambient tint plus shrine, rift and altar point lights.
+- Resolution scaling: 1280×720 canvas, integer stretch on exact multiples, EXPAND otherwise.
 - One settlement, 19 scheduled NPCs, one sect questline with event-driven steps and rewards.
 - One procedural hidden realm with hazards, chests and a one-time inheritance.
 - Save/load with atomic writes, sha256 verification, 3 backups, corruption fallback, schema migration.
@@ -96,8 +102,8 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 
 ## Not implemented yet
 
-Character appearance and backgrounds; weather and seasons; Y-sort/lighting/animation (all
-characters are code-drawn shapes); fast travel and maps; physiques; method-specific cultivation
+Character appearance and backgrounds; weather and seasons; animation (all characters are
+code-drawn shapes); fast travel and maps; physiques; method-specific cultivation
 loops; mastery and manuals; alchemy, forging, professions and economy; NPC goals, memory,
 relationships, parties and independent progression; the twelve sects and faction politics;
 additional hidden-realm templates; dynamic world events; the main narrative and endgame;

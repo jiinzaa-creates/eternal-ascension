@@ -27,6 +27,8 @@ const KEY_BINDINGS := {
 	"quick_save": [KEY_F5],
 	"quick_load": [KEY_F9],
 	"toggle_help": [KEY_F1],
+	"zoom_in": [KEY_EQUAL],
+	"zoom_out": [KEY_MINUS],
 	"accept": [KEY_ENTER],
 	"reroll": [KEY_R],
 	"undo_point": [KEY_BACKSPACE],
