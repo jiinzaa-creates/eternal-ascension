@@ -29,6 +29,7 @@ an inheritance, and a crash-safe save system.
 | Quick save / quick load | F5 / F9 |
 | Zoom camera in / out | Mouse wheel, `=` / `-` |
 | Shop: buy / switch mode / close | 1–6 / TAB / E |
+| Routes: travel / set waypoint | T, then 1–6 then ENTER / V |
 | Continent map | M |
 | Toggle help | F1 |
 
@@ -98,6 +99,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Seamless streaming over a 12×12-chunk province: pure payload generation on worker threads, nodes built on the main thread, and a deterministic seed identity for every chunk.
 - Chunk deltas: harvested resources are remembered per chunk with the day they were taken, saved with the run, and restored when the chunk streams back in.
 - Background regrowth: chunk herbs return a few days after being harvested, evaluated from the clock when the chunk reloads rather than ticked per frame.
+- Navigation and fast travel: a route list of settlement landmarks and discovered sites (T), travel that costs in-game time instead of stones, a waypoint with a HUD compass and distance, waypoint arrival detection, and saved routes and waypoints.
 - World locations: deterministic overworld sites per chunk — collapsed ruins (one-shot loot, permanent), spirit ore veins (ore, refills after 10 days) and spirit stone deposits (stones, refill after 7 days) — each carrying its own regrow window in the chunk delta.
 - Discovery rewards: the first visit to any site pays spirit stones once and is remembered in the save, so a site cannot be farmed for its discovery.
 - Settlement services and economy: a merchant with deterministic daily stock and remembered purchases, buy/sell pricing on one value curve (sell pays 40%), a code-drawn shop overlay (1–6, TAB, E), and an inn that sells eight hours of rest for spirit stones.

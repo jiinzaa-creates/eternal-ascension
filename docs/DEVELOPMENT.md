@@ -45,6 +45,22 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Generated content has a **stable string ID**; saves reference IDs, never indices.
 - Procedural world state is regenerated from the seed; saves store only deltas.
 
+## Navigation and fast travel
+
+- `Travel` is pure maths (hours, bearing, metres, destination list). The host moves the player and
+  advances the clock; nothing in `Travel` touches the scene.
+- **Travel is paid in time, not currency**: `Clock.advance(hours)` moves schedules, weather and
+  regrowth together. Do not add a second travel currency without also deciding what time means.
+- Destinations are settlement landmarks plus `travel_sites`, which records discovered sites with
+  their positions so they stay reachable after their chunk unloads. The list is capped at
+  `Travel.MAX_ROWS` (6) and sorted by id; landmarks always come first.
+- Waypoints are `waypoint_name` + `waypoint_position` on the host, drawn by `Hud.draw_waypoint` as a
+  rotated arrow with distance. `Travel.has_arrived` clears it within `ARRIVE_RADIUS`.
+- Travel is blocked inside a hidden realm (`Travel.can_travel`), and the panel freezes both player
+  loops like the map and shop. Restore them on every close path.
+- After moving the player, re-stream and `settle()` before showing anything: the destination may be
+  outside the current ring.
+
 ## World locations
 
 - Overworld sites (ruins, ore veins, deposits) are generated per chunk by `ChunkGen._pois_for` from

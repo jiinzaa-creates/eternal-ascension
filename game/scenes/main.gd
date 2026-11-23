@@ -31,6 +31,15 @@ var shop_panel: ShopPanel
 var shop_open := false
 var _shop_mode := "buy"
 var _sell_base := 0
+## Navigation: known destinations, the travel overlay and the current waypoint.
+var travel_panel: TravelPanel
+var travel_open := false
+var travel_index := 0
+var waypoint_name := ""
+var waypoint_position := Vector2.ZERO
+## Discovered sites, recorded with a position so they stay travel destinations
+## after their chunk unloads.
+var travel_sites: Dictionary = {}
 var interactables: Array = []
 var ground_items: Array = []
 var quests: QuestLog
@@ -138,6 +147,8 @@ func _build_hud() -> void:
 	world_map.setup(continent, Continent.region_for_world_position(player.global_position))
 	shop_panel = ShopPanel.new()
 	layer.add_child(shop_panel)
+	travel_panel = TravelPanel.new()
+	layer.add_child(travel_panel)
 
 
 func _spawn_npcs() -> void:
@@ -347,8 +358,14 @@ func _process(delta: float) -> void:
 		return
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
-	if (world_map != null and world_map.visible) or shop_open:
+	if (world_map != null and world_map.visible) or shop_open or travel_open:
 		return
+
+	if Travel.has_arrived(player.global_position, waypoint_position):
+		Bus.toast.emit("You have reached %s." % waypoint_name)
+		waypoint_name = ""
+		waypoint_position = Vector2.ZERO
+
 	# The province is hidden inside a realm: streaming there would load chunks
 	# for tomb coordinates and spawn props under the tomb floor.
 	chunks.today = Clock.day
@@ -510,6 +527,94 @@ func _rest_at_inn() -> void:
 	Bus.toast.emit("You sleep for eight hours and wake restored. (-%d stones)" % cost)
 
 
+# --------------------------------------------------------------- travel ----
+
+func _travel_landmarks() -> Array:
+	return [
+		{"id": "landmark.plaza", "name": "Azure Cloud plaza", "position": settlement.position_for("plaza")},
+		{"id": "landmark.shrine", "name": "Azure Cloud shrine", "position": settlement.position_for("shrine")},
+		{"id": "landmark.tavern", "name": "Tavern inn", "position": settlement.position_for("tavern")},
+		{"id": "landmark.rift", "name": "Rift to the Hollow Moon", "position": portal_position},
+	]
+
+
+func travel_destinations() -> Array:
+	return Travel.destinations(_travel_landmarks(), travel_sites, Travel.MAX_ROWS)
+
+
+func _open_travel() -> void:
+	if travel_panel == null or player == null:
+		return
+	if realm_instance != null:
+		Bus.toast.emit("No route can be charted inside a hidden realm.")
+		return
+	travel_index = 0
+	travel_open = true
+	player.set_physics_process(false)
+	player.set_process(false)
+	_show_travel()
+
+
+func _close_travel() -> void:
+	travel_open = false
+	if travel_panel != null:
+		travel_panel.hide_panel()
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+func _show_travel() -> void:
+	if travel_panel == null or player == null:
+		return
+	var destinations := travel_destinations()
+	if travel_index >= destinations.size():
+		travel_index = maxi(0, destinations.size() - 1)
+	var rows: Array = []
+	for destination in destinations:
+		var target: Vector2 = destination["position"]
+		var distance := target.distance_to(player.global_position)
+		rows.append({
+			"name": String(destination["name"]),
+			"detail": "%s · %.1f h" % [Travel.distance_label(distance), Travel.hours_for(distance)],
+			"color": "#9fe0c0" if waypoint_name == String(destination["name"]) else "#e6eef2",
+		})
+	travel_panel.setup(rows, travel_index)
+
+
+func _travel_to(index: int) -> void:
+	var destinations := travel_destinations()
+	if index < 0 or index >= destinations.size():
+		return
+	if not Travel.can_travel(true, realm_instance != null, false):
+		return
+	var destination: Dictionary = destinations[index]
+	var target: Vector2 = destination["position"]
+	var hours := Travel.hours_for(target.distance_to(player.global_position))
+	player.global_position = target + Vector2(0, 44)
+	player.spawn_point = player.global_position
+	Clock.advance(hours)
+	chunks.today = Clock.day
+	chunks.stream_around(player.global_position)
+	chunks.settle()
+	camera_rig.reset_smoothing()
+	waypoint_name = ""
+	waypoint_position = Vector2.ZERO
+	_close_travel()
+	Bus.toast.emit("Travelled to %s (%.1f hours)." % [String(destination["name"]), hours])
+
+
+func _set_waypoint(index: int) -> void:
+	var destinations := travel_destinations()
+	if index < 0 or index >= destinations.size():
+		return
+	var destination: Dictionary = destinations[index]
+	waypoint_name = String(destination["name"])
+	waypoint_position = destination["position"]
+	_close_travel()
+	Bus.toast.emit("Waypoint set: %s." % waypoint_name)
+
+
 func toggle_map() -> void:
 	if world_map == null or player == null or phase == "creation":
 		return
@@ -536,6 +641,27 @@ func _unhandled_input(event: InputEvent) -> void:
 			for i in Attributes.KEYS.size():
 				if event.is_action_pressed("skill_%d" % (i + 1)):
 					allocate_attribute(Attributes.KEYS[i])
+		return
+
+	if travel_open:
+		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
+			_close_travel()
+			return
+		if event.is_action_pressed("accept"):
+			_travel_to(travel_index)
+			return
+		if event.is_action_pressed("travel_waypoint"):
+			_set_waypoint(travel_index)
+			return
+		for i in 6:
+			if event.is_action_pressed("skill_%d" % (i + 1)):
+				travel_index = i
+				_show_travel()
+				return
+		return
+
+	if event.is_action_pressed("open_travel"):
+		_open_travel()
 		return
 
 	if shop_open:
@@ -752,6 +878,11 @@ func cultivation_restore() -> void:
 func _award_discovery(node: Interactable, reward: int) -> void:
 	if not Game.discover(node.id):
 		return
+	travel_sites[node.id] = {
+		"name": node.label,
+		"x": node.global_position.x,
+		"y": node.global_position.y,
+	}
 	Game.spirit_stones += reward
 	Bus.toast.emit("Discovery — %s (+%d spirit stones)." % [node.label, reward])
 
@@ -938,6 +1069,8 @@ func _save(slot: int) -> void:
 		"used_interactables": used_interactables.duplicate(),
 		"chunk_deltas": world_delta.to_dict(),
 		"shop": merchant.to_dict(),
+		"travel_sites": travel_sites.duplicate(true),
+		"waypoint": {"name": waypoint_name, "x": waypoint_position.x, "y": waypoint_position.y},
 		"realm_seed": realm_seed,
 		"realm_cleared": realm_cleared,
 		"inheritance_taken": inheritance_taken,
@@ -973,6 +1106,10 @@ func _load_game(slot: int) -> void:
 	world_delta = WorldDelta.from_dict(data.get("chunk_deltas", {}))
 	chunks.delta = world_delta
 	merchant.from_dict(data.get("shop", {}))
+	travel_sites = data.get("travel_sites", {}).duplicate(true)
+	var waypoint: Dictionary = data.get("waypoint", {})
+	waypoint_name = String(waypoint.get("name", ""))
+	waypoint_position = Vector2(float(waypoint.get("x", 0.0)), float(waypoint.get("y", 0.0)))
 	for node in interactables:
 		if used_interactables.has(node.id):
 			node.used = true

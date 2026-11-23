@@ -622,6 +622,41 @@ func _run() -> void:
 			check(back != null, "a mine or deposit refills after its window")
 		Clock.day -= step
 
+	# --- navigation and fast travel ------------------------------------------
+	check(main.travel_sites.size() > 0, "discovered sites become travel destinations")
+	var destinations: Array = main.travel_destinations()
+	check(destinations.size() >= 5, "landmarks and sites make a route list (%d)" % destinations.size())
+	check(String(destinations[0]["id"]).begins_with("landmark."), "landmarks lead the travel list")
+
+	main._open_travel()
+	check(main.travel_open, "the travel panel opens")
+	check(main.travel_panel.visible, "the travel panel is drawn")
+	check(not player.is_physics_processing(), "the travel panel freezes the player")
+	main._close_travel()
+	check(not main.travel_open and not main.travel_panel.visible, "the travel panel closes")
+	check(player.is_physics_processing(), "closing travel restores the player")
+
+	var shrine_target: Vector2 = main.settlement.position_for("shrine")
+	var time_before: float = float(Clock.day) * 24.0 + Clock.hour
+	main._open_travel()
+	main._travel_to(1)
+	check(not main.travel_open, "travelling closes the panel")
+	check(player.global_position.distance_to(shrine_target) < 120.0, "travel moves the player to the destination")
+	var time_after: float = float(Clock.day) * 24.0 + Clock.hour
+	check(time_after > time_before, "travel costs time")
+
+	main._open_travel()
+	main._set_waypoint(2)
+	check(main.waypoint_name != "", "a waypoint can be set")
+	check(main.waypoint_position != Vector2.ZERO, "a waypoint has a position")
+	main._save(92)
+	main._load_game(92)
+	await frames(2)
+	check(main.waypoint_name != "", "the waypoint survives a save")
+	player.global_position = main.waypoint_position
+	await frames(3)
+	check(main.waypoint_position == Vector2.ZERO, "reaching a waypoint clears it")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

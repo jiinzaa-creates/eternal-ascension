@@ -28,6 +28,7 @@ func _ready() -> void:
 	_biome_tests()
 	_economy_tests()
 	_location_tests()
+	_travel_tests()
 	_camera_tests()
 	_display_tests()
 	_lighting_tests()
@@ -742,6 +743,51 @@ func _location_tests() -> void:
 		site.used = true
 		check(not site.can_interact(), "a spent %s site is not offered" % kind_name)
 		site.free()
+
+
+# ----------------------------------------------------------------- travel ----
+
+func _travel_tests() -> void:
+	print("[travel] cost, bearing, destinations and arrival")
+	check(approx(Travel.hours_for(0.0), Travel.MIN_HOURS), "a short trip still costs the minimum time")
+	check(approx(Travel.hours_for(1000000.0), Travel.MAX_HOURS), "a cross-province trip is capped")
+	check(Travel.hours_for(4000.0) > Travel.hours_for(1000.0), "longer trips cost more time")
+	check(approx(Travel.hours_for(1000.0), Travel.MIN_HOURS), "short trips are floored at the minimum")
+	check(approx(Travel.hours_for(4000.0), 1.4), "four thousand units costs 1.4 hours")
+
+	check(approx(Travel.bearing(Vector2.ZERO, Vector2(10, 0)), 0.0), "east is zero radians")
+	check(approx(Travel.bearing(Vector2.ZERO, Vector2(0, 10)), PI * 0.5), "south is a quarter turn")
+	check(approx(Travel.bearing(Vector2.ZERO, Vector2(0, -10)), -PI * 0.5), "north points up")
+
+	check(Travel.distance_label(0.0) == "0 m", "distance is labelled in metres")
+	check(Travel.distance_label(1234.6) == "1235 m", "distance rounds to whole metres")
+
+	check(Travel.can_travel(true, false, false), "travel is allowed on the overworld")
+	check(not Travel.can_travel(true, true, false), "travel is blocked inside a realm")
+	check(not Travel.can_travel(false, false, false), "travel needs a target")
+
+	var landmarks := [
+		{"id": "landmark.a", "name": "Plaza", "position": Vector2(10, 10)},
+		{"id": "landmark.b", "name": "Shrine", "position": Vector2(20, 20)},
+	]
+	var sites := {}
+	for i in 8:
+		sites["poi.site.%d" % i] = {"name": "Site %d" % i, "x": float(i * 100), "y": 50.0}
+	var list := Travel.destinations(landmarks, sites)
+	check(list.size() == Travel.MAX_ROWS, "the travel list is capped at %d rows" % Travel.MAX_ROWS)
+	check(String(list[0]["id"]) == "landmark.a", "landmarks come first")
+	var site_count := 0
+	for row in list:
+		if String(row["id"]).begins_with("poi."):
+			site_count += 1
+	check(site_count == Travel.MAX_ROWS - landmarks.size(), "sites fill the remaining rows")
+	var first_site: Dictionary = list[landmarks.size()]
+	check(String(first_site["id"]) == "poi.site.0", "discovered sites are listed in id order")
+	check(Travel.destinations([], {}).is_empty(), "no landmarks and no sites means no routes")
+
+	check(Travel.has_arrived(Vector2(100, 100), Vector2(120, 100)), "arrival is generous")
+	check(not Travel.has_arrived(Vector2(100, 100), Vector2(300, 100)), "a distant waypoint is not arrived")
+	check(not Travel.has_arrived(Vector2(100, 100), Vector2.ZERO), "an unset waypoint never counts as reached")
 
 
 # -------------------------------------------------------------------- npc ----

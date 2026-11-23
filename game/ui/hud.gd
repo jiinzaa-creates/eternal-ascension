@@ -66,6 +66,7 @@ func _draw() -> void:
 
 	draw_vitals(player)
 	draw_world_panel(player)
+	draw_waypoint(player)
 	draw_techniques(player)
 	draw_inventory(player)
 	draw_quest(player)
@@ -128,6 +129,23 @@ func draw_world_panel(player: Player) -> void:
 		_text(Vector2(x, y), String(weapon.get("name", "?")), 12, Color(ItemGen.RARITY_COLORS[int(weapon.get("rarity", 0))]))
 	y += 18.0
 	_text(Vector2(x, y), "Weapon dmg %d   Armor %d" % [int(player.weapon_damage()), int(player.armor())], 12, MUTED)
+
+
+## Compass to the chosen waypoint, with the distance to it.
+func draw_waypoint(player: Player) -> void:
+	var target: Vector2 = host.waypoint_position
+	if target == Vector2.ZERO or String(host.phase) == "realm":
+		return
+	var distance := target.distance_to(player.global_position)
+	var angle := Travel.bearing(player.global_position, target)
+	var w := 230.0
+	var x := size.x * 0.5 - w * 0.5
+	var y := 14.0
+	draw_rect(Rect2(x, y, w, 30.0), PANEL_BG)
+	draw_set_transform(Vector2(x + 20.0, y + 15.0), angle, Vector2.ONE)
+	draw_colored_polygon(PackedVector2Array([Vector2(8, 0), Vector2(-5, 5), Vector2(-5, -5)]), ACCENT)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_text(Vector2(x + 38.0, y + 19.0), "%s · %s" % [String(host.waypoint_name), Travel.distance_label(distance)], 12, INK)
 
 
 func draw_quest(player: Player) -> void:
@@ -212,10 +230,10 @@ func draw_toasts() -> void:
 
 func draw_help() -> void:
 	var lines := "WASD move · SHIFT sprint · LMB attack · SPACE dodge · F meditate · G breakthrough · E interact · 1-6 technique · M map · F5 save · F9 load · F1 hide"
-	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close"
+	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))
-	var pad := "Gamepad: left stick move · right stick aim · X attack · A dodge · B interact · Y meditate · RB sprint · LB shop mode"
+	var pad := "Gamepad: left stick move · right stick aim · X attack · A dodge · B interact · Y meditate · RB sprint · LB shop · DPAD travel/waypoint"
 	_text(Vector2(24.0, size.y - 60.0), pad, 11, Color("#6b7b84"))
 
 

@@ -30,6 +30,8 @@ const KEY_BINDINGS := {
 	"toggle_help": [KEY_F1],
 	"map": [KEY_M],
 	"shop_mode": [KEY_TAB],
+	"open_travel": [KEY_T],
+	"travel_waypoint": [KEY_V],
 	"zoom_in": [KEY_EQUAL],
 	"zoom_out": [KEY_MINUS],
 	"accept": [KEY_ENTER],
@@ -63,6 +65,8 @@ const JOY_BUTTON_BINDINGS := {
 	"breakthrough": [JOY_BUTTON_DPAD_UP],
 	"map": [JOY_BUTTON_BACK],
 	"shop_mode": [JOY_BUTTON_LEFT_SHOULDER],
+	"open_travel": [JOY_BUTTON_DPAD_DOWN],
+	"travel_waypoint": [JOY_BUTTON_DPAD_LEFT],
 }
 
 ## Content toggles. Captivity is a moral/legal simulation, not an inventory system,
