@@ -2840,6 +2840,80 @@ func _run() -> void:
 		"practice opens the mending pill")
 	main.close_alchemy()
 
+	# --- NPC database: every body carries a whole record ------------------------
+	check(main.npcs.size() >= 18, "the market still holds its population (%d)" % main.npcs.size())
+	var m47_sheet_ok := true
+	var m47_root_ok := true
+	var m47_gear_ok := true
+	var m47_arts_ok := true
+	var m47_goals_ok := true
+	var m47_rules := Equipment.new(DB)
+	for m47_value in main.npcs:
+		var m47_npc: Npc = m47_value
+		if m47_npc.root_id == "" or m47_npc.physique_id == "" or m47_npc.goals.is_empty() or m47_npc.attrs.total() <= 0:
+			m47_sheet_ok = false
+		var m47_root_entry: Dictionary = DB.by_id("root", m47_npc.root_id)
+		if m47_root_entry.is_empty() or int(m47_root_entry.get("tier", 0)) != m47_npc.root_tier:
+			m47_root_ok = false
+		for m47_slot in m47_npc.gear.keys():
+			var m47_piece: Dictionary = m47_npc.gear[m47_slot]
+			if not m47_rules.missing_requirements(m47_piece, m47_npc.attrs, m47_npc.realm).is_empty():
+				m47_gear_ok = false
+		for m47_tech in m47_npc.technique_ids:
+			var m47_state: Dictionary = {"realm": m47_npc.realm, "attrs": m47_npc.attrs}
+			if not bool(Techniques.can_learn(String(m47_tech), m47_state).get("ok", false)):
+				m47_arts_ok = false
+		for m47_goal in m47_npc.goals:
+			if DB.npc_goal(String(m47_goal)).is_empty():
+				m47_goals_ok = false
+	check(m47_sheet_ok, "every NPC has attributes, a root, a body and ambitions")
+	check(m47_root_ok, "every NPC's root tier matches its root")
+	check(m47_gear_ok, "every NPC wears only gear it qualifies for")
+	check(m47_arts_ok, "every NPC knows only arts it qualifies for")
+	check(m47_goals_ok, "every NPC's goals are authored")
+	var m47_elder: Npc = main.elder as Npc
+	check(m47_elder.attrs.get_attr("int") > 20, "an elder outclasses a mortal")
+	check(m47_elder.technique_ids.size() == 2, "an elder carries two arts")
+	check(not m47_elder.gear.is_empty(), "an elder is geared")
+
+	var m47_common: Npc = null
+	for m47_person in main.npcs:
+		var m47_resident: Npc = m47_person
+		if m47_resident.npc_id != "elder_bai" and m47_resident.npc_id != "instructor_rui":
+			m47_common = m47_resident
+			break
+	check(m47_common != null, "a generic resident exists")
+	m47_common.global_position = player.global_position + Vector2(20, 0)
+	check(main.nearest_npc() == m47_common, "the closest person is offered to the dossier")
+	var m47_before := NpcDb.memory_entry(Game.npc_memory, m47_common.npc_id)
+	main._talk(m47_common)
+	var m47_after := NpcDb.memory_entry(Game.npc_memory, m47_common.npc_id)
+	check(bool(m47_after.get("met", false)), "talking introduces the player")
+	check(int(m47_after.get("talks", 0)) == int(m47_before.get("talks", 0)) + 1, "talking is counted")
+	check(int(m47_after.get("last_day", -1)) == Clock.day, "talking records the day")
+	check(int(m47_after.get("regard", 0)) > int(m47_before.get("regard", 0)), "talking warms regard")
+	check(m47_common.standing() == m47_common.base_disposition + int(m47_after.get("regard", 0)),
+		"standing reads base disposition plus memory")
+	var m47_expected: Dictionary = NpcDb.sheet(
+		main._archetype(m47_common.archetype_id), m47_common.npc_id, m47_common.realm)
+	check(String(m47_expected.get("root_id", "")) == m47_common.root_id, "the carried root is the generated one")
+	check(int((m47_expected["attrs"] as Dictionary)["str"]) == m47_common.attrs.get_attr("str"),
+		"the carried attributes are the generated ones")
+
+	# Memory is the only part of a person a save has to carry.
+	Save.delete_slot(85)
+	var m47_talks := int(m47_after.get("talks", 0))
+	var m47_regard := int(m47_after.get("regard", 0))
+	main._save(85)
+	Game.npc_memory.clear()
+	main._load_game(85)
+	var m47_loaded := NpcDb.memory_entry(Game.npc_memory, m47_common.npc_id)
+	check(int(m47_loaded.get("talks", 0)) == m47_talks, "NPC memory survives a save")
+	check(int(m47_loaded.get("regard", 0)) == m47_regard, "regard survives a save")
+	check(m47_common.standing() == m47_common.base_disposition + m47_regard,
+		"a loaded NPC reads the restored memory")
+	Save.delete_slot(85)
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

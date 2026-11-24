@@ -26,6 +26,16 @@ var root_tier := 3
 var schedule: Array = []
 var settlement: Settlement
 var speed := 54.0
+## The rest of the record. Generation lives in NpcDb; this node only carries the
+## answer, so a sheet can be rebuilt from a seed and compared without the body.
+var archetype_id := ""
+var attrs := Attributes.new()
+var root_id := ""
+var physique_id := Physiques.DEFAULT_ID
+var technique_ids: Array = []
+var gear: Dictionary = {}
+var goals: Array = []
+var base_disposition := 0
 
 var current_activity := "idle"
 var current_location := ""
@@ -42,7 +52,8 @@ var _last_hour := -1
 
 
 func setup(id_value: String, name_value: String, role_value: String, sect_value: String,
-		realm_value: int, schedule_entries: Array, home: Settlement) -> void:
+		realm_value: int, schedule_entries: Array, home: Settlement,
+		sheet: Dictionary = {}) -> void:
 	npc_id = id_value
 	display_name = name_value
 	role = role_value
@@ -51,7 +62,63 @@ func setup(id_value: String, name_value: String, role_value: String, sect_value:
 	schedule = schedule_entries
 	settlement = home
 	speed = 48.0 + float(realm) * 4.0
+	apply_sheet(sheet)
 	add_to_group("npc")
+
+
+## Copies a generated record onto the body. No rule lives here: NpcDb decided
+## the person, and the node only reads what it was handed.
+func apply_sheet(sheet: Dictionary) -> void:
+	if sheet.is_empty():
+		return
+	archetype_id = String(sheet.get("archetype_id", archetype_id))
+	realm = int(sheet.get("realm", realm))
+	attrs.from_dict(sheet.get("attrs", {}))
+	root_id = String(sheet.get("root_id", ""))
+	root_tier = int(sheet.get("root_tier", root_tier))
+	physique_id = String(sheet.get("physique_id", Physiques.DEFAULT_ID))
+	var learned: Variant = sheet.get("techniques", [])
+	technique_ids = (learned as Array).duplicate() if typeof(learned) == TYPE_ARRAY else []
+	var worn: Variant = sheet.get("gear", {})
+	gear = (worn as Dictionary).duplicate(true) if typeof(worn) == TYPE_DICTIONARY else {}
+	var pursued: Variant = sheet.get("goals", [])
+	goals = (pursued as Array).duplicate() if typeof(pursued) == TYPE_ARRAY else []
+	base_disposition = int(sheet.get("disposition", 0))
+
+
+## How the player has shifted this person's opinion, capped by the memory rule.
+func regard() -> int:
+	return int(NpcDb.memory_entry(Game.npc_memory, npc_id).get("regard", 0))
+
+
+func standing() -> int:
+	return base_disposition + regard()
+
+
+func standing_label() -> String:
+	return NpcDb.standing_label(standing())
+
+
+func root_name() -> String:
+	return String(DB.by_id("root", root_id).get("name", "Unknown Root"))
+
+
+func physique_name() -> String:
+	return Physiques.name_of(physique_id)
+
+
+func technique_names() -> Array[String]:
+	var out: Array[String] = []
+	for id in technique_ids:
+		out.append(String(DB.technique(String(id)).get("name", String(id))))
+	return out
+
+
+func goal_labels() -> Array[String]:
+	var out: Array[String] = []
+	for id in goals:
+		out.append(NpcDb.goal_label(String(id)))
+	return out
 
 
 func _ready() -> void:

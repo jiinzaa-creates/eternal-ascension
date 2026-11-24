@@ -21,6 +21,7 @@ var suffixes: Array = []
 var passives: Array = []
 var quests: Array = []
 var npc_data: Dictionary = {}
+var npc_goals: Array = []
 var biomes: Array = []
 var enemy_archetypes: Array = []
 var spirit_beasts: Array = []
@@ -63,6 +64,7 @@ func load_all() -> void:
 	passives = _read("passives.json").get("passives", [])
 	quests = _read("quests.json").get("quests", [])
 	npc_data = _read("npcs.json")
+	npc_goals = npc_data.get("goals", [])
 	biomes = _read("biomes.json").get("biomes", [])
 	enemy_archetypes = _read("enemy_archetypes.json").get("archetypes", [])
 	spirit_beasts = _read("spirit_beasts.json").get("beasts", [])
@@ -102,6 +104,7 @@ func load_all() -> void:
 	_index("unique", uniques)
 	_index("loot", loot_tables)
 	_index("origin", origins)
+	_index("npc_goal", npc_goals)
 	_index("physique", physiques)
 	_index("weapon_type", weapon_types)
 	_index("station", crafting_stations)
@@ -262,6 +265,10 @@ func schedules() -> Dictionary:
 
 func archetypes() -> Array:
 	return npc_data.get("archetypes", [])
+
+
+func npc_goal(id: String) -> Dictionary:
+	return by_id("npc_goal", id)
 
 
 func bases_for(slot: String) -> Array:
@@ -587,8 +594,7 @@ func validate() -> Array:
 			if String(step.get("kind", "")) == "" or String(step.get("target", "")) == "":
 				problems.append("quest %s has a step without kind/target" % q.get("id", "?"))
 
-	if npc_data.is_empty() or npc_data.get("archetypes", []).is_empty():
-		problems.append("npc archetype data is missing")
+	_validate_npc_data(problems)
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())
@@ -1193,6 +1199,7 @@ func _validate_affix(affix: Dictionary, seen: Dictionary, problems: Array) -> vo
 func counts() -> Dictionary:
 	return {
 		"realms": realms.size(),
+		"npc_goals": npc_goals.size(),
 		"roots": roots.size(),
 		"methods": methods.size(),
 		"meridians": meridians.size(),
@@ -1213,3 +1220,114 @@ func counts() -> Dictionary:
 		"physiques": physiques.size(),
 		"weapon_types": weapon_types.size(),
 	}
+
+
+## The NPC record is content too: an archetype naming a root band, a body, an
+## art or a piece of gear that does not exist would quietly make a hollow person.
+## A sheet can only be built from what this function accepts.
+func _validate_npc_data(problems: Array) -> void:
+	if npc_data.is_empty() or npc_data.get("archetypes", []).is_empty():
+		problems.append("npc archetype data is missing")
+		return
+	var goal_ids: Dictionary = {}
+	for value in npc_goals:
+		if typeof(value) != TYPE_DICTIONARY:
+			problems.append("npc goal is not an object")
+			continue
+		var goal: Dictionary = value
+		var goal_id: String = String(goal.get("id", ""))
+		if goal_id == "":
+			problems.append("npc goal without id")
+			continue
+		if goal_ids.has(goal_id):
+			problems.append("duplicate npc goal id " + goal_id)
+		goal_ids[goal_id] = true
+		if String(goal.get("label", "")) == "":
+			problems.append("npc goal %s has no label" % goal_id)
+		if String(goal.get("blurb", "")) == "":
+			problems.append("npc goal %s has no blurb" % goal_id)
+	if goal_ids.is_empty():
+		problems.append("npc goals are missing")
+
+	var schedules: Dictionary = npc_data.get("schedules", {})
+	var seen: Dictionary = {}
+	for value in npc_data.get("archetypes", []):
+		if typeof(value) != TYPE_DICTIONARY:
+			problems.append("npc archetype is not an object")
+			continue
+		var archetype: Dictionary = value
+		var id: String = String(archetype.get("id", ""))
+		if id == "":
+			problems.append("npc archetype without id")
+			continue
+		if seen.has(id):
+			problems.append("duplicate npc archetype id " + id)
+		seen[id] = true
+		if String(archetype.get("role", "")) == "":
+			problems.append("npc archetype %s has no role" % id)
+		var realm: int = int(archetype.get("realm", 0))
+		if realm < 1 or realm > 12:
+			problems.append("npc archetype %s has realm outside 1..12" % id)
+		if not schedules.has(String(archetype.get("schedule", ""))):
+			problems.append("npc archetype %s names unknown schedule %s" % [id, String(archetype.get("schedule", ""))])
+		var disposition: int = int(archetype.get("disposition", 0))
+		if disposition < -100 or disposition > 100:
+			problems.append("npc archetype %s has disposition outside -100..100" % id)
+
+		var attrs: Variant = archetype.get("attrs", null)
+		if typeof(attrs) != TYPE_DICTIONARY:
+			problems.append("npc archetype %s has no attribute block" % id)
+		else:
+			for key in Attributes.KEYS:
+				if not (attrs as Dictionary).has(key):
+					problems.append("npc archetype %s is missing %s" % [id, String(key)])
+				elif int((attrs as Dictionary)[key]) < 0:
+					problems.append("npc archetype %s has negative %s" % [id, String(key)])
+		if int(archetype.get("attr_growth", 0)) < 0:
+			problems.append("npc archetype %s has negative attribute growth" % id)
+
+		var span: Variant = archetype.get("root", null)
+		if typeof(span) != TYPE_ARRAY or (span as Array).size() != 2:
+			problems.append("npc archetype %s has no root tier range" % id)
+		else:
+			var low: int = int((span as Array)[0])
+			var high: int = int((span as Array)[1])
+			if low < 1 or high > Roots.MAX_TIER or low > high:
+				problems.append("npc archetype %s has a bad root tier range" % id)
+
+		var physique_pool: Variant = archetype.get("physiques", null)
+		if typeof(physique_pool) != TYPE_ARRAY or (physique_pool as Array).is_empty():
+			problems.append("npc archetype %s has no physique pool" % id)
+		else:
+			for physique_id in physique_pool:
+				if by_id("physique", String(physique_id)).is_empty():
+					problems.append("npc archetype %s names unknown physique %s" % [id, String(physique_id)])
+
+		var technique_pool: Variant = archetype.get("techniques", null)
+		if typeof(technique_pool) != TYPE_ARRAY or (technique_pool as Array).is_empty():
+			problems.append("npc archetype %s has no technique pool" % id)
+		else:
+			for technique_id in technique_pool:
+				if by_id("technique", String(technique_id)).is_empty():
+					problems.append("npc archetype %s names unknown technique %s" % [id, String(technique_id)])
+		if int(archetype.get("technique_count", 0)) < 0:
+			problems.append("npc archetype %s asks for a negative number of techniques" % id)
+
+		var gear_pool: Variant = archetype.get("gear", null)
+		if typeof(gear_pool) != TYPE_ARRAY or (gear_pool as Array).is_empty():
+			problems.append("npc archetype %s has no gear pool" % id)
+		else:
+			for base_id in gear_pool:
+				var base: Dictionary = by_id("base", String(base_id))
+				if base.is_empty():
+					problems.append("npc archetype %s names unknown item base %s" % [id, String(base_id)])
+				elif not Items.is_equipment(String(base.get("slot", ""))):
+					problems.append("npc archetype %s names a non-equipment base %s" % [id, String(base_id)])
+
+		var goal_pool: Variant = archetype.get("goals", null)
+		if typeof(goal_pool) != TYPE_ARRAY or (goal_pool as Array).is_empty():
+			problems.append("npc archetype %s has no goals" % id)
+		else:
+			for goal_id in goal_pool:
+				if not goal_ids.has(String(goal_id)):
+					problems.append("npc archetype %s names unknown goal %s" % [id, String(goal_id)])

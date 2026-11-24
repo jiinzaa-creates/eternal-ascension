@@ -32,6 +32,9 @@ var crafts_made: int = 0
 ## Practice earned in each profession, by id: `{profession.smith: {xp: n}}`.
 ## The rank itself is derived, so only practice is ever stored.
 var professions: Dictionary = {}
+## What people remember of the player, by stable NPC id. The sheet regenerates
+## from the seed; this is the only part of a person a save has to carry.
+var npc_memory: Dictionary = {}
 
 
 func _process(delta: float) -> void:
@@ -55,6 +58,7 @@ func new_run(seed_value: int = 0) -> void:
 	age_warning_stage = 0
 	crafts_made = 0
 	professions.clear()
+	npc_memory.clear()
 	hitstop.clear()
 
 
@@ -92,6 +96,7 @@ func to_dict() -> Dictionary:
 		"age_warning_stage": age_warning_stage,
 		"crafts_made": crafts_made,
 		"professions": professions.duplicate(true),
+		"npc_memory": npc_memory.duplicate(true),
 	}
 
 
@@ -111,3 +116,4 @@ func from_dict(data: Dictionary) -> void:
 	age_warning_stage = int(data.get("age_warning_stage", 0))
 	crafts_made = int(data.get("crafts_made", 0))
 	professions = Professions.sanitize(data.get("professions", {}))
+	npc_memory = NpcDb.sanitize_memory(data.get("npc_memory", {}))

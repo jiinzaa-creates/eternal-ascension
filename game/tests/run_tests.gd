@@ -72,6 +72,7 @@ func _ready() -> void:
 	_interaction_tests()
 	_climate_tests()
 	_npc_tests()
+	_npcdb_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3041,7 +3042,148 @@ func _npc_tests() -> void:
 	npc.free()
 
 
+## Find one archetype by its stable id.
+func _npc_archetype(id: String) -> Dictionary:
+	for value in DB.archetypes():
+		var archetype: Dictionary = value
+		if String(archetype.get("id", "")) == id:
+			return archetype
+	return {}
+
+
 # ----------------------------------------------------------------- quests ----
+
+## The NPC record is a pure function; memory is the only thing that changes.
+## These checks keep both halves honest: a sheet can never name content that
+## does not exist or gear the body could not wear, and a save can never buy
+## regard it did not earn.
+func _npcdb_tests() -> void:
+	print("[npc] every person has a full deterministic record")
+	check(DB.npc_goals.size() >= 6, "NPC goals are authored")
+	check(not DB.npc_goal("goal.pursue_dao").is_empty(), "a goal can be read by id")
+	check(NpcDb.goal_label("goal.pursue_dao") == "Pursue the Dao", "a goal has a label")
+	check(NpcDb.goal_blurb("goal.pursue_dao") != "", "a goal has a blurb")
+	check(NpcDb.goal_blurb("goal.unknown") == "", "an unknown goal has no blurb")
+
+	var disciple := _npc_archetype("inner_disciple")
+	check(not disciple.is_empty(), "the inner disciple archetype exists")
+	var first: Dictionary = NpcDb.sheet(disciple, "npc.inner_disciple.7")
+	var again: Dictionary = NpcDb.sheet(disciple, "npc.inner_disciple.7")
+	check(JSON.stringify(first) == JSON.stringify(again), "a sheet is a pure function of seed and id")
+	check(String(first.get("archetype_id", "")) == "inner_disciple", "the sheet remembers its archetype")
+	check(int(first.get("realm", 0)) == 2, "the sheet uses the archetype realm")
+
+	var template: Dictionary = disciple.get("attrs", {})
+	var attrs: Dictionary = first.get("attrs", {})
+	check(attrs.size() == Attributes.KEYS.size(), "every attribute is generated")
+	var attrs_ok := true
+	for key in Attributes.KEYS:
+		if not attrs.has(key) or int(attrs[key]) < int(template.get(key, 0)):
+			attrs_ok = false
+	check(attrs_ok, "no attribute falls below the archetype base")
+
+	var elder_sheet: Dictionary = NpcDb.sheet(_npc_archetype("elder"), "elder_bai", 4)
+	var farmer_sheet: Dictionary = NpcDb.sheet(_npc_archetype("farmer"), "npc.farmer.0")
+	check(int((elder_sheet["attrs"] as Dictionary)["str"]) > int((farmer_sheet["attrs"] as Dictionary)["str"]),
+		"realm and archetype raise attributes")
+
+	var span: Array = disciple.get("root", [1, 1])
+	var root_tier := int(first.get("root_tier", 0))
+	check(root_tier >= int(span[0]) and root_tier <= int(span[1]), "the root tier stays in the archetype band")
+	var root: Dictionary = DB.by_id("root", String(first.get("root_id", "")))
+	check(not root.is_empty() and int(root.get("tier", 0)) == root_tier, "the root id and tier agree")
+
+	var physique_id := String(first.get("physique_id", ""))
+	check(not DB.physique(physique_id).is_empty(), "the body is a known physique")
+	check((disciple.get("physiques", []) as Array).has(physique_id), "the body comes from the archetype pool")
+
+	var techniques: Array = first.get("techniques", [])
+	check(techniques.size() == 2, "a disciple carries two arts")
+	var body := Attributes.new()
+	body.from_dict(attrs)
+	var legal := true
+	for tech_id in techniques:
+		if not bool(Techniques.can_learn(String(tech_id), {"realm": 2, "attrs": body}).get("ok", false)):
+			legal = false
+	check(legal, "every art is one the body qualifies for")
+
+	var gear: Dictionary = first.get("gear", {})
+	check(not gear.is_empty(), "a disciple wears gear")
+	var rules := Equipment.new(DB)
+	var gear_ok := true
+	for slot in gear.keys():
+		var piece: Dictionary = gear[slot]
+		if String(piece.get("slot", "")) != String(slot):
+			gear_ok = false
+		if not rules.missing_requirements(piece, body, 2).is_empty():
+			gear_ok = false
+	check(gear_ok, "every worn piece passes the equip gate")
+	var gear_again: Dictionary = NpcDb.roll_gear(disciple, "npc.inner_disciple.7", 2, attrs)
+	check(JSON.stringify(gear) == JSON.stringify(gear_again), "gear rerolls identically")
+
+	var goals: Array = first.get("goals", [])
+	check(goals.size() == 2, "two ambitions are chosen")
+	var goals_known := true
+	for goal_id in goals:
+		if DB.npc_goal(String(goal_id)).is_empty():
+			goals_known = false
+	check(goals_known, "ambitions come from the catalogue")
+	check(goals[0] != goals[1], "ambitions do not repeat")
+	check(int(first.get("disposition", 99)) == int(disciple.get("disposition", 0)),
+		"disposition comes from the archetype")
+
+	var memory: Dictionary = {}
+	var blank := NpcDb.memory_entry(memory, "npc.x")
+	check(not bool(blank["met"]) and int(blank["talks"]) == 0, "an unmet person starts blank")
+	var greeted := NpcDb.remember(memory, "npc.x", 12)
+	check(bool(greeted["met"]) and int(greeted["talks"]) == 1 and int(greeted["last_day"]) == 12,
+		"talking is remembered")
+	check(int(greeted["regard"]) == NpcDb.REGARD_PER_TALK, "talking warms regard")
+	check(memory.has("npc.x"), "memory is written to the dictionary it is handed")
+	NpcDb.remember(memory, "npc.x", 13)
+	var twice := NpcDb.memory_entry(memory, "npc.x")
+	check(int(twice["talks"]) == 2 and int(twice["last_day"]) == 13, "memory accumulates")
+	check(int(twice["regard"]) == NpcDb.REGARD_PER_TALK * 2, "regard stacks")
+	for _i in 40:
+		NpcDb.remember(memory, "npc.x", 14)
+	check(int(NpcDb.memory_entry(memory, "npc.x")["regard"]) == NpcDb.REGARD_MAX, "regard is capped")
+	check(not bool(NpcDb.remember({}, "", 1)["met"]), "an unnamed listener remembers nothing")
+
+	var dirty := NpcDb.sanitize_memory({
+		"npc.x": {"met": true, "talks": -4, "last_day": -2, "regard": 900},
+		"npc.y": {"met": true, "talks": 3, "last_day": 4, "regard": -3},
+		"junk": "nope",
+		"": {"met": true},
+	})
+	check(dirty.size() == 2, "garbage memory entries are dropped")
+	check(int(dirty["npc.x"]["talks"]) == 0 and int(dirty["npc.x"]["last_day"]) == 0,
+		"negative memory counts are cleaned")
+	check(int(dirty["npc.x"]["regard"]) == NpcDb.REGARD_MAX, "regard is clamped on load")
+	check(int(dirty["npc.y"]["regard"]) == -3, "a negative regard that is real survives")
+	check(NpcDb.sanitize_memory("broken").is_empty(), "a non-dictionary memory block is ignored")
+	check(NpcDb.sanitize_memory({}).is_empty(), "an empty save has no memory")
+
+	check(NpcDb.standing_label(-30) == "hostile", "a hostile standing is named")
+	check(NpcDb.standing_label(-5) == "wary", "a wary standing is named")
+	check(NpcDb.standing_label(0) == "neutral", "a neutral standing is named")
+	check(NpcDb.standing_label(12) == "friendly", "a friendly standing is named")
+	check(NpcDb.standing_label(30) == "warm", "a warm standing is named")
+
+	# A body carries the record the database rolled, and reads memory live.
+	var npc := Npc.new()
+	npc.setup("npc.test.body", "Test Body", "Disciple", "sect.azure_cloud", 2, [], null, first)
+	check(npc.attrs.get_attr("str") == int(attrs["str"]), "the body carries its attributes")
+	check(npc.root_id == String(first["root_id"]) and npc.root_tier == root_tier, "the body carries its root")
+	check(npc.technique_ids.size() == techniques.size(), "the body carries its arts")
+	check(npc.goal_labels().size() == goals.size(), "the body can name its ambitions")
+	check(npc.standing() == int(first["disposition"]), "an unmet body stands at its base disposition")
+	Game.npc_memory = {"npc.test.body": {"met": true, "talks": 2, "last_day": 3, "regard": 6}}
+	check(npc.regard() == 6, "the body reads its memory")
+	check(npc.standing() == int(first["disposition"]) + 6, "memory moves standing without touching the sheet")
+	check(npc.standing_label() == NpcDb.standing_label(npc.standing()), "the body names its standing")
+	Game.npc_memory.clear()
+	npc.free()
+
 
 func _quest_tests() -> void:
 	print("[quests] the Azure Cloud line advances only on real events")

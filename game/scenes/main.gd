@@ -230,9 +230,9 @@ func _build_feedback() -> void:
 func _spawn_npcs() -> void:
 	var schedules: Dictionary = DB.schedules()
 	elder = _make_npc("elder_bai", "Elder Bai Qing", "Elder", "sect.azure_cloud",
-		4, schedules.get("elder", []), Vector2(-30, 40))
+		4, schedules.get("elder", []), Vector2(-30, 40), "elder")
 	_make_npc("instructor_rui", "Instructor Rui", "Sword Instructor", "sect.azure_cloud",
-		3, schedules.get("inner_disciple", []), Vector2(64, 120))
+		3, schedules.get("inner_disciple", []), Vector2(64, 120), "inner_disciple")
 
 	var plan := [
 		["sect_master", 1],
@@ -256,7 +256,8 @@ func _spawn_npcs() -> void:
 				String(archetype.get("sect", "")),
 				int(archetype.get("realm", 1)),
 				schedules.get(String(archetype.get("schedule", "disciple")), []),
-				offset
+				offset,
+				String(entry[0])
 			)
 
 
@@ -267,12 +268,18 @@ func _archetype(id: String) -> Dictionary:
 	return {}
 
 
+## One generated record per body: the archetype names the pools, NpcDb rolls the
+## person, and the node carries the result. `archetype_id` is kept explicit so
+## an authored character can outrank or differ from its template.
 func _make_npc(id: String, display: String, role: String, sect: String, realm: int,
-		schedule: Array, offset: Vector2) -> Npc:
+		schedule: Array, offset: Vector2, archetype_id: String = "") -> Npc:
+	var archetype := _archetype(archetype_id)
+	if archetype.is_empty():
+		archetype = _archetype("outer_disciple")
 	var npc := Npc.new()
 	npc.name = "Npc_" + id
-	npc.setup(id, display, role, sect, realm, schedule, settlement)
-	npc.root_tier = int(_name_rng.randi_range(2, 7))
+	var sheet := NpcDb.sheet(archetype, id, realm)
+	npc.setup(id, display, role, sect, realm, schedule, settlement, sheet)
 	world.add_child(npc)
 	npc.global_position = settlement.position_for("plaza") + offset
 	npcs.append(npc)
@@ -1637,6 +1644,25 @@ func _active_interactables() -> Array:
 	return interactables
 
 
+## The dossier follows the nearest person within conversational distance.
+func nearest_npc() -> Npc:
+	if player == null or realm_instance != null or String(phase) == "ended":
+		return null
+	var best: Npc = null
+	var best_dist := 150.0
+	for node in npcs:
+		if not is_instance_valid(node):
+			continue
+		var npc := node as Npc
+		if npc == null:
+			continue
+		var dist: float = npc.global_position.distance_to(player.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best = npc
+	return best
+
+
 func _nearest_interactable() -> Node:
 	var best: Node = null
 	var best_dist := 96.0
@@ -1812,6 +1838,9 @@ func _teach_technique() -> void:
 
 
 func _talk(npc: Npc) -> void:
+	# Every conversation is remembered before it does anything else: a merchant
+	# with nothing to sell still remembers being spoken to.
+	NpcDb.remember(Game.npc_memory, npc.npc_id, Clock.day)
 	if npc.npc_id == "instructor_rui":
 		_teach_technique()
 		return

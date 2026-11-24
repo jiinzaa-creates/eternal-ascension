@@ -96,6 +96,8 @@ func _draw() -> void:
 	draw_waypoint(player)
 	draw_techniques(player)
 	draw_inventory(player)
+	# The dossier is ambient HUD; every full-screen screen opens over it.
+	draw_npc_dossier(player)
 	draw_gear(player)
 	draw_storage(player)
 	draw_forge(player)
@@ -687,6 +689,59 @@ func draw_alchemy(player: Player) -> void:
 		_text(Vector2(cx, cy), _fit("Refused — %s" % String(rules_check.get("reason", "not enough")), 11, 350.0), 11, Color("#e08f8f"))
 	cy += 26.0
 	_text(Vector2(cx, cy), "Pills are drunk from the satchel (I, then U).", 11, Color("#7f9098"))
+
+
+## The person in front of the body: the whole database entry, not a name plate.
+## It follows proximity instead of a key, so walking away closes it and no part
+## of the run has to pause for a glance.
+func draw_npc_dossier(_player: Player) -> void:
+	if host == null:
+		return
+	var npc := host.nearest_npc() as Npc
+	if npc == null:
+		return
+	var x := 24.0
+	var y := 334.0
+	var width := 432.0
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 232.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 232.0), Color("#5f7f8c", 0.45), false, 1.0)
+	_text(Vector2(x, y), _fit("%s — %s" % [npc.display_name, npc.role], 15, 408.0), 15, ACCENT)
+	y += 20.0
+	var sect_part := ""
+	if String(npc.sect_id) != "":
+		sect_part = " · " + String(npc.sect_id)
+	var realm_name := String(DB.realm(npc.realm).get("name", "Realm %d" % npc.realm))
+	_text(Vector2(x, y), _fit("Realm %d — %s%s" % [npc.realm, realm_name, sect_part], 11, 408.0), 11, MUTED)
+	y += 17.0
+	_text(Vector2(x, y), npc.attrs.summary(), 11, INK)
+	y += 17.0
+	var root: Dictionary = DB.by_id("root", npc.root_id)
+	var purity := Roots.purity_label(float(root.get("purity", 0.5)))
+	_text(Vector2(x, y), _fit("Root: %s (tier %d, %s)   Body: %s" % [
+		npc.root_name(), npc.root_tier, purity, npc.physique_name()], 11, 408.0), 11, Color("#c8b8e8"))
+	y += 17.0
+	var arts: Array[String] = npc.technique_names()
+	_text(Vector2(x, y), _fit("Arts: " + (", ".join(arts) if not arts.is_empty() else "none"), 11, 408.0), 11, Color("#8fd8e8"))
+	y += 17.0
+	var worn: Array[String] = []
+	for slot in ["weapon", "armor", "ring", "talisman"]:
+		var piece: Variant = npc.gear.get(slot, {})
+		if typeof(piece) == TYPE_DICTIONARY and not (piece as Dictionary).is_empty():
+			worn.append(String((piece as Dictionary).get("name", String(slot))))
+	_text(Vector2(x, y), _fit("Gear: " + (", ".join(worn) if not worn.is_empty() else "nothing"), 11, 408.0), 11, Color("#d0b888"))
+	y += 17.0
+	var ambition: Array[String] = npc.goal_labels()
+	_text(Vector2(x, y), _fit("Goals: " + (", ".join(ambition) if not ambition.is_empty() else "none"), 11, 408.0), 11, Color("#d8c070"))
+	y += 17.0
+	var memory: Dictionary = NpcDb.memory_entry(Game.npc_memory, npc.npc_id)
+	var relation := "A stranger. E — talk."
+	if bool(memory.get("met", false)):
+		relation = "Met %d× · last day %d · regard %+d (%s)" % [
+			int(memory.get("talks", 0)), int(memory.get("last_day", 0)),
+			npc.standing(), npc.standing_label()]
+	_text(Vector2(x, y), _fit(relation, 11, 408.0), 11, MUTED)
+	y += 16.0
+	_text(Vector2(x, y), "The sheet regenerates from the seed; memory is saved.", 10, Color("#5f7079"))
 
 
 ## The storehouse: the satchel on the left, the shelves on the right. The cursor

@@ -972,6 +972,36 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   ids, a station that does not exist, a negative quality bonus, an out-of-range failure reduction,
   and a recipe or potion whose profession is unknown or whose level is outside `0…4`.
 
+## NPC database
+
+- **A person is a generated record.** `data/npcs.json` holds the goal catalogue and, for each
+  archetype, an attribute template plus `attr_growth`, a `root` tier band, a `physiques` pool, a
+  `techniques` pool, a `gear` pool, a starting `disposition` and a goal pool. `NpcDb.sheet(archetype,
+  npc_id, realm)` is the only generator: it draws every field from
+  `Rng.stream("npc_sheet", hash(npc_id))`, so the same seed and id always rebuild the same person.
+  Authored characters pass their realm explicitly and keep their own name, role and schedule; only
+  the record comes from the template.
+- **What a sheet contains.** Six attributes (template + one growth step per realm above the first,
+  plus a deterministic 0–1 jitter), a root id and its tier inside the archetype's band, a physique
+  id from the pool, up to `technique_count` arts, one generated piece per gear slot, and
+  `goal_count` ambitions.
+- **Legality is enforced at generation.** Arts are filtered through `Techniques.can_learn` against
+  the generated realm and attributes, and each generated piece goes through `Equipment.can_equip`
+  against the same body; a piece the person could not wear is dropped, never worn. `DB.validate()`
+  checks every pool id, the root band, the attribute block, the schedule and the goal references, so
+  a typo cannot create a hollow person.
+- **Memory is separate from identity.** `Game.npc_memory` maps a stable NPC id to
+  `{met, talks, last_day, regard}`. `NpcDb.remember()` is the only write and `_talk()` is its only
+  caller; regard rises by `REGARD_PER_TALK` to `REGARD_MAX`, and `standing()` is the archetype's base
+  disposition plus regard, labelled hostile → wary → neutral → friendly → warm. Memory is never
+  derived from the sheet, so changing a person's gear cannot rewrite a friendship.
+- **Saving.** The memory dictionary is one optional key, read through
+  `NpcDb.sanitize_memory()`: non-dictionaries, empty ids, negative counts and out-of-range regard are
+  discarded or clamped. Sheets are never saved; the seed regenerates them. Schema stays 2.
+- **Reading it.** Standing within 150 units of an NPC draws the dossier on the HUD: identity, realm,
+  all six attributes, root with purity, physique, arts, worn gear, ambitions and the memory line
+  (stranger, or met ×N / last day / regard / standing). It needs no key and pauses nothing.
+
 ## Loot tables
 
 - **One table per source, all in data.** `data/loot_tables.json` holds `kill.wild`,
