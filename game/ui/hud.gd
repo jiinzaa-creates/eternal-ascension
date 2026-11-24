@@ -120,6 +120,7 @@ func _draw() -> void:
 	draw_player_sect(player)
 	draw_storylines(player)
 	draw_narrative(player)
+	draw_endgame(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -140,6 +141,13 @@ func draw_ended(player: Player) -> void:
 	]
 	for i in lines.size():
 		_text(center + Vector2(-_text_width(lines[i], 15) * 0.5, -60.0 + float(i) * 26.0), lines[i], 15, MUTED)
+	# The life may have written the blank page. The death screen keeps the
+	# epitaph, because the choice is part of the run rather than a menu state.
+	if host != null and host.endgame != null and host.endgame.is_chosen():
+		var written := "THE PAGE YOU WROTE — %s" % String(
+			host.endgame.chosen().get("title", "")).to_upper()
+		_text(center + Vector2(-_text_width(written, 13) * 0.5, 62.0), written, 13,
+			Color("#d8c070"))
 	var hint := "ENTER — begin again"
 	_text(center + Vector2(-_text_width(hint, 16) * 0.5, 110.0), hint, 16, Color("#e8d9a8"))
 
@@ -1086,6 +1094,147 @@ func draw_narrative(_player: Player) -> void:
 		10, Color("#7b8b94"))
 
 
+## The blank page: four resolutions, each page's proof and price, and the
+## epilogue a written save keeps. A reading screen, frozen like the archive.
+func draw_endgame(_player: Player) -> void:
+	if host == null or not bool(host.endgame_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
+	var w := 1100.0
+	var h := 664.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0c1012", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "THE BLANK PAGE", 22, Color("#e0d0a0"))
+	_text(Vector2(x + 24.0, y + 58.0), "The book's last page is blank because the reader writes it. It is written once.", 11, MUTED)
+	_text(Vector2(x + 24.0, y + 80.0), _fit("%s  ·  %s" % [
+		String(host.endgame_progress()), String(host.endgame.threshold_summary())], 10, 1040.0), 10,
+		Color("#a8b8c0"))
+
+	var chosen: Dictionary = host.endgame_epilogue()
+	if not chosen.is_empty():
+		_draw_epilogue(chosen, x, y, w)
+	elif not bool(host.endgame_ready()):
+		_draw_page_unready(x, y, w)
+	else:
+		_draw_page_choices(x, y, w)
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "F8 / E / ESC — close", 10, Color("#7b8b94"))
+
+
+func _draw_epilogue(chosen: Dictionary, x: float, y: float, w: float) -> void:
+	var colour := Color(String(chosen.get("colour", "#c8d8e0")))
+	_text(Vector2(x + 24.0, y + 112.0), "THE PAGE IS WRITTEN", 11, ACCENT)
+	_text(Vector2(x + 24.0, y + 156.0), _fit(String(chosen.get("title", "")), 30, 1000.0), 30, colour)
+	_text(Vector2(x + 24.0, y + 186.0), _fit(String(chosen.get("approach", "")), 13, 1010.0), 13,
+		Color("#d8e4ea"))
+	var promise_y := y + 216.0
+	_text(Vector2(x + 24.0, promise_y), "WHAT IT PROMISED", 9, Color("#7f9098"))
+	var promise := _wrapped(String(chosen.get("promise", "")), 11, 1010.0)
+	for i in mini(promise.size(), 2):
+		_text(Vector2(x + 24.0, promise_y + 17.0 + float(i) * 15.0), promise[i], 11,
+			Color("#a8c8b8"))
+	var cost_y := promise_y + 58.0
+	_text(Vector2(x + 24.0, cost_y), "WHAT IT COST", 9, Color("#7f9098"))
+	var cost := _wrapped(String(chosen.get("cost", "")), 11, 1010.0)
+	for i in mini(cost.size(), 2):
+		_text(Vector2(x + 24.0, cost_y + 17.0 + float(i) * 15.0), cost[i], 11,
+			Color("#d8a8a0"))
+	var epi_y := cost_y + 60.0
+	draw_line(Vector2(x + 24.0, epi_y - 14.0), Vector2(x + w - 24.0, epi_y - 14.0),
+		Color("#2b343a"), 1.0)
+	var epilogue := _wrapped(String(chosen.get("epilogue", "")), 12, 1010.0)
+	for i in mini(epilogue.size(), 12):
+		_text(Vector2(x + 24.0, epi_y + 10.0 + float(i) * 20.0), epilogue[i], 12,
+			Color("#d8e4ea"))
+
+
+func _draw_page_unready(x: float, y: float, w: float) -> void:
+	_text(Vector2(x + 24.0, y + 118.0), "THE PAGE WILL NOT TURN", 11, Color("#e0a080"))
+	var intro := _wrapped("Each thread ends where the four questions meet. The page opens only when all four final records are recovered.", 11, 1010.0)
+	for i in mini(intro.size(), 2):
+		_text(Vector2(x + 24.0, y + 144.0 + float(i) * 16.0), intro[i], 11, Color("#8fa2ab"))
+	var rows: Array = host.endgame_missing()
+	var list_y := y + 202.0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		draw_rect(Rect2(x + 24.0, list_y - 16.0, w - 48.0, 72.0), Color("#0a0f12", 0.94))
+		_text(Vector2(x + 40.0, list_y + 2.0), "%02d" % (i + 1), 10, Color("#4f5f68"))
+		_text(Vector2(x + 70.0, list_y + 2.0), _fit(String(row.get("title", "?")), 14, 620.0), 14,
+			Color("#c8d4da"))
+		_text(Vector2(x + 70.0, list_y + 23.0), _fit(String(row.get("summary", "")), 10, 900.0), 10,
+			Color("#7f9098"))
+		_text(Vector2(x + w - 178.0, list_y + 2.0), "UNRECOVERED", 9, Color("#6f7f88"))
+		list_y += 82.0
+
+
+func _draw_page_choices(x: float, y: float, w: float) -> void:
+	var rows: Array = host.endgame_rows()
+	if rows.is_empty():
+		return
+	var cursor := clampi(int(host.endgame_index), 0, rows.size() - 1)
+	var list_y := y + 116.0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var selected := i == cursor
+		var colour := Color(String(row.get("colour", "#c8d8e0")))
+		var unlocked := bool(row.get("unlocked", false))
+		if selected:
+			draw_rect(Rect2(x + 18.0, list_y - 10.0, 430.0, 104.0), Color("#162026", 0.96))
+			draw_rect(Rect2(x + 18.0, list_y - 10.0, 3.0, 104.0), colour)
+		var title_colour := colour if selected else (Color("#c8d4da") if unlocked else Color("#6f7f88"))
+		_text(Vector2(x + 32.0, list_y + 14.0), _fit(String(row.get("title", "?")), 15, 390.0), 15, title_colour)
+		_text(Vector2(x + 32.0, list_y + 36.0), _fit("Asks: " + String(row.get("proof", "")), 10, 390.0), 10,
+			Color("#8fa2ab") if unlocked else Color("#6f7f88"))
+		_text(Vector2(x + 32.0, list_y + 58.0), "READY" if unlocked else "CLOSED", 9,
+			ACCENT if unlocked else Color("#a86f6f"))
+		list_y += 114.0
+
+	var chosen_row: Dictionary = rows[cursor]
+	var colour := Color(String(chosen_row.get("colour", "#c8d8e0")))
+	var px := x + 476.0
+	var pw := 600.0
+	var py := y + 108.0
+	draw_rect(Rect2(px, py, pw, 512.0), Color("#0a0f12", 0.94))
+	draw_rect(Rect2(px, py, pw, 512.0), Color("#2b343a"), false, 1.0)
+	_text(Vector2(px + 22.0, py + 32.0), _fit(String(chosen_row.get("title", "")), 19, pw - 44.0), 19, colour)
+	var cy := py + 56.0
+	var approach := _wrapped(String(chosen_row.get("approach", "")), 12, pw - 44.0)
+	for i in mini(approach.size(), 2):
+		_text(Vector2(px + 22.0, cy + float(i) * 16.0), approach[i], 12, Color("#d8e4ea"))
+	cy += 44.0
+	_text(Vector2(px + 22.0, cy), "WHAT IT PROMISES", 9, Color("#7f9098"))
+	var promise := _wrapped(String(chosen_row.get("promise", "")), 11, pw - 44.0)
+	for i in mini(promise.size(), 3):
+		_text(Vector2(px + 22.0, cy + 18.0 + float(i) * 15.0), promise[i], 11, Color("#a8c8b8"))
+	cy += 72.0
+	_text(Vector2(px + 22.0, cy), "WHAT IT COSTS", 9, Color("#7f9098"))
+	var cost := _wrapped(String(chosen_row.get("cost", "")), 11, pw - 44.0)
+	for i in mini(cost.size(), 3):
+		_text(Vector2(px + 22.0, cy + 18.0 + float(i) * 15.0), cost[i], 11, Color("#d8a8a0"))
+	cy += 76.0
+	draw_line(Vector2(px + 22.0, cy - 14.0), Vector2(px + pw - 22.0, cy - 14.0), Color("#2b343a"), 1.0)
+	_text(Vector2(px + 22.0, cy + 10.0), "WHAT THE PAGE ASKS", 9, Color("#7f9098"))
+	_text(Vector2(px + 22.0, cy + 30.0), _fit(String(chosen_row.get("proof", "")), 12, pw - 44.0), 12,
+		Color("#d8c898"))
+
+	var status_y := cy + 58.0
+	if not bool(chosen_row.get("unlocked", false)):
+		var reason := _wrapped(String(chosen_row.get("reason", "")), 11, pw - 44.0)
+		for i in mini(reason.size(), 2):
+			_text(Vector2(px + 22.0, status_y + float(i) * 16.0), reason[i], 11, Color("#e08f8f"))
+	elif int(host.endgame_confirm_index) == cursor:
+		_text(Vector2(px + 22.0, status_y), "Press ENTER again to write this page.", 12, Color("#e8c060"))
+		_text(Vector2(px + 22.0, status_y + 18.0), "It cannot be unwritten, and no other page will be offered.", 10,
+			Color("#c8a860"))
+	else:
+		_text(Vector2(px + 22.0, status_y), "ENTER considers this page. A second ENTER writes it.", 11, ACCENT)
+	_text(Vector2(px + 22.0, py + 482.0), "One life, one page. The province keeps whatever is written.", 9,
+		Color("#6f7f88"))
+
+
 ## Draw-time word wrap for the archive's prose. No layout node, no reflow pass:
 ## the same line breaks are used for every frame of the reading screen.
 func _wrapped(text: String, font_size: int, max_width: float) -> PackedStringArray:
@@ -1639,7 +1788,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · F4 sect · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · F4 sect · F6 stories · F7 archive · F8 blank page · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

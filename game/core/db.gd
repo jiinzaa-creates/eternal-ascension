@@ -65,6 +65,8 @@ var sect_autonomy_data: Dictionary = {}
 var sect_storylines_data: Dictionary = {}
 ## The main narrative: four threads of four records, gated by real progress.
 var main_narrative_data: Dictionary = {}
+## The endgame: one blank page, four resolutions and what each asks of a run.
+var endgame_data: Dictionary = {}
 ## Hidden realm layouts: room grids, corners, populations and wardens.
 var hidden_realm_data: Dictionary = {}
 ## Hidden realm discovery sites and opening cycles.
@@ -139,6 +141,7 @@ func load_all() -> void:
 	sect_autonomy_data = _read("sect_autonomy.json")
 	sect_storylines_data = _read("sect_storylines.json")
 	main_narrative_data = _read("main_narrative.json")
+	endgame_data = _read("endgame.json")
 	hidden_realm_data = _read("hidden_realm_templates.json")
 	realm_access_data = _read("realm_access.json")
 	hidden_realm_family_data = _read("hidden_realm_families.json")
@@ -782,6 +785,7 @@ func validate() -> Array:
 	# The main narrative: four threads of four records, ordered chains, real ids
 	# and a final record in each thread that converges two other threads.
 	problems.append_array(MainNarrative.validate(main_narrative_data))
+	problems.append_array(Endgame.validate(endgame_data))
 	# Hidden realm layouts: a valid default, reachable corners and real enemies.
 	problems.append_array(HiddenRealms.validate(hidden_realm_data))
 	# Nine content families, each with its own layout, palette and population.

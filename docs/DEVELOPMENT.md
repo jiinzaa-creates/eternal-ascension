@@ -1529,6 +1529,40 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   link, a first record that starts from another record, a record that skips or inverts its predecessor,
   a final record that converges fewer than two other threads, and a prerequisite cycle.
 
+## Endgame
+
+- **One blank page.** `data/endgame.json` authors a threshold (title, summary, prose and the four
+  records it needs) and four resolutions. `Endgame` (`game/systems/endgame.gd`) is the only reader.
+  The page is deliberately not a prophecy: the four threads describe one instrument, and the last
+  page is blank because the reader writes it. Nobody is chosen; someone volunteers or refuses.
+- **The page turns only on a complete book.** `ready(narrative)` needs the final record of every
+  thread — `lore.severed_heaven.4`, `lore.root_question.4`, `lore.physique_bloodlines.4` and
+  `lore.pavilion_book.4`. A shut page still lists the four resolutions, but no resolution is
+  selectable, and the screen prints the missing records rather than a hint the run cannot use.
+- **Four proofs, one page each.** Each resolution asks something different of the life lived, so the
+  endgame reads the systems beneath it rather than a single completion flag:
+  `ending.mend_the_road` needs four claimed altars, `ending.close_the_door` a founded hall,
+  `ending.keep_the_ledger` twenty regard with the Azure Cloud, and `ending.leave_it_blank` nothing but
+  the reading. The scene supplies the proof from the same snapshot the archive uses (claimed altars,
+  `Game.player_sect`, the accepted house's regard); `Endgame` never reads a node.
+- **A choice is final.** `choose()` refuses an unknown id, a page already written, an incomplete book
+  and a page whose proof is missing. The chosen id is the only endgame state, and it is one id per
+  save. **F8** opens the page: ↑/↓ chooses, the first ENTER arms the selected page, a second ENTER
+  writes it, and moving the cursor disarms. The screen shows each page's approach, promise, cost and
+  the proof it asks, then the epilogue once written. The death screen carries the written page's
+  title, because the choice belongs to the run.
+- **Saves keep the page, never a claim.** `endgame` is an optional top-level block (`version`,
+  `chosen`) under schema 2. An unknown id, or one loaded against an archive that does not hold all
+  four final records, is dropped, so a hand-edited save cannot claim an ending the run never reached.
+  A pre-M70 save loads with the page unwritten.
+- **Validation.** `Endgame.validate()` runs from `DB.validate` and rejects a missing threshold, empty
+  threshold prose, a threshold that does not name exactly four records, an unknown record, a record
+  that is not its thread's final record, two records from one thread, a missing thread, a wrong ending
+  count, a bad/duplicate id, a missing title, approach, promise, cost or epilogue, an invalid colour,
+  an unknown proof, a repeated proof, a non-final threshold record, an impossible altar count or
+  regard, an unknown house, more than one refusal, and a set of pages that does not use every kind of
+  proof.
+
 ## Spirit beasts and bosses
 
 - **A beast is a species, not a new body.** `Beasts` reads `data/spirit_beasts.json` and normalises each
@@ -1925,6 +1959,9 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - M69 adds the optional `main_narrative` block (`version`, `known`). A pre-M69 save loads an empty
   archive; its real progress opens records on the next reported event or archive read, so the schema
   stays 2 and no old run starts with a record it did not earn.
+- M70 adds the optional `endgame` block (`version`, `chosen`). A pre-M70 save loads with the blank page
+  unwritten; a choice whose archive lacks the four final records is discarded on load, so the schema
+  stays 2 and no old run starts with an ending it never chose.
 - Add a migration step in `Save._migrate()` for every bump, and a test that loads a
   hand-written older payload (`schema 0`) and asserts the migrated result.
 - Never delete a migration step: old saves in the wild depend on the whole chain.

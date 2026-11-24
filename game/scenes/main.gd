@@ -132,6 +132,13 @@ var narrative: MainNarrative
 var narrative_open := false
 var narrative_thread_index := 0
 var narrative_revelation_index := 0
+## The blank page: the endgame's one irreversible choice. State lives here; the
+## rules and the authored pages live in Endgame.
+var endgame: Endgame
+var endgame_open := false
+var endgame_index := 0
+## -1 until ENTER has armed the selected page; a second ENTER writes it.
+var endgame_confirm_index := -1
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -198,6 +205,7 @@ func _ready() -> void:
 	quests = QuestLog.new()
 	storylines = SectStorylines.new()
 	narrative = MainNarrative.new()
+	endgame = Endgame.new()
 	_build_world()
 	_spawn_player()
 	_build_hud()
@@ -746,7 +754,8 @@ func _process(delta: float) -> void:
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
-			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open:
+			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open \
+			or endgame_open:
 		return
 
 	_tick_inheritance_trial(delta)
@@ -825,6 +834,8 @@ func _process(delta: float) -> void:
 		toggle_storylines()
 	if Input.is_action_just_pressed("open_narrative"):
 		toggle_narrative()
+	if Input.is_action_just_pressed("open_endgame"):
+		toggle_endgame()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1862,6 +1873,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.is_action_pressed("ui_up"):
 			narrative_revelation_index = maxi(0, narrative_revelation_index - 1)
+			return
+		return
+
+	if endgame_open:
+		if event.is_action_pressed("open_endgame") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_endgame()
+			return
+		if event.is_action_pressed("ui_down"):
+			endgame_index = mini(endgame_index + 1, maxi(0, endgame_rows().size() - 1))
+			endgame_confirm_index = -1
+			return
+		if event.is_action_pressed("ui_up"):
+			endgame_index = maxi(0, endgame_index - 1)
+			endgame_confirm_index = -1
+			return
+		if event.is_action_pressed("accept"):
+			_endgame_activate(endgame_index)
 			return
 		return
 
@@ -3283,6 +3312,116 @@ func _evaluate_narrative() -> void:
 		Log.info("narrative", "recorded %s" % String(entry.get("id", "")))
 	if not opened.is_empty():
 		Bus.player_stats_changed.emit()
+
+
+# --------------------------------------------------------------- endgame ----
+
+
+func toggle_endgame() -> void:
+	if endgame_open:
+		_close_endgame()
+	else:
+		_open_endgame()
+
+
+## Opening the blank page also reads the archive, so a run that finished its last
+## record on the way here sees the page turn immediately.
+func _open_endgame() -> void:
+	if player == null or String(phase) != "play":
+		return
+	_evaluate_narrative()
+	endgame_open = true
+	endgame_confirm_index = -1
+	endgame_index = clampi(endgame_index, 0, maxi(0, endgame_rows().size() - 1))
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_endgame() -> void:
+	if not endgame_open:
+		return
+	endgame_open = false
+	endgame_confirm_index = -1
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+func endgame_ready() -> bool:
+	return endgame != null and endgame.ready(narrative)
+
+
+func endgame_rows() -> Array:
+	if endgame == null:
+		return []
+	return endgame.available(narrative, _endgame_context())
+
+
+## The proof a page asks of the run comes from the same snapshot the archive
+## reads: claimed altars, a founded hall and the houses' regard.
+func _endgame_context() -> Dictionary:
+	var context := _narrative_context()
+	return {
+		"altars": int(context.get("inheritances", 0)),
+		"founded_sect": bool(context.get("founded_sect", false)),
+		"regard": context.get("storyline_regard", {}),
+	}
+
+
+func endgame_missing() -> Array:
+	if endgame == null:
+		return []
+	return endgame.missing_final_rows(narrative)
+
+
+func endgame_progress() -> String:
+	if endgame == null:
+		return ""
+	return endgame.progress_text(narrative)
+
+
+func endgame_epilogue() -> Dictionary:
+	if endgame == null or not endgame.is_chosen():
+		return {}
+	return endgame.chosen()
+
+
+## ENTER is a two-step: the first press arms the page, the second writes it. A
+## cursor move disarms. Nothing here is timed, so a permanent choice is never
+## made by a held key.
+func _endgame_activate(index: int) -> void:
+	var rows := endgame_rows()
+	if rows.is_empty():
+		return
+	var row_index := clampi(index, 0, rows.size() - 1)
+	var row: Dictionary = rows[row_index]
+	if not bool(row.get("unlocked", false)):
+		Bus.toast.emit(String(row.get("reason", "The page will not turn.")))
+		return
+	if endgame_confirm_index != row_index:
+		endgame_confirm_index = row_index
+		Bus.toast.emit("Press ENTER again to write this page.")
+		return
+	_endgame_choose(row_index)
+
+
+func _endgame_choose(index: int) -> bool:
+	if endgame == null:
+		return false
+	var rows := endgame_rows()
+	if rows.is_empty():
+		return false
+	var row_index := clampi(index, 0, rows.size() - 1)
+	var id := String((rows[row_index] as Dictionary).get("id", ""))
+	var context := _endgame_context()
+	if not endgame.choose(id, narrative, context):
+		Bus.toast.emit(endgame.blocked_reason(endgame.ending(id), narrative, context))
+		return false
+	endgame_confirm_index = -1
+	Log.info("endgame", "wrote %s" % id)
+	Bus.toast.emit("The blank page is written — %s." % String(endgame.chosen().get("title", "")))
+	Bus.player_stats_changed.emit()
+	return true
 
 
 ## What a house's gates are judged against: the body and the run, never a copy
@@ -5067,6 +5206,7 @@ func _save(slot: int) -> void:
 		"quests": quests.to_dict(),
 		"sect_storylines": storylines.to_dict(),
 		"main_narrative": narrative.to_dict(),
+		"endgame": endgame.to_dict(),
 		"used_interactables": used_interactables.duplicate(),
 		"chunk_deltas": world_delta.to_dict(),
 		"shop": merchant.to_dict(),
@@ -5127,6 +5267,7 @@ func _load_game(slot: int) -> void:
 	_close_player_sect()
 	_close_storylines()
 	_close_narrative()
+	_close_endgame()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.
@@ -5142,6 +5283,7 @@ func _load_game(slot: int) -> void:
 	quests.from_dict(data.get("quests", {}))
 	storylines.from_dict(data.get("sect_storylines", {}))
 	narrative.from_dict(data.get("main_narrative", {}))
+	endgame.from_dict(data.get("endgame", {}), narrative)
 	used_interactables = data.get("used_interactables", []).duplicate()
 	realm_seed = int(data.get("realm_seed", 0))
 	realm_cleared = bool(data.get("realm_cleared", false))

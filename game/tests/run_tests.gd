@@ -91,6 +91,7 @@ func _ready() -> void:
 	_quest_architecture_tests()
 	_sect_storyline_tests()
 	_main_narrative_tests()
+	_endgame_tests()
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
 	_inheritance_tests()
@@ -5681,6 +5682,214 @@ func _narrative_record(data: Dictionary, id: String) -> Dictionary:
 		for value in (thread_value as Dictionary).get("revelations", []):
 			if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
 				return value
+	return {}
+
+
+# ----------------------------------------------------------------- endgame ----
+
+func _endgame_tests() -> void:
+	print("[endgame] one blank page, four resolutions, one irreversible choice")
+	check(not DB.endgame_data.is_empty(), "endgame data loads")
+	check(Endgame.validate(DB.endgame_data).is_empty(), "the authored endgame validates")
+	var page := Endgame.new()
+	check(page.endings().size() == 4, "the blank page offers four resolutions")
+	check(page.threshold_requirements().size() == 4, "the threshold needs four final records")
+	check(not page.is_chosen(), "a new run has written nothing")
+	check(page.chosen().is_empty(), "an unwritten page resolves to nothing")
+	check(page.epilogue_text() == "", "an unwritten page has no epilogue")
+	check(page.ending("ending.nope").is_empty(), "an unknown page resolves to nothing")
+
+	# The page only turns when every thread has reached its final record.
+	var full := _endgame_narrative()
+	check(not page.ready(null), "no archive means no page")
+	check(not page.ready(MainNarrative.new()), "an empty archive leaves the page shut")
+	check(page.missing_finals(MainNarrative.new()).size() == 4, "all four finals are missed")
+	check(page.progress_text(MainNarrative.new()) == "0 / 4 final records", "progress starts at zero")
+	var three := MainNarrative.new()
+	for id in ["lore.severed_heaven.4", "lore.root_question.4", "lore.physique_bloodlines.4"]:
+		three.known[id] = true
+	check(not page.ready(three), "three finals are not the whole book")
+	check(page.missing_finals(three).size() == 1, "the last missing final is named")
+	check(String((page.missing_final_rows(three)[0] as Dictionary).get("id", "")) ==
+		"lore.pavilion_book.4", "the missing page resolves for the screen")
+	check(page.ready(full), "all four finals open the page")
+	check(page.progress_text(full) == "4 / 4 final records", "a complete book reads complete")
+	check(page.missing_final_rows(full).is_empty(), "a complete book misses nothing")
+
+	# Each resolution asks a different proof: claimed altars, a founded hall, a
+	# house's regard, and one refusal that asks only for the reading.
+	var proof := page.proof(page.ending("ending.mend_the_road"))
+	check(String(proof.get("kind", "")) == "altars", "the mend is proved by altars")
+	check(page.proof_text(page.ending("ending.mend_the_road")) == "4 altars claimed",
+		"the mend's price reads as altars")
+	check(page.proof_text(page.ending("ending.keep_the_ledger")) ==
+		"20 regard with The Hoarded Vein", "the ledger's price names the house")
+	check(page.proof_text(page.ending("ending.leave_it_blank")) == "nothing but the reading",
+		"the refusal asks for nothing")
+	var bare := _endgame_context({})
+	check(page.proof_met(page.ending("ending.leave_it_blank"), bare), "a refusal is always proved")
+	check(not page.proof_met(page.ending("ending.mend_the_road"), bare), "an unclaimed altar proves nothing")
+	check(page.proof_met(page.ending("ending.mend_the_road"), _endgame_context({"altars": 4})),
+		"four altars prove the mend")
+	check(page.proof_met(page.ending("ending.close_the_door"), _endgame_context({"founded_sect": true})),
+		"a founded hall proves the door")
+	check(page.proof_met(page.ending("ending.keep_the_ledger"),
+		_endgame_context({"regard": {"storyline.azure_cloud": 20}})), "regard proves the ledger")
+	check(not page.proof_met(page.ending("ending.keep_the_ledger"),
+		_endgame_context({"regard": {"storyline.azure_cloud": 19}})), "one point short proves nothing")
+
+	# A complete book with no other proof offers only the refusal.
+	var rows := page.available(full, bare)
+	check(rows.size() == 4, "the page lists four resolutions")
+	check(bool(_endgame_row(rows, "ending.leave_it_blank").get("unlocked", false)),
+		"the refusal is open to anyone who read the book")
+	check(not bool(_endgame_row(rows, "ending.mend_the_road").get("unlocked", false)),
+		"the mend is closed without altars")
+	check(String(_endgame_row(rows, "ending.mend_the_road").get("reason", "")).contains(
+		"4 altars claimed"), "a closed page names the proof it wants")
+	check(not bool(_endgame_row(rows, "ending.close_the_door").get("unlocked", false)),
+		"the door is closed without a hall")
+	check(not bool(_endgame_row(rows, "ending.keep_the_ledger").get("unlocked", false)),
+		"the ledger is closed without regard")
+	check(not page.choose("ending.mend_the_road", full, bare), "a page whose proof is missing refuses")
+	check(not page.choose("ending.nope", full, _endgame_context({"altars": 4})),
+		"an unknown page refuses")
+	check(not page.is_chosen(), "a refused page leaves the book unwritten")
+
+	# Writing is final. The first proved page is the only page this save keeps.
+	var altars := _endgame_context({"altars": 4})
+	check(page.choose("ending.mend_the_road", full, altars), "a proved page is written")
+	check(page.is_chosen(), "the written page is held")
+	check(String(page.chosen().get("id", "")) == "ending.mend_the_road", "the chosen page is named")
+	check(String(page.epilogue_text()).contains("You take the seams"), "the written page has an epilogue")
+	check(not page.choose("ending.close_the_door", full, _endgame_context({"founded_sect": true})),
+		"a written page cannot be rewritten")
+	check(String(page.chosen().get("id", "")) == "ending.mend_the_road", "the first page stands")
+	var written := page.available(full, altars)
+	check(bool(_endgame_row(written, "ending.mend_the_road").get("chosen", false)),
+		"the written page reads as chosen")
+	check(String(_endgame_row(written, "ending.mend_the_road").get("reason", "")) ==
+		"The page is already written.", "a written page says so")
+	var refusal := Endgame.new()
+	check(refusal.choose("ending.leave_it_blank", full, bare), "the refusal needs only the reading")
+	var clerk := Endgame.new()
+	check(clerk.choose("ending.keep_the_ledger", full,
+		_endgame_context({"regard": {"storyline.azure_cloud": 20}})), "regard writes the ledger")
+	var warden := Endgame.new()
+	check(warden.choose("ending.close_the_door", full, _endgame_context({"founded_sect": true})),
+		"a hall writes the door")
+
+	# A save keeps the written page, never a page the archive cannot support.
+	var save := page.to_dict()
+	check(int(save.get("version", 0)) == 1, "the endgame save is versioned")
+	check(String(save.get("chosen", "")) == "ending.mend_the_road", "the save names the page")
+	var restored := Endgame.new()
+	restored.from_dict(save, full)
+	check(restored.is_chosen(), "a save restores the written page")
+	check(String(restored.chosen().get("title", "")) == "Mend the Road", "the restored page resolves")
+	var early := Endgame.new()
+	early.from_dict({"version": 1, "chosen": "ending.leave_it_blank"}, MainNarrative.new())
+	check(not early.is_chosen(), "a save cannot claim a page before the book is complete")
+	var forged := Endgame.new()
+	forged.from_dict({"version": 1, "chosen": "ending.nope"}, full)
+	check(not forged.is_chosen(), "an unknown page is dropped from a save")
+	var blank := Endgame.new()
+	blank.choose("ending.leave_it_blank", full, bare)
+	blank.from_dict({}, full)
+	check(not blank.is_chosen(), "an empty block clears the page")
+	check(blank.chosen().is_empty(), "a cleared page resolves to nothing")
+
+	# Validation refuses malformed pages, not just malformed ids.
+	var broken: Dictionary = DB.endgame_data.duplicate(true)
+	broken["endings"] = []
+	check(not Endgame.validate(broken).is_empty(), "an empty page list is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	(broken["endings"] as Array).pop_back()
+	check(not Endgame.validate(broken).is_empty(), "a missing resolution is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.close_the_door")["id"] = "ending.mend_the_road"
+	check(not Endgame.validate(broken).is_empty(), "two pages sharing an id are rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.close_the_door")["colour"] = "not-a-colour"
+	check(not Endgame.validate(broken).is_empty(), "an invalid page colour is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.close_the_door")["epilogue"] = ""
+	check(not Endgame.validate(broken).is_empty(), "a page without an epilogue is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.close_the_door")["proof"] = {}
+	check(not Endgame.validate(broken).is_empty(), "a page with no proof is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.close_the_door")["proof"] = {"kind": "nope"}
+	check(not Endgame.validate(broken).is_empty(), "an unknown proof is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.mend_the_road")["proof"] = {"kind": "altars", "amount": 0}
+	check(not Endgame.validate(broken).is_empty(), "a proof of zero altars is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.mend_the_road")["proof"] = {"kind": "altars", "amount": 10}
+	check(not Endgame.validate(broken).is_empty(), "a proof of ten altars is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.keep_the_ledger")["proof"] = {
+		"kind": "regard", "storyline": "storyline.nope", "amount": 20}
+	check(not Endgame.validate(broken).is_empty(), "an unknown house's regard is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.keep_the_ledger")["proof"] = {
+		"kind": "regard", "storyline": "storyline.azure_cloud", "amount": 101}
+	check(not Endgame.validate(broken).is_empty(), "an impossible regard is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.close_the_door")["proof"] = {"kind": "none"}
+	check(not Endgame.validate(broken).is_empty(), "two refusals are rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.mend_the_road")["proof"] = {"kind": "altars", "amount": 4}
+	_endgame_entry(broken, "ending.close_the_door")["proof"] = {"kind": "altars", "amount": 8}
+	check(not Endgame.validate(broken).is_empty(), "two pages asking the same proof are rejected")
+	broken = DB.endgame_data.duplicate(true)
+	broken["threshold"] = {}
+	check(not Endgame.validate(broken).is_empty(), "a missing threshold is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	((broken["threshold"] as Dictionary)["requires"] as Array).pop_back()
+	check(not Endgame.validate(broken).is_empty(), "a threshold with three records is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	((broken["threshold"] as Dictionary)["requires"] as Array)[0] = "lore.nope"
+	check(not Endgame.validate(broken).is_empty(), "a threshold naming an unknown record is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	((broken["threshold"] as Dictionary)["requires"] as Array)[0] = "lore.severed_heaven.3"
+	check(not Endgame.validate(broken).is_empty(), "a threshold naming a non-final record is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	((broken["threshold"] as Dictionary)["requires"] as Array)[1] = "lore.severed_heaven.4"
+	check(not Endgame.validate(broken).is_empty(), "a threshold naming one thread twice is rejected")
+	broken = DB.endgame_data.duplicate(true)
+	_endgame_entry(broken, "ending.leave_it_blank")["promise"] = ""
+	check(not Endgame.validate(broken).is_empty(), "a page without a promise is rejected")
+
+
+## A ledger holding only the four final records: enough to turn the page, and
+## deliberately not enough to prove any resolution but the refusal.
+func _endgame_narrative() -> MainNarrative:
+	var narrative := MainNarrative.new()
+	for id in ["lore.severed_heaven.4", "lore.root_question.4",
+			"lore.physique_bloodlines.4", "lore.pavilion_book.4"]:
+		narrative.known[id] = true
+	return narrative
+
+
+func _endgame_context(overrides: Dictionary = {}) -> Dictionary:
+	var context := {"altars": 0, "founded_sect": false, "regard": {}}
+	for key in overrides.keys():
+		context[key] = overrides[key]
+	return context
+
+
+func _endgame_row(rows: Array, id: String) -> Dictionary:
+	for value in rows:
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
+			return value
+	return {}
+
+
+func _endgame_entry(data: Dictionary, id: String) -> Dictionary:
+	for value in data.get("endings", []):
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
+			return value
 	return {}
 
 

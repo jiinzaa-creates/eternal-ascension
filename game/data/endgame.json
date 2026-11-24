@@ -1,0 +1,66 @@
+{
+  "threshold": {
+    "title": "The Blank Page",
+    "summary": "Four records, one instrument. The book's last page is blank because the reader writes it.",
+    "text": "The four questions are one question, and it has no answer written in it. The road was cut, the roots were fitted, the bloodlines were stocked and the book was copied so that each climber would believe the road was theirs. The book has one page left. It is blank. Nobody is chosen. Someone has to volunteer, or refuse. Whatever is written here is written once, and the province keeps it.",
+    "requires": [
+      "lore.severed_heaven.4",
+      "lore.root_question.4",
+      "lore.physique_bloodlines.4",
+      "lore.pavilion_book.4"
+    ]
+  },
+  "endings": [
+    {
+      "id": "ending.mend_the_road",
+      "title": "Mend the Road",
+      "colour": "#b8a8e8",
+      "approach": "Join the broken seams and let the province climb again.",
+      "promise": "The ladder runs past the ninth rung. The strong will leave, and the province becomes a threshold instead of a stump.",
+      "cost": "Every house that lived off a fragment loses its vein; the tombs empty and the altars close behind you.",
+      "epilogue": "You take the seams you carry and fit them back into the road. It is not a healing; it is a repair, loud as a bell struck once. The province tilts, and for the first time in a hundred generations the night sky is above the ladder rather than at the end of it. Behind you the sect's vein runs dry, the altars go quiet, and the first climbers begin to argue about who should go first. You do not decide that for them. You have given them the argument back.",
+      "proof": {
+        "kind": "altars",
+        "amount": 4
+      }
+    },
+    {
+      "id": "ending.close_the_door",
+      "title": "Close the Door",
+      "colour": "#7fd3e0",
+      "approach": "Seal the inward door and hold it shut with a house of your own.",
+      "promise": "No one ascends, and no one is collected. The province keeps its short years and its own weather.",
+      "cost": "The road ends with you. The book's last page stays blank, and the houses that waited for a climber must learn to wait for nothing.",
+      "epilogue": "Your hall becomes a hinge. You set the door against its frame, and the province's qi turns inward like a tide that has forgotten the moon. It is a small ending: no ascension, no harvest of bodies, no clerk's ledger. The sects will hate you for a generation and then forget why. Somewhere in the Floating Archive a book loses its last page and drifts on, lighter. The door holds because people you trained stand at it. That is the whole miracle: it is held, not fated.",
+      "proof": {
+        "kind": "hall"
+      }
+    },
+    {
+      "id": "ending.keep_the_ledger",
+      "title": "Keep the Ledger",
+      "colour": "#d8c070",
+      "approach": "Take the clerk's seat and decide who is fitted, who is stocked and who is read.",
+      "promise": "The climb continues under a hand that knows its price. No one is chosen by heaven, only by a clerk who answers to the province.",
+      "cost": "You become the blank column. The book will remember you the way it remembers the last one.",
+      "epilogue": "The Azure Cloud opens its pedigree vault and you sit where the blank column is. The first name you enter is your own, and you strike it out. The road still takes climbers; the physiques still pass down the bloodlines; the book still rewrites its readers. But now the intake forms are read before they are filled, and the houses bring their carriers to a table where the last word belongs to someone who has walked the whole road and come back. It is not mercy. It is accounting, done by a hand that knows what each line costs. The book copies you as it copies everyone, and the copy is very like the original.",
+      "proof": {
+        "kind": "regard",
+        "storyline": "storyline.azure_cloud",
+        "amount": 20
+      }
+    },
+    {
+      "id": "ending.leave_it_blank",
+      "title": "Leave It Blank",
+      "colour": "#c8d8e0",
+      "approach": "Write nothing. Refuse to volunteer, and let the road end unfinished.",
+      "promise": "No one is chosen, no one is collected, and the last page stays a page.",
+      "cost": "The questions stay questions. The province keeps its seams and never learns what it was.",
+      "epilogue": "You close the book without writing. The blank page does not resist; it has been waiting for a reader who would leave it alone. Nothing happens. The road stays cut, the roots stay fitted, the bloodlines stay stocked, and the clerk's blank column stays blank. In the province the sects go on arguing about a ladder that goes nowhere, and people are born with seams they will never explain. It is not a victory. It is a refusal, and it is yours. Somewhere the book records that its last reader finished by not finishing, and the record, for once, is not a copy of anyone.",
+      "proof": {
+        "kind": "none"
+      }
+    }
+  ]
+}

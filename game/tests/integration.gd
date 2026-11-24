@@ -4629,6 +4629,96 @@ func _run() -> void:
 	main.inheritances_taken = m69_claims
 	main.inheritance_taken = m69_legacy
 
+	# --- M70: the blank page ------------------------------------------------
+	var m70_narrative: MainNarrative = main.narrative
+	var m70_endgame: Endgame = main.endgame
+	check(main.endgame != null, "the blank page loads in the scene")
+	check(main.endgame.endings().size() == 4, "the scene holds four resolutions")
+
+	# An unfinished archive leaves the page shut, and the screen says what the
+	# book still lacks instead of offering a choice it cannot honour.
+	main.narrative = MainNarrative.new()
+	main.endgame = Endgame.new()
+	main._open_endgame()
+	check(main.endgame_open, "the blank page screen opens")
+	check(not player.is_physics_processing(), "the blank page freezes the player")
+	check(not main.endgame_ready(), "an empty archive leaves the page shut")
+	check(main.endgame_missing().size() == 4, "the screen lists four missing finals")
+	check(String(main.endgame_progress()) == "0 / 4 final records", "the screen shows its progress")
+	check(main.endgame_rows().size() == 4, "the shut page still lists four resolutions")
+	check(not bool(_m70_row(main.endgame_rows(), "ending.leave_it_blank").get("unlocked", false)),
+		"no page is open before the book is complete")
+	main._close_endgame()
+	check(not main.endgame_open, "the blank page closes")
+	check(player.is_physics_processing(), "closing the blank page restores the player")
+
+	# Finishing the archive turns the page. Only the refusal is open to a run
+	# that has proved nothing else.
+	# A real finished run holds every record: the finals are the last links of
+	# their chains, and the archive's own save refuses to restore a link whose
+	# predecessors are missing.
+	for thread_value in main.narrative.threads():
+		if typeof(thread_value) != TYPE_DICTIONARY:
+			continue
+		for record_value in (thread_value as Dictionary).get("revelations", []):
+			if typeof(record_value) == TYPE_DICTIONARY:
+				main.narrative.known[String((record_value as Dictionary).get("id", ""))] = true
+	main._open_endgame()
+	check(main.endgame_ready(), "four final records open the page")
+	check(main.endgame_missing().is_empty(), "a complete book misses nothing")
+	var m70_rows: Array = main.endgame_rows()
+	check(m70_rows.size() == 4, "the open page lists four resolutions")
+	check(bool(_m70_row(m70_rows, "ending.leave_it_blank").get("unlocked", false)),
+		"the refusal is open to anyone who read the book")
+	var m70_mend: Dictionary = _m70_row(m70_rows, "ending.mend_the_road")
+	check(not bool(m70_mend.get("unlocked", false)),
+		"the mend waits for altars the run has not claimed")
+	check(String(m70_mend.get("reason", "")).contains("4 altars claimed"),
+		"the page names the proof it wants")
+	main.endgame_index = 0
+	main._endgame_activate(0)
+	check(not main.endgame.is_chosen(), "ENTER on a closed page writes nothing")
+	check(int(main.endgame_confirm_index) == -1, "a closed page is never armed")
+	check(not main._endgame_choose(0), "a closed page refuses to be chosen")
+	check(not main.endgame.is_chosen(), "a refused page leaves the book unwritten")
+
+	# ENTER arms before it writes, so a permanent page is never one keystroke.
+	main.endgame_index = 3
+	main._endgame_activate(3)
+	check(not main.endgame.is_chosen(), "the first ENTER only arms the page")
+	check(int(main.endgame_confirm_index) == 3, "the armed page is recorded")
+	main._endgame_activate(3)
+	check(main.endgame.is_chosen(), "the second ENTER writes the page")
+	check(String(main.endgame.chosen().get("id", "")) == "ending.leave_it_blank",
+		"the chosen page is kept")
+	check(String(main.endgame_epilogue().get("epilogue", "")).contains("You close the book"),
+		"the epilogue is ready to read")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("The blank page is written"),
+		"writing the page is announced")
+	check(not main._endgame_choose(0), "a written page refuses another resolution")
+	check(String(main.endgame.chosen().get("id", "")) == "ending.leave_it_blank",
+		"the first page stands")
+
+	# The written page and the archive that authorised it both survive a save.
+	main._close_endgame()
+	Save.delete_slot(110)
+	main._save(110)
+	main.endgame = Endgame.new()
+	main._load_game(110)
+	check(main.endgame.is_chosen(), "the written page survives a save")
+	check(String(main.endgame.chosen().get("id", "")) == "ending.leave_it_blank",
+		"the saved page is the same page")
+	check(main.endgame_ready(), "the archive that authorised it survives too")
+	main._open_endgame()
+	check(String(main.endgame_epilogue().get("title", "")) == "Leave It Blank",
+		"the loaded page reads its epilogue")
+	main._close_endgame()
+	Save.delete_slot(110)
+
+	# Put the run back where the remaining suite expects it.
+	main.narrative = m70_narrative
+	main.endgame = m70_endgame
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
@@ -4673,3 +4763,10 @@ func _run() -> void:
 
 	main.queue_free()
 	await get_tree().process_frame
+
+
+func _m70_row(rows: Array, id: String) -> Dictionary:
+	for value in rows:
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
+			return value
+	return {}

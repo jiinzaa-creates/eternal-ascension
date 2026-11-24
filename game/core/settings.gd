@@ -28,6 +28,7 @@ const KEY_BINDINGS := {
 	"open_player_sect": [KEY_F4],
 	"open_storylines": [KEY_F6],
 	"open_narrative": [KEY_F7],
+	"open_endgame": [KEY_F8],
 	"breakthrough": [KEY_G],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],
