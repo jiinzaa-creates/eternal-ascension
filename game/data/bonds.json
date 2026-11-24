@@ -1,0 +1,79 @@
+{
+  "bands": [
+    {
+      "id": "bond.enemy",
+      "label": "Enemy",
+      "min": -100,
+      "max": -21,
+      "greeting": "They do not meet your eyes.",
+      "blurb": "There is no road back from this without a debt paid."
+    },
+    {
+      "id": "bond.rival",
+      "label": "Rival",
+      "min": -20,
+      "max": -6,
+      "greeting": "They watch you the way a hawk watches a field.",
+      "blurb": "Respect with an edge on it."
+    },
+    {
+      "id": "bond.stranger",
+      "label": "Stranger",
+      "min": -5,
+      "max": 9,
+      "greeting": "They take your measure, and no more.",
+      "blurb": "A face without a history."
+    },
+    {
+      "id": "bond.acquaintance",
+      "label": "Acquaintance",
+      "min": 10,
+      "max": 24,
+      "greeting": "They nod as you come near.",
+      "blurb": "A name you both know now."
+    },
+    {
+      "id": "bond.friend",
+      "label": "Friend",
+      "min": 25,
+      "max": 49,
+      "greeting": "Their face warms when they see you.",
+      "blurb": "Someone who would hear you out."
+    },
+    {
+      "id": "bond.sworn",
+      "label": "Sworn friend",
+      "min": 50,
+      "max": 100,
+      "greeting": "They wave you over like family.",
+      "blurb": "A bond that outlives convenience."
+    }
+  ],
+  "ties": [
+    {
+      "id": "tie.mentor",
+      "label": "Mentor",
+      "reciprocal": "tie.student",
+      "phrase": "Mentor of %s",
+      "blurb": "Someone whose teaching shaped another's road."
+    },
+    {
+      "id": "tie.student",
+      "label": "Student",
+      "reciprocal": "tie.mentor",
+      "phrase": "Student of %s",
+      "blurb": "Someone still carrying another's lessons."
+    },
+    {
+      "id": "tie.kin",
+      "label": "Kin",
+      "reciprocal": "tie.kin",
+      "phrase": "Kin of %s",
+      "blurb": "Blood, or the oath that stands in for it."
+    }
+  ],
+  "pairs": [
+    {"from": "elder_bai", "to": "instructor_rui", "tie": "tie.mentor", "score": 46},
+    {"from": "instructor_rui", "to": "elder_bai", "tie": "tie.student", "score": 58}
+  ]
+}

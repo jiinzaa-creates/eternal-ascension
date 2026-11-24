@@ -84,8 +84,16 @@ const NPC_SIM_RADIUS := 1500.0
 ## How often the settlement looks for trouble. A quarter second is well under a
 ## frame of walking, and it keeps a crowd of residents off the enemy list.
 const NPC_ALERT_TICK := 0.25
+## How far a resident who likes the player will call a warning to them, and how
+## long before the same town warns them again. Friendship is not a siren.
+const WARN_RADIUS := 420.0
+const WARN_COOLDOWN := 20.0
 var _npc_seen: Dictionary = {}
 var _alert_timer := 0.0
+var _warn_timer := 0.0
+## Stable id → the display name it was spawned with, so authored ties can be
+## named the way the player sees them.
+var _npc_names: Dictionary = {}
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -232,6 +240,7 @@ func _build_feedback() -> void:
 
 
 func _spawn_npcs() -> void:
+	_npc_names.clear()
 	var schedules: Dictionary = DB.schedules()
 	elder = _make_npc("elder_bai", "Elder Bai Qing", "Elder", "sect.azure_cloud",
 		4, schedules.get("elder", []), Vector2(-30, 40), "elder")
@@ -289,8 +298,32 @@ func _make_npc(id: String, display: String, role: String, sect: String, realm: i
 	world.add_child(npc)
 	npc.global_position = settlement.position_for("plaza") + offset
 	npcs.append(npc)
+	_npc_names[id] = display
 	_npc_index += 1
 	return npc
+
+
+## A stable id as the player would say it. Unknown ids fall back to words, so a
+## tie to a resident who is not spawned still reads.
+func person_name(id: String) -> String:
+	if id == Relationships.PLAYER_ID:
+		return "you"
+	if _npc_names.has(id):
+		return String(_npc_names[id])
+	return id.replace("_", " ").capitalize()
+
+
+## The authored ties of one resident, named through the people actually spawned.
+func npc_tie_line(npc: Npc) -> String:
+	if npc == null:
+		return ""
+	var parts: Array[String] = []
+	for value in Relationships.ties_of(npc.npc_id):
+		var entry: Dictionary = value
+		parts.append(String(entry.get("phrase", "Linked to %s")) % person_name(String(entry.get("to", ""))))
+	if parts.is_empty():
+		return ""
+	return "Bonds: " + ", ".join(parts)
 
 
 func _random_name() -> String:
@@ -1257,6 +1290,7 @@ func _simulate_npcs() -> void:
 ## neighbour's shout, or carry on. A new alarm is shouted once, never per frame.
 ## Threats in the wilds are not the town's business until they walk in.
 func _direct_npcs(delta: float) -> void:
+	_warn_timer = maxf(0.0, _warn_timer - delta)
 	_alert_timer -= delta
 	if _alert_timer > 0.0 or npcs.is_empty() or realm_instance != null:
 		return
@@ -1312,6 +1346,36 @@ func _direct_npcs(delta: float) -> void:
 			var heard_at: Vector2 = crier.threat_position
 			listener.react(NpcAi.decide(false, true, listener.ai), heard_at,
 				NpcAi.ALARM_SECONDS, listener.global_position.distance_to(heard_at))
+
+	# A resident who thinks well of the player does not let them walk into it
+	# blind. One voice, once per crisis.
+	if not shouted.is_empty() and _warn_timer <= 0.0:
+		_warn_player()
+
+
+## Friendship made audible: the warmest resident within earshot calls out. Both
+## conditions are required, so a friend across the province says nothing.
+func _warn_player() -> void:
+	var best: Npc = null
+	var best_score := -101
+	for value in npcs:
+		if not is_instance_valid(value):
+			continue
+		var npc := value as Npc
+		if npc == null or not npc.simulated or not npc.is_awake():
+			continue
+		if npc.global_position.distance_to(player.global_position) > WARN_RADIUS:
+			continue
+		var score := int(npc.bond_to_player().get("score", 0))
+		if not Relationships.warns(score) or score <= best_score:
+			continue
+		best = npc
+		best_score = score
+	if best == null:
+		return
+	_warn_timer = WARN_COOLDOWN
+	Bus.toast.emit("%s (%s): \"Stay close — something hostile is in the market.\"" % [
+		best.display_name, best.role])
 
 
 func _flush_away_report() -> void:
@@ -1920,6 +1984,12 @@ func _talk(npc: Npc) -> void:
 	if npc.reacting():
 		Bus.toast.emit("%s: \"%s\"" % [npc.display_name, npc.warning_line()])
 		return
+	# A person who has decided against you does not pretend otherwise, and the
+	# moment is not a conversation worth remembering.
+	var bond: Dictionary = npc.bond_to_player()
+	if Relationships.refuses(int(bond.get("score", 0))):
+		Bus.toast.emit("%s turns away. (%s)" % [npc.display_name, String(bond.get("label", "Enemy"))])
+		return
 	# Every real conversation is remembered: a merchant with nothing to sell still
 	# remembers being spoken to.
 	NpcDb.remember(Game.npc_memory, npc.npc_id, Clock.day)
@@ -1931,8 +2001,13 @@ func _talk(npc: Npc) -> void:
 		_teach_technique()
 		return
 	if npc.npc_id != "elder_bai":
-		Bus.toast.emit("%s (%s): \"%s\"" % [
-			npc.display_name, npc.role, Schedules.small_talk(npc.current_activity)])
+		var line := "%s (%s): \"%s\"" % [
+			npc.display_name, npc.role, Schedules.small_talk(npc.current_activity)]
+		# The band colours the greeting: a friend's face is not a stranger's.
+		var greeting := Relationships.greeting(String(bond.get("band", "")))
+		if greeting != "":
+			line += " " + greeting
+		Bus.toast.emit(line)
 		return
 
 	if quests.completed:

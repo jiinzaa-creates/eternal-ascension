@@ -3095,6 +3095,123 @@ func _run() -> void:
 		m49_restored.reaction = "routine"
 		m49_restored.snap_to_schedule()
 
+	# --- relationships: a directed graph, authored ties and what they change ---
+	var m50_day: int = Clock.day
+	var m50_hour: float = Clock.hour
+	var m50_home: Vector2 = player.global_position
+	Clock.day = 3
+	Clock.hour = 10.0
+	player.global_position = main.settlement.position_for("plaza")
+	Game.npc_memory.clear()
+	for m50_node in main.npcs:
+		var m50_person: Npc = m50_node
+		m50_person.alarm_left = 0.0
+		m50_person.reaction = "routine"
+		m50_person.snap_to_schedule()
+	await frames(2)
+
+	check(not main.npcs.is_empty(), "the settlement is populated")
+	var m50_ids: Array = []
+	for m50_entry in main.npcs:
+		m50_ids.append((m50_entry as Npc).npc_id)
+	check(m50_ids.size() == main.npcs.size(), "every resident has a stable id")
+	var m50_graph := Relationships.graph(m50_ids)
+	check(m50_graph.size() == m50_ids.size(), "the whole settlement is in the graph")
+	var m50_edges := 0
+	var m50_bands_ok := true
+	var m50_asymmetric := false
+	for m50_from in m50_graph.keys():
+		var m50_row: Dictionary = m50_graph[m50_from]
+		m50_edges += m50_row.size()
+		for m50_to in m50_row.keys():
+			var m50_edge: Dictionary = m50_row[m50_to]
+			if DB.bond(String(m50_edge.get("band", ""))).is_empty():
+				m50_bands_ok = false
+			var m50_back: Dictionary = (m50_graph[m50_to] as Dictionary)[m50_from]
+			if int(m50_back.get("score", 0)) != int(m50_edge.get("score", 0)):
+				m50_asymmetric = true
+	check(m50_edges == m50_ids.size() * (m50_ids.size() - 1),
+		"every resident has an edge to every other, one direction each")
+	check(m50_bands_ok, "every edge reads through a shipped band")
+	check(m50_asymmetric, "the town does not feel one way about itself")
+
+	var m50_elder: Npc = main.elder as Npc
+	check(String(Relationships.edge("elder_bai", "instructor_rui").get("tie_label", "")) == "Mentor",
+		"the elder mentors the instructor")
+	check(main.npc_tie_line(m50_elder).contains("Mentor"), "the dossier names the relation")
+	check(main.npc_tie_line(m50_elder).contains("Instructor Rui"),
+		"the dossier names the tie through the spawned person")
+	check(main.person_name("elder_bai") == "Elder Bai Qing", "a stable id resolves to the displayed name")
+
+	var m50_guard: Npc = null
+	var m50_other: Npc = null
+	for m50_pick in main.npcs:
+		var m50_resident: Npc = m50_pick
+		if m50_guard == null and m50_resident.archetype_id == "guard":
+			m50_guard = m50_resident
+		elif m50_other == null and m50_resident.npc_id != "elder_bai" and m50_resident.npc_id != "instructor_rui":
+			m50_other = m50_resident
+	check(m50_guard != null and m50_other != null, "a guard and a neighbour stand in the market")
+	var m50_quiet := m50_guard.bond_to_player()
+	check(String(m50_quiet.get("band", "")) == "bond.stranger", "an unmet guard is a stranger, not a friend")
+	check(not Relationships.warns(int(m50_quiet.get("score", 0))), "a stranger keeps quiet")
+
+	# Memory is the only stored half; the band is read through it.
+	Game.npc_memory[m50_guard.npc_id] = {"met": true, "talks": 3, "last_day": Clock.day, "regard": 30}
+	var m50_warm := m50_guard.bond_to_player()
+	check(int(m50_warm.get("score", 0)) == 25, "temperament and memory set the bond")
+	check(String(m50_warm.get("band", "")) == "bond.friend", "a guard at the cap is a friend")
+	m50_guard.global_position = player.global_position + Vector2(16, 0)
+	main._talk(m50_guard)
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("face warms"),
+		"a friend greets the player differently")
+
+	var m50_threat := Dummy.new()
+	m50_threat.aggressive = true
+	main.world.add_child(m50_threat)
+	m50_threat.global_position = main.settlement.position_for("plaza") + Vector2(80, 0)
+	m50_threat.profile["aggro_range"] = 1.0
+	await frames(2)
+	main._warn_timer = 0.0
+	main._alert_timer = 0.0
+	main._direct_npcs(0.3)
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("Stay close"),
+		"a friend calls a warning to the player")
+	_toasts.clear()
+	main._alert_timer = 0.0
+	main._direct_npcs(0.3)
+	check(_toasts.is_empty(), "one warning is enough for one crisis")
+
+	# The alarm would answer for the guard; this block is about the bond.
+	m50_guard.alarm_left = 0.0
+	m50_guard.stand_down()
+	Game.npc_memory[m50_guard.npc_id] = {"met": true, "talks": 2, "last_day": Clock.day, "regard": -30}
+	var m50_cold := m50_guard.bond_to_player()
+	check(String(m50_cold.get("band", "")) == "bond.enemy", "a guard pushed to the floor is an enemy")
+	var m50_talks := int(NpcDb.memory_entry(Game.npc_memory, m50_guard.npc_id).get("talks", 0))
+	main._talk(m50_guard)
+	check(int(NpcDb.memory_entry(Game.npc_memory, m50_guard.npc_id).get("talks", 0)) == m50_talks,
+		"an enemy is not spoken with")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("turns away"),
+		"an enemy turns away")
+	check(not Relationships.warns(int(m50_cold.get("score", 0))), "an enemy does not warn the player")
+	check(int(m50_other.bond_to_player().get("score", 0)) == m50_other.base_disposition,
+		"a neighbour is unaffected by the guard's fall")
+
+	m50_threat.queue_free()
+	await frames(2)
+	for m50_restore_row in main.npcs:
+		var m50_restored: Npc = m50_restore_row
+		m50_restored.alarm_left = 0.0
+		m50_restored.reaction = "routine"
+		m50_restored.snap_to_schedule()
+	Game.npc_memory.clear()
+	main._warn_timer = 0.0
+	main._alert_timer = 0.0
+	Clock.day = m50_day
+	Clock.hour = m50_hour
+	player.global_position = m50_home
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

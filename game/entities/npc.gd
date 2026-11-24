@@ -116,6 +116,21 @@ func standing_label() -> String:
 	return NpcDb.standing_label(standing())
 
 
+## What this body feels about the player, read through the relationship bands.
+## Directional on purpose: it says nothing about how the player feels back.
+func bond_to_player() -> Dictionary:
+	return Relationships.toward_player(base_disposition, regard())
+
+
+func bond_label() -> String:
+	return String(bond_to_player().get("label", "Stranger"))
+
+
+## "Friend (+28)" — the dossier's one-line bond.
+func bond_line() -> String:
+	return Relationships.describe(int(bond_to_player().get("score", 0)))
+
+
 func root_name() -> String:
 	return String(DB.by_id("root", root_id).get("name", "Unknown Root"))
 

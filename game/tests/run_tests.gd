@@ -75,6 +75,7 @@ func _ready() -> void:
 	_npcdb_tests()
 	_schedules_tests()
 	_npcai_tests()
+	_relationships_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3394,6 +3395,162 @@ func _npcai_tests() -> void:
 		"a guard stands its ground")
 	check(String(farmer_brain.get("response", "")) == "flee", "a farmer runs")
 	check(String(merchant_brain.get("response", "")) == "shelter", "a merchant shuts the stall")
+
+
+func _relationships_tests() -> void:
+	print("[relationships] bands, ties and a directed graph")
+	# The catalogue is data, and it must tile the whole range.
+	check(DB.bonds.size() >= 6, "the bond catalogue has a band for every degree")
+	check(Relationships.validate(DB.bonds, DB.bond_ties, DB.bond_pairs).is_empty(),
+		"the shipped relationship data is consistent")
+	check(String(DB.bond("bond.friend").get("label", "")) == "Friend", "a band is indexed by id")
+	check(DB.bond("bond.nonsense").is_empty(), "an unknown band is not invented")
+	check(String(DB.bond_tie("tie.mentor").get("reciprocal", "")) == "tie.student",
+		"a tie knows what the other side is called")
+	check(DB.bond_tie("").is_empty(), "an empty tie id is not a tie")
+
+	# Thresholds: each band owns a slice, including both of its edges.
+	check(Relationships.band_id(-100) == "bond.enemy", "the floor is an enemy's")
+	check(Relationships.band_id(-21) == "bond.enemy", "the coldest rival score is still enmity")
+	check(Relationships.band_id(-20) == "bond.rival", "one point warmer is a rival")
+	check(Relationships.band_id(-6) == "bond.rival", "a rival's warm edge")
+	check(Relationships.band_id(-5) == "bond.stranger", "a stranger begins where rivalry ends")
+	check(Relationships.band_id(9) == "bond.stranger", "a stranger's warm edge")
+	check(Relationships.band_id(10) == "bond.acquaintance", "an acquaintance begins")
+	check(Relationships.band_id(24) == "bond.acquaintance", "an acquaintance ends at friendship")
+	check(Relationships.band_id(25) == "bond.friend", "friendship begins at its threshold")
+	check(Relationships.band_id(49) == "bond.friend", "friendship holds its range")
+	check(Relationships.band_id(50) == "bond.sworn", "a sworn friend is made at fifty")
+	check(Relationships.band_id(100) == "bond.sworn", "the ceiling is a sworn bond")
+	check(Relationships.band_id(-500) == "bond.enemy", "an impossible score clamps at enmity")
+	check(Relationships.band_id(500) == "bond.sworn", "an impossible warmth clamps at devotion")
+	check(Relationships.label(30) == "Friend" and Relationships.blurb(30) != "",
+		"a band names and explains itself")
+	check(Relationships.describe(30) == "Friend (+30)", "a bond reads as a label and a number")
+	check(Relationships.greeting("bond.stranger") != "", "every band has a greeting")
+	check(Relationships.greeting("bond.nonsense") == "", "an unknown band greets nobody")
+
+	# Behaviour is a rule on the band, not a number scattered through callers.
+	check(Relationships.warns(25), "a friend warns the player")
+	check(Relationships.warns(80), "a sworn friend warns the player")
+	check(not Relationships.warns(24), "an acquaintance keeps its own counsel")
+	check(not Relationships.refuses(-20), "a rival still speaks")
+	check(Relationships.refuses(-21), "an enemy refuses")
+
+	# Ties: structural, reciprocal, and directional.
+	check(Relationships.reciprocal("tie.mentor") == "tie.student", "a mentor's other side is a student")
+	check(Relationships.reciprocal("tie.student") == "tie.mentor", "a student's other side is a mentor")
+	check(Relationships.reciprocal("tie.kin") == "tie.kin", "kin is its own other side")
+	check(Relationships.reciprocal("") == "", "no tie has no other side")
+
+	var elder_to_rui := Relationships.edge("elder_bai", "instructor_rui")
+	var rui_to_elder := Relationships.edge("instructor_rui", "elder_bai")
+	check(String(elder_to_rui.get("tie", "")) == "tie.mentor", "the elder is the instructor's mentor")
+	check(String(rui_to_elder.get("tie", "")) == "tie.student", "the instructor is the elder's student")
+	check(int(elder_to_rui.get("score", 0)) == 46, "an authored tie keeps its score")
+	check(int(rui_to_elder.get("score", 0)) == 58, "the other direction keeps its own")
+	check(String(elder_to_rui.get("label", "")) == "Mentor", "a tie names the edge")
+	check(String(elder_to_rui.get("band", "")) == "bond.friend", "a tie still carries a warmth band")
+	check(String(elder_to_rui.get("blurb", "")) == "Someone whose teaching shaped another's road.",
+		"a tie explains itself")
+	check(not Relationships.pair("instructor_rui", "elder_bai").is_empty(),
+		"an authored pair is found by direction")
+	check(Relationships.pair("elder_bai", "npc.guard.0").is_empty(), "an unauthored pair is not invented")
+	var ties := Relationships.ties_of("elder_bai")
+	check(ties.size() == 1 and String((ties[0] as Dictionary).get("to", "")) == "instructor_rui",
+		"the elder's ties name the instructor")
+	check(String((ties[0] as Dictionary).get("phrase", "")).contains("%s"),
+		"a tie carries a readable phrase")
+	check(Relationships.ties_of("").is_empty(), "nobody is bound to nobody")
+	check(Relationships.edge("elder_bai", "npc.guard.0").get("tie", "") == "",
+		"an unauthored edge has no tie")
+
+	# The seeded fabric: deterministic, bounded, and not symmetric.
+	var a := Relationships.base_score("npc.guard.0", "npc.farmer.0")
+	var b := Relationships.base_score("npc.guard.0", "npc.farmer.0")
+	check(a == b, "the same pair draws the same baseline")
+	check(a >= Relationships.BASE_MIN and a <= Relationships.BASE_MAX, "a baseline stays in its range")
+	check(Relationships.base_score("npc.guard.0", "npc.guard.0") == 0, "nobody has a score with themselves")
+	check(Relationships.base_score("", "npc.guard.0") == 0, "an empty person has no score")
+	var found_asymmetry := false
+	for other in ["npc.farmer.0", "npc.merchant.0", "npc.outer_disciple.0", "npc.guard.1"]:
+		if Relationships.base_score("npc.guard.0", String(other)) != Relationships.base_score(String(other), "npc.guard.0"):
+			found_asymmetry = true
+	check(found_asymmetry, "two people do not feel exactly the same about each other")
+
+	# The whole fabric, built on demand and never stored.
+	var ids := ["elder_bai", "instructor_rui", "npc.guard.0"]
+	var graph := Relationships.graph(ids)
+	check(graph.size() == 3, "every named person gets a row")
+	check((graph["npc.guard.0"] as Dictionary).size() == 2, "a row has an edge to everyone else")
+	check(not (graph["npc.guard.0"] as Dictionary).has("npc.guard.0"), "nobody has an edge to themselves")
+	var graph_ok := true
+	for from_id in graph.keys():
+		var row: Dictionary = graph[from_id]
+		for to_id in row.keys():
+			var row_edge: Dictionary = row[to_id]
+			if DB.bond(String(row_edge.get("band", ""))).is_empty():
+				graph_ok = false
+	check(graph_ok, "every generated edge reads through a real band")
+	check(Relationships.graph([]).is_empty(), "an empty settlement has no fabric")
+
+	# The player node is memory, read through the same bands.
+	var neutral := Relationships.toward_player(0, 0)
+	check(int(neutral.get("score", 0)) == 0 and String(neutral.get("band", "")) == "bond.stranger",
+		"an unmet stranger starts neutral")
+	var warm := Relationships.toward_player(10, 30)
+	check(int(warm.get("score", 0)) == 40, "temperament plus regard is the player's score")
+	check(String(warm.get("band", "")) == "bond.friend", "a warm regard reads as friendship")
+	check(String(warm.get("label", "")) == "Friend", "the player's bond has a name")
+	check(int(Relationships.toward_player(-100, -100).get("score", 0)) == -100,
+		"the player's score clamps at the floor")
+	check(int(Relationships.toward_player(100, 100).get("score", 0)) == 100,
+		"the player's score clamps at the ceiling")
+
+	var npc := Npc.new()
+	npc.npc_id = "npc.test.bond"
+	npc.base_disposition = 10
+	Game.npc_memory = {"npc.test.bond": {"met": true, "talks": 1, "last_day": 1, "regard": 15}}
+	check(int(npc.bond_to_player().get("score", 0)) == 25, "a body's bond reads its own memory")
+	check(npc.bond_label() == "Friend", "a body names its bond")
+	check(npc.bond_line() == "Friend (+25)", "the dossier line carries the number")
+	npc.npc_id = "npc.test.unknown"
+	check(int(npc.bond_to_player().get("score", 0)) == 10,
+		"an unremembered body still has its temperament")
+	Game.npc_memory.clear()
+	npc.free()
+
+	# Validation: the checks have teeth.
+	check(not Relationships.validate([], [], []).is_empty(), "a missing catalogue is a problem")
+	var thin := [{"id": "bond.enemy", "label": "Enemy", "min": -100, "max": 0, "greeting": "x", "blurb": "x"}]
+	check(not Relationships.validate(thin, [], []).is_empty(), "bands that stop early leave a gap")
+	var overlapping := [
+		{"id": "bond.one", "label": "One", "min": -100, "max": 20, "greeting": "x", "blurb": "x"},
+		{"id": "bond.two", "label": "Two", "min": 20, "max": 100, "greeting": "x", "blurb": "x"},
+	]
+	check(not Relationships.validate(overlapping, [], []).is_empty(), "overlapping bands are a problem")
+	var bad_ties := [{"id": "tie.a", "label": "A", "reciprocal": "tie.missing", "phrase": "%s of %s"}]
+	check(not Relationships.validate(DB.bonds, bad_ties, []).is_empty(), "a tie to nothing is a problem")
+	var one_sided := [
+		{"id": "tie.a", "label": "A", "reciprocal": "tie.b", "phrase": "%s of %s"},
+		{"id": "tie.b", "label": "B", "reciprocal": "tie.b", "phrase": "%s of %s"},
+	]
+	check(not Relationships.validate(DB.bonds, one_sided, []).is_empty(), "ties that disagree are a problem")
+	var bad_pairs := [{"from": "a", "to": "b", "tie": "tie.ghost", "score": 10}]
+	check(not Relationships.validate(DB.bonds, DB.bond_ties, bad_pairs).is_empty(),
+		"a pair with no tie is a problem")
+	var duplicate_pairs := [
+		{"from": "a", "to": "b", "tie": "tie.kin", "score": 10},
+		{"from": "a", "to": "b", "tie": "tie.kin", "score": 20},
+	]
+	check(not Relationships.validate(DB.bonds, DB.bond_ties, duplicate_pairs).is_empty(),
+		"the same pair twice is a problem")
+	var self_pair := [{"from": "a", "to": "a", "tie": "tie.kin", "score": 10}]
+	check(not Relationships.validate(DB.bonds, DB.bond_ties, self_pair).is_empty(),
+		"a pair with itself is a problem")
+	var wild_score := [{"from": "a", "to": "b", "tie": "tie.kin", "score": 400}]
+	check(not Relationships.validate(DB.bonds, DB.bond_ties, wild_score).is_empty(),
+		"a pair beyond the range is a problem")
 
 
 func _quest_tests() -> void:

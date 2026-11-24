@@ -414,6 +414,43 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **Tests must stand in the market.** `_simulate_npcs` sleeps the town beyond `NPC_SIM_RADIUS`, so
   the integration scenario moves the player to the plaza for the block and restores them after.
 
+## Relationships
+
+- **One graph, two kinds of edge.** `Relationships` (`game/systems/relationships.gd`) holds a
+  directed graph over stable person ids. A **warmth** edge is a score in −100..100 read through the
+  bands in `data/bonds.json`; a **tie** edge is a structural relation authored in the same file
+  (mentor/student, kin). A tie names the edge (`Mentor of Instructor Rui`) while the band still
+  decides behaviour, so description and rules never disagree. The band is what a person calls the
+  bond; the score is what the simulation keeps.
+- **Every edge is asymmetric by construction.** `base_score(a, b)` seeds `Rng` with the ordered
+  pair, so A→B and B→A are separate draws, never two halves of one symmetric relation. An authored
+  pair keeps its own number in each direction — the elder holds his student at 46, the student holds
+  his teacher at 58 — which is exactly the asymmetry the design calls for, expressed as data rather
+  than a symmetry-breaking hack.
+- **The bands tile the range or the game will not boot.** `Relationships.validate()` sorts the bands
+  and requires them to cover −100..100 with no gap and no overlap, every band to carry a label, a
+  blurb and a greeting, every tie to name a reciprocal that names it back and a phrase with exactly
+  one `%s`, and every authored pair to name a known tie, two different people and a score in range.
+  `DB.validate()` runs it, so a score with two names — or none — is a startup error, not a person
+  who cannot decide how they feel.
+- **The player is a node, not a second ledger.** A body's feeling toward the player is
+  `Relationships.toward_player(base_disposition, regard)` — M47's memory, read through the bands.
+  `Npc.bond_to_player()` is that call and `bond_line()` is its one-line form. There is no parallel
+  score to drift: raising regard raises the bond because they are the same number.
+- **Bands have teeth.** `warns()` is true for friend and sworn friend: `main._warn_player()` picks
+  the warmest waking resident within `WARN_RADIUS` (420) of the player and has them call a warning
+  once per `WARN_COOLDOWN` (20 s), so friendship is audible without becoming a siren.
+  `refuses()` is true for an enemy: `_talk()` ends the conversation before memory is written, so an
+  enemy's talk count does not rise. `greeting(band)` colours ordinary conversation, which is why a
+  friend's face is not a stranger's.
+- **The dossier tells the truth in one line.** The relation line shows the band and the score beside
+  the old regard (`Friend (+25) · regard +30 (warm)`), and the footnote becomes the authored ties
+  (`Bonds: Mentor of Instructor Rui`) when a person has any. Stable ids resolve through
+  `main.person_name()`, which records the name each body was actually spawned with.
+- **Nothing new is saved.** The resident-to-resident fabric regenerates from the world seed, the
+  ties come from data, and the player's standing is memory. Schema stays 2 and old saves load
+  unchanged.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

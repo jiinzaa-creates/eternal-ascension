@@ -747,14 +747,25 @@ func draw_npc_dossier(_player: Player) -> void:
 	_text(Vector2(x, y), _fit("Goals: " + (", ".join(ambition) if not ambition.is_empty() else "none"), 11, 408.0), 11, Color("#d8c070"))
 	y += 17.0
 	var memory: Dictionary = NpcDb.memory_entry(Game.npc_memory, npc.npc_id)
-	var relation := "A stranger. E — talk."
+	var bond: Dictionary = npc.bond_to_player()
+	var relation := "A stranger (%+d). E — talk." % int(bond.get("score", 0))
 	if bool(memory.get("met", false)):
-		relation = "Met %d× · last day %d · regard %+d (%s)" % [
+		relation = "Met %d× · day %d · %s · regard %+d (%s)" % [
 			int(memory.get("talks", 0)), int(memory.get("last_day", 0)),
+			Relationships.describe(int(bond.get("score", 0))),
 			npc.standing(), npc.standing_label()]
 	_text(Vector2(x, y), _fit(relation, 11, 408.0), 11, MUTED)
 	y += 16.0
-	_text(Vector2(x, y), "The sheet regenerates from the seed; memory is saved.", 10, Color("#5f7079"))
+	# Authored ties take the footnote when a person has any: they are facts about
+	# two people, not numbers the run can warm up or grind down.
+	var footnote := "The sheet regenerates from the seed; memory is saved."
+	var footnote_color := Color("#5f7079")
+	if host != null:
+		var ties := String(host.npc_tie_line(npc))
+		if ties != "":
+			footnote = ties
+			footnote_color = Color("#c8b8e8")
+	_text(Vector2(x, y), _fit(footnote, 10, 408.0), 10, footnote_color)
 
 
 ## The storehouse: the satchel on the left, the shelves on the right. The cursor

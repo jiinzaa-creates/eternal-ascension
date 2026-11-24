@@ -37,6 +37,9 @@ var crafting_actions: Array = []
 var potions: Array = []
 var alchemy_station: Dictionary = {}
 var professions: Array = []
+var bonds: Array = []
+var bond_ties: Array = []
+var bond_pairs: Array = []
 
 var _by_id: Dictionary = {}
 
@@ -84,6 +87,10 @@ func load_all() -> void:
 	alchemy_station = station_value if typeof(station_value) == TYPE_DICTIONARY else {}
 	var profession_data := _read("professions.json")
 	professions = profession_data.get("professions", [])
+	var bond_data := _read("bonds.json")
+	bonds = bond_data.get("bands", [])
+	bond_ties = bond_data.get("ties", [])
+	bond_pairs = bond_data.get("pairs", [])
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -112,6 +119,8 @@ func load_all() -> void:
 	_index("action", crafting_actions)
 	_index("potion", potions)
 	_index("profession", professions)
+	_index("bond", bonds)
+	_index("bond_tie", bond_ties)
 
 
 func _read(file: String) -> Dictionary:
@@ -269,6 +278,28 @@ func archetypes() -> Array:
 
 func npc_goal(id: String) -> Dictionary:
 	return by_id("npc_goal", id)
+
+
+func bond(id: String) -> Dictionary:
+	return by_id("bond", id)
+
+
+func bond_tie(id: String) -> Dictionary:
+	if id == "":
+		return {}
+	return by_id("bond_tie", id)
+
+
+## One directed authored pair, or {} when the two people are not formally
+## bound. Direction matters: the file may name only one side of a relation.
+func bond_pair(from_id: String, to_id: String) -> Dictionary:
+	for value in bond_pairs:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var pair_entry: Dictionary = value
+		if String(pair_entry.get("from", "")) == from_id and String(pair_entry.get("to", "")) == to_id:
+			return pair_entry
+	return {}
 
 
 func bases_for(slot: String) -> Array:
@@ -595,6 +626,9 @@ func validate() -> Array:
 				problems.append("quest %s has a step without kind/target" % q.get("id", "?"))
 
 	_validate_npc_data(problems)
+	# Relationship content: bands must tile the whole score range, ties must
+	# name each other, and authored pairs must reference both.
+	problems.append_array(Relationships.validate(bonds, bond_ties, bond_pairs))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())
