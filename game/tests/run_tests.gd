@@ -89,6 +89,7 @@ func _ready() -> void:
 	_sect_autonomy_tests()
 	_quest_tests()
 	_hidden_realm_tests()
+	_hidden_realm_family_tests()
 	_realm_access_tests()
 	_save_tests()
 	print("-----------------------------------------------")
@@ -4990,7 +4991,7 @@ func _hidden_realm_tests() -> void:
 	add_child(realm)
 	realm.generate(4242)
 
-	check(HiddenRealms.templates().size() == 3, "the registry holds three layouts")
+	check(HiddenRealms.templates().size() == 9, "the registry holds nine layouts")
 	check(HiddenRealms.default_id() == "template.tomb", "the tomb remains the default")
 	check(String(HiddenRealms.default_template().get("name", "")) == "Tomb of the Hollow Moon",
 		"the default template resolves")
@@ -5139,17 +5140,121 @@ func _hidden_realm_tests() -> void:
 	twin.queue_free()
 
 
+# --------------------------------------------------------- realm families ----
+
+func _hidden_realm_family_tests() -> void:
+	print("[families] nine realms, nine layouts, nine wardens")
+	check(HiddenRealms.families().size() == HiddenRealms.FAMILY_COUNT, "nine content families are charted")
+	check(HiddenRealms.default_family_id() == "family.ancient_tomb", "the ancient tomb remains the default family")
+	check(String(HiddenRealms.default_family().get("id", "")) == "family.ancient_tomb", "the default family resolves")
+	check(HiddenRealms.family("family.nope").is_empty(), "an unknown family resolves to nothing")
+	check(HiddenRealms.family_index("family.ancient_tomb") == 0, "families keep their authored order")
+
+	var layouts: Dictionary = {}
+	var inheritances := 0
+	for value in HiddenRealms.families():
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var layout := String(entry.get("template", ""))
+		check(not layouts.has(layout), "%s has a layout of its own" % id)
+		layouts[layout] = true
+		if bool(entry.get("inheritance", false)):
+			inheritances += 1
+		var realm := HiddenRealm.new()
+		add_child(realm)
+		realm.generate(9001, layout, id, "test." + id)
+		check(realm.realm_name == String(entry.get("name", "")), "%s names its realm" % id)
+		check(realm.family_id == id and String(realm.family.get("id", "")) == id, "%s reports its family" % id)
+		check(realm.template_id == layout, "%s uses its family layout" % id)
+		check(realm.altar_enabled == bool(entry.get("inheritance", false)), "%s honours the inheritance rule" % id)
+		check(realm.loot_table == String(entry.get("loot_table", "")), "%s carries its own loot table" % id)
+		check(approx(realm.hazard_dps, float(entry.get("hazard_dps", 0.0))), "%s sets its own hazard damage" % id)
+		check(realm.enemy_ilvl == int(entry.get("enemy_ilvl", 0)), "%s sets its own enemy tier" % id)
+		check(realm.warden_id == String(entry.get("warden", "")), "%s posts its own warden" % id)
+		check(realm.palette == entry.get("palette", {}), "%s paints its own palette" % id)
+		var altar := false
+		var exit_found := false
+		var chests := 0
+		for node in realm.interactables:
+			if String(node.id) == "realm.altar":
+				altar = true
+			elif String(node.id) == "realm.exit":
+				exit_found = true
+			elif String(node.id).begins_with("test." + id + ".chest."):
+				chests += 1
+		check(altar == realm.altar_enabled, "%s only builds an altar where inheritance lives" % id)
+		check(exit_found, "%s always has a way out" % id)
+		check(chests == realm.treasure_count, "%s namespaces its chests by site" % id)
+		var hazard_rect: Rect2 = realm.hazards[0]["rect"]
+		check(approx(realm.hazard_dps_at(hazard_rect.get_center()), realm.hazard_dps), "%s hazards use its damage" % id)
+		realm.queue_free()
+	check(layouts.size() == HiddenRealms.FAMILY_COUNT, "every family owns a distinct layout")
+	check(inheritances == 1, "only the tomb carries the inheritance altar")
+
+	check(HiddenRealms.validate_families(DB.hidden_realm_family_data).is_empty(), "the shipped families validate")
+	var broken: Dictionary = DB.hidden_realm_family_data.duplicate(true)
+	broken.erase("families")
+	check(not HiddenRealms.validate_families(broken).is_empty(), "missing families are rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	broken["families"] = (DB.hidden_realm_family_data["families"] as Array).slice(1)
+	check(not HiddenRealms.validate_families(broken).is_empty(), "a missing family is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array).append((DB.hidden_realm_family_data["families"] as Array)[1].duplicate(true))
+	check(not HiddenRealms.validate_families(broken).is_empty(), "a duplicate family is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[1]["template"] = "template.nope"
+	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown family layout is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[1]["loot_table"] = "chest.nope"
+	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown family loot table is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[1]["inheritance"] = true
+	check(not HiddenRealms.validate_families(broken).is_empty(), "a second inheritance is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[0]["inheritance"] = false
+	check(not HiddenRealms.validate_families(broken).is_empty(), "removing the only inheritance is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[1]["warden"] = "boss.nope"
+	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown family warden is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[1]["enemy_roster"] = ["nope"]
+	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown family enemy is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[1]["palette"].erase("hazard")
+	check(not HiddenRealms.validate_families(broken).is_empty(), "a family palette without a hazard colour is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	(broken["families"] as Array)[1]["hazard_dps"] = -1.0
+	check(not HiddenRealms.validate_families(broken).is_empty(), "negative family hazard damage is rejected")
+	broken = DB.hidden_realm_family_data.duplicate(true)
+	broken["default"] = "family.nope"
+	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown default family is rejected")
+
+
 # ------------------------------------------------------------------- save ----
 
 func _realm_access_tests() -> void:
 	print("[access] discovery sites, opening windows and the shared gate")
-	check(RealmAccess.sites().size() >= 1, "at least one realm site is charted")
+	check(RealmAccess.sites().size() == HiddenRealms.FAMILY_COUNT, "one site is charted for every family")
 	check(RealmAccess.default_id() == "realm.hollow_moon", "the Hollow Moon is the default site")
 	var site: Dictionary = RealmAccess.default_site()
 	check(String(site.get("name", "")) == "Tomb of the Hollow Moon", "the default site resolves")
 	check(not HiddenRealms.template(String(site.get("template", ""))).is_empty(), "the site names a real layout")
+	check(String(site.get("family", "")) == "family.ancient_tomb", "the default site names its family")
 	check(RealmAccess.world_position(site, Vector2(10, 20)) == Vector2(830, -500), "the site position is relative to spawn")
 	check(RealmAccess.reveal_radius(site) > 0.0, "the site has a reveal radius")
+
+	var seeds: Dictionary = {}
+	for value in RealmAccess.sites():
+		var entry: Dictionary = value
+		var site_id := String(entry.get("id", ""))
+		var family := HiddenRealms.family(String(entry.get("family", "")))
+		check(not family.is_empty(), "%s names a real family" % site_id)
+		check(String(family.get("template", "")) == String(entry.get("template", "")), "%s agrees with its family" % site_id)
+		var derived := RealmAccess.seed_for(entry, 8814237719)
+		check(derived == RealmAccess.seed_for(entry, 8814237719), "%s derives a stable seed" % site_id)
+		check(derived >= 100000 and derived <= 999999, "%s derives a usable seed" % site_id)
+		check(not seeds.has(derived), "%s derives a seed of its own" % site_id)
+		seeds[derived] = true
 
 	var first := RealmAccess.window_for(site, 1)
 	check(bool(first["open"]), "day one is inside the opening")
@@ -5197,6 +5302,12 @@ func _realm_access_tests() -> void:
 	broken = DB.realm_access_data.duplicate(true)
 	(broken["sites"] as Array)[0]["template"] = "template.nope"
 	check(not RealmAccess.validate(broken).is_empty(), "an unknown layout is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["family"] = "family.nope"
+	check(not RealmAccess.validate(broken).is_empty(), "an unknown family is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["template"] = "template.shrine"
+	check(not RealmAccess.validate(broken).is_empty(), "a site that disagrees with its family is rejected")
 	broken = DB.realm_access_data.duplicate(true)
 	(broken["sites"] as Array)[0]["radius"] = 10
 	check(not RealmAccess.validate(broken).is_empty(), "a reveal radius that is too small is rejected")

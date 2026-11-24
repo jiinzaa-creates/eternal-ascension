@@ -14,11 +14,23 @@ const GAP := 110.0
 const COLS := 5
 const ROWS := 4
 const HAZARD_DPS := 7.0
+const DEFAULT_PALETTE := {
+	"floor": "#241f30", "entry": "#1c2a2a", "inheritance": "#2b2440",
+	"treasure": "#2a2620", "border": "#3b3350", "hazard": "#5a2030",
+	"hazard_edge": "#c06070", "accent": "#8f7fd0",
+}
 
 var realm_seed: int = 0
 var realm_name: String = "Tomb of the Hollow Moon"
 var template_id: String = "template.tomb"
+var family_id: String = ""
+var family: Dictionary = {}
 var profile: Dictionary = {}
+var palette: Dictionary = DEFAULT_PALETTE.duplicate()
+var instance_id: String = ""
+var altar_enabled := true
+var loot_table := "chest.sealed"
+var hazard_dps := HAZARD_DPS
 var cols: int = COLS
 var rows: int = ROWS
 var treasure_count: int = 2
@@ -49,8 +61,13 @@ var entity_parent: Node = null
 var detached: Array = []
 
 
-func generate(seed_value: int, wanted_template: String = "") -> void:
+func generate(seed_value: int, wanted_template: String = "", wanted_family: String = "", realm_instance_id: String = "") -> void:
 	realm_seed = seed_value
+	instance_id = realm_instance_id
+	family_id = wanted_family
+	family = HiddenRealms.family(family_id) if family_id != "" else {}
+	if not family.is_empty() and wanted_template == "":
+		wanted_template = String(family.get("template", ""))
 	var id := wanted_template if wanted_template != "" else HiddenRealms.default_id()
 	profile = HiddenRealms.template(id)
 	if profile.is_empty():
@@ -66,6 +83,20 @@ func generate(seed_value: int, wanted_template: String = "") -> void:
 	enemies_per_room = clampi(int(profile.get("enemies_per_room", 2)), 1, 6)
 	enemy_roster = (profile.get("enemy_roster", []) as Array).duplicate()
 	warden_id = String(profile.get("warden", ""))
+	altar_enabled = true
+	loot_table = "chest.sealed"
+	hazard_dps = HAZARD_DPS
+	palette = DEFAULT_PALETTE.duplicate()
+	if not family.is_empty():
+		realm_name = String(family.get("name", realm_name))
+		altar_enabled = bool(family.get("inheritance", false))
+		loot_table = String(family.get("loot_table", loot_table))
+		hazard_dps = float(family.get("hazard_dps", hazard_dps))
+		palette = (family.get("palette", palette) as Dictionary).duplicate(true)
+		enemy_ilvl = clampi(int(family.get("enemy_ilvl", enemy_ilvl)), 1, 12)
+		enemies_per_room = clampi(int(family.get("enemies_per_room", enemies_per_room)), 1, 6)
+		enemy_roster = (family.get("enemy_roster", enemy_roster) as Array).duplicate()
+		warden_id = String(family.get("warden", warden_id))
 	var stream_index := maxi(0, HiddenRealms.index_of(template_id))
 	var r: RandomNumberGenerator = Rng.stream("hidden_realm", seed_value, stream_index)
 	cells.clear()
@@ -96,7 +127,7 @@ func _assign_kinds(r: RandomNumberGenerator) -> void:
 	for cell in cells:
 		kinds[cell] = "combat"
 	kinds[entry_cell] = "entry"
-	kinds[altar_cell] = "inheritance"
+	kinds[altar_cell] = "inheritance" if altar_enabled else "combat"
 	var treasure_candidates: Array[Vector2i] = []
 	for cell in cells:
 		if String(kinds[cell]) == "combat":
@@ -211,7 +242,7 @@ func _build_hazards(r: RandomNumberGenerator) -> void:
 		var offset := Vector2(r.randf_range(-90.0, 90.0), r.randf_range(-70.0, 70.0))
 		hazards.append({
 			"rect": Rect2(center + offset - Vector2(48, 48), Vector2(96, 96)),
-			"dps": HAZARD_DPS,
+			"dps": hazard_dps,
 		})
 
 
@@ -222,16 +253,20 @@ func _build_interactables() -> void:
 	_attach(exit)
 	interactables.append(exit)
 
-	var altar := Interactable.new()
-	altar.setup(Interactable.Kind.ALTAR, "realm.altar", "Inheritance Altar")
-	altar.position = cell_center(altar_cell)
-	_attach(altar)
-	interactables.append(altar)
+	if altar_enabled:
+		var altar := Interactable.new()
+		altar.setup(Interactable.Kind.ALTAR, "realm.altar", "Inheritance Altar")
+		altar.position = cell_center(altar_cell)
+		_attach(altar)
+		interactables.append(altar)
 
 	for cell in cells:
 		if String(kinds[cell]) == "treasure":
 			var chest := Interactable.new()
-			chest.setup(Interactable.Kind.CHEST, "realm.chest.%d.%d" % [cell.x, cell.y], "Sealed Chest")
+			var chest_id := "realm.chest.%d.%d" % [cell.x, cell.y]
+			if instance_id != "":
+				chest_id = "%s.chest.%d.%d" % [instance_id, cell.x, cell.y]
+			chest.setup(Interactable.Kind.CHEST, chest_id, "Sealed Chest")
 			chest.position = cell_center(cell) + Vector2(0, -40)
 			_attach(chest)
 			interactables.append(chest)
@@ -272,10 +307,10 @@ func _spawn_warden() -> void:
 	if entry.is_empty():
 		return
 	var body := Dummy.new()
-	body.ilvl = 2
+	body.ilvl = enemy_ilvl
 	body.global_position = cell_center(altar_cell) + Vector2(0, 130)
 	_attach(body)
-	body.become_boss(entry, 2)
+	body.become_boss(entry, enemy_ilvl)
 	warden = body
 
 
@@ -330,33 +365,37 @@ func hazard_dps_at(world_position: Vector2) -> float:
 
 func _draw() -> void:
 	# Corridors first, rooms on top: openings read as doorways.
+	var border := Color(String(palette.get("border", "#3b3350")))
 	for link in links:
 		var a: Vector2 = cell_center(link[0])
 		var b: Vector2 = cell_center(link[1])
-		draw_line(a, b, Color("#2a2438"), 56.0)
-		draw_line(a, b, Color("#171320"), 40.0)
+		draw_line(a, b, border.darkened(0.25), 56.0)
+		draw_line(a, b, border.darkened(0.55), 40.0)
 
 	for cell in cells:
 		var center: Vector2 = cell_center(cell)
 		var rect := Rect2(center - Vector2(ROOM_W, ROOM_H) * 0.5, Vector2(ROOM_W, ROOM_H))
 		var kind := String(kinds[cell])
-		var floor_color := Color("#241f30")
+		var floor_color := Color(String(palette.get("floor", "#241f30")))
 		if kind == "entry":
-			floor_color = Color("#1c2a2a")
+			floor_color = Color(String(palette.get("entry", "#1c2a2a")))
 		elif kind == "inheritance":
-			floor_color = Color("#2b2440")
+			floor_color = Color(String(palette.get("inheritance", "#2b2440")))
 		elif kind == "treasure":
-			floor_color = Color("#2a2620")
+			floor_color = Color(String(palette.get("treasure", "#2a2620")))
 		draw_rect(rect, floor_color)
-		draw_rect(rect, Color("#3b3350"), false, 6.0)
+		draw_rect(rect, border, false, 6.0)
 
+	var hazard_color := Color(String(palette.get("hazard", "#5a2030")))
+	var hazard_edge := Color(String(palette.get("hazard_edge", "#c06070")))
 	for hazard in hazards:
 		var rect: Rect2 = hazard["rect"]
-		draw_rect(rect, Color("#5a2030", 0.55))
-		draw_rect(rect, Color("#c06070", 0.7), false, 2.0)
+		draw_rect(rect, Color(hazard_color, 0.55))
+		draw_rect(rect, Color(hazard_edge, 0.7), false, 2.0)
 
+	var accent := Color(String(palette.get("accent", "#8f7fd0")))
 	for cell in cells:
 		if String(kinds[cell]) == "inheritance":
 			var center := cell_center(cell)
-			draw_arc(center, 150.0, 0.0, TAU, 48, Color("#8f7fd0", 0.4), 2.0)
-			draw_arc(center, 110.0, 0.0, TAU, 40, Color("#8f7fd0", 0.25), 1.5)
+			draw_arc(center, 150.0, 0.0, TAU, 48, Color(accent, 0.4), 2.0)
+			draw_arc(center, 110.0, 0.0, TAU, 40, Color(accent, 0.25), 1.5)

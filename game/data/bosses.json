@@ -39,6 +39,158 @@
 			"reward": {"stones": 400, "rarity": 3, "title": "the Hollow Moon"},
 			"telegraph_color": "#c090ff",
 			"intro": "The warden rises from the altar's shadow, and the tomb holds its breath."
+		},
+		{
+			"id": "boss.immortal_ruin",
+			"name": "Warden of the Broken Heaven",
+			"archetype": "sentinel",
+			"color": "#7fd8d0",
+			"hp_mult": 8.0,
+			"damage_mult": 1.6,
+			"poise_mult": 2.0,
+			"ilvl_bonus": 3,
+			"thresholds": [0.7, 0.35],
+			"phases": [
+				{"name": "Broken Hall", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Falling Archive", "damage_mult": 1.2, "speed_mult": 1.1, "cooldown_mult": 0.9, "status": {"id": "chill", "duration": 2.5, "magnitude": 0.15}, "adds": ["beast.moonfang"]},
+				{"name": "Last Seal", "damage_mult": 1.45, "speed_mult": 1.25, "cooldown_mult": 0.75, "status": {"id": "shock", "duration": 2.5, "magnitude": 0.15}, "adds": ["beast.moonfang", "beast.gloomserpent"]}
+			],
+			"reward": {"stones": 450, "rarity": 3, "title": "the Broken Heaven"},
+			"telegraph_color": "#7fd8d0",
+			"intro": "The ruin's warden unfolds from a wall that was never a wall."
+		},
+		{
+			"id": "boss.beast_realm",
+			"name": "The First Beast",
+			"archetype": "brawler",
+			"color": "#9fe0a0",
+			"hp_mult": 7.5,
+			"damage_mult": 1.55,
+			"poise_mult": 2.0,
+			"ilvl_bonus": 3,
+			"thresholds": [0.6, 0.3],
+			"phases": [
+				{"name": "Territory", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Pack Call", "damage_mult": 1.2, "speed_mult": 1.15, "cooldown_mult": 0.9, "status": {"id": "bleed", "duration": 3.0, "magnitude": 3.0}, "adds": ["beast.stoneback"]},
+				{"name": "Apex", "damage_mult": 1.5, "speed_mult": 1.35, "cooldown_mult": 0.7, "status": {"id": "bleed", "duration": 3.0, "magnitude": 4.0}, "adds": ["beast.stoneback", "beast.thundercrane"]}
+			],
+			"reward": {"stones": 400, "rarity": 3, "title": "the First Beast"},
+			"telegraph_color": "#9fe0a0",
+			"intro": "The green dark goes quiet. Something enormous stops pretending to be a tree."
+		},
+		{
+			"id": "boss.battlefield",
+			"name": "The Unfallen General",
+			"archetype": "sentinel",
+			"color": "#d09080",
+			"hp_mult": 8.5,
+			"damage_mult": 1.65,
+			"poise_mult": 2.1,
+			"ilvl_bonus": 4,
+			"thresholds": [0.7, 0.4],
+			"phases": [
+				{"name": "Line Holds", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Broken Formation", "damage_mult": 1.25, "speed_mult": 1.1, "cooldown_mult": 0.9, "status": {"id": "shock", "duration": 2.0, "magnitude": 0.12}, "adds": ["beast.stoneback"]},
+				{"name": "Last Charge", "damage_mult": 1.55, "speed_mult": 1.3, "cooldown_mult": 0.7, "status": {"id": "bleed", "duration": 3.0, "magnitude": 3.0}, "adds": ["beast.stoneback", "beast.moonfang"]}
+			],
+			"reward": {"stones": 500, "rarity": 3, "title": "the Unfallen"},
+			"telegraph_color": "#d09080",
+			"intro": "A standard rises from the mud. The general has not yet received the order to die."
+		},
+		{
+			"id": "boss.heavenly_garden",
+			"name": "Keeper of the Jade Gate",
+			"archetype": "archer",
+			"color": "#b0f0c0",
+			"hp_mult": 7.0,
+			"damage_mult": 1.5,
+			"poise_mult": 1.8,
+			"ilvl_bonus": 3,
+			"thresholds": [0.75, 0.4],
+			"phases": [
+				{"name": "Pruning", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Withering", "damage_mult": 1.2, "speed_mult": 1.15, "cooldown_mult": 0.9, "status": {"id": "chill", "duration": 2.5, "magnitude": 0.15}, "adds": ["beast.thundercrane"]},
+				{"name": "Roots of Heaven", "damage_mult": 1.4, "speed_mult": 1.3, "cooldown_mult": 0.7, "status": {"id": "chill", "duration": 3.0, "magnitude": 0.2}, "adds": ["beast.thundercrane", "beast.gloomserpent"]}
+			],
+			"reward": {"stones": 420, "rarity": 3, "title": "the Jade Gate"},
+			"telegraph_color": "#b0f0c0",
+			"intro": "The garden's keeper draws a bow of braided roots. Nothing here is unguarded."
+		},
+		{
+			"id": "boss.abandoned_sect",
+			"name": "The Last Disciple",
+			"archetype": "skirmisher",
+			"color": "#e0c080",
+			"hp_mult": 7.5,
+			"damage_mult": 1.55,
+			"poise_mult": 1.9,
+			"ilvl_bonus": 4,
+			"thresholds": [0.65, 0.3],
+			"phases": [
+				{"name": "Lesson", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Correction", "damage_mult": 1.2, "speed_mult": 1.2, "cooldown_mult": 0.85, "status": {"id": "bleed", "duration": 2.5, "magnitude": 2.5}, "adds": ["beast.moonfang"]},
+				{"name": "Final Exam", "damage_mult": 1.5, "speed_mult": 1.35, "cooldown_mult": 0.7, "status": {"id": "shock", "duration": 2.5, "magnitude": 0.15}, "adds": ["beast.moonfang", "beast.stoneback"]}
+			],
+			"reward": {"stones": 470, "rarity": 3, "title": "the Last Lesson"},
+			"telegraph_color": "#e0c080",
+			"intro": "The last disciple sets down a broom and picks up a sword."
+		},
+		{
+			"id": "boss.trial_realm",
+			"name": "The Examiner",
+			"archetype": "sentinel",
+			"color": "#f0e0a0",
+			"hp_mult": 8.0,
+			"damage_mult": 1.7,
+			"poise_mult": 2.2,
+			"ilvl_bonus": 4,
+			"thresholds": [0.66, 0.33],
+			"phases": [
+				{"name": "First Trial", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Second Trial", "damage_mult": 1.3, "speed_mult": 1.15, "cooldown_mult": 0.85, "status": {"id": "shock", "duration": 2.5, "magnitude": 0.18}, "adds": ["beast.thundercrane"]},
+				{"name": "Final Judgment", "damage_mult": 1.6, "speed_mult": 1.3, "cooldown_mult": 0.65, "status": {"id": "shock", "duration": 3.0, "magnitude": 0.2}, "adds": ["beast.thundercrane", "beast.stoneback"]}
+			],
+			"reward": {"stones": 550, "rarity": 3, "title": "the Examiner"},
+			"telegraph_color": "#f0e0a0",
+			"intro": "A voice without a body asks whether you are ready. The arena answers first."
+		},
+		{
+			"id": "boss.spatial_fracture",
+			"name": "The Folded One",
+			"archetype": "skirmisher",
+			"color": "#90b0ff",
+			"hp_mult": 8.0,
+			"damage_mult": 1.65,
+			"poise_mult": 2.0,
+			"ilvl_bonus": 4,
+			"thresholds": [0.72, 0.36],
+			"phases": [
+				{"name": "Near", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Far", "damage_mult": 1.25, "speed_mult": 1.25, "cooldown_mult": 0.85, "status": {"id": "chill", "duration": 2.5, "magnitude": 0.18}, "adds": ["beast.gloomserpent"]},
+				{"name": "Elsewhere", "damage_mult": 1.5, "speed_mult": 1.4, "cooldown_mult": 0.7, "status": {"id": "chill", "duration": 3.0, "magnitude": 0.22}, "adds": ["beast.gloomserpent", "beast.moonfang"]}
+			],
+			"reward": {"stones": 600, "rarity": 3, "title": "the Fold"},
+			"telegraph_color": "#90b0ff",
+			"intro": "The fracture's keeper is already behind you, and also in front."
+		},
+		{
+			"id": "boss.forbidden_domain",
+			"name": "The Nameless Sovereign",
+			"archetype": "brawler",
+			"color": "#d07080",
+			"hp_mult": 9.0,
+			"damage_mult": 1.8,
+			"poise_mult": 2.3,
+			"ilvl_bonus": 5,
+			"thresholds": [0.7, 0.35],
+			"phases": [
+				{"name": "Name Unspoken", "damage_mult": 1.0, "speed_mult": 1.0, "cooldown_mult": 1.0, "status": {}, "adds": []},
+				{"name": "Name Erased", "damage_mult": 1.35, "speed_mult": 1.2, "cooldown_mult": 0.85, "status": {"id": "bleed", "duration": 3.0, "magnitude": 4.0}, "adds": ["beast.gloomserpent"]},
+				{"name": "Name Returned", "damage_mult": 1.7, "speed_mult": 1.35, "cooldown_mult": 0.65, "status": {"id": "bleed", "duration": 3.5, "magnitude": 5.0}, "adds": ["beast.gloomserpent", "beast.thundercrane", "beast.moonfang"]}
+			],
+			"reward": {"stones": 700, "rarity": 3, "title": "the Nameless"},
+			"telegraph_color": "#d07080",
+			"intro": "The sovereign has no name left to speak, and no intention of being named."
 		}
 	]
 }

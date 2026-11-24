@@ -49,6 +49,13 @@ static func reveal_radius(entry: Dictionary) -> float:
 	return float(entry.get("radius", 420.0))
 
 
+## Every family gets its own deterministic layout from the world seed. Only the
+## legacy tomb keeps a saved seed, so new families need no extra save key.
+static func seed_for(entry: Dictionary, world_seed: int) -> int:
+	var stream := Rng.stream_from(world_seed, "realm_site", hash(String(entry.get("id", ""))), 0)
+	return 100000 + int(stream.randf() * 900000.0)
+
+
 ## The opening window for a day (1-based). An open window reports how many days
 ## remain including today; a sealed one reports the next opening day.
 static func window_for(entry: Dictionary, day: int) -> Dictionary:
@@ -151,6 +158,12 @@ static func validate(data: Dictionary) -> Array:
 		var template := String(entry.get("template", ""))
 		if HiddenRealms.template(template).is_empty():
 			problems.append("realm access site %s names unknown template %s" % [id, template])
+		var family_id := String(entry.get("family", ""))
+		var family := HiddenRealms.family(family_id)
+		if family.is_empty():
+			problems.append("realm access site %s names unknown family %s" % [id, family_id])
+		elif String(family.get("template", "")) != template:
+			problems.append("realm access site %s disagrees with its family layout" % id)
 		var radius := int(entry.get("radius", 0))
 		if radius < MIN_RADIUS or radius > MAX_RADIUS:
 			problems.append("realm access site %s has an invalid reveal radius" % id)

@@ -1236,51 +1236,74 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 
 ## Hidden realm framework
 
-- **Layouts are data.** `data/hidden_realm_templates.json` holds the templates, and `HiddenRealms`
+- **Layouts are data.** `data/hidden_realm_templates.json` holds nine templates, and `HiddenRealms`
   (`game/systems/hidden_realms.gd`) is the only reader. A template declares its grid (`cols`, `rows`),
   entry and altar corners, loop count, treasure-room count, hazard chance, enemy tier, population and
   roster, and an optional warden. The default is `template.tomb`, the historic 5×4 Tomb of the Hollow
-  Moon; `template.ossuary` and `template.shrine` are the other authored layouts that prove the shape.
-- **`HiddenRealm.generate(seed, template_id = "")`** resolves the template, lays out the grid and fills
-  it: entry/altar roles, treasure rooms, a spanning tree plus `loops` extra corridors, seeded hazards,
-  one chest per treasure room, room guards and the profile's warden. Connectivity is guaranteed by
-  construction and flood-filled in the unit suite for every template.
-- **The default is unchanged.** Calling `generate(seed)` selects `template.tomb` at stream index 0, the
-  same `Rng.stream("hidden_realm", seed, 0)` the old generator used, so existing realm seeds keep their
-  corridor layout. Other templates use their registry index as the stream counter, so a template and a
-  seed always rebuild the same realm.
+  Moon. The other eight (ossuary, shrine, battlefield, garden, abandoned sect, trial, spatial fracture
+  and forbidden domain) are distinct layouts, not reskins: sizes run 4×4 to 7×5 and entry/altar
+  corners, loop counts, treasure counts and guard density differ.
+- **Families own the content.** `data/hidden_realm_families.json` names nine families and maps each to
+  one layout, an inheritance flag, a loot table, a light colour, hazard DPS, enemy tier/population and
+  roster, a warden and an eight-swatch palette. `HiddenRealms.families()`, `family(id)` and
+  `validate_families()` are the only readers. Exactly one family (`family.ancient_tomb`) sets
+  `inheritance: true`; the other eight deliberately build no altar, because broader inheritances belong
+  to a later milestone.
+- **`HiddenRealm.generate(seed, template_id = "", family_id = "", instance_id = "")`** resolves the
+  family and template, lays out the grid and fills it: entry/altar roles, treasure rooms, a spanning
+  tree plus `loops` extra corridors, seeded hazards, one chest per treasure room, room guards and the
+  family's warden. The family overrides the template's display name, loot table, hazard DPS, enemy
+  tier/population/roster, warden and palette; the template still owns geometry. Connectivity is
+  guaranteed by construction and flood-filled in the unit suite for every family and layout.
+- **The default is unchanged.** Calling `generate(seed)` still selects `template.tomb` at stream index
+  0, the same `Rng.stream("hidden_realm", seed, 0)` the old generator used, so existing tomb seeds keep
+  their corridor layout. Other templates use their registry index as the stream counter, so a template
+  and a seed always rebuild the same realm.
+- **Chest ids are namespace-safe.** A standalone or legacy tomb keeps `realm.chest.x.y`; an instanced
+  family uses `<site id>.chest.x.y`, so `used_interactables` cannot collide between two families that
+  happen to share a grid coordinate. The altar keeps its historic `realm.altar` id.
 - **`DB.validate` owns boot safety.** It rejects an unknown default, duplicate ids, a missing name, a
   grid outside 3–8 cells per side, an unknown or identical entry/altar corner, zero or excessive
   treasure rooms, invalid loops/hazard chance/tier/population, an empty or unknown enemy roster and an
-  unknown warden. The scene reads the spawned warden's id from the realm rather than a hardcoded
-  constant, so a bossless layout needs no special case.
-- **Scope.** This milestone is the framework; the rift still opens the default tomb, and choosing or
-  discovering another template belongs to the next milestone. A future selector must save the template
-  id beside `realm_seed`; today only the seed is stored and the default is implied. M64 adds the
-  remaining content families as data entries, not new generators.
+  unknown warden. Family validation adds exactly nine entries, unique ids and layouts, a real template,
+  loot table and warden, a complete valid palette and light colour, a sane hazard and population, and
+  exactly one inheritance family. `RealmAccess.validate` also rejects a site whose family is unknown or
+  whose layout disagrees with that family. The scene reads the spawned warden's id from the realm rather
+  than a hardcoded constant, so a bossless layout needs no special case.
 
 ## Discovering and entering a hidden realm
 
-- **The site is data.** `data/realm_access.json` names the world site, the layout it opens, its
-  offset from the market spawn, reveal radius, opening cycle and the rumor/discovery lines. `RealmAccess`
-  (`game/systems/realm_access.gd`) owns the pure rules; `HiddenRealms` still owns the layout.
-- **Discovery writes one existing save key.** `Game.discovered` records the stable site id
-  (`realm.hollow_moon`), which already travels through the optional game dictionary and needs no schema
-  change. A pre-M63 save with a nonzero `realm_seed` or any realm progress is marked discovered on load,
-  so an old save keeps the tomb it had already entered.
-- **Three ways to hear of it.** Walking within `radius` discovers the site; the first conversation of a
-  day can carry a rumor (one per day, with the site's own line); and the market notice board repeats the
-  rumor. Discovery reveals the portal and adds it to the route list.
+- **The sites are data.** `data/realm_access.json` names nine world sites, one per family, each with
+  the family and layout it opens, its offset from the market spawn, reveal radius, opening cycle and the
+  rumor/discovery lines. `RealmAccess` (`game/systems/realm_access.gd`) owns the pure rules;
+  `HiddenRealms` still owns layouts and families. The default stays `realm.hollow_moon`.
+- **Discovery writes one existing save key.** `Game.discovered` records stable site ids
+  (`realm.hollow_moon`, `realm.heavenly_garden`, …), which already travel through the optional game
+  dictionary and need no schema change. A pre-M63 save with a nonzero `realm_seed` or any realm progress
+  is marked discovered on load, so an old save keeps the tomb it had already entered.
+- **Three ways to hear of one.** Walking within a site's `radius` discovers that site; the first
+  conversation of a day can carry one rumor, which reveals the first still-undiscovered site in authored
+  order; and the market notice board repeats the same rumor. Discovery reveals that site's portal and
+  adds it to the route list.
 - **Opening windows are derived, not stored.** A site declares `cycle_days`, `open_days` and an
   `offset_days` phase. `window_for()` reports open days remaining and the closing day, or the next
-  opening day; the portal label, map footer and travel row all read the same result. A reload cannot
-  extend an opening, and a closed rift refuses entry at the portal with its opening day.
-- **The map and routes show the same truth.** A known site draws a purple mark in the player's current
-  continent region and a footer line with open/sealed status; the route list leads with landmarks and
-  then the realm, so the capped site rows cannot crowd it out.
-- **Scope.** One site (the tomb) is authored; M64 adds realm content and its own sites through the same
-  data and gate. The direct `_enter_realm()` transition remains gate-free for tests and future
-  transitions; every player entrance goes through `RealmAccess.access()` at the portal.
+  opening day; every portal label, map footer and travel row reads the same result per site. A reload
+  cannot extend an opening, and a closed rift refuses entry at its own portal with its opening day.
+- **Seeds are per site.** The tomb keeps the historic saved `realm_seed`. Every other family derives a
+  stable seed from `Game.world_seed`, the site id and the `realm_site` stream, so no new save key is
+  needed; `active_realm_seed` exists only while a realm is open and is never written. The tomb also keeps
+  its saved `realm_cleared` / `inheritance_taken` state; other families have no altar to claim.
+- **The scene is multi-portal.** `main.gd` builds one `Interactable` per site into `realm_portals` and
+  `realm_portal_positions`; discovery, labels, map marks, travel rows, approach checks and entry all
+  take a site id. `_enter_realm(site_id)` records `active_realm_id` and `active_realm_seed`, and exiting
+  returns the player to that site's portal. The named `realm_portal` handle remains the default tomb for
+  tests and older call sites.
+- **The map and routes show the same truth.** Every known site draws its mark in the player's current
+  continent region and a footer line with its own open/sealed status; the route list leads with
+  landmarks and then each discovered realm, so the capped site rows cannot crowd them out.
+- **Scope.** The direct `_enter_realm()` transition remains gate-free for tests and future transitions;
+  every player entrance goes through `RealmAccess.access()` at the portal. M65 owns broader
+  inheritances and any new family-specific mechanics.
 
 ## Spirit beasts and bosses
 

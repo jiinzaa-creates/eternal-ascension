@@ -132,8 +132,13 @@ var tribulation_arena: TribulationArena = null
 var realm_seed := 0
 var realm_cleared := false
 var inheritance_taken := false
-## The overworld rift is only visible once its site is discovered.
+## The overworld rifts are only visible once their site is discovered.
+var realm_portals: Dictionary = {}
+var realm_portal_positions: Dictionary = {}
+## The default portal is kept as a named handle for tests and older code paths.
 var realm_portal: Interactable = null
+var active_realm_id := ""
+var active_realm_seed := 0
 var _realm_access_day := -1
 ## One rumor per day is enough; the flag is session state, not a save key.
 var _realm_rumor_day := -1
@@ -394,19 +399,25 @@ func _spawn_interactables() -> void:
 		world.add_child(herb)
 		interactables.append(herb)
 
-	var site := RealmAccess.default_site()
-	portal_position = RealmAccess.world_position(site, SPAWN)
-	realm_portal = Interactable.new()
-	realm_portal.setup(Interactable.Kind.PORTAL, String(site.get("id", "realm.hollow_moon")),
-		RealmAccess.portal_label(site, Clock.day))
-	realm_portal.position = portal_position
-	realm_portal.visible = realm_known()
-	world.add_child(realm_portal)
-	interactables.append(realm_portal)
+	for site in RealmAccess.sites():
+		var site_id := String(site.get("id", ""))
+		var portal_pos := RealmAccess.world_position(site, SPAWN)
+		var portal := Interactable.new()
+		portal.setup(Interactable.Kind.PORTAL, site_id, RealmAccess.portal_label(site, Clock.day))
+		portal.position = portal_pos
+		portal.visible = realm_known(site_id)
+		world.add_child(portal)
+		interactables.append(portal)
+		realm_portals[site_id] = portal
+		realm_portal_positions[site_id] = portal_pos
+		if site_id == RealmAccess.default_id():
+			realm_portal = portal
+			portal_position = portal_pos
+		var family := HiddenRealms.family(String(site.get("family", "")))
+		lighting.add_light(world, portal_pos, Color(String(family.get("light_color", "#b48cff"))), 260.0, 1.0)
 
-	# Night lighting: the shrine and the rift stay readable after dusk.
+	# Night lighting: the shrine and the rifts stay readable after dusk.
 	lighting.add_light(world, shrine.position, Color("#ffd9a0"), 220.0, 0.9)
-	lighting.add_light(world, realm_portal.position, Color("#b48cff"), 260.0, 1.0)
 
 	# A door for every building, at the doorway the building draws.
 	for spec in Settlement.BUILDINGS:
@@ -1491,12 +1502,15 @@ func _travel_landmarks() -> Array:
 		{"id": "landmark.shrine", "name": "Azure Cloud shrine", "position": settlement.position_for("shrine")},
 		{"id": "landmark.tavern", "name": "Tavern inn", "position": settlement.position_for("tavern")},
 	]
-	var site := _realm_site()
-	if not site.is_empty() and realm_known():
+	for site in RealmAccess.sites():
+		var site_id := String(site.get("id", ""))
+		if not realm_known(site_id):
+			continue
+		var at: Vector2 = realm_portal_positions.get(site_id, portal_position)
 		rows.append({
-			"id": String(site.get("id", "")),
+			"id": site_id,
 			"name": RealmAccess.travel_label(site, Clock.day),
-			"position": portal_position,
+			"position": at,
 		})
 	return rows
 
@@ -3501,11 +3515,17 @@ func _use_interactable(node: Interactable) -> void:
 			if node.id == "realm.exit":
 				_exit_realm()
 			else:
-				_try_enter_realm()
+				_try_enter_realm(String(node.id))
 		Interactable.Kind.CHEST:
 			if node.used:
 				return
-			_loot(node, 6, "sealed chest", "chest.sealed")
+			# A realm chest uses its family's table and tier, not a global default.
+			var chest_table := "chest.sealed"
+			var chest_ilvl := 6
+			if realm_instance != null and is_instance_valid(realm_instance):
+				chest_table = realm_instance.loot_table
+				chest_ilvl = maxi(2, realm_instance.enemy_ilvl)
+			_loot(node, chest_ilvl, "sealed chest", chest_table)
 		Interactable.Kind.ALTAR:
 			_claim_inheritance()
 		Interactable.Kind.DOOR:
@@ -3821,7 +3841,7 @@ func _claim_inheritance() -> void:
 		Bus.toast.emit("Inheritance: the Thousand Petal Illusion is yours.")
 	if gained:
 		Bus.toast.emit("Inheritance: Void Affinity awakens in your meridians.")
-	var inherited := Physiques.inherited_for(player.physique_id, realm_seed)
+	var inherited := Physiques.inherited_for(player.physique_id, active_realm_seed)
 	if player.inherit_physique(inherited):
 		Bus.toast.emit("Inheritance: %s awakens in your bones." % Physiques.name_of(player.physique_id))
 	elif not inherited.is_empty() and inherited == player.physique_id:
@@ -3832,7 +3852,7 @@ func _claim_inheritance() -> void:
 	# The altar has its own table, not a chest's: one assured piece above the
 	# mundane, rolled from the realm seed so the tomb gives the same thing twice.
 	var spoils := Loot.new(DB, Rng).roll(
-		"inheritance.altar", maxi(1, player.cultivation.realm + 2), realm_seed + 91, ground_items.size())
+		"inheritance.altar", maxi(1, player.cultivation.realm + 2), active_realm_seed + 91, ground_items.size())
 	var items: Array = spoils.get("items", [])
 	for item in items:
 		player.pick_up(item as Dictionary)
@@ -3856,31 +3876,36 @@ func _set_overworld_active(active: bool) -> void:
 		if is_instance_valid(node):
 			# Discovery survives the overworld being hidden: an unknown rift must
 			# not appear just because the player stepped out of a realm.
-			node.visible = active and (node != realm_portal or realm_known())
+			var known := true
+			if node.kind == Interactable.Kind.PORTAL and String(node.id).begins_with("realm."):
+				known = realm_known(String(node.id))
+			node.visible = active and known
 
 
 ## ------------------------------------------------------- realm access ----
 
-func _realm_site() -> Dictionary:
+func _realm_site(site_id: String = "") -> Dictionary:
+	if site_id != "":
+		return RealmAccess.site(site_id)
 	return RealmAccess.default_site()
 
 
-func realm_known() -> bool:
-	var site := _realm_site()
+func realm_known(site_id: String = "") -> bool:
+	var site := _realm_site(site_id)
 	return not site.is_empty() and Game.discovered.has(String(site.get("id", "")))
 
 
-func realm_window() -> Dictionary:
-	var site := _realm_site()
+func realm_window(site_id: String = "") -> Dictionary:
+	var site := _realm_site(site_id)
 	if site.is_empty():
 		return {"open": false}
 	return RealmAccess.window_for(site, Clock.day)
 
 
-## Walking near the rift, hearing a rumor, or loading a pre-M63 save that had
-## already entered it all discover the same stable site id.
-func _discover_realm(source: String = "approach", quiet: bool = false) -> bool:
-	var site := _realm_site()
+## Walking near a rift, hearing a rumor, or loading a pre-M63 save that had
+## already entered the tomb all discover the same stable site id.
+func _discover_realm(site_id: String = "", source: String = "approach", quiet: bool = false) -> bool:
+	var site := _realm_site(site_id)
 	if site.is_empty():
 		return false
 	if not Game.discover(String(site.get("id", ""))):
@@ -3897,91 +3922,112 @@ func _discover_realm(source: String = "approach", quiet: bool = false) -> bool:
 
 
 func _hear_realm_rumor(source: String) -> bool:
-	if realm_known() or _realm_rumor_day == Clock.day:
+	if _realm_rumor_day == Clock.day:
 		return false
-	if not _discover_realm("rumor"):
+	var target: Dictionary = {}
+	for site in RealmAccess.sites():
+		if not realm_known(String(site.get("id", ""))):
+			target = site
+			break
+	if target.is_empty():
+		return false
+	if not _discover_realm(String(target.get("id", "")), "rumor"):
 		return false
 	_realm_rumor_day = Clock.day
-	Log.info("scene", "%s revealed the hidden realm" % source)
+	Log.info("scene", "%s revealed %s" % [source, String(target.get("name", "a hidden realm"))])
 	return true
 
 
 func _check_realm_access() -> void:
 	if String(phase) != "play" or player == null:
 		return
-	var site := _realm_site()
-	if site.is_empty():
-		return
-	if not realm_known() and player.global_position.distance_to(portal_position) <= RealmAccess.reveal_radius(site):
-		_discover_realm("approach")
+	for site in RealmAccess.sites():
+		var site_id := String(site.get("id", ""))
+		if realm_known(site_id):
+			continue
+		var at: Vector2 = realm_portal_positions.get(site_id, portal_position)
+		if player.global_position.distance_to(at) <= RealmAccess.reveal_radius(site):
+			_discover_realm(site_id, "approach")
 	if _realm_access_day != Clock.day:
 		_realm_access_day = Clock.day
 		_sync_realm_portal()
 
 
-## Keep the portal, its label, the travel list and the map mark in step with the
-## calendar. Discovery is saved; the opening itself is derived from the day.
+## Keep every rift, label, travel row and map mark in step with the calendar.
+## Discovery is saved; the opening itself is derived from the day.
 func _sync_realm_portal() -> void:
-	var site := _realm_site()
-	if site.is_empty() or realm_portal == null:
-		return
-	var known := realm_known()
-	realm_portal.label = RealmAccess.portal_label(site, Clock.day)
-	realm_portal.visible = known and String(phase) == "play"
-	if not known:
-		return
-	# Travel reads the realm from `_travel_landmarks()`, not `travel_sites`, so a
-	# discovered rift leads the route list instead of competing with POIs for the
-	# last capped row.
+	for site in RealmAccess.sites():
+		var site_id := String(site.get("id", ""))
+		var portal: Variant = realm_portals.get(site_id, null)
+		if portal == null or not is_instance_valid(portal):
+			continue
+		var known := realm_known(site_id)
+		portal.label = RealmAccess.portal_label(site, Clock.day)
+		portal.visible = known and String(phase) == "play"
 
 
-func _try_enter_realm() -> void:
-	var site := _realm_site()
-	var verdict := RealmAccess.access(site, Clock.day, realm_known())
+func _try_enter_realm(site_id: String = "") -> void:
+	var site := _realm_site(site_id)
+	var verdict := RealmAccess.access(site, Clock.day, realm_known(site_id))
 	if not bool(verdict.get("ok", false)):
 		Bus.toast.emit(String(verdict.get("reason", "The rift will not open.")))
 		return
-	_enter_realm()
+	_enter_realm(site_id)
 
 
 func _realm_map_marks() -> Array:
-	var site := _realm_site()
-	if site.is_empty() or not realm_known():
-		return []
-	return [{
-		"name": String(site.get("name", "Hidden realm")),
-		"open": bool(realm_window().get("open", false)),
-		"status": RealmAccess.status_line(site, Clock.day),
-	}]
+	var marks: Array = []
+	for site in RealmAccess.sites():
+		var site_id := String(site.get("id", ""))
+		if not realm_known(site_id):
+			continue
+		marks.append({
+			"name": String(site.get("name", "Hidden realm")),
+			"open": bool(realm_window(site_id).get("open", false)),
+			"status": RealmAccess.status_line(site, Clock.day),
+		})
+	return marks
 
 
-func _enter_realm() -> void:
+func _enter_realm(site_id: String = "") -> void:
 	if realm_instance != null:
 		return
-	if realm_seed == 0:
-		var roll := float(Rng.roll_float("realm_seed", Game.kills, 0))
-		realm_seed = 100000 + int(roll * 900000.0)
+	var site := _realm_site(site_id)
+	if site.is_empty():
+		return
+	var id := String(site.get("id", ""))
+	if id == RealmAccess.default_id():
+		if realm_seed == 0:
+			var roll := float(Rng.roll_float("realm_seed", Game.kills, 0))
+			realm_seed = 100000 + int(roll * 900000.0)
+		active_realm_seed = realm_seed
+	else:
+		active_realm_seed = RealmAccess.seed_for(site, Game.world_seed)
+	active_realm_id = id
+	portal_position = realm_portal_positions.get(id, portal_position)
 	_set_overworld_active(false)
 	realm_instance = HiddenRealm.new()
 	realm_instance.name = "HiddenRealm"
 	realm_instance.entity_parent = world
 	world.add_child(realm_instance)
-	var site := _realm_site()
-	realm_instance.generate(realm_seed, String(site.get("template", HiddenRealms.default_id())))
+	realm_instance.generate(active_realm_seed, String(site.get("template", HiddenRealms.default_id())),
+		String(site.get("family", "")), id)
 	# A warden already killed in this save stays dead: the tomb remembers.
 	var warden_dead := realm_instance.warden_id != "" and bosses_slain.has(realm_instance.warden_id)
 	if warden_dead:
 		realm_instance.clear_warden()
 	realm_instance.spawn_warden = not warden_dead
-	if realm_cleared:
+	if realm_cleared and id == RealmAccess.default_id():
 		realm_instance.mark_cleared()
 	player.global_position = realm_instance.entry_position() + Vector2(0, 60)
 	player.spawn_point = player.global_position
 	phase = "realm"
 	camera_rig.set_bounds(realm_instance.world_bounds())
 	camera_rig.reset_smoothing()
-	lighting.add_light(realm_instance, realm_instance.altar_position(), Color("#c9b6ff"), 320.0, 1.0)
-	Bus.toast.emit("The rift closes behind you. The tomb does not want you here.")
+	var family := HiddenRealms.family(String(site.get("family", "")))
+	lighting.add_light(realm_instance, realm_instance.altar_position(),
+		Color(String(family.get("light_color", "#c9b6ff"))), 320.0, 1.0)
+	Bus.toast.emit("The rift closes behind you. %s does not want you here." % realm_instance.realm_name)
 	if realm_instance.has_warden():
 		var ward: Dictionary = Boss.profile(DB.boss(realm_instance.warden_id))
 		Bus.toast.emit(String(ward.get("intro", "Something old rises in the dark.")))
@@ -3999,6 +4045,7 @@ func _exit_realm() -> void:
 	player.spawn_point = player.global_position
 	camera_rig.set_bounds(ChunkManager.world_bounds())
 	camera_rig.reset_smoothing()
+	active_realm_id = ""
 	_sync_realm_portal()
 	Bus.toast.emit("You return to the Verdant Fringe.")
 

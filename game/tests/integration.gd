@@ -412,7 +412,7 @@ func _run() -> void:
 
 	# --- hidden realm --------------------------------------------------------
 	if not main.realm_known():
-		main._discover_realm("test", true)
+		main._discover_realm("", "test", true)
 	check(main.realm_known(), "the rift site is discovered")
 	check(main.realm_portal.visible, "a discovered rift is visible")
 	var realm_routes := 0
@@ -421,9 +421,9 @@ func _run() -> void:
 			realm_routes += 1
 	check(realm_routes == 1, "a discovered rift is a travel destination once")
 	check(bool(main.realm_window().get("open", false)), "the realm is open on the test day")
-	check(main._realm_map_marks().size() == 1, "a discovered rift marks the map")
+	check(main._realm_map_marks().size() >= 1, "a discovered rift marks the map")
 	main.world_map.setup(main.continent, 0, main._realm_map_marks())
-	check(main.world_map.realm_marks.size() == 1, "the map receives the mark")
+	check(main.world_map.realm_marks.size() == main._realm_map_marks().size(), "the map receives every mark")
 	var access_day: int = Clock.day
 	Clock.day = 5
 	main._sync_realm_portal()
@@ -495,6 +495,62 @@ func _run() -> void:
 	check(main.chunks.visible, "the overworld is visible again")
 	check(main.chunks.props[0].visible, "streamed props return with the overworld")
 	check(main.camera_rig.limit_right == int(ChunkManager.world_bounds().end.x), "camera bounds return to the province")
+
+	# --- a second family is its own site, layout and population --------------
+	var family_site: Dictionary = {}
+	var family_open_day := int(access_day)
+	for value in RealmAccess.sites():
+		var entry: Dictionary = value
+		if String(entry.get("id", "")) == RealmAccess.default_id():
+			continue
+		var window := RealmAccess.window_for(entry, int(access_day))
+		family_site = entry
+		if not bool(window.get("open", false)):
+			family_open_day = int(window.get("opens_day", access_day))
+		else:
+			family_open_day = int(access_day)
+		break
+	check(not family_site.is_empty(), "a second family has its own site")
+	var family_id := String(family_site.get("id", ""))
+	if not main.realm_known(family_id):
+		main._discover_realm(family_id, "test", true)
+	check(main.realm_known(family_id), "the second site is discovered independently")
+	check(main.realm_known(RealmAccess.default_id()), "the tomb stays discovered")
+	check(main.realm_portals.has(family_id) and main.realm_portals[family_id].visible,
+		"the second rift has its own visible portal")
+	check(main._realm_map_marks().size() >= 2, "both discovered rifts mark the map")
+	var family_routes := 0
+	for route in main.travel_destinations():
+		if String(route.get("id", "")) == family_id:
+			family_routes += 1
+	check(family_routes == 1, "the second rift is a travel destination once")
+	Clock.day = family_open_day
+	main._sync_realm_portal()
+	main._try_enter_realm(family_id)
+	await frames(3)
+	check(main.realm_instance != null, "the second rift admits the player")
+	check(main.active_realm_id == family_id, "the active realm records its site")
+	var family_entry: Dictionary = HiddenRealms.family(String(family_site.get("family", "")))
+	check(main.realm_instance.family_id == String(family_site.get("family", "")), "the instance carries its family")
+	check(main.realm_instance.realm_name == String(family_entry.get("name", "")), "the family names the realm")
+	check(main.realm_instance.template_id == String(family_site.get("template", "")), "the site opens its family layout")
+	check(not main.realm_instance.altar_enabled, "a non-inheritance family has no altar")
+	var family_altar: Interactable = null
+	var family_exit: Interactable = null
+	for node in main.realm_instance.interactables:
+		if node.id == "realm.altar":
+			family_altar = node
+		elif node.id == "realm.exit":
+			family_exit = node
+	check(family_altar == null, "the second family builds no inheritance altar")
+	check(family_exit != null, "the second family still has an exit")
+	player.global_position = family_exit.global_position
+	main._try_interact()
+	await frames(3)
+	check(main.realm_instance == null and String(main.phase) == "play", "the second family exits cleanly")
+	check(String(main.active_realm_id) == "", "leaving clears the active realm")
+	Clock.day = access_day
+	main._sync_realm_portal()
 
 	# --- interaction: doors, containers, manuals, examination ----------------
 	var container: Interactable = null
