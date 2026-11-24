@@ -758,10 +758,12 @@ func _run() -> void:
 	var poi_id := ""
 	var poi_window := 0
 	var poi_coord := Vector2i.ZERO
+	var poi_position := Vector2.ZERO
 	if poi != null:
 		poi_id = poi.id
 		poi_window = poi.regrow_days
 		poi_coord = poi.chunk_coord
+		poi_position = poi.global_position
 		var stones_before_site: int = Game.spirit_stones
 		player.global_position = poi.global_position
 		main._use_interactable(poi)
@@ -787,7 +789,7 @@ func _run() -> void:
 		player.global_position = Vector2(12200, 12200)
 		await frames(2)
 		main.chunks.settle()
-		player.global_position = home
+		player.global_position = poi_position
 		await frames(2)
 		main.chunks.settle()
 		var back: Interactable = _find_interactable(main.interactables, poi_id)
@@ -830,7 +832,8 @@ func _run() -> void:
 	check(main.waypoint_name != "", "the waypoint survives a save")
 	player.global_position = main.waypoint_position
 	await frames(3)
-	check(main.waypoint_position == Vector2.ZERO, "reaching a waypoint clears it")
+	check(main.waypoint_position == Vector2.ZERO, "reaching a waypoint clears it (phase %s, day %d, age %.1f/%.1f)" % [
+		String(main.phase), Clock.day, Game.age_years(), player.stats.lifespan_years()])
 
 	# --- off-screen simulation ------------------------------------------------
 	var some_npc: Npc = main.npcs[0]
@@ -4288,6 +4291,133 @@ func _run() -> void:
 	Game.discovered = m66_discovered
 	Game.story_offers = m66_offers
 	main._refresh_world_event(false, m66_event_state)
+
+	# --- M67: the quest graph -------------------------------------------------
+	var m67_day := Clock.day
+	var m67_stones := Game.spirit_stones
+	var m67_contribution := Game.sect_contribution
+	var m67_standing: Dictionary = Game.faction_standing.duplicate(true)
+	var m67_realm: int = player.cultivation.realm
+	var m67_sublevel: int = player.cultivation.sublevel
+	var m67_qi: float = player.cultivation.qi
+	var m67_hp: float = player.hp
+	var m67_contamination: float = player.cultivation.contamination
+	# A live kill tiding must not also pay while these errands are measured.
+	main.world_event_state["rewarded"] = true
+	check(main.quests.is_valid(), "the quest graph loads in the scene")
+	check(main.quests.is_completed(QuestLog.PRIMARY_ID), "the initiation is complete before the new errands")
+	var m67_temper_id := "quest.azure_cloud.tempering"
+	player.cultivation.realm = 4
+	player.cultivation.sublevel = 1
+	player.rebuild_stats()
+	main._talk(main.elder)
+	check(main.quests.is_accepted(m67_temper_id), "Elder Bai offers the tempering errand after the initiation")
+	check(main.quests.current_kind(m67_temper_id) == "kill" or main.quests.current_kind(m67_temper_id) == "collect",
+		"the errand opens on its branch")
+	for i in 5:
+		main._after_kill(1)
+	check(main.quests.progress_of(m67_temper_id) == 1, "five kills complete the branch's beast path")
+	check(main.quests.current_kind(m67_temper_id) == "channel", "the errand moves to the shrine")
+	var m67_shrine: Interactable = null
+	for node in main.interactables:
+		if node is Interactable and node.kind == Interactable.Kind.SHRINE:
+			m67_shrine = node
+			break
+	check(m67_shrine != null, "the shrine is available for the errand")
+	# A contaminated body would be cleansed at the shrine, charging the purse.
+	player.cultivation.contamination = 0.0
+	var m67_temper_stones := Game.spirit_stones
+	var m67_temper_points := Game.sect_contribution
+	if m67_shrine != null:
+		main._use_interactable(m67_shrine)
+	check(main.quests.is_completed(m67_temper_id), "the shrine completes the tempering errand")
+	check(Game.spirit_stones == m67_temper_stones + 150, "the errand pays its stones")
+	check(Game.sect_contribution >= m67_temper_points + 25, "the errand pays its contribution")
+
+	var m67_ledger_id := "quest.market.ledger"
+	var m67_board: Interactable = null
+	for node in main.interactables:
+		if node is Interactable and node.id == "board.market":
+			m67_board = node
+			break
+	check(m67_board != null, "the notice board exists")
+	if m67_board != null:
+		main._use_interactable(m67_board)
+	check(main.quests.is_accepted(m67_ledger_id), "the board posts its contract")
+	check(main.quests.active_ids().size() >= 2, "more than one errand can be live")
+	check(main.quests.tracker_lines(2).size() == 4, "the HUD tracker shows two live errands")
+	main.merchant.day = -1
+	main.merchant.refresh(DB, Rng, Clock.day)
+	Game.spirit_stones = 1000
+	for i in 3:
+		main._buy_index(0)
+	check(main.quests.progress_of(m67_ledger_id) == 1, "three purchases move the contract to its hunt")
+	main._after_kill(1)
+	main._after_kill(1)
+	check(main.quests.is_completed(m67_ledger_id), "two beasts close the contract")
+	check(bool(main.quests.state_of(m67_ledger_id).get("rewarded", false)), "the contract's reward is recorded")
+
+	var m67_descent_id := "quest.realm.first_descent"
+	var m67_rui: Npc = null
+	for node in main.npcs:
+		if node is Npc and node.npc_id == "instructor_rui":
+			m67_rui = node
+	check(m67_rui != null, "Instructor Rui is present")
+	if m67_rui != null:
+		main._talk(m67_rui)
+	check(main.quests.is_accepted(m67_descent_id), "Rui offers the descent at realm 3")
+	for i in 2:
+		main._enter_realm(RealmAccess.default_id())
+		await frames(2)
+		check(main.realm_instance != null, "a realm can be entered for the descent")
+		main._exit_realm()
+		await frames(2)
+	check(main.quests.progress_of(m67_descent_id) == 1, "two descents move the errand")
+	var m67_trial_site: Dictionary = {}
+	for value in RealmAccess.sites():
+		var entry: Dictionary = value
+		if not main._inheritance_claimed(String(entry.get("id", ""))):
+			m67_trial_site = entry
+			break
+	check(not m67_trial_site.is_empty(), "an unclaimed altar remains for the descent")
+	if not m67_trial_site.is_empty():
+		var m67_trial_id := String(m67_trial_site.get("id", ""))
+		Game.discovered[m67_trial_id] = true
+		main._enter_realm(m67_trial_id)
+		await frames(2)
+		check(main.realm_instance != null, "the trial site opens")
+		if main.realm_instance != null:
+			var m67_family_id := String(m67_trial_site.get("family", ""))
+			main._start_inheritance_trial(m67_trial_site, Inheritances.for_family(m67_family_id)[0])
+			check(main.quests.progress_of(m67_descent_id) == 2, "an altar trial moves the descent")
+			main._exit_realm()
+			await frames(2)
+	var m67_descent_stones := Game.spirit_stones
+	main._report_quests("talk", "instructor_rui", 1)
+	check(main.quests.is_completed(m67_descent_id), "reporting to Rui completes the descent")
+	check(Game.spirit_stones >= m67_descent_stones + 200, "the descent pays its stones")
+	check(bool(main.quests.state_of(m67_descent_id).get("rewarded", false)), "the descent's reward is recorded")
+
+	Save.delete_slot(107)
+	main._save(107)
+	main.quests = QuestLog.new()
+	main._load_game(107)
+	check(main.quests.is_completed(m67_temper_id), "the tempering errand survives a save")
+	check(main.quests.is_completed(m67_ledger_id), "the board contract survives a save")
+	check(bool(main.quests.state_of(m67_ledger_id).get("rewarded", false)), "a paid reward survives a save")
+	check(main.quests.completed, "the initiation still survives a save")
+	Save.delete_slot(107)
+	main._refresh_world_event(false, m66_event_state)
+	Clock.day = m67_day
+	Game.spirit_stones = m67_stones
+	Game.sect_contribution = m67_contribution
+	Game.faction_standing = m67_standing
+	player.cultivation.realm = m67_realm
+	player.cultivation.sublevel = m67_sublevel
+	player.rebuild_stats()
+	player.cultivation.qi = m67_qi
+	player.cultivation.contamination = m67_contamination
+	player.hp = minf(m67_hp, player.hp_max)
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

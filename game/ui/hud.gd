@@ -374,25 +374,37 @@ func draw_quest(player: Player) -> void:
 	var quests: QuestLog = host.quests as QuestLog
 	if quests == null or not quests.is_valid():
 		return
+	var lines: Array = quests.tracker_lines(2)
+	if lines.is_empty():
+		return
 	var w := size.x
 	var y := 210.0
-	var lines: Array[String] = ["QUEST — " + quests.title(), quests.objective_text()]
 	var width := 316.0
 	draw_rect(Rect2(w - 316.0 - 12.0, y - 22.0, width, 22.0 + float(lines.size()) * 18.0), PANEL_BG)
 	for i in lines.size():
-		var color := Color("#d8c070") if i == 0 else INK
-		_text(Vector2(w - 316.0, y + float(i) * 18.0), lines[i], 12, color)
+		var line := String(lines[i])
+		var color := Color("#d8c070") if line.begins_with("QUEST — ") else INK
+		_text(Vector2(w - 316.0, y + float(i) * 18.0), _fit(line, 12, 292.0), 12, color)
 
 
 ## The travelling party, under the quest line: each member's name, trade, realm,
 ## bond and health. Every number comes from the body itself, so the panel cannot
 ## disagree with the fight happening behind it.
+## The right-hand stack starts below the quest tracker, which grows with a
+## second live quest. One fixed offset would let the two panels overlap.
+func _side_panel_y() -> float:
+	var extra := 0.0
+	if host.quests != null:
+		extra = maxf(0.0, float(host.quests.tracker_lines(2).size() - 2) * 18.0)
+	return 296.0 + extra
+
+
 func draw_party(player: Player) -> void:
 	var members: Array = host.party_members()
 	if members.is_empty():
 		return
 	var x := size.x - 316.0
-	var y := 296.0
+	var y := _side_panel_y()
 	var height := 34.0 + float(members.size()) * 34.0
 	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, height), PANEL_BG)
 	_text(Vector2(x, y), "PARTY  %s" % Party.slots_label(members.size(), player.stats.party_slots()), 12, ACCENT)
@@ -420,7 +432,7 @@ func draw_captives(player: Player) -> void:
 		return
 	var members: Array = host.party_members()
 	var x := size.x - 316.0
-	var y := 296.0
+	var y := _side_panel_y()
 	if not members.is_empty():
 		y += 34.0 + float(members.size()) * 34.0
 	var shown := mini(rows.size(), 3)

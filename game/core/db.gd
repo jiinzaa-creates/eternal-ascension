@@ -736,15 +736,9 @@ func validate() -> Array:
 		if not synergy.is_empty() and String(synergy.get("with", "")) == "":
 			problems.append("passive %s has a synergy without a partner" % p.get("id", "?"))
 
-	if quests.is_empty():
-		problems.append("no quests defined")
-	for q in quests:
-		var steps: Array = q.get("steps", [])
-		if steps.is_empty():
-			problems.append("quest %s has no steps" % q.get("id", "?"))
-		for step in steps:
-			if String(step.get("kind", "")) == "" or String(step.get("target", "")) == "":
-				problems.append("quest %s has a step without kind/target" % q.get("id", "?"))
+	# The quest graph: ordered steps, real objectives, reachable prerequisites
+	# without cycles, authored rewards that resolve, and one self-starting line.
+	problems.append_array(QuestLog.validate(quests))
 
 	_validate_npc_data(problems)
 	# Relationship content: bands must tile the whole score range, ties must

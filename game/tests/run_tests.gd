@@ -88,6 +88,7 @@ func _ready() -> void:
 	_player_sect_tests()
 	_sect_autonomy_tests()
 	_quest_tests()
+	_quest_architecture_tests()
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
 	_inheritance_tests()
@@ -4983,6 +4984,177 @@ func _quest_tests() -> void:
 	var copy := QuestLog.new()
 	copy.from_dict(log.to_dict())
 	check(copy.completed and copy.step_index == log.step_index, "quest state round-trips through a save dictionary")
+
+
+func _quest_architecture_tests() -> void:
+	print("[quests] graph, branching steps, gates and save compatibility")
+	check(DB.quests.size() == 4, "four quests are authored")
+	check(QuestLog.validate(DB.quests).is_empty(), "the authored quest graph validates")
+	var log := QuestLog.new()
+	check(log.is_valid(), "the primary quest resolves")
+	check(log.is_accepted(QuestLog.PRIMARY_ID), "the primary quest starts itself")
+	check(log.active_ids().size() == 1, "only the self-starting quest is live at the start")
+	check(log.completed_ids().is_empty(), "nothing is complete at the start")
+	check(not log.is_available("quest.azure_cloud.tempering", {"realm": 9}),
+		"the tempering errand waits for the initiation")
+	check(not log.is_available("quest.realm.first_descent", {"realm": 2}), "a realm gate is enforced")
+	check(log.is_available("quest.realm.first_descent", {"realm": 3}), "the realm gate opens at its realm")
+	check(log.is_available("quest.market.ledger", {"realm": 1}), "the board contract is open at realm 1")
+	check(log.quest_state("quest.azure_cloud.tempering", {"realm": 9}) == "locked",
+		"a quest behind its prerequisite reads locked")
+	check(log.quest_state("quest.market.ledger", {"realm": 1}) == "available",
+		"a reachable quest reads available")
+	check(not log.accept("quest.realm.first_descent", {"realm": 2}), "an unreachable quest is refused")
+
+	var ledger_id := "quest.market.ledger"
+	check(log.accept(ledger_id, {"realm": 1}), "an available quest is accepted")
+	check(log.quest_state(ledger_id, {"realm": 1}) == "active", "an accepted quest reads active")
+	check(not log.accept(ledger_id, {"realm": 1}), "a quest is accepted only once")
+	check(log.active_ids().size() == 2, "two quests can run together")
+	check(log.title_of(ledger_id) == "The Market's Ledger", "a quest title resolves")
+	check(log.objective_text(ledger_id).contains("0/3"), "a new quest shows its first objective")
+	check(log.tracker_text().begins_with("The Azure Cloud Invitation"), "the legacy tracker reads the primary quest")
+
+	# A giver's contract advances on its own kind only.
+	check(log.report("kill", "beast", 1).is_empty(), "an unrelated event does not advance the contract")
+	var advances := log.report("trade", "market", 3)
+	check(advances.size() == 1, "one report advances the one quest it matches")
+	if not advances.is_empty():
+		var advance: Dictionary = advances[0]
+		check(String(advance.get("quest_id", "")) == ledger_id, "the advance names the quest")
+		check(not bool(advance.get("completed", true)), "the advance is not a completion")
+	check(log.progress_of(ledger_id) == 1, "three purchases move the contract to its second step")
+	check(log.current_kind(ledger_id) == "kill", "the contract then asks for beasts")
+	log.report("kill", "beast", 2)
+	check(log.is_completed(ledger_id), "the contract completes on its last objective")
+	check(log.completed_ids().has(ledger_id), "the completed contract is listed")
+	check(not log.state_of(ledger_id).get("rewarded", true), "the log never pays a reward itself")
+	check(log.mark_rewarded(ledger_id), "the scene marks a reward paid")
+	check(not log.mark_rewarded(ledger_id), "a reward is marked only once")
+	check(log.quest_state(ledger_id, {"realm": 1}) == "completed", "a completed quest reads completed")
+
+	# A branch is a step with two accepted paths; either one moves the chain.
+	var branch := QuestLog.new()
+	branch.completed = true
+	var temper_id := "quest.azure_cloud.tempering"
+	check(branch.is_available(temper_id, {"realm": 2}), "the initiation opens the tempering errand")
+	check(branch.accept(temper_id, {"realm": 2}), "the tempering errand is accepted")
+	var branch_text := branch.objective_text(temper_id)
+	check(branch_text.contains("0/5") and branch_text.contains("0/4"), "a branch shows both paths")
+	var branch_advance := branch.report("collect", "spirit_herb", 4)
+	check(branch_advance.size() == 1, "one side of the branch completes the step")
+	check(branch.progress_of(temper_id) == 1, "the branch moves to its shared step")
+	check(branch.current_kind(temper_id) == "channel", "the shared step is the shrine")
+	branch.report("channel", "shrine", 1)
+	check(branch.is_completed(temper_id), "the shared step completes the errand")
+
+	# A counted objective needs every report it asks for.
+	var descent := QuestLog.new()
+	check(descent.accept("quest.realm.first_descent", {"realm": 3}), "the descent is accepted at realm 3")
+	descent.report("realm", "enter", 1)
+	check(descent.progress_of("quest.realm.first_descent") == 0, "one entry does not finish a two-entry step")
+	descent.report("realm", "enter", 1)
+	check(descent.progress_of("quest.realm.first_descent") == 1, "the second entry moves the descent")
+	descent.report("inheritance", "trial", 1)
+	check(descent.progress_of("quest.realm.first_descent") == 2, "an altar trial moves the descent")
+	check(descent.current_kind("quest.realm.first_descent") == "talk", "the descent then asks for a report")
+	descent.report("talk", "instructor_rui", 1)
+	check(descent.is_completed("quest.realm.first_descent"), "reporting to Rui completes the descent")
+
+	# The HUD tracker is capped and reads live objectives.
+	var hud_log := QuestLog.new()
+	hud_log.accept(ledger_id, {"realm": 1})
+	var capped: Array = hud_log.tracker_lines(1)
+	check(capped.size() == 2, "the tracker caps at the requested number of quests")
+	check(String(capped[0]).begins_with("QUEST — "), "the tracker heads each quest")
+	var lines: Array = hud_log.tracker_lines(2)
+	check(lines.size() == 4, "the tracker shows both live quests when asked")
+	check(String(lines[3]).contains("0/3"), "the tracker carries live progress")
+
+	# Persistence: full states, legacy mirrors and old saves.
+	var saved := log.to_dict()
+	check(int(saved.get("version", 0)) == QuestLog.SAVE_VERSION, "the quest ledger is versioned")
+	check(saved.has("states") and saved.has("step_index"), "the save carries full states and legacy mirrors")
+	var restored := QuestLog.new()
+	restored.from_dict(saved)
+	check(restored.is_completed(ledger_id), "a completed quest survives a round trip")
+	check(not restored.mark_rewarded(ledger_id), "a paid reward survives a round trip")
+	check(restored.is_accepted(QuestLog.PRIMARY_ID), "an open quest survives a round trip")
+
+	var legacy := {
+		"quest_id": QuestLog.PRIMARY_ID,
+		"step_index": 3,
+		"counters": {"kill:beast": 3, "collect:spirit_herb": 1},
+		"completed": false,
+		"rewarded": false,
+	}
+	var migrated := QuestLog.new()
+	migrated.from_dict(legacy)
+	check(migrated.step_index == 3, "a pre-M67 save keeps its step")
+	check(migrated.is_accepted(QuestLog.PRIMARY_ID), "a pre-M67 save's progress implies acceptance")
+	check(migrated.current_kind() == "channel", "a pre-M67 save resumes the right step")
+	check(int(migrated.counters.get("kill:beast", 0)) == 3, "a pre-M67 save keeps its counters")
+	check(not migrated.is_completed(QuestLog.PRIMARY_ID), "migration does not invent completion")
+
+	var dirty := legacy.duplicate(true)
+	dirty["states"] = {
+		QuestLog.PRIMARY_ID: {"step_index": 999, "counters": {"kill:beast": -4, "junk": 2},
+			"completed": true, "rewarded": false},
+		"quest.unknown": {"step_index": 1},
+	}
+	var cleaned := QuestLog.new()
+	cleaned.from_dict(dirty)
+	check(cleaned.is_completed(QuestLog.PRIMARY_ID), "a completed state loads")
+	check(cleaned.step_index == cleaned.steps_of(QuestLog.PRIMARY_ID).size() - 1, "an oversized step is clamped")
+	check(int(cleaned.counters.get("kill:beast", -1)) == 0, "negative counters are discarded")
+	check(not cleaned.counters.has("junk"), "malformed counters are dropped")
+	check(not cleaned.states.has("quest.unknown"), "unknown quest states are dropped")
+
+	# Validation catches broken content rather than booting it.
+	check(not QuestLog.validate([]).is_empty(), "an empty quest table is rejected")
+	var broken: Array = DB.quests.duplicate(true)
+	(broken as Array).append((broken as Array)[0])
+	check(not QuestLog.validate(broken).is_empty(), "a duplicate quest id is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[0] as Dictionary)["steps"] = []
+	check(not QuestLog.validate(broken).is_empty(), "a quest with no steps is rejected")
+	broken = DB.quests.duplicate(true)
+	((broken[1] as Dictionary)["steps"] as Array)[0]["objectives"][0]["kind"] = "dance"
+	check(not QuestLog.validate(broken).is_empty(), "an unknown objective kind is rejected")
+	broken = DB.quests.duplicate(true)
+	((broken[1] as Dictionary)["steps"] as Array)[0]["mode"] = "maybe"
+	check(not QuestLog.validate(broken).is_empty(), "an unknown step mode is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[1] as Dictionary)["requires"] = {"quests": ["quest.nope"]}
+	check(not QuestLog.validate(broken).is_empty(), "an unknown prerequisite is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[1] as Dictionary)["requires"] = {"quests": ["quest.azure_cloud.tempering"]}
+	check(not QuestLog.validate(broken).is_empty(), "a self-prerequisite is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[1] as Dictionary)["requires"] = {"quests": ["quest.market.ledger"]}
+	(broken[2] as Dictionary)["requires"] = {"quests": ["quest.azure_cloud.tempering"]}
+	check(not QuestLog.validate(broken).is_empty(), "a prerequisite cycle is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[1] as Dictionary)["reward"] = {"technique": "tech.nope"}
+	check(not QuestLog.validate(broken).is_empty(), "an unknown reward technique is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[1] as Dictionary)["reward"] = {"spirit_stones": -5}
+	check(not QuestLog.validate(broken).is_empty(), "a negative reward is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[1] as Dictionary)["reward"] = {}
+	check(not QuestLog.validate(broken).is_empty(), "a quest that pays nothing is rejected")
+	broken = DB.quests.duplicate(true)
+	(broken[1] as Dictionary)["reward"] = {"technique": "tech.palm.azure_cloud"}
+	check(QuestLog.validate(broken).is_empty(), "a lone technique reward counts as pay")
+	broken = DB.quests.duplicate(true)
+	(broken[0] as Dictionary)["auto"] = false
+	check(not QuestLog.validate(broken).is_empty(), "a primary line that does not start itself is rejected")
+	broken = DB.quests.duplicate(true)
+	var retained: Array = []
+	for value in broken:
+		if String((value as Dictionary).get("id", "")) != QuestLog.PRIMARY_ID:
+			retained.append(value)
+	check(not QuestLog.validate(retained).is_empty(), "a missing primary quest is rejected")
 
 
 # ---------------------------------------------------------- hidden realms ----

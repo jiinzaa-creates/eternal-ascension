@@ -1303,7 +1303,8 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   landmarks and then each discovered realm, so the capped site rows cannot crowd them out.
 - **Scope.** The direct `_enter_realm()` transition remains gate-free for tests and future transitions;
   every player entrance goes through `RealmAccess.access()` at the portal. M65 closed the inheritance
-  loop; M66 adds province-wide tidings; M67 owns further competition and family-specific mechanics.
+  loop; M66 adds province-wide tidings; M67 builds the quest graph; M68 owns further competition and
+  family-specific mechanics.
 
 ## Inheritances and altar trials
 
@@ -1377,6 +1378,62 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   out-of-range effect, an unknown task kind or impossible count, a bad reward key or amount, a tiding
   that changes nothing, and a default that is not authored. It runs from `DB.validate` after the
   inheritance checks.
+
+## Quests
+
+- **The graph is data.** `data/quests.json` holds four quests: the primary Azure Cloud invitation
+  (`auto`, no giver), Elder Bai's tempering errand, the market notice board's ledger contract and
+  Instructor Rui's first descent. A quest declares `id`, `title`, `summary`, `completion`, `sect`,
+  `giver`, `auto`, `requires`, ordered `steps` and a `reward`. `QuestLog` (`game/systems/quests.gd`)
+  is the only reader; `DB.quests` is loaded and validated at boot.
+- **Gates are read at the moment they are asked for.** `requires` accepts `quests` (all completed),
+  `any_quests` (one completed), `min_realm` and `min_contribution`; anything else is a boot problem.
+  `available_ids(context)` and `is_available()` never mutate state, and `quest_state()` reports
+  `locked`, `available`, `active` or `completed` from the same evaluation. `context` is
+  `{realm, contribution}`, read from the body and the run, so a gate cannot drift from the truth.
+  Unknown keys in `requires` are ignored rather than read, so a typo cannot quietly open a gate.
+- **A giver's conversation is the acceptance.** `main._talk()` calls `_accept_giver_quests(giver_id)`
+  before its own dialogue: every available quest naming that stable id (`elder_bai`, `instructor_rui`,
+  `board.market`) is accepted with a toast. The primary quest starts itself (`auto`), so no dialogue
+  is needed to begin the game and a pre-M67 save still opens on its first step.
+- **Steps branch.** A step is either one objective (`kind`, `target`, `count`, `text`) or a
+  multi-objective step with `mode: "all" | "any"`. `all` needs every objective's count; `any` needs
+  one, and the branch then moves to the shared next step. The tempering errand's first step is an
+  `any` branch (five beasts or four herbs), and its second step is the shrine; the descent's first
+  step is an `all` of two realm entries and one altar trial. Objective text and the tracker read the
+  live counters, so an `any` branch names both paths until one is paid.
+- **Progress is reported, not polled.** `main._report_quests(kind, target, amount)` calls
+  `QuestLog.report()` and returns the advancement entries; it is wired into the real events —
+  `_after_kill`, herb gathering (including a tiding's `harvest_extra`), the shrine, purchases, forge
+  and alchemy work, realm entry, starting an inheritance trial, and talks/returns. Only an accepted
+  quest whose current step matches the kind and target moves; a branch's unused objective keeps its
+  counter, and an event does not advance a quest that is waiting on a different step.
+- **The log never touches the purse.** `report()` changes step, counters and completion and says
+  whether a quest completed; `_announce_quest_advancements()` then toasts the new objective or calls
+  `_grant_quest_reward(id)`. `mark_rewarded(id)` is the one-time guard, so a replayed save or a
+  second report cannot pay twice. The authored reward pays spirit stones and contribution (the
+  contribution defaults to `SectEconomy.quest_award()` when the reward omits it), learns an authored
+  technique/passive, and moves the standing of the sect named by the quest through
+  `Factions.quest_award()`; a quest with no sect (`sect: ""`) pays no standing.
+- **The legacy face is a view.** `step_index`, `completed`, `rewarded`, `counters`, `quest`,
+  `objective_text()` with no id, `title()` and `track()` all read or write the primary quest's state,
+  so the opening questline's old call sites, tests and saved fields keep working. `track()` still
+  returns a bool; `report()` returns the advancement list used by the new scene code.
+- **The HUD tracker is capped.** `tracker_lines(max_quests)` returns `["QUEST — Title", objective]`
+  pairs for open quests in authored order (the primary first), and the HUD draws at most two. A
+  journal screen is deliberately left to the UI milestone.
+- **Saves are versioned with mirrors.** `to_dict()` writes `version: 2`, a `states` table of every
+  quest (step, counters, completed, rewarded) and the old primary mirrors. `from_dict()` prefers
+  `states`, migrates a pre-M67 scalar payload into the primary quest's state, accepts progress as
+  implicit acceptance, clamps steps and counters, drops unknown quest ids and re-accepts every `auto`
+  quest, so a hand-edited or older save can never strand the opening line.
+- **Validation.** `QuestLog.validate(list)` runs from `DB.validate` and rejects an empty table, a
+  missing/duplicate/unnamed id, an empty title or summary, a quest with neither giver nor `auto`, an
+  unknown sect, a non-object step, a step without text or with neither kind nor objectives, an
+  unknown step mode, an objective with an unknown kind, no target or an impossible count, an unknown
+  prerequisite id, a self-prerequisite, a prerequisite cycle, a malformed reward, an unknown
+  technique/passive, a negative amount, an unknown reward key, a reward that pays nothing, a missing
+  primary quest and a primary quest that does not start itself.
 
 ## Spirit beasts and bosses
 
@@ -1766,6 +1823,9 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.
 - M65 added the optional `inheritances_taken` dictionary without a bump: an older save loads it as
   empty, and its historic tomb `inheritance_taken` boolean seeds that site's entry.
+- M67 replaced the scalar quest fields with an optional `quests` block (`version`, `states` and the
+  legacy mirrors). A pre-M67 save's `step_index`/`counters`/`completed`/`rewarded` are migrated into
+  the primary quest's state on load, so the schema stays 2 and no old run loses its place.
 - Add a migration step in `Save._migrate()` for every bump, and a test that loads a
   hand-written older payload (`schema 0`) and asserts the migrated result.
 - Never delete a migration step: old saves in the wild depend on the whole chain.

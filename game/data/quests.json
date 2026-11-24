@@ -3,8 +3,12 @@
     {
       "id": "quest.azure_cloud.initiation",
       "title": "The Azure Cloud Invitation",
+      "summary": "Elder Bai offers a place in the sect to anyone who can prove they belong.",
       "sect": "sect.azure_cloud",
       "giver": "elder_bai",
+      "auto": true,
+      "requires": {},
+      "completion": "The Azure Cloud has accepted you.",
       "steps": [
         {"kind": "talk", "target": "elder_bai", "text": "Seek Elder Bai at the Azure Cloud hall"},
         {"kind": "kill", "target": "beast", "count": 3, "text": "Slay 3 spirit beasts beyond the market"},
@@ -17,6 +21,59 @@
         "passive": "passive.heavenly_qi_absorption",
         "spirit_stones": 120
       }
+    },
+    {
+      "id": "quest.azure_cloud.tempering",
+      "title": "Tempering the Outer Disciple",
+      "summary": "Elder Bai sets a proving errand before the sect calls you more than a guest.",
+      "sect": "sect.azure_cloud",
+      "giver": "elder_bai",
+      "auto": false,
+      "requires": {"quests": ["quest.azure_cloud.initiation"], "min_realm": 2},
+      "completion": "Elder Bai nods: the sect's stores are full and the shrine has heard you.",
+      "steps": [
+        {
+          "text": "Provide for the sect's stores — cull beasts or gather herbs",
+          "mode": "any",
+          "objectives": [
+            {"kind": "kill", "target": "beast", "count": 5, "short": "beasts"},
+            {"kind": "collect", "target": "spirit_herb", "count": 4, "short": "herbs"}
+          ]
+        },
+        {"kind": "channel", "target": "shrine", "text": "Carry the offering to the shrine"}
+      ],
+      "reward": {"spirit_stones": 150, "contribution": 25}
+    },
+    {
+      "id": "quest.market.ledger",
+      "title": "The Market's Ledger",
+      "summary": "The notice board carries a merchant-league contract: spend at the stalls, thin the marsh boars.",
+      "sect": "",
+      "giver": "board.market",
+      "auto": false,
+      "requires": {"min_realm": 1},
+      "completion": "The league's clerk strikes the contract from the board.",
+      "steps": [
+        {"kind": "trade", "target": "market", "count": 3, "text": "Buy three lots from the market stalls"},
+        {"kind": "kill", "target": "beast", "count": 2, "text": "Clear two beasts from the marsh road"}
+      ],
+      "reward": {"spirit_stones": 90, "contribution": 5}
+    },
+    {
+      "id": "quest.realm.first_descent",
+      "title": "First Descent",
+      "summary": "Instructor Rui wants a disciple who has walked a hidden realm and stood at an altar.",
+      "sect": "sect.azure_cloud",
+      "giver": "instructor_rui",
+      "auto": false,
+      "requires": {"min_realm": 3},
+      "completion": "Rui hears the account and marks you ready for the inner yard.",
+      "steps": [
+        {"kind": "realm", "target": "enter", "count": 2, "text": "Enter two hidden realms"},
+        {"kind": "inheritance", "target": "trial", "count": 1, "text": "Begin an inheritance trial at an altar"},
+        {"kind": "talk", "target": "instructor_rui", "text": "Report your descent to Instructor Rui"}
+      ],
+      "reward": {"spirit_stones": 200, "contribution": 15}
     }
   ]
 }

@@ -927,6 +927,7 @@ func _buy_index(index: int) -> void:
 	Game.spirit_stones -= price
 	merchant.take(index)
 	_record_world_event("trade", 1)
+	_report_quests("trade", "market", 1)
 	player.pick_up(item)
 	Bus.toast.emit("Bought %s for %d spirit stones." % [String(item.get("name", "item")), price])
 	_show_shop("buy")
@@ -1184,6 +1185,7 @@ func _forge_make(recipe: Dictionary) -> void:
 	var item: Dictionary = result["item"]
 	player.pick_up(item)
 	_record_world_event("crafts", 1)
+	_report_quests("craft", "forge", 1)
 	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Forged %s%s." % [String(item.get("name", "a piece")), flourish])
 	var practice := Professions.award(Game.professions, "profession.smith")
@@ -1306,6 +1308,7 @@ func _brew(recipe: Dictionary) -> void:
 	var pill: Dictionary = result["item"]
 	player.pick_up(pill)
 	_record_world_event("crafts", 1)
+	_report_quests("craft", "alchemy", 1)
 	var flourish := " (exceptional brew)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Brewed %s at potency x%.2f%s." % [String(pill.get("name", "a pill")), Alchemy.potency_of(pill), flourish])
 	var practice := Professions.award(Game.professions, "profession.alchemist")
@@ -3473,6 +3476,12 @@ func _talk(npc: Npc) -> void:
 	# conversation of a day can carry the rumor, even if the realm is already
 	# known by then the call does nothing.
 	_hear_realm_rumor(npc.display_name)
+	# A giver's errand begins in conversation. Reports happen before the greeting
+	# can return early, so a step that asks for a conversation always sees it.
+	_accept_giver_quests(npc.npc_id)
+	_report_quests("talk", npc.npc_id)
+	_report_quests("return", npc.npc_id)
+
 	# A request answered in person: the pill changes hands before the greeting.
 	var story_index := Stories.deliver_index(Game.story_offers, npc.npc_id)
 	if story_index >= 0 and _story_has_item(String((Game.story_offers[story_index] as Dictionary).get("target", ""))):
@@ -3501,14 +3510,7 @@ func _talk(npc: Npc) -> void:
 		Bus.toast.emit("Elder Bai: \"You are Azure Cloud now. Climb, and do not look down.\"" + story_suffix)
 		return
 
-	var advanced := quests.track("talk", "elder_bai")
-	advanced = quests.track("return", "elder_bai") or advanced
-	if quests.completed:
-		_grant_reward()
-	elif advanced:
-		_toast_new_objective()
-	else:
-		Bus.toast.emit(("Elder Bai: \"%s\"" % quests.objective_text()) + story_suffix)
+	Bus.toast.emit(("Elder Bai: \"%s\"" % quests.objective_text()) + story_suffix)
 
 
 func _use_interactable(node: Interactable) -> void:
@@ -3520,17 +3522,16 @@ func _use_interactable(node: Interactable) -> void:
 			var herb := _make_herb()
 			player.inventory.append(herb)
 			Bus.item_picked.emit(herb)
-			var before := quests.step_index
-			quests.track("collect", "spirit_herb", 1)
+			# A Qi surge fills every gathering the tiding touches.
+			for i in _world_event_int("harvest_extra"):
+				var extra_herb := _make_herb()
+				player.inventory.append(extra_herb)
+				Bus.item_picked.emit(extra_herb)
 			Bus.toast.emit("Gathered a spirit herb.")
-			if quests.step_index != before:
-				_toast_new_objective()
+			_report_quests("collect", "spirit_herb", 1)
 		Interactable.Kind.SHRINE:
-			var before := quests.step_index
-			quests.track("channel", "shrine")
-			if quests.step_index != before:
-				_toast_new_objective()
-			else:
+			var advanced := _report_quests("channel", "shrine")
+			if advanced.is_empty():
 				Bus.toast.emit("The shrine hums. Your meridians settle.")
 			if player.cultivation.contamination > 0.0:
 				if Game.spirit_stones >= Meridians.CLEANSE_COST:
@@ -3607,6 +3608,8 @@ func _use_interactable(node: Interactable) -> void:
 		Interactable.Kind.EXAMINE:
 			if node.id == "board.market":
 				_hear_realm_rumor("The notice board")
+				_accept_giver_quests("board.market")
+				_report_quests("talk", "board.market")
 			Bus.toast.emit(node.examine_text)
 		Interactable.Kind.HERALD:
 			_read_world_event()
@@ -3820,31 +3823,87 @@ func _make_herb(count: int = 1) -> Dictionary:
 	}
 
 
-func _toast_new_objective() -> void:
-	Bus.toast.emit("Quest — %s" % quests.objective_text())
-
-
-func _grant_reward() -> void:
-	if quests.rewarded:
+## One completed quest pays once. The authored reward decides what it is; a
+## quest attached to a real sect also moves that faction's standing, which is
+## the same rule the initiation always used.
+func _grant_quest_reward(id: String) -> void:
+	if not quests.mark_rewarded(id):
 		return
-	quests.rewarded = true
-	var reward: Dictionary = quests.quest.get("reward", {})
+	var entry := DB.quest(id)
+	var reward: Dictionary = entry.get("reward", {})
 	var technique_id := String(reward.get("technique", ""))
-	if player.learn_technique(technique_id):
+	if technique_id != "" and player.learn_technique(technique_id):
 		var tech: Dictionary = DB.technique(technique_id)
 		Bus.toast.emit("Inherited technique: %s" % String(tech.get("name", technique_id)))
 	var passive_id := String(reward.get("passive", ""))
-	if player.add_passive(passive_id):
+	if passive_id != "" and player.add_passive(passive_id):
 		var passive: Dictionary = DB.passive(passive_id)
 		Bus.toast.emit("Passive awakened: %s" % String(passive.get("name", passive_id)))
-	Game.spirit_stones += int(reward.get("spirit_stones", 0))
-	# The sect keeps a record of who carried its invitation: a completed quest is
-	# the largest single act of standing in the game.
-	Game.faction_standing = Factions.award(Game.faction_standing, "faction.azure_cloud", Factions.quest_award())
-	Game.sect_contribution = SectEconomy.award_contribution(Game.sect_contribution, SectEconomy.quest_award())
-	Bus.toast.emit("Azure Cloud Sect remembers: %s (+%d contribution)" % [Factions.describe(
-		"faction.azure_cloud", Game.faction_standing, Game.notoriety), SectEconomy.quest_award()])
+	var stones := int(reward.get("spirit_stones", 0))
+	Game.spirit_stones += stones
+	var contribution := int(reward.get("contribution", SectEconomy.quest_award()))
+	Game.sect_contribution = SectEconomy.award_contribution(Game.sect_contribution, contribution)
+	var sect_id := String(entry.get("sect", ""))
+	var sect := DB.sect(sect_id) if sect_id != "" else {}
+	var faction_id := String(sect.get("faction", ""))
+	if faction_id != "":
+		Game.faction_standing = Factions.award(Game.faction_standing, faction_id, Factions.quest_award())
+		Bus.toast.emit("%s remembers your service." % String(sect.get("name", "The sect")))
+	var parts: Array[String] = []
+	if stones > 0:
+		parts.append("%d stones" % stones)
+	if contribution > 0:
+		parts.append("%d contribution" % contribution)
+	var extra := "" if parts.is_empty() else " (+" + ", +".join(parts) + ")"
+	Bus.toast.emit("Quest complete — %s.%s" % [quests.title_of(id), extra])
 	Bus.player_stats_changed.emit()
+
+
+## What availability is judged against. Realm and contribution are read from the
+## body and the run, never stored on the quest, so a gate can never drift.
+func _quest_context() -> Dictionary:
+	return {
+		"realm": player.cultivation.realm if player != null else 0,
+		"contribution": Game.sect_contribution,
+	}
+
+
+## A giver offers every quest whose requirements are met and that names them.
+## Conversation is the acceptance, so no separate dialogue screen is needed.
+func _accept_giver_quests(giver_id: String) -> void:
+	if player == null or giver_id == "":
+		return
+	var context := _quest_context()
+	for value in quests.available_ids(context):
+		var id := String(value)
+		var entry := DB.quest(id)
+		if String(entry.get("giver", "")) != giver_id:
+			continue
+		if quests.accept(id, context):
+			Bus.toast.emit("New quest — %s: %s" % [
+				String(entry.get("title", "Quest")), String(entry.get("summary", ""))])
+
+
+func _report_quests(kind: String, target: String, amount: int = 1) -> Array:
+	if player == null:
+		return []
+	var advancements := quests.report(kind, target, amount)
+	_announce_quest_advancements(advancements)
+	return advancements
+
+
+## One toast per quest that moved: a step gets its new objective, a finished
+## quest pays its reward. The log itself never touches the purse.
+func _announce_quest_advancements(advancements: Array) -> void:
+	for value in advancements:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("quest_id", ""))
+		if bool(entry.get("completed", false)):
+			_grant_quest_reward(id)
+		else:
+			Bus.toast.emit("Quest — %s: %s" % [quests.title_of(id), quests.objective_text(id)])
 
 
 ## The altar is guarded, not merely hidden. This is the whole gate: no claim
@@ -3912,6 +3971,7 @@ func _start_inheritance_trial(site: Dictionary, entry: Dictionary) -> void:
 		Inheritances.rarity_name(int(entry.get("rarity", 0))),
 		Inheritances.trial_label(entry),
 	])
+	_report_quests("inheritance", "trial", 1)
 
 
 ## The trial ticks only while play is live. The timer is the pressure; killing
@@ -4228,6 +4288,7 @@ func _enter_realm(site_id: String = "") -> void:
 	var family := HiddenRealms.family(String(site.get("family", "")))
 	lighting.add_light(realm_instance, realm_instance.altar_position(),
 		Color(String(family.get("light_color", "#c9b6ff"))), 320.0, 1.0)
+	_report_quests("realm", "enter", 1)
 	Bus.toast.emit("The rift closes behind you. %s does not want you here." % realm_instance.realm_name)
 	if realm_instance.has_warden():
 		var ward: Dictionary = Boss.profile(DB.boss(realm_instance.warden_id))
@@ -4388,10 +4449,7 @@ func _on_boss_defeated(id: String, _at: Vector2) -> void:
 func _after_kill(ilvl: int) -> void:
 	if player != null:
 		player.on_kill(ilvl)
-	var before := quests.step_index
-	quests.track("kill", "beast", 1)
-	if quests.step_index != before:
-		_toast_new_objective()
+	_report_quests("kill", "beast", 1)
 	_record_world_event("kills", 1)
 	_check_story_hunts()
 
