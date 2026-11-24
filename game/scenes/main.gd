@@ -131,7 +131,12 @@ var realm_instance: HiddenRealm = null
 var tribulation_arena: TribulationArena = null
 var realm_seed := 0
 var realm_cleared := false
+## Legacy tomb flag. Per-site claims live in `inheritances_taken`.
 var inheritance_taken := false
+var inheritances_taken: Dictionary = {}
+## The altar trial in progress: site, offered entry, time left and echo bodies.
+var inheritance_trial: Dictionary = {}
+var inheritance_trial_nodes: Array = []
 ## The overworld rifts are only visible once their site is discovered.
 var realm_portals: Dictionary = {}
 var realm_portal_positions: Dictionary = {}
@@ -713,6 +718,7 @@ func _process(delta: float) -> void:
 			or sect_ledger_open or council_open or player_sect_open:
 		return
 
+	_tick_inheritance_trial(delta)
 	_simulate_npcs()
 	_direct_npcs(delta)
 	_flush_away_report()
@@ -3828,37 +3834,190 @@ func _claim_inheritance() -> void:
 	if _warden_blocks_altar():
 		Bus.toast.emit("The warden still holds the altar. It must fall first.")
 		return
-	if inheritance_taken:
-		Bus.toast.emit("The altar is cold. Someone already took what it held.")
+	var site := _realm_site(active_realm_id)
+	if site.is_empty():
 		return
-	inheritance_taken = true
-	realm_cleared = true
-	if realm_instance != null:
+	var site_id := String(site.get("id", ""))
+	if _inheritance_claimed(site_id):
+		Bus.toast.emit("The altar is cold. Its legacy has already been claimed.")
+		return
+	if not inheritance_trial.is_empty():
+		Bus.toast.emit("The altar is still deciding. %s" % inheritance_trial_line())
+		return
+	var offer := Inheritances.offer(String(site.get("family", "")), active_realm_seed, player.inheritance_state())
+	var entry_value: Variant = offer.get("entry", {})
+	var entry: Dictionary = entry_value if typeof(entry_value) == TYPE_DICTIONARY else {}
+	if entry.is_empty():
+		Bus.toast.emit("The altar refuses you: %s." % String(offer.get("reason", "your path does not resonate")))
+		return
+	_start_inheritance_trial(site, entry)
+
+
+## Compatibility is checked before the trial starts, so an incompatible body is
+## never sent into a fight it cannot win the right to lose.
+func _start_inheritance_trial(site: Dictionary, entry: Dictionary) -> void:
+	if realm_instance == null or player == null:
+		return
+	var family := HiddenRealms.family(String(site.get("family", "")))
+	var tier := Inheritances.trial_tier(entry, int(family.get("enemy_ilvl", 2)))
+	var trial := Inheritances.trial_of(entry)
+	var base := realm_instance.altar_position()
+	var roster: Array = realm_instance.enemy_roster
+	if roster.is_empty():
+		roster = ["sentinel", "skirmisher", "archer", "brawler"]
+	for i in int(trial["guards"]):
+		var angle := TAU * float(i) / float(int(trial["guards"]))
+		var at := base + Vector2(cos(angle) * 150.0, sin(angle) * 120.0)
+		var archetype := String(roster[i % roster.size()])
+		var guard := realm_instance.spawn_trial_guard(archetype, at, tier, "Trial Echo")
+		if guard != null:
+			inheritance_trial_nodes.append(guard)
+	if bool(trial["rival"]):
+		var rival := realm_instance.spawn_trial_guard("brawler", base + Vector2(0, -150), tier + 1, "Rival Seeker", true)
+		if rival != null:
+			inheritance_trial_nodes.append(rival)
+	inheritance_trial = {
+		"site_id": String(site.get("id", "")),
+		"entry": entry,
+		"seconds": float(trial["seconds"]),
+		"cleared": false,
+	}
+	Bus.toast.emit("The altar offers %s (%s). Trial: %s." % [
+		String(entry.get("name", "an inheritance")),
+		Inheritances.rarity_name(int(entry.get("rarity", 0))),
+		Inheritances.trial_label(entry),
+	])
+
+
+## The trial ticks only while play is live. The timer is the pressure; killing
+## every echo, including the rival, is the pass condition.
+func _tick_inheritance_trial(delta: float) -> void:
+	if inheritance_trial.is_empty() or bool(inheritance_trial.get("cleared", false)):
+		return
+	var left := float(inheritance_trial.get("seconds", 0.0)) - delta
+	inheritance_trial["seconds"] = left
+	if left <= 0.0:
+		_fail_inheritance_trial()
+		return
+	if _alive_trial_guards() > 0:
+		return
+	inheritance_trial["cleared"] = true
+	var site := _realm_site(String(inheritance_trial.get("site_id", "")))
+	var entry_value: Variant = inheritance_trial.get("entry", {})
+	var entry: Dictionary = entry_value if typeof(entry_value) == TYPE_DICTIONARY else {}
+	_finish_inheritance(site, entry)
+
+
+func _alive_trial_guards() -> int:
+	var alive := 0
+	for node in inheritance_trial_nodes:
+		if not is_instance_valid(node):
+			continue
+		var body := node as Dummy
+		if body != null and body.hp > 0.0:
+			alive += 1
+	return alive
+
+
+func _fail_inheritance_trial() -> void:
+	var entry_value: Variant = inheritance_trial.get("entry", {})
+	var entry: Dictionary = entry_value if typeof(entry_value) == TYPE_DICTIONARY else {}
+	_clear_inheritance_trial()
+	Bus.toast.emit("The trial closes. %s returns to the altar." % String(entry.get("name", "The inheritance")))
+
+
+func _clear_inheritance_trial() -> void:
+	for node in inheritance_trial_nodes:
+		if is_instance_valid(node):
+			node.queue_free()
+	inheritance_trial_nodes.clear()
+	inheritance_trial = {}
+
+
+## A one-line status the HUD can draw without knowing the trial's rules.
+func inheritance_trial_line() -> String:
+	if inheritance_trial.is_empty():
+		return ""
+	var entry_value: Variant = inheritance_trial.get("entry", {})
+	var entry: Dictionary = entry_value if typeof(entry_value) == TYPE_DICTIONARY else {}
+	var left := maxi(0, int(ceil(float(inheritance_trial.get("seconds", 0.0)))))
+	var alive := _alive_trial_guards()
+	return "INHERITANCE TRIAL — %s · %ds · %d %s remain" % [
+		String(entry.get("name", "Legacy")), left, alive, "echo" if alive == 1 else "echoes"
+	]
+
+
+func _inheritance_claimed(site_id: String) -> bool:
+	if site_id == "":
+		return false
+	if site_id == RealmAccess.default_id() and inheritance_taken:
+		return true
+	return inheritances_taken.has(site_id)
+
+
+func _finish_inheritance(site: Dictionary, entry: Dictionary) -> void:
+	if player == null or site.is_empty() or entry.is_empty():
+		_clear_inheritance_trial()
+		return
+	var site_id := String(site.get("id", ""))
+	if _inheritance_claimed(site_id):
+		_clear_inheritance_trial()
+		return
+	var compatibility := Inheritances.check(entry, player.inheritance_state())
+	if not bool(compatibility.get("ok", false)):
+		_clear_inheritance_trial()
+		Bus.toast.emit("The legacy slips away: %s." % String(compatibility.get("reason", "incompatible")))
+		return
+	var grants_value: Variant = entry.get("grants", {})
+	var grants: Dictionary = grants_value if typeof(grants_value) == TYPE_DICTIONARY else {}
+	var learned := player.learn_technique(String(grants.get("technique", "")))
+	var gained := player.add_passive(String(grants.get("passive", "")))
+	var inherited := false
+	var physique := String(grants.get("physique", ""))
+	if physique != "":
+		inherited = player.inherit_physique(physique)
+	_mark_inheritance_taken(site_id)
+	if site_id == RealmAccess.default_id():
+		realm_cleared = true
+	if realm_instance != null and is_instance_valid(realm_instance):
 		realm_instance.mark_cleared()
-	var learned := player.learn_technique("tech.palm.thousand_petals")
-	var gained := player.add_passive("passive.void_affinity")
+	_clear_inheritance_trial()
+	var rarity := Inheritances.rarity_name(int(entry.get("rarity", 0)))
+	Bus.toast.emit("Inheritance — %s (%s)." % [String(entry.get("name", "Legacy")), rarity])
 	if learned:
-		Bus.toast.emit("Inheritance: the Thousand Petal Illusion is yours.")
+		var tech := DB.technique(String(grants.get("technique", "")))
+		Bus.toast.emit("Technique: %s." % String(tech.get("name", "a hidden art")))
 	if gained:
-		Bus.toast.emit("Inheritance: Void Affinity awakens in your meridians.")
-	var inherited := Physiques.inherited_for(player.physique_id, active_realm_seed)
-	if player.inherit_physique(inherited):
-		Bus.toast.emit("Inheritance: %s awakens in your bones." % Physiques.name_of(player.physique_id))
-	elif not inherited.is_empty() and inherited == player.physique_id:
+		var passive := DB.passive(String(grants.get("passive", "")))
+		Bus.toast.emit("Passive: %s." % String(passive.get("name", "a new constitution")))
+	if inherited:
+		Bus.toast.emit("Body: %s." % Physiques.name_of(player.physique_id))
+	elif physique != "":
 		Bus.toast.emit("The altar's body is no greater than the one you already carry.")
-	if not learned and not gained:
-		Bus.toast.emit("The altar yields nothing you can still use.")
-	_grant_unique(Uniques.ALTAR_SOURCE)
+	var relic := String(entry.get("relic", ""))
+	if relic != "":
+		_grant_unique_item(relic)
+	elif site_id == RealmAccess.default_id():
+		_grant_unique(Uniques.ALTAR_SOURCE)
 	# The altar has its own table, not a chest's: one assured piece above the
-	# mundane, rolled from the realm seed so the tomb gives the same thing twice.
+	# mundane, rolled from the realm seed so the same altar gives the same thing.
 	var spoils := Loot.new(DB, Rng).roll(
-		"inheritance.altar", maxi(1, player.cultivation.realm + 2), active_realm_seed + 91, ground_items.size())
+		"inheritance.altar", maxi(1, player.cultivation.realm + 2 + int(entry.get("rarity", 0))),
+		active_realm_seed + 91, ground_items.size())
 	var items: Array = spoils.get("items", [])
 	for item in items:
 		player.pick_up(item as Dictionary)
 	if not items.is_empty():
 		Bus.toast.emit("Inheritance: %s." % String((items[0] as Dictionary).get("name", "a piece of the altar")))
 	Bus.cultivation_changed.emit()
+
+
+func _mark_inheritance_taken(site_id: String) -> void:
+	if site_id == "":
+		return
+	inheritances_taken[site_id] = true
+	if site_id == RealmAccess.default_id():
+		inheritance_taken = true
 
 
 # --------------------------------------------------------- hidden realm ----
@@ -4017,7 +4176,9 @@ func _enter_realm(site_id: String = "") -> void:
 	if warden_dead:
 		realm_instance.clear_warden()
 	realm_instance.spawn_warden = not warden_dead
-	if realm_cleared and id == RealmAccess.default_id():
+	if _inheritance_claimed(id):
+		realm_instance.mark_cleared()
+	elif realm_cleared and id == RealmAccess.default_id():
 		realm_instance.mark_cleared()
 	player.global_position = realm_instance.entry_position() + Vector2(0, 60)
 	player.spawn_point = player.global_position
@@ -4036,6 +4197,7 @@ func _enter_realm(site_id: String = "") -> void:
 func _exit_realm() -> void:
 	if realm_instance == null:
 		return
+	_clear_inheritance_trial()
 	realm_instance.cleanup()
 	realm_instance.queue_free()
 	realm_instance = null
@@ -4120,20 +4282,25 @@ func _on_boss_phase_changed(boss: Node, index: int, phase_name: String) -> void:
 func _grant_unique(source: String) -> void:
 	if player == null:
 		return
-	var owned := Uniques.owned_ids(player.equipment, player.inventory)
-	var rules := Uniques.new(DB)
 	for entry in DB.uniques:
-		if String(entry.get("source", "")) != source:
-			continue
-		var unique_id := String(entry.get("id", ""))
-		if owned.has(unique_id):
-			continue
-		var relic := rules.make(unique_id)
-		if relic.is_empty():
-			continue
-		player.pick_up(relic)
-		Bus.toast.emit("Relic — %s. %s" % [String(relic.get("name", "?")), String(relic.get("lore", ""))])
+		if String(entry.get("source", "")) == source:
+			_grant_unique_item(String(entry.get("id", "")))
+			return
+
+
+## Grants one authored relic by id. Ownership is checked across worn and bagged
+## copies, so a relic can never be duplicated by a second altar.
+func _grant_unique_item(unique_id: String) -> void:
+	if player == null or unique_id == "":
 		return
+	var owned := Uniques.owned_ids(player.equipment, player.inventory)
+	if owned.has(unique_id):
+		return
+	var relic := Uniques.new(DB).make(unique_id)
+	if relic.is_empty():
+		return
+	player.pick_up(relic)
+	Bus.toast.emit("Relic — %s. %s" % [String(relic.get("name", "?")), String(relic.get("lore", ""))])
 
 
 ## Paid once per stable boss id. The reward is the boss' own, not the ordinary
@@ -4250,6 +4417,7 @@ func _save(slot: int) -> void:
 		"realm_seed": realm_seed,
 		"realm_cleared": realm_cleared,
 		"inheritance_taken": inheritance_taken,
+		"inheritances_taken": inheritances_taken.duplicate(),
 		"bosses_slain": bosses_slain.duplicate(),
 	}
 	if Save.save_game(slot, data):
@@ -4282,6 +4450,7 @@ func _load_game(slot: int) -> void:
 		tribulation_arena = null
 		Bus.toast.emit("The tribulation is left unfinished.")
 	if realm_instance != null:
+		_clear_inheritance_trial()
 		realm_instance.cleanup()
 		realm_instance.queue_free()
 		realm_instance = null
@@ -4313,6 +4482,17 @@ func _load_game(slot: int) -> void:
 	realm_seed = int(data.get("realm_seed", 0))
 	realm_cleared = bool(data.get("realm_cleared", false))
 	inheritance_taken = bool(data.get("inheritance_taken", false))
+	inheritances_taken.clear()
+	var taken_value: Variant = data.get("inheritances_taken", {})
+	if typeof(taken_value) == TYPE_DICTIONARY:
+		for key in (taken_value as Dictionary).keys():
+			var site_id := String(key)
+			if not RealmAccess.site(site_id).is_empty():
+				inheritances_taken[site_id] = true
+	# A pre-M65 save only has the tomb's boolean. It still means the tomb altar
+	# was claimed, so the per-site ledger adopts it on load.
+	if inheritance_taken:
+		inheritances_taken[RealmAccess.default_id()] = true
 	# A pre-M63 save never recorded discovery, but a nonzero seed or any realm
 	# progress proves the player had already found the rift.
 	var legacy_site := _realm_site()

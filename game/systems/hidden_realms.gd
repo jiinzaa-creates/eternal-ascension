@@ -231,8 +231,8 @@ static func validate_families(data: Dictionary) -> Array:
 			for key in PALETTE_KEYS:
 				if not Color.html_is_valid(String((palette_value as Dictionary).get(key, ""))):
 					problems.append("hidden realm family %s has an invalid %s colour" % [id, key])
-	if inheritances != 1:
-		problems.append("expected exactly one inheritance family, found %d" % inheritances)
+	if inheritances != FAMILY_COUNT:
+		problems.append("expected every family to carry an inheritance altar, found %d" % inheritances)
 	var default_value := String(data.get("default", ""))
 	if default_value == "" or not seen.has(default_value):
 		problems.append("the default hidden realm family is missing or unknown")

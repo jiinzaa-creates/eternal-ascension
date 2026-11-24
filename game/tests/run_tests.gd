@@ -90,6 +90,7 @@ func _ready() -> void:
 	_quest_tests()
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
+	_inheritance_tests()
 	_realm_access_tests()
 	_save_tests()
 	print("-----------------------------------------------")
@@ -5076,6 +5077,14 @@ func _hidden_realm_tests() -> void:
 		other.queue_free()
 		repeat_same.queue_free()
 
+	var trial_echo = realm.spawn_trial_guard("sentinel", Vector2(20, 20), 3, "Trial Echo")
+	check(trial_echo != null and trial_echo.display_name == "Trial Echo", "a trial echo is a named body")
+	check(trial_echo.archetype == "sentinel" and trial_echo.aggressive, "a trial echo keeps its archetype and fights")
+	trial_echo.queue_free()
+	var rival = realm.spawn_trial_guard("brawler", Vector2(40, 20), 4, "Rival Seeker", true)
+	check(rival != null and rival.is_elite, "a rival claimant is an elite body")
+	rival.queue_free()
+
 	check(realm.has_warden(), "the default tomb posts its warden")
 	realm.clear_warden()
 	check(not realm.has_warden(), "a cleared tomb removes its warden")
@@ -5189,7 +5198,7 @@ func _hidden_realm_family_tests() -> void:
 		check(approx(realm.hazard_dps_at(hazard_rect.get_center()), realm.hazard_dps), "%s hazards use its damage" % id)
 		realm.queue_free()
 	check(layouts.size() == HiddenRealms.FAMILY_COUNT, "every family owns a distinct layout")
-	check(inheritances == 1, "only the tomb carries the inheritance altar")
+	check(inheritances == HiddenRealms.FAMILY_COUNT, "every family carries an inheritance altar")
 
 	check(HiddenRealms.validate_families(DB.hidden_realm_family_data).is_empty(), "the shipped families validate")
 	var broken: Dictionary = DB.hidden_realm_family_data.duplicate(true)
@@ -5208,11 +5217,8 @@ func _hidden_realm_family_tests() -> void:
 	(broken["families"] as Array)[1]["loot_table"] = "chest.nope"
 	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown family loot table is rejected")
 	broken = DB.hidden_realm_family_data.duplicate(true)
-	(broken["families"] as Array)[1]["inheritance"] = true
-	check(not HiddenRealms.validate_families(broken).is_empty(), "a second inheritance is rejected")
-	broken = DB.hidden_realm_family_data.duplicate(true)
-	(broken["families"] as Array)[0]["inheritance"] = false
-	check(not HiddenRealms.validate_families(broken).is_empty(), "removing the only inheritance is rejected")
+	(broken["families"] as Array)[1]["inheritance"] = false
+	check(not HiddenRealms.validate_families(broken).is_empty(), "a family without an inheritance altar is rejected")
 	broken = DB.hidden_realm_family_data.duplicate(true)
 	(broken["families"] as Array)[1]["warden"] = "boss.nope"
 	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown family warden is rejected")
@@ -5228,6 +5234,143 @@ func _hidden_realm_family_tests() -> void:
 	broken = DB.hidden_realm_family_data.duplicate(true)
 	broken["default"] = "family.nope"
 	check(not HiddenRealms.validate_families(broken).is_empty(), "an unknown default family is rejected")
+
+
+# ------------------------------------------------------------ inheritances ----
+
+func _inheritance_tests() -> void:
+	print("[inheritances] family pools, compatibility, rarity and trials")
+	check(Inheritances.entries().size() == 27, "three inheritances are authored for every family")
+	check(Inheritances.default_id() == "inherit.tomb.dustbound", "the tomb's first legacy is the default")
+	check(Inheritances.find("inherit.nope").is_empty(), "an unknown inheritance resolves to nothing")
+	check(Inheritances.rarity_name(0) == "Common" and Inheritances.rarity_name(2) == "Transcendent", "rarity tiers are named")
+	check(String(Inheritances.rarity_color(1)).begins_with("#"), "rarity carries a colour")
+
+	var families: Dictionary = {}
+	for value in Inheritances.entries():
+		var entry: Dictionary = value
+		var family_id := String(entry.get("family", ""))
+		families[family_id] = int(families.get(family_id, 0)) + 1
+		check(not HiddenRealms.family(family_id).is_empty(), "%s belongs to a real family" % String(entry.get("id", "")))
+		check(int(entry.get("rarity", -1)) >= 0 and int(entry.get("rarity", -1)) <= 2, "%s has a rarity" % String(entry.get("id", "")))
+		check(int(entry.get("weight", 0)) > 0, "%s can be offered" % String(entry.get("id", "")))
+		var grants: Dictionary = entry.get("grants", {})
+		check(not DB.technique(String(grants.get("technique", ""))).is_empty(), "%s grants a real technique" % String(entry.get("id", "")))
+		check(not DB.passive(String(grants.get("passive", ""))).is_empty(), "%s grants a real passive" % String(entry.get("id", "")))
+		check(not DB.physique(String(grants.get("physique", ""))).is_empty(), "%s grants a real body" % String(entry.get("id", "")))
+		var trial := Inheritances.trial_of(entry)
+		check(int(trial["guards"]) >= 1 and float(trial["seconds"]) >= 5.0, "%s has a real trial" % String(entry.get("id", "")))
+	check(families.size() == HiddenRealms.FAMILY_COUNT, "every family owns a pool")
+	for family in HiddenRealms.families():
+		var family_id := String((family as Dictionary).get("id", ""))
+		check(Inheritances.for_family(family_id).size() == 3, "%s offers three legacies" % family_id)
+
+	var low_state := {
+		"realm": 1, "physique_tier": 1, "affinities": ["fire"],
+		"attrs": {"str": 12, "dex": 12, "int": 12, "wis": 12, "agi": 12, "char": 12},
+	}
+	var low_offer := Inheritances.offer("family.ancient_tomb", 9001, low_state)
+	var low_entry: Dictionary = low_offer.get("entry", {})
+	check(not low_entry.is_empty() and int(low_entry.get("rarity", -1)) == 0, "a low realm only qualifies for the common legacy")
+	check(int(low_offer.get("eligible", 0)) == 1, "incompatible legacies are filtered before the roll")
+	var rare := Inheritances.find("inherit.tomb.hollow_moon")
+	var rare_check := Inheritances.check(rare, low_state)
+	check(not bool(rare_check["ok"]) and String(rare_check["reason"]).contains("realm 2"), "a rare legacy names its realm gate")
+	var mythic := Inheritances.find("inherit.tomb.moonless")
+	var mythic_check := Inheritances.check(mythic, low_state)
+	check(not bool(mythic_check["ok"]) and String(mythic_check["reason"]).contains("realm 3"), "a transcendent legacy gates the realm first")
+
+	var high_state := {
+		"realm": 6, "physique_tier": 5, "affinities": ["yin", "chaos", "space"],
+		"attrs": {"str": 40, "dex": 40, "int": 40, "wis": 40, "agi": 40, "char": 40},
+	}
+	check(bool(Inheritances.check(rare, high_state)["ok"]), "a ready body passes the rare gate")
+	check(bool(Inheritances.check(mythic, high_state)["ok"]), "a resonant body passes the transcendent gate")
+	var wrong_root := high_state.duplicate(true)
+	wrong_root["affinities"] = ["fire"]
+	var root_check := Inheritances.check(mythic, wrong_root)
+	check(not bool(root_check["ok"]) and String(root_check["reason"]).contains("affinity"), "a body without the right root is refused")
+	var attribute_entry := rare.duplicate(true)
+	attribute_entry["requires"]["min_attrs"] = {"int": 99}
+	var attribute_check := Inheritances.check(attribute_entry, high_state)
+	check(not bool(attribute_check["ok"]) and String(attribute_check["reason"]).contains("99 INT"), "an attribute gate is checked and named")
+	var first_offer := Inheritances.offer("family.ancient_tomb", 777, high_state)
+	var second_offer := Inheritances.offer("family.ancient_tomb", 777, high_state)
+	check(String((first_offer["entry"] as Dictionary).get("id", "")) == String((second_offer["entry"] as Dictionary).get("id", "")), "the same seed offers the same legacy")
+	var seen: Dictionary = {}
+	for i in 60:
+		var rolled := Inheritances.offer("family.ancient_tomb", i, high_state)
+		var picked: Dictionary = rolled.get("entry", {})
+		check(String(picked.get("family", "")) == "family.ancient_tomb", "an offer stays inside its family")
+		seen[String(picked.get("id", ""))] = true
+	check(seen.size() >= 2, "rarity weighting can offer more than one legacy")
+
+	var common_trial := Inheritances.trial_of(Inheritances.find("inherit.tomb.dustbound"))
+	check(int(common_trial["guards"]) == 2 and int(common_trial["seconds"]) == 20 and not bool(common_trial["rival"]), "a common trial is two echoes without a rival")
+	var mythic_trial := Inheritances.trial_of(mythic)
+	check(int(mythic_trial["guards"]) == 4 and bool(mythic_trial["rival"]), "a transcendent trial adds a rival seeker")
+	check(Inheritances.trial_tier(mythic, 3) > Inheritances.trial_tier(Inheritances.find("inherit.tomb.dustbound"), 3), "rarer legacies guard a stronger echo")
+	check(Inheritances.trial_label(mythic).contains("rival seeker"), "the trial label advertises the rival")
+
+	check(Inheritances.validate(DB.inheritances_data).is_empty(), "the shipped inheritances validate")
+	var broken: Dictionary = DB.inheritances_data.duplicate(true)
+	broken.erase("entries")
+	check(not Inheritances.validate(broken).is_empty(), "missing inheritances are rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array).append((DB.inheritances_data["entries"] as Array)[0].duplicate(true))
+	check(not Inheritances.validate(broken).is_empty(), "a duplicate inheritance is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["family"] = "family.nope"
+	check(not Inheritances.validate(broken).is_empty(), "an unknown inheritance family is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["rarity"] = 9
+	check(not Inheritances.validate(broken).is_empty(), "an impossible rarity is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["weight"] = 0
+	check(not Inheritances.validate(broken).is_empty(), "a weightless inheritance is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["grants"]["technique"] = "tech.nope"
+	check(not Inheritances.validate(broken).is_empty(), "an unknown granted technique is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["grants"] = {}
+	check(not Inheritances.validate(broken).is_empty(), "an inheritance that grants nothing is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["requires"]["min_realm"] = 0
+	check(not Inheritances.validate(broken).is_empty(), "an impossible realm gate is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["requires"]["min_physique_tier"] = 0
+	check(not Inheritances.validate(broken).is_empty(), "an impossible body gate is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["requires"]["any_affinity"] = ["nope"]
+	check(not Inheritances.validate(broken).is_empty(), "an unknown affinity is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["requires"]["min_attrs"] = {"luck": 1}
+	check(not Inheritances.validate(broken).is_empty(), "an unknown attribute gate is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["trial"]["guards"] = 0
+	check(not Inheritances.validate(broken).is_empty(), "an empty trial is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["trial"]["seconds"] = 1
+	check(not Inheritances.validate(broken).is_empty(), "a trial too short to fight is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["trial"]["rival"] = "yes"
+	check(not Inheritances.validate(broken).is_empty(), "a malformed rival flag is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	(broken["entries"] as Array)[0]["relic"] = "item.unique.nope"
+	check(not Inheritances.validate(broken).is_empty(), "an unknown inheritance relic is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	var retained: Array = []
+	for value in (broken["entries"] as Array):
+		if String((value as Dictionary).get("family", "")) != "family.ancient_tomb":
+			retained.append(value)
+	broken["entries"] = retained
+	check(not Inheritances.validate(broken).is_empty(), "a family with no legacy is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	broken["default"] = "inherit.nope"
+	check(not Inheritances.validate(broken).is_empty(), "an unknown default inheritance is rejected")
+	broken = DB.inheritances_data.duplicate(true)
+	broken["default"] = "inherit.garden.cadence"
+	check(not Inheritances.validate(broken).is_empty(), "a default outside the tomb is rejected")
 
 
 # ------------------------------------------------------------------- save ----

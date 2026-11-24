@@ -1059,6 +1059,21 @@ func _die() -> void:
 	Bus.player_stats_changed.emit()
 
 
+## What an altar reads before it offers a legacy: realm, body, root affinities
+## and attributes. Pure data, so compatibility can be unit-tested without a scene.
+func inheritance_state() -> Dictionary:
+	var values: Dictionary = {}
+	for key in Attributes.KEYS:
+		values[key] = int(attrs.get_attr(key))
+	return {
+		"realm": cultivation.realm,
+		"physique_tier": Physiques.tier_of(physique_id),
+		"affinities": cultivation.root_data().get("affinities", []),
+		"attrs": values,
+		"method_id": cultivation.method_id,
+	}
+
+
 ## What the method rules read right now. Pure data, no side effects.
 func method_state() -> Dictionary:
 	var partner := false

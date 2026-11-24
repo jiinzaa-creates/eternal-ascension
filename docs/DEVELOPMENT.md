@@ -1246,9 +1246,8 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **Families own the content.** `data/hidden_realm_families.json` names nine families and maps each to
   one layout, an inheritance flag, a loot table, a light colour, hazard DPS, enemy tier/population and
   roster, a warden and an eight-swatch palette. `HiddenRealms.families()`, `family(id)` and
-  `validate_families()` are the only readers. Exactly one family (`family.ancient_tomb`) sets
-  `inheritance: true`; the other eight deliberately build no altar, because broader inheritances belong
-  to a later milestone.
+  `validate_families()` are the only readers. Every family sets `inheritance: true`; validation now
+  requires all nine altars rather than permitting one.
 - **`HiddenRealm.generate(seed, template_id = "", family_id = "", instance_id = "")`** resolves the
   family and template, lays out the grid and fills it: entry/altar roles, treasure rooms, a spanning
   tree plus `loops` extra corridors, seeded hazards, one chest per treasure room, room guards and the
@@ -1267,7 +1266,7 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   treasure rooms, invalid loops/hazard chance/tier/population, an empty or unknown enemy roster and an
   unknown warden. Family validation adds exactly nine entries, unique ids and layouts, a real template,
   loot table and warden, a complete valid palette and light colour, a sane hazard and population, and
-  exactly one inheritance family. `RealmAccess.validate` also rejects a site whose family is unknown or
+  an altar on every family. `RealmAccess.validate` also rejects a site whose family is unknown or
   whose layout disagrees with that family. The scene reads the spawned warden's id from the realm rather
   than a hardcoded constant, so a bossless layout needs no special case.
 
@@ -1291,8 +1290,9 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   cannot extend an opening, and a closed rift refuses entry at its own portal with its opening day.
 - **Seeds are per site.** The tomb keeps the historic saved `realm_seed`. Every other family derives a
   stable seed from `Game.world_seed`, the site id and the `realm_site` stream, so no new save key is
-  needed; `active_realm_seed` exists only while a realm is open and is never written. The tomb also keeps
-  its saved `realm_cleared` / `inheritance_taken` state; other families have no altar to claim.
+  needed; `active_realm_seed` exists only while a realm is open and is never written. The tomb keeps its
+  historic `realm_cleared` / `inheritance_taken` state; every family also records altar claims in the
+  per-site `inheritances_taken` ledger.
 - **The scene is multi-portal.** `main.gd` builds one `Interactable` per site into `realm_portals` and
   `realm_portal_positions`; discovery, labels, map marks, travel rows, approach checks and entry all
   take a site id. `_enter_realm(site_id)` records `active_realm_id` and `active_realm_seed`, and exiting
@@ -1302,8 +1302,47 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   continent region and a footer line with its own open/sealed status; the route list leads with
   landmarks and then each discovered realm, so the capped site rows cannot crowd them out.
 - **Scope.** The direct `_enter_realm()` transition remains gate-free for tests and future transitions;
-  every player entrance goes through `RealmAccess.access()` at the portal. M65 owns broader
-  inheritances and any new family-specific mechanics.
+  every player entrance goes through `RealmAccess.access()` at the portal. M65 closed the inheritance
+  loop; M66 owns further competition and family-specific mechanics.
+
+## Inheritances and altar trials
+
+- **The pool is data.** `data/inheritances.json` holds 27 entries, three per family, and `Inheritances`
+  (`game/systems/inheritances.gd`) is the only reader. Each entry declares a family, name, description,
+  rarity (0 Common, 1 Resonant, 2 Transcendent), weight, compatibility terms, a technique/passive/
+  physique grant, an optional relic and a trial. `entries()`, `for_family()`, `find()` and `default_id()`
+  are the accessors; `DB.inheritances_data` is loaded, indexed and validated at boot.
+- **Compatibility is checked before the roll.** `check(entry, state)` tests the realm, physique tier,
+  optional root affinities and per-attribute minima in that order and returns the first refusal with a
+  readable reason. `offer(family, seed, state)` filters the family's three entries to what the body can
+  accept, then draws one with `Rng.stream_from(seed, "inheritance_offer", hash(family), 0)` and
+  `Rng.pick_weighted()` over the authored weights. No global RNG is involved, so the same realm seed,
+  family and body always offer the same legacy. An empty pool returns the first gate that failed rather
+  than a generic refusal.
+- **The trial is authored, scaled and transient.** `trial_of()` fills defaults, and `trial_tier()`
+  raises the echoes' level from the family tier and the legacy's rarity. A trial declares guard count,
+  seconds and whether a rival seeker joins. `HiddenRealm.spawn_trial_guard()` builds each echo through
+  the same `Dummy` path as a realm guard and marks the rival elite. `trial_label()` feeds the HUD.
+- **The altar runs the whole loop.** `_try_interact()` on an unclaimed altar opens the offer and starts
+  the trial; the scene stores `site`, `entry`, `seconds` and `started_at`, spawns the echoes around the
+  altar and refuses a second offer while one is live. `_tick_inheritance_trial()` counts down, watches
+  the guard list, and completes as soon as every echo and the rival are dead — so walking away and
+  returning cannot reroll or farm it. `_finish_inheritance()` rechecks compatibility, applies the
+  technique, passive and physique, grants the relic when authored, rolls the altar's one guaranteed
+  piece, marks the altar cleared for that site and records the claim. Timing out or leaving the realm
+  clears the trial without a grant. Saves are still refused inside a realm.
+- **Claims are per site.** `inheritances_taken` is an optional top-level save dictionary of site id to
+  `true`. The tomb's historic `inheritance_taken` boolean still loads and seeds the tomb's entry, so a
+  pre-M65 save does not lose its claim. `_inheritance_claimed(site)` reads the ledger; `realm_cleared`
+  remains the tomb's old flag and is set alongside it when the tomb is claimed.
+- **The HUD reads the live trial.** `inheritance_trial_line()` names the offered legacy, its rarity and
+  the seconds or echoes remaining, and the HUD draws it under the realm banner. The realm banner now
+  reads the actual family name instead of the tomb's hardcoded label.
+- **Validation.** `Inheritances.validate()` rejects a missing/duplicate id, unknown family, empty name
+  or description, rarity outside 0–2, non-positive weight, unknown technique/passive/physique, empty
+  grants, impossible realm/body gates, unknown affinities or attributes, a trial with no guards or too
+  little time, a malformed rival flag, an unknown relic, a family with no entry, an unknown default and
+  a default outside the tomb. `Inheritances.validate` runs from `DB.validate` after families load.
 
 ## Spirit beasts and bosses
 
@@ -1691,6 +1730,8 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 ## Save compatibility
 
 - `Save.CURRENT_SCHEMA` is bumped whenever the save shape changes.
+- M65 added the optional `inheritances_taken` dictionary without a bump: an older save loads it as
+  empty, and its historic tomb `inheritance_taken` boolean seeds that site's entry.
 - Add a migration step in `Save._migrate()` for every bump, and a test that loads a
   hand-written older payload (`schema 0`) and asserts the migrated result.
 - Never delete a migration step: old saves in the wild depend on the whole chain.
@@ -1731,7 +1772,7 @@ game/
               biomes, enemy_archetypes, spirit_beasts, bosses)
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests, motion, animator,
               camera_rig, lighting, display_policy, technique_combat, enemy_ai, beasts, boss,
-              items, hitstop, status, sfx
+              items, hitstop, status, sfx, hidden_realms, realm_access, inheritances
   entities/   player, dummy, npc, interactable, projectile, spell_zone, summon
   world/      chunk_manager, settlement, hidden_realm, prop, building, occluder
   ui/         hud, world_map, shop_panel, travel_panel, skill_bar_panel, damage_numbers,

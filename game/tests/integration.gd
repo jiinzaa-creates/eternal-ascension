@@ -472,10 +472,23 @@ func _run() -> void:
 	var physique_at_altar: String = player.physique_id
 	player.global_position = altar.global_position
 	main._try_interact()
-	check(main.inheritance_taken, "the altar grants an inheritance")
+	check(not main.inheritance_taken, "the altar opens a trial before it grants anything")
+	check(not main.inheritance_trial.is_empty(), "the altar keeps a live trial")
+	check(main.inheritance_trial_line().contains("INHERITANCE TRIAL"), "the trial has a readable status line")
+	check(main.inheritance_trial_nodes.size() >= 2, "the trial spawns its echoes")
+	var offered: Dictionary = main.inheritance_trial.get("entry", {})
+	var offered_grants: Dictionary = offered.get("grants", {})
+	check(not offered.is_empty(), "the altar's offer is recorded")
+	for value in main.inheritance_trial_nodes.duplicate():
+		var echo := value as Dummy
+		if echo != null and echo.hp > 0.0:
+			echo.take_hit(1000000.0, Vector2.ZERO, 0.0, 1.0)
+	await frames(4)
+	check(main.inheritance_taken, "passing the trial grants an inheritance")
+	check(main.inheritances_taken.has("realm.hollow_moon"), "the claim is recorded per site")
 	check(Physiques.tier_of(player.physique_id) >= Physiques.tier_of(physique_at_altar), "the inheritance never weakens the body")
-	check(player.passives.has("passive.void_affinity"), "the inheritance grants a passive")
-	check(player.technique_ids.has("tech.palm.thousand_petals"), "the inheritance grants a hidden technique")
+	check(player.passives.has(String(offered_grants.get("passive", ""))), "the inheritance grants its passive")
+	check(player.technique_ids.has(String(offered_grants.get("technique", ""))), "the inheritance grants its technique")
 
 	player.global_position = exit_node.global_position
 	main._try_interact()
@@ -534,7 +547,7 @@ func _run() -> void:
 	check(main.realm_instance.family_id == String(family_site.get("family", "")), "the instance carries its family")
 	check(main.realm_instance.realm_name == String(family_entry.get("name", "")), "the family names the realm")
 	check(main.realm_instance.template_id == String(family_site.get("template", "")), "the site opens its family layout")
-	check(not main.realm_instance.altar_enabled, "a non-inheritance family has no altar")
+	check(main.realm_instance.altar_enabled, "the second family also carries an altar")
 	var family_altar: Interactable = null
 	var family_exit: Interactable = null
 	for node in main.realm_instance.interactables:
@@ -542,7 +555,21 @@ func _run() -> void:
 			family_altar = node
 		elif node.id == "realm.exit":
 			family_exit = node
-	check(family_altar == null, "the second family builds no inheritance altar")
+	check(family_altar != null, "the second family builds its inheritance altar")
+	check(Inheritances.for_family(String(family_site.get("family", ""))).size() == 3, "the second family has its own legacy pool")
+	check(not main._inheritance_claimed(family_id), "the second family's legacy is still unclaimed")
+	var contested := Inheritances.find("inherit.ruin.heavens_debris")
+	main._start_inheritance_trial(family_site, contested)
+	var rival_seen := false
+	for value in main.inheritance_trial_nodes:
+		var body := value as Dummy
+		if body != null and body.display_name.contains("Rival Seeker") and body.is_elite:
+			rival_seen = true
+	check(main.inheritance_trial_nodes.size() == 5 and rival_seen, "a contested legacy adds an elite rival to its echoes")
+	main.inheritance_trial["seconds"] = 0.0
+	main._tick_inheritance_trial(0.1)
+	check(main.inheritance_trial.is_empty(), "a timed-out trial clears its echoes")
+	check(not main._inheritance_claimed(family_id), "a timed-out trial grants nothing")
 	check(family_exit != null, "the second family still has an exit")
 	player.global_position = family_exit.global_position
 	main._try_interact()
@@ -1236,8 +1263,9 @@ func _run() -> void:
 	player.try_attack()
 	var unbound_cost := qi_before_unwoven - player.cultivation.qi
 	check(unbound_cost > 0.0, "a technique spends Qi before weaving")
-	await frames(40)
 
+	# Compare both realms before the first swing can land: a hit would raise
+	# mastery and discount the second cost, turning this into a flaky test.
 	player._attack_state = "idle"
 	player._cooldown = 0.0
 	player.tech_cooldowns.clear()
@@ -1248,7 +1276,7 @@ func _run() -> void:
 	player.try_attack()
 	var woven_cost := qi_before_woven - player.cultivation.qi
 	check(woven_cost < unbound_cost, "technique weaving discounts Qi")
-	check(approx(woven_cost, unbound_cost * Realms.WEAVING_MULT, 0.05), "weaving is a tenth off the cost")
+	check(approx(woven_cost, unbound_cost * Realms.WEAVING_MULT, 0.05), "weaving is a tenth off the cost (unbound %.3f woven %.3f)" % [unbound_cost, woven_cost])
 	await frames(40)
 
 	player.cultivation.realm = 12
@@ -4092,6 +4120,7 @@ func _run() -> void:
 	main.quests.step_index = 0
 	main.quests.completed = false
 	main.inheritance_taken = false
+	main.inheritances_taken.clear()
 	Game.spirit_stones = 0
 	Game.professions.clear()
 	main._load_game(96)
@@ -4099,6 +4128,7 @@ func _run() -> void:
 	check(player.passives.size() == saved_passives, "quick load restores passives")
 	check(main.quests.completed, "quick load restores quest completion")
 	check(main.inheritance_taken, "quick load restores the inheritance")
+	check(main.inheritances_taken.has("realm.hollow_moon"), "quick load restores the per-site claim")
 	check(player.physique_id == saved_physique, "quick load restores the physique")
 	check(Game.spirit_stones == saved_stones, "quick load restores spirit stones")
 	check(Professions.level_of(Game.professions, "profession.smith") == 2, "practice survives a save")

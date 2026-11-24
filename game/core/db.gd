@@ -10,6 +10,8 @@ const DATA_DIR := "res://data/"
 
 var realms: Array = []
 var roots: Array = []
+## The thirteen root affinities, used to validate inheritance compatibility.
+var root_affinities: Array = []
 var methods: Array = []
 var meridians: Array = []
 var tribulations: Array = []
@@ -65,6 +67,8 @@ var hidden_realm_data: Dictionary = {}
 var realm_access_data: Dictionary = {}
 ## Hidden realm content families: palette, hazards, enemies and rewards.
 var hidden_realm_family_data: Dictionary = {}
+## Authored inheritances: per-family rarity pools, compatibility and trials.
+var inheritances_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -79,7 +83,9 @@ func _ready() -> void:
 func load_all() -> void:
 	_by_id.clear()
 	realms = _read("realms.json").get("realms", [])
-	roots = _read("roots.json").get("roots", [])
+	var root_doc := _read("roots.json")
+	roots = root_doc.get("roots", [])
+	root_affinities = root_doc.get("affinities", [])
 	methods = _read("methods.json").get("methods", [])
 	meridians = _read("meridians.json").get("meridians", [])
 	tribulations = _read("tribulations.json").get("tribulations", [])
@@ -128,6 +134,7 @@ func load_all() -> void:
 	hidden_realm_data = _read("hidden_realm_templates.json")
 	realm_access_data = _read("realm_access.json")
 	hidden_realm_family_data = _read("hidden_realm_families.json")
+	inheritances_data = _read("inheritances.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -164,6 +171,7 @@ func load_all() -> void:
 	_index("sect", sects())
 	_index("hierarchy_rank", hierarchy_ladder())
 	_index("hierarchy_rank", hierarchy_offices())
+	_index("inheritance", Inheritances.entries())
 
 
 func _read(file: String) -> Dictionary:
@@ -769,6 +777,8 @@ func validate() -> Array:
 	problems.append_array(HiddenRealms.validate(hidden_realm_data))
 	# Nine content families, each with its own layout, palette and population.
 	problems.append_array(HiddenRealms.validate_families(hidden_realm_family_data))
+	# Inheritances are authored per family: compatibility, rarity and a trial.
+	problems.append_array(Inheritances.validate(inheritances_data))
 	# Discovery sites must point at a real layout and a sane opening cycle.
 	problems.append_array(RealmAccess.validate(realm_access_data))
 

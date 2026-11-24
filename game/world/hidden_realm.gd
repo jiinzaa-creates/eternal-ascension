@@ -346,6 +346,21 @@ func spawn_beast(species_id: String, at: Vector2, realm: int) -> Dummy:
 	return beast
 
 
+## A trial echo is an ordinary body with its own name and rank. The altar owns
+## the trial; the realm only builds the bodies so leaving frees them with the
+## rest of the realm's children.
+func spawn_trial_guard(archetype_id: String, at: Vector2, realm: int, label: String, elite: bool = false) -> Dummy:
+	var body := Dummy.new()
+	body.ilvl = clampi(realm, 1, 12)
+	body.global_position = at
+	_attach(body)
+	body.set_archetype(archetype_id if archetype_id != "" else "brawler")
+	body.display_name = label if label != "" else "Trial Echo"
+	if elite:
+		body.make_elite(1.8, 1.18, 1.35)
+	return body
+
+
 func mark_cleared() -> void:
 	cleared = true
 	for node in interactables:

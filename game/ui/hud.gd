@@ -108,6 +108,7 @@ func _draw() -> void:
 	draw_prompt()
 	draw_realm_banner()
 	draw_tribulation()
+	draw_inheritance_trial()
 	draw_boss()
 	draw_captive_ledger(player)
 	draw_chronicle(player)
@@ -1369,11 +1370,26 @@ func draw_prompt() -> void:
 func draw_realm_banner() -> void:
 	if String(host.phase) != "realm":
 		return
-	var text := "HIDDEN REALM — Tomb of the Hollow Moon"
+	var realm_name := "Hidden realm"
+	if host.realm_instance != null and is_instance_valid(host.realm_instance):
+		realm_name = String(host.realm_instance.realm_name)
+	var text := "HIDDEN REALM — %s" % realm_name
 	var width := _text_width(text, 16) + 28.0
 	var pos := Vector2(size.x * 0.5 - width * 0.5, 22.0)
 	draw_rect(Rect2(pos, Vector2(width, 28.0)), Color("#241a38", 0.85))
 	_text(pos + Vector2(14.0, 19.0), text, 16, Color("#c8b8ff"))
+
+
+## The altar trial is a live countdown, not a toast the player has to remember.
+func draw_inheritance_trial() -> void:
+	var text: String = host.inheritance_trial_line()
+	if text == "":
+		return
+	var width := _text_width(text, 15) + 28.0
+	var pos := Vector2(size.x * 0.5 - width * 0.5, 56.0)
+	draw_rect(Rect2(pos, Vector2(width, 28.0)), Color("#18140f", 0.88))
+	draw_rect(Rect2(pos, Vector2(width, 28.0)), Color("#e0c060", 0.7), false, 1.5)
+	_text(pos + Vector2(14.0, 19.0), text, 15, Color("#f0d890"))
 
 
 ## The encounter banner: the trial's name, its colour, and where in it you are.
