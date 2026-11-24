@@ -3718,6 +3718,29 @@ func _run() -> void:
 	check(not main.sects_open, "the sect codex closes")
 	check(player.is_physics_processing(), "closing the codex resumes play")
 
+	# --- hierarchy: a place in the hall ---------------------------------------
+	check(Hierarchy.ladder().size() == 7 and Hierarchy.offices().size() == 2,
+		"the ladder and its offices are loaded")
+	check(main.elder.rank_id() == "rank.elder", "Elder Bai holds the elder's rung")
+	check(main.elder.rank_line().contains("Elder") and main.elder.rank_line().contains("authority"),
+		"the dossier reads his station")
+	check(Hierarchy.for_archetype("guard") == "office.guardian", "a guard holds the guardian office")
+	check(Hierarchy.for_archetype("merchant") == "", "a merchant holds no sect seat")
+	var m57_station := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
+		Game.notoriety, Hierarchy.seat_available())
+	check(not m57_station.is_empty(), "the player has a station in the Azure Cloud")
+	main.toggle_hierarchy()
+	check(main.hierarchy_open, "the hierarchy screen opens")
+	check(main.hierarchy_rows().size() == 9, "the screen lists seven rungs and two offices")
+	var m57_you := 0
+	for m57_row in main.hierarchy_rows():
+		if bool(m57_row.get("you", false)):
+			m57_you += 1
+	check(m57_you == 1, "exactly one rung is the player's station")
+	check(not player.is_physics_processing(), "the hierarchy screen freezes play")
+	main.toggle_hierarchy()
+	check(not main.hierarchy_open and player.is_physics_processing(), "closing the hierarchy resumes play")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

@@ -82,6 +82,7 @@ func _ready() -> void:
 	_stories_tests()
 	_factions_tests()
 	_sects_tests()
+	_hierarchy_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -4318,6 +4319,127 @@ func _sects_tests() -> void:
 	broken = DB.sects_data.duplicate(true)
 	(broken["sects"] as Array)[1]["technique"]["kind"] = "dance"
 	check(not Sects.validate(broken).is_empty(), "an unknown signature kind is rejected")
+
+
+## Hierarchy: seven rungs and two offices, every resident placed, and the
+## player's station derived from the same standing the gate already reads.
+func _hierarchy_tests() -> void:
+	print("[hierarchy] a place in the hall")
+	check(Hierarchy.ladder().size() == Hierarchy.EXPECTED_LADDER, "the seven rungs are loaded")
+	check(Hierarchy.offices().size() == Hierarchy.EXPECTED_OFFICES, "the two offices are loaded")
+	check(Hierarchy.rank("rank.elder").get("name", "") == "Elder", "a rank is found by id")
+	check(Hierarchy.rank("office.instructor").get("name", "") == "Instructor", "an office is found by id")
+	check(Hierarchy.rank("rank.nope").is_empty(), "an unknown rank is empty")
+	check(not Hierarchy.seat_available(), "the master's seat is held at the start")
+	check(Hierarchy.authority("rank.elder") == 65, "a rank carries its authority")
+	check(Hierarchy.duty("office.guardian").contains("gate"), "an office carries its duty")
+	check(Hierarchy.privilege("rank.inner_disciple").contains("library"), "a rank carries its privilege")
+	check(Hierarchy.title("rank.nope") == "" and Hierarchy.authority("rank.nope") == 0,
+		"an unknown rank has no title or authority")
+	var levels: Array = []
+	var last_authority := -1
+	var seats := 0
+	for value in Hierarchy.ladder():
+		var entry: Dictionary = value
+		levels.append(int(entry.get("level", -1)))
+		check(int(entry.get("authority", 0)) >= last_authority, "authority rises with the ladder")
+		last_authority = int(entry.get("authority", 0))
+		if bool(entry.get("seat", false)):
+			seats += 1
+	check(levels == [0, 1, 2, 3, 4, 5, 6], "the ladder covers every level in order")
+	check(seats == 1, "exactly one rung is the seat")
+
+	check(Hierarchy.for_archetype("elder") == "rank.elder", "an elder archetype holds the elder rung")
+	check(Hierarchy.for_archetype("inner_disciple") == "rank.inner_disciple", "a disciple is placed")
+	check(Hierarchy.for_archetype("guard") == "office.guardian", "a guard holds the guardian office")
+	check(Hierarchy.for_archetype("merchant") == "", "an unaligned trade holds no seat")
+	check(Hierarchy.for_npc("elder_bai", "inner_disciple") == "rank.elder", "an authored resident overrides the template")
+	check(Hierarchy.for_npc("instructor_rui", "inner_disciple") == "office.instructor", "the instructor holds his office")
+	check(Hierarchy.for_npc("npc.sect_master.0", "sect_master") == "rank.sect_master",
+		"a generated master holds the seat")
+	check(Hierarchy.station_line("elder_bai", "elder").contains("Elder") and
+		Hierarchy.station_line("elder_bai", "elder").contains("65"), "a station line names rank and authority")
+	check(Hierarchy.station_line("npc.merchant.0", "merchant") == "", "a trade has no station line")
+
+	check(Hierarchy.player_rank(1, {}).get("id", "") == "rank.outer_disciple", "a fresh name is an outer disciple")
+	check(Hierarchy.player_rank(1, {"faction.azure_cloud": -50}).get("id", "") == "rank.servant",
+		"a hostile name is a servant")
+	check(Hierarchy.player_rank(2, {"faction.azure_cloud": 20}).get("id", "") == "rank.inner_disciple",
+		"standing and realm open the inner hall")
+	check(Hierarchy.player_rank(3, {"faction.azure_cloud": 40}).get("id", "") == "rank.core_disciple",
+		"a core seat needs both") 
+	check(Hierarchy.player_rank(4, {"faction.azure_cloud": 60}).get("id", "") == "rank.elder",
+		"an elder's seat can be earned")
+	check(Hierarchy.player_rank(5, {"faction.azure_cloud": 80}).get("id", "") == "rank.deputy",
+		"the deputy's place is reachable")
+	check(Hierarchy.player_rank(6, {"faction.azure_cloud": 95}).get("id", "") == "rank.deputy",
+		"the held seat stops a qualified player at deputy")
+	check(Hierarchy.player_rank(6, {"faction.azure_cloud": 95}, 0, true).get("id", "") == "rank.sect_master",
+		"a vacant seat can be taken")
+	check(Hierarchy.player_rank(4, {"faction.azure_cloud": 60}, 40).get("id", "") == "rank.core_disciple",
+		"notoriety costs a place in the hall")
+	check(Hierarchy.next_rank("rank.servant").get("id", "") == "rank.outer_disciple", "the next rung is readable")
+	check(Hierarchy.next_rank("rank.sect_master").is_empty(), "nothing stands above the master")
+
+	var inner_missing: Array = Hierarchy.missing_for("rank.inner_disciple", 1, {}, 0, false)
+	check(inner_missing.size() == 2, "the inner hall wants standing and realm")
+	check(String(inner_missing[0]).contains("20 standing") and String(inner_missing[1]).contains("realm 2"),
+		"the missing requirements say what is short")
+	var seat_missing: Array = Hierarchy.missing_for("rank.sect_master", 6, {"faction.azure_cloud": 95}, 0, false)
+	check(seat_missing.size() == 1 and String(seat_missing[0]).contains("seat is held"),
+		"the held seat is named as the only obstacle")
+	check(Hierarchy.missing_for("rank.sect_master", 6, {"faction.azure_cloud": 95}, 0, true).is_empty(),
+		"a vacant seat has nothing missing")
+	var progress := Hierarchy.station_progress(1, {})
+	check(progress.contains("Station: Outer Disciple") and progress.contains("Inner Disciple needs"),
+		"the progress line names the station and the next rung")
+	var hud_station := Hierarchy.hud_line(1, {})
+	check(hud_station.contains("Station: Outer Disciple") and hud_station.contains("Inner Disciple"),
+		"the vitals line is short and honest")
+	check(not Game.to_dict().has("sect_rank") and not Game.to_dict().has("hierarchy"),
+		"rank is derived, not stored")
+
+	check(Hierarchy.validate(DB.hierarchy_data).is_empty(), "the shipped hierarchy validates")
+	var broken: Dictionary = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array).pop_back()
+	check(not Hierarchy.validate(broken).is_empty(), "a six-rung ladder is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array).append((DB.hierarchy_data["ladder"] as Array)[0].duplicate(true))
+	check(not Hierarchy.validate(broken).is_empty(), "a duplicate rank is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array)[1]["level"] = 0
+	check(not Hierarchy.validate(broken).is_empty(), "two ranks on one level are rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array)[1]["duty"] = " "
+	check(not Hierarchy.validate(broken).is_empty(), "a rank without a duty is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array)[5]["authority"] = 10
+	check(not Hierarchy.validate(broken).is_empty(), "a rank below the authority under it is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array)[0]["seat"] = true
+	(broken["ladder"] as Array)[6]["seat"] = false
+	check(not Hierarchy.validate(broken).is_empty(), "a seat on the wrong rung is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array)[6]["requires"]["standing"] = 200
+	check(not Hierarchy.validate(broken).is_empty(), "an impossible standing gate is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["ladder"] as Array)[2]["requires"]["realm"] = 0
+	check(not Hierarchy.validate(broken).is_empty(), "a realm gate below one is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["offices"] as Array).pop_back()
+	check(not Hierarchy.validate(broken).is_empty(), "a missing office is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["offices"] as Array)[0]["authority"] = 200
+	check(not Hierarchy.validate(broken).is_empty(), "an office outside the authority range is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["assignments"] as Dictionary)["archetypes"]["elder"] = "rank.nope"
+	check(not Hierarchy.validate(broken).is_empty(), "an assignment to an unknown rank is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	(broken["assignments"] as Dictionary)["archetypes"]["nobody"] = "rank.outer_disciple"
+	check(not Hierarchy.validate(broken).is_empty(), "an assignment for an unknown archetype is rejected")
+	broken = DB.hierarchy_data.duplicate(true)
+	broken["seat_held"] = "yes"
+	check(not Hierarchy.validate(broken).is_empty(), "a non-boolean seat flag is rejected")
 
 
 func _quest_tests() -> void:

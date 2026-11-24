@@ -14,6 +14,7 @@ const ROLE_COLORS := {
 	"Outer Disciple": "#8fa0a8",
 	"Merchant": "#d0a070",
 	"Guard": "#b07070",
+	"Sword Instructor": "#b8a0d8",
 	"Farmer": "#9fb070",
 }
 
@@ -139,6 +140,17 @@ func faction_standing() -> int:
 ## "Azure Cloud Sect — Trusted (+27)" — the dossier's faction line.
 func faction_line() -> String:
 	return Factions.describe(faction_id(), Game.faction_standing, Game.notoriety)
+
+
+## The seat this body holds in its sect, or "" for an unaligned trade.
+func rank_id() -> String:
+	return Hierarchy.for_npc(npc_id, archetype_id)
+
+
+## "Station: Elder · authority 65" — what the dossier says about their place
+## in the hall, which is not the same question as their cultivation.
+func rank_line() -> String:
+	return Hierarchy.station_line(npc_id, archetype_id)
 
 
 ## Base temperament, what the player earned in person, and what the body's

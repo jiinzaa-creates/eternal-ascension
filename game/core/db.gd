@@ -49,6 +49,8 @@ var stories: Dictionary = {}
 var factions_data: Dictionary = {}
 ## The twelve sects: identity, seat, economy, fault line and signature arts.
 var sects_data: Dictionary = {}
+## Sect hierarchy: the rank ladder, specialist offices and who holds them.
+var hierarchy_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -104,6 +106,7 @@ func load_all() -> void:
 	stories = _read("stories.json")
 	factions_data = _read("factions.json")
 	sects_data = _read("sects.json")
+	hierarchy_data = _read("hierarchy.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -138,6 +141,8 @@ func load_all() -> void:
 	_index("faction", factions())
 	_index("faction_band", faction_bands())
 	_index("sect", sects())
+	_index("hierarchy_rank", hierarchy_ladder())
+	_index("hierarchy_rank", hierarchy_offices())
 
 
 func _read(file: String) -> Dictionary:
@@ -343,6 +348,25 @@ func sects() -> Array:
 
 func sect(id: String) -> Dictionary:
 	return by_id("sect", id)
+
+
+func hierarchy_ladder() -> Array:
+	var value: Variant = hierarchy_data.get("ladder", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func hierarchy_offices() -> Array:
+	var value: Variant = hierarchy_data.get("offices", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func hierarchy_rank(id: String) -> Dictionary:
+	return by_id("hierarchy_rank", id)
+
+
+func hierarchy_assignments() -> Dictionary:
+	var value: Variant = hierarchy_data.get("assignments", {})
+	return value if typeof(value) == TYPE_DICTIONARY else {}
 
 
 func bond(id: String) -> Dictionary:
@@ -706,6 +730,9 @@ func validate() -> Array:
 	# Sect content: exactly twelve houses, unique names and signatures, real
 	# links to playable arts, and one local gate tied to a real faction.
 	problems.append_array(Sects.validate(sects_data))
+	# Hierarchy content: seven ordered rungs, one held seat at the top, two
+	# specialist offices, and every assignment naming a real rank and archetype.
+	problems.append_array(Hierarchy.validate(hierarchy_data))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())

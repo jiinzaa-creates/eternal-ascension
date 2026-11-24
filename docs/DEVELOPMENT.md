@@ -685,6 +685,45 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   absence of a save key, and twelve validation negatives. Integration opens and closes the codex,
   checks all twelve rows, the freeze, and that play resumes.
 
+## Sect hierarchy
+
+- **One ladder, seven rungs.** `data/hierarchy.json` holds Servant → Outer Disciple → Inner
+  Disciple → Core Disciple → Elder → Deputy → Sect Master. Each rung carries an `authority`
+  (0–100), a `duty`, a `privilege`, and `requires` `{standing, realm}`. Authority must rise with
+  the ladder; exactly one rung is the `seat` and it must be the top. Two specialist `offices` —
+  Instructor and Guardian — sit outside the ladder with their own duties and authority.
+- **People are placed, not generated.** `assignments.archetypes` maps the settlement templates
+  (`sect_master`, `elder`, `inner_disciple`, `outer_disciple`, `guard`) and `assignments.people`
+  overrides authored residents (`elder_bai` → Elder, `instructor_rui` → Instructor). Unaligned
+  trades (`merchant`, `farmer`) hold no seat. `Hierarchy.for_npc()` reads the person override
+  first, then the archetype; `Npc.rank_id()` and `Npc.rank_line()` expose it to the dossier.
+- **The player's station is derived.** `Hierarchy.player_rank(realm, standing, notoriety,
+  seat_open)` takes the highest rung whose standing and realm gates are met, using
+  `Factions.effective_standing()` for the Azure Cloud, so notoriety can cost a place in the hall.
+  Nothing is saved: the same standing and realm always produce the same station, and acting for
+  the sect is the only way up. `next_rank()` answers the rung above; `missing_for()` lists the
+  standing, realm and held-seat reasons still in the way; `station_progress()` and `hud_line()`
+  format them for the screen and the vitals panel.
+- **The seat.** `seat_held` is true at this stage, so a fully qualified player stops at Deputy
+  while the resident Sect Master keeps the seat. Passing `seat_open = true` (or clearing the flag)
+  lets the top rung be taken: M59 politics and M60–61 sect leadership consume this, not a rewrite.
+- **The screen.** **N** opens a frozen screen: the seven rungs on the left with their gates, duties
+  and current holders, the player's station on the right with duty, privilege, next rung and what
+  is missing, and both offices with their holders. It closes on **N**, **E** or **ESC**. The
+  dossier gains `Station: Elder · authority 65`; the vitals panel shows the current station and the
+  first unmet requirement. Authority and privilege are declared and displayed, not yet spent: no
+  stipend, command or gate key is wired until the economy and politics milestones.
+- **Validated at boot.** `DB.validate()` runs `Hierarchy.validate()`, rejecting a ladder that is
+  not exactly seven levels 0–6, duplicate rank/office ids, two ranks on one level, missing names,
+  duties or privileges, authority outside 0–100 or falling with the ladder, a seat not on the top
+  rung or more than one seat, standings outside −100..100, realms outside 1–12, a missing office,
+  a non-boolean seat flag, and assignments naming an unknown rank or archetype.
+- **Tests.** Unit `_hierarchy_tests` covers the ladder and offices, placement overrides, every
+  promotion gate including notoriety and the held seat, next/missing/progress lines, absence of a
+  save key, and twelve validation negatives. Integration checks Elder Bai's station and dossier
+  line, guard and merchant placement, the player's derived station, the nine-row screen, the
+  single highlighted rung, and the freeze.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

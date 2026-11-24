@@ -1,0 +1,98 @@
+{
+  "seat_held": true,
+  "ladder": [
+    {
+      "id": "rank.servant",
+      "name": "Servant",
+      "level": 0,
+      "authority": 5,
+      "duty": "Carry, clean and learn to stand straight.",
+      "privilege": "A roof, rations and the outer yard.",
+      "requires": {"standing": -100, "realm": 1}
+    },
+    {
+      "id": "rank.outer_disciple",
+      "name": "Outer Disciple",
+      "level": 1,
+      "authority": 15,
+      "duty": "Drill the forms and run the sect's errands.",
+      "privilege": "Outer hall lessons and the training yard.",
+      "requires": {"standing": 0, "realm": 1}
+    },
+    {
+      "id": "rank.inner_disciple",
+      "name": "Inner Disciple",
+      "level": 2,
+      "authority": 30,
+      "duty": "Cultivate in earnest and answer for the outer yard.",
+      "privilege": "The inner library and a cultivation mat.",
+      "requires": {"standing": 20, "realm": 2}
+    },
+    {
+      "id": "rank.core_disciple",
+      "name": "Core Disciple",
+      "level": 3,
+      "authority": 50,
+      "duty": "Guard the sect's name abroad and teach what you know.",
+      "privilege": "Core hall keys and a seat at the elders' table.",
+      "requires": {"standing": 40, "realm": 3}
+    },
+    {
+      "id": "rank.elder",
+      "name": "Elder",
+      "level": 4,
+      "authority": 65,
+      "duty": "Hold a hall, judge disputes and keep the vein accounted.",
+      "privilege": "A voice in the hall and the right to open the vaults.",
+      "requires": {"standing": 60, "realm": 4}
+    },
+    {
+      "id": "rank.deputy",
+      "name": "Deputy",
+      "level": 5,
+      "authority": 80,
+      "duty": "Answer for every gate and every disciple beneath you.",
+      "privilege": "Command of the gates in the master's absence.",
+      "requires": {"standing": 80, "realm": 5}
+    },
+    {
+      "id": "rank.sect_master",
+      "name": "Sect Master",
+      "level": 6,
+      "authority": 100,
+      "duty": "Hold the seat and answer for every gate.",
+      "privilege": "The seat, the seal and the final word.",
+      "requires": {"standing": 95, "realm": 6},
+      "seat": true
+    }
+  ],
+  "offices": [
+    {
+      "id": "office.instructor",
+      "name": "Instructor",
+      "authority": 35,
+      "duty": "Teach the forms and test who is ready.",
+      "privilege": "The training yard and the right to judge a student."
+    },
+    {
+      "id": "office.guardian",
+      "name": "Guardian",
+      "authority": 45,
+      "duty": "Stand the gate and answer for the sect's walls.",
+      "privilege": "The gate watch and the wall keys."
+    }
+  ],
+  "assignments": {
+    "archetypes": {
+      "sect_master": "rank.sect_master",
+      "elder": "rank.elder",
+      "inner_disciple": "rank.inner_disciple",
+      "outer_disciple": "rank.outer_disciple",
+      "guard": "office.guardian"
+    },
+    "people": {
+      "elder_bai": "rank.elder",
+      "instructor_rui": "office.instructor"
+    }
+  }
+}

@@ -113,6 +113,7 @@ func _draw() -> void:
 	draw_chronicle(player)
 	draw_factions(player)
 	draw_sects(player)
+	draw_hierarchy(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -192,6 +193,9 @@ func draw_vitals(player: Player) -> void:
 	_text(Vector2(x, y), "Meridians: %d/12   Contamination: %d%%" % [
 		player.cultivation.meridian_count(), int(player.cultivation.contamination)
 	], 11, Color("#8fd8e8"))
+	y += 18.0
+	_text(Vector2(x, y), _fit(Hierarchy.hud_line(player.cultivation.realm, Game.faction_standing,
+		Game.notoriety, Hierarchy.seat_available()), 11, 408.0), 11, Color("#d8c898"))
 	y += 18.0
 	_text(Vector2(x, y), "Realm art: %s   Unlocks: %d" % [
 		String(player.cultivation.realm_ability().get("name", "—")), player.cultivation.unlock_ids().size()
@@ -617,6 +621,78 @@ func draw_sects(player: Player) -> void:
 		10, Color("#7b8b94"))
 
 
+## The sect hierarchy: the seven rungs and two offices of the Azure Cloud, who
+## holds each, and where the player's standing and realm have placed them.
+func draw_hierarchy(player: Player) -> void:
+	if not bool(host.hierarchy_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
+	var w := 900.0
+	var h := 570.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "SECT HIERARCHY", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "The Azure Cloud's ladder — a station is earned by standing and realm, not granted by a key.", 11, MUTED)
+	var realm := player.cultivation.realm
+	var current := Hierarchy.player_rank(realm, Game.faction_standing, Game.notoriety,
+		Hierarchy.seat_available())
+	_text(Vector2(x + 24.0, y + 78.0), _fit("Your station: %s · authority %d" % [
+		String(current.get("name", "")), Hierarchy.authority(String(current.get("id", "")))],
+		12, w - 48.0), 12, Color("#d8c898"))
+	draw_line(Vector2(x + 20.0, y + 94.0), Vector2(x + w - 20.0, y + 94.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.hierarchy_rows()
+	var row_y := y + 114.0
+	for i in mini(rows.size(), 7):
+		var row: Dictionary = rows[i]
+		if bool(row.get("you", false)):
+			draw_rect(Rect2(x + 18.0, row_y - 14.0, 470.0, 48.0), Color("#1b2328", 0.9))
+		_text(Vector2(x + 24.0, row_y), "%d  ·  %s   —   authority %d" % [
+			int(row.get("level", 0)), String(row.get("name", "?")), int(row.get("authority", 0))],
+			13, Color("#d8c898") if bool(row.get("you", false)) else ACCENT)
+		var need: Dictionary = row.get("requires", {})
+		var need_line := "Needs %d standing · realm %d" % [int(need.get("standing", -100)), int(need.get("realm", 1))]
+		if bool(row.get("seat", false)):
+			need_line = "The seat is held."
+		_text(Vector2(x + 24.0, row_y + 17.0), _fit("%s   ·   %s" % [need_line, String(row.get("duty", ""))], 10, 456.0), 10, MUTED)
+		var holders: Array = row.get("holders", [])
+		var held := "No one holds it." if holders.is_empty() else "Held by: " + ", ".join(holders)
+		_text(Vector2(x + 24.0, row_y + 31.0), _fit(held, 9, 456.0), 9, Color("#7f9098"))
+		row_y += 54.0
+
+	var right := x + 520.0
+	_text(Vector2(right, y + 114.0), "YOUR STATION", 12, ACCENT)
+	_text(Vector2(right, y + 140.0), _fit(String(current.get("name", "")), 18, 348.0), 18, Color("#d8c898"))
+	_text(Vector2(right, y + 160.0), _fit(Hierarchy.duty(String(current.get("id", ""))), 10, 348.0), 10, INK)
+	_text(Vector2(right, y + 176.0), _fit("Privilege: " + Hierarchy.privilege(String(current.get("id", ""))), 10, 348.0), 10, MUTED)
+	var next := Hierarchy.next_rank(String(current.get("id", "")))
+	var next_line := "No rung above this one."
+	if not next.is_empty():
+		var missing := Hierarchy.missing_for(String(next.get("id", "")), realm, Game.faction_standing,
+			Game.notoriety, Hierarchy.seat_available())
+		if missing.is_empty():
+			next_line = "Next: %s — ready." % String(next.get("name", ""))
+		else:
+			next_line = "Next: %s — %s" % [String(next.get("name", "")), ", ".join(missing)]
+	_text(Vector2(right, y + 196.0), _fit(next_line, 10, 348.0), 10, Color("#a8d8c0"))
+	draw_line(Vector2(right, y + 214.0), Vector2(x + w - 24.0, y + 214.0), Color("#2b343a"), 1.0)
+	_text(Vector2(right, y + 234.0), "OFFICES", 12, ACCENT)
+	var office_y := y + 256.0
+	for i in range(7, mini(rows.size(), 9)):
+		var office: Dictionary = rows[i]
+		_text(Vector2(right, office_y), "%s · authority %d" % [String(office.get("name", "?")), int(office.get("authority", 0))], 12, Color("#c8b8e8"))
+		var holders: Array = office.get("holders", [])
+		_text(Vector2(right, office_y + 15.0), _fit(String(office.get("duty", "")), 9, 348.0), 9, INK)
+		_text(Vector2(right, office_y + 28.0), _fit("Held by: " + (", ".join(holders) if not holders.is_empty() else "nobody"), 9, 348.0), 9, MUTED)
+		office_y += 48.0
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "N / E / ESC — close   ·   rank follows Azure Cloud standing and realm; no rank counter is saved",
+		10, Color("#7b8b94"))
+
+
 ## The active bar only: six slots, each with its art's own cooldown sweep.
 ## Occupancy of the other two bars and any art off the bars are named on the
 ## line beneath, so the readout never hides a known technique.
@@ -957,8 +1033,8 @@ func draw_npc_dossier(_player: Player) -> void:
 	var x := 24.0
 	var y := 334.0
 	var width := 432.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 286.0), PANEL_BG)
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 286.0), Color("#5f7f8c", 0.45), false, 1.0)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 302.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 302.0), Color("#5f7f8c", 0.45), false, 1.0)
 	_text(Vector2(x, y), _fit("%s — %s" % [npc.display_name, npc.role], 15, 408.0), 15, ACCENT)
 	y += 20.0
 	var sect_part := ""
@@ -1020,6 +1096,11 @@ func draw_npc_dossier(_player: Player) -> void:
 	var faction := npc.faction_line()
 	if faction != "":
 		_text(Vector2(x, y), _fit(faction, 11, 408.0), 11, Color("#c8b8e8"))
+		y += 16.0
+	# The seat in the hall, which is a different question from the house's regard.
+	var station := npc.rank_line()
+	if station != "":
+		_text(Vector2(x, y), _fit(station, 11, 408.0), 11, Color("#d8c898"))
 		y += 16.0
 	# Authored ties take the footnote when a person has any: they are facts about
 	# two people, not numbers the run can warm up or grind down.
@@ -1132,7 +1213,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

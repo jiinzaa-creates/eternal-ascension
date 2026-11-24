@@ -112,6 +112,8 @@ var chronicle_open := false
 var factions_open := false
 ## The sect codex: twelve houses, their seats, economies, fault lines and arts.
 var sects_open := false
+## The sect hierarchy: the ladder, who holds each rung, and where the player stands.
+var hierarchy_open := false
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -676,7 +678,7 @@ func _process(delta: float) -> void:
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
-			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open:
+			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open:
 		return
 
 	_simulate_npcs()
@@ -742,6 +744,8 @@ func _process(delta: float) -> void:
 		toggle_factions()
 	if Input.is_action_just_pressed("open_sects"):
 		toggle_sects()
+	if Input.is_action_just_pressed("open_hierarchy"):
+		toggle_hierarchy()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1673,6 +1677,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close_sects()
 		return
 
+	if hierarchy_open:
+		if event.is_action_pressed("open_hierarchy") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_hierarchy()
+		return
+
 	if chronicle_open:
 		if event.is_action_pressed("open_chronicle") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -2345,6 +2355,70 @@ func sect_rows() -> Array:
 		var row := Sects.row(String((value as Dictionary).get("id", "")))
 		if not row.is_empty():
 			out.append(row)
+	return out
+
+
+# ------------------------------------------------------------- hierarchy ----
+
+
+func toggle_hierarchy() -> void:
+	if hierarchy_open:
+		_close_hierarchy()
+	else:
+		_open_hierarchy()
+
+
+func _open_hierarchy() -> void:
+	if player == null or String(phase) != "play":
+		return
+	hierarchy_open = true
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_hierarchy() -> void:
+	if not hierarchy_open:
+		return
+	hierarchy_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## Every rung and office, with the residents who hold it and whether it is the
+## player's own station. The scene supplies the occupancy because only it knows
+## who is spawned; the ladder and eligibility stay in `Hierarchy`.
+func hierarchy_rows() -> Array:
+	var current := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
+		Game.notoriety, Hierarchy.seat_available())
+	var current_id := String(current.get("id", ""))
+	var out: Array = []
+	for group in [Hierarchy.ladder(), Hierarchy.offices()]:
+		for value in group:
+			if typeof(value) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = value
+			var id := String(entry.get("id", ""))
+			var holders: Array[String] = []
+			for node in npcs:
+				if not is_instance_valid(node):
+					continue
+				var person := node as Npc
+				if person != null and person.rank_id() == id:
+					holders.append(person.display_name)
+			out.append({
+				"id": id,
+				"name": String(entry.get("name", id)),
+				"level": int(entry.get("level", -1)),
+				"authority": int(entry.get("authority", 0)),
+				"duty": String(entry.get("duty", "")),
+				"privilege": String(entry.get("privilege", "")),
+				"requires": entry.get("requires", {}),
+				"seat": bool(entry.get("seat", false)),
+				"office": not entry.has("level"),
+				"holders": holders,
+				"you": id == current_id,
+			})
 	return out
 
 
@@ -3470,6 +3544,7 @@ func _load_game(slot: int) -> void:
 	_close_chronicle()
 	_close_factions()
 	_close_sects()
+	_close_hierarchy()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.
