@@ -1250,6 +1250,13 @@ func _validate_npc_data(problems: Array) -> void:
 		problems.append("npc goals are missing")
 
 	var schedules: Dictionary = npc_data.get("schedules", {})
+	for schedule_name in schedules.keys():
+		var entries: Variant = schedules[schedule_name]
+		if typeof(entries) != TYPE_ARRAY:
+			problems.append("schedule %s is not an array" % String(schedule_name))
+			continue
+		problems.append_array(Schedules.validate(
+			entries, String(schedule_name), Settlement.LOCATIONS.keys()))
 	var seen: Dictionary = {}
 	for value in npc_data.get("archetypes", []):
 		if typeof(value) != TYPE_DICTIONARY:
@@ -1270,6 +1277,9 @@ func _validate_npc_data(problems: Array) -> void:
 			problems.append("npc archetype %s has realm outside 1..12" % id)
 		if not schedules.has(String(archetype.get("schedule", ""))):
 			problems.append("npc archetype %s names unknown schedule %s" % [id, String(archetype.get("schedule", ""))])
+		var rest_name: String = String(archetype.get("rest_schedule", ""))
+		if rest_name != "" and not schedules.has(rest_name):
+			problems.append("npc archetype %s names unknown rest schedule %s" % [id, rest_name])
 		var disposition: int = int(archetype.get("disposition", 0))
 		if disposition < -100 or disposition > 100:
 			problems.append("npc archetype %s has disposition outside -100..100" % id)

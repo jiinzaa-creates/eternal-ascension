@@ -341,6 +341,40 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Presentation is currently a pronoun line (`she/her`, `he/him`, `they/them`) and is cosmetic by
   design. Nothing gates on it.
 
+## Schedules
+
+- **One list per routine, resolved by hour and weekday.** A schedule is an array of
+  `{from, to, location, activity}` entries in `data/npcs.json`. `Schedules.resolve(entries, hour,
+  weekday)` is the only resolver: `from` is inclusive, `to` exclusive, and a range whose end is
+  before its start wraps past midnight (the 22→6 sleep needs no special case). Entries may also
+  carry a `days` array; an entry without one applies every day. A later entry never wins over an
+  earlier one because validation forbids overlaps, so array order cannot change the answer.
+- **The week is code, the routines are data.** `Clock` owns a fixed seven-day week (Metalday →
+  Restday) independent of the 30-day seasons; `Clock.weekday_for(day)` is pure and day 1 is a
+  Metalday. `Npc.active_schedule()` reads the weekday table normally and swaps in the archetype's
+  `rest_schedule` on the Restday, so a rest day changes the whole day rather than one entry.
+- **Restday is a market day.** Disciples sleep in and then crowd the market, merchants start at
+  05:00 and sell until 18:00, farmers visit the shrine, and guards keep only the gate before
+  drinking. The Lightday drill is the other day-specific shape: guards train at the yard from
+  12:00 instead of patrolling the plaza, expressed as two entries with disjoint `days` filters.
+- **Validation is completeness, not vibes.** `Schedules.validate(entries, name, locations)` checks
+  hour bounds, the location graph, non-empty activities, weekday indices and duplicates, then walks
+  all 7 × 24 hours and requires exactly one owner for each. `DB.validate()` runs it on every
+  shipped schedule and rejects an archetype whose `rest_schedule` does not exist, so a gap or an
+  overlap fails at boot with the schedule's name rather than showing up as a stuck NPC.
+- **Walking follows the path graph.** `Settlement.route_from(from, to)` returns `[to]` when either
+  end is the plaza and `[plaza, to]` otherwise, because every path in the market radiates from the
+  plaza. `Npc` keeps that route, advances a waypoint when it arrives, and only then heads for the
+  destination; a snap clears the route. `Npc.travelling()` reports whether ground is still left to
+  cover, which the nameplate and dossier read as `walking`.
+- **The routine has consequences.** `Schedules.awake()` gates every conversation: a sleeping NPC
+  refuses politely and records no memory, because a conversation that did not happen must not
+  warm regard. `Schedules.can_teach(location, activity)` is the instructor's sole service gate
+  (training yard, training block, 08:00–12:00); off duty he names where he is and charges nothing.
+  Greetings come from `Schedules.small_talk(activity)`, so what an NPC says is a fact about the hour.
+- **No new save state.** The clock already saves the day and hour, so the routine, the weekday and
+  the route are all derived after a load. Memory remains the only NPC state a save carries.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

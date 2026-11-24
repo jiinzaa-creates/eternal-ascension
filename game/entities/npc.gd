@@ -23,9 +23,15 @@ var role := ""
 var sect_id := ""
 var realm := 1
 var root_tier := 3
+## The weekday routine and, when the calendar says Restday, the routine that
+## replaces it. Both come straight from `data/npcs.json`.
 var schedule: Array = []
+var rest_schedule: Array = []
 var settlement: Settlement
 var speed := 54.0
+## Route through the plaza, so a body walks the paths instead of through walls.
+var route: Array = []
+var _route_index := 0
 ## The rest of the record. Generation lives in NpcDb; this node only carries the
 ## answer, so a sheet can be rebuilt from a seed and compared without the body.
 var archetype_id := ""
@@ -49,6 +55,7 @@ var simulated := true
 var _idle_timer := 0.0
 var _wander := Vector2.ZERO
 var _last_hour := -1
+var _last_weekday := -1
 
 
 func setup(id_value: String, name_value: String, role_value: String, sect_value: String,
@@ -125,11 +132,12 @@ func _ready() -> void:
 	collision_layer = 1
 	collision_mask = 1
 	if settlement != null:
-		target = settlement.position_for("plaza")
+		_set_destination("plaza")
 
 
 func _physics_process(delta: float) -> void:
 	_update_activity()
+	_advance_route()
 	var to_target := target - global_position
 	if to_target.length() > 14.0:
 		velocity = to_target.normalized() * speed
@@ -149,16 +157,49 @@ func _update_activity() -> void:
 	if settlement == null:
 		return
 	var hour := int(Clock.hour)
-	if hour == _last_hour:
+	var weekday := Clock.weekday()
+	if hour == _last_hour and weekday == _last_weekday:
 		return
 	_last_hour = hour
+	_last_weekday = weekday
 	var entry := resolve_schedule(hour)
 	if entry.is_empty():
 		return
-	var location := String(entry.get("location", "plaza"))
-	current_location = location
 	current_activity = String(entry.get("activity", "idle"))
-	target = settlement.position_for(location)
+	_set_destination(String(entry.get("location", "plaza")))
+
+
+## A weekday routine, replaced whole on a Restday when data names one.
+func active_schedule() -> Array:
+	if Clock.is_rest_day() and not rest_schedule.is_empty():
+		return rest_schedule
+	return schedule
+
+
+## Points the body at a location, routing through the plaza when the path graph
+## says the two places are on different spokes.
+func _set_destination(location: String) -> void:
+	if settlement == null:
+		current_location = location
+		route = []
+		target = Vector2.ZERO
+		return
+	var origin := current_location
+	current_location = location
+	route = settlement.route_from(origin, location)
+	_route_index = 0
+	if route.is_empty():
+		route = [location]
+	target = settlement.position_for(String(route[0]))
+
+
+func _advance_route() -> void:
+	if settlement == null or _route_index >= route.size() - 1:
+		return
+	if global_position.distance_to(target) > 14.0:
+		return
+	_route_index += 1
+	target = settlement.position_for(String(route[_route_index]))
 
 
 func sleep() -> void:
@@ -187,25 +228,44 @@ func snap_to_schedule() -> void:
 		return
 	current_location = String(entry.get("location", "plaza"))
 	current_activity = String(entry.get("activity", "idle"))
+	route = []
 	target = settlement.position_for(current_location)
 	global_position = target
 	_last_hour = int(Clock.hour)
+	_last_weekday = Clock.weekday()
 
 
-## Returns the schedule entry active at a given hour, handling ranges that wrap
-## past midnight (for example 21:00 -> 05:00 sleep).
+## Returns the schedule entry active now, handling ranges that wrap past
+## midnight (21:00 -> 05:00 sleep) and day-filtered entries. The current day's
+## routine decides whether the weekday or Restday table is read.
 func resolve_schedule(hour: int) -> Dictionary:
-	for entry in schedule:
-		var from := float(entry.get("from", 0))
-		var to := float(entry.get("to", 24))
-		var active := false
-		if from <= to:
-			active = float(hour) >= from and float(hour) < to
-		else:
-			active = float(hour) >= from or float(hour) < to
-		if active:
-			return entry
-	return {}
+	return Schedules.resolve(active_schedule(), hour, Clock.weekday())
+
+
+func activity_entry() -> Dictionary:
+	return resolve_schedule(int(Clock.hour))
+
+
+## "Meditating at the shrine until 09:00" — the dossier's one-line routine.
+func activity_line() -> String:
+	var entry := activity_entry()
+	if entry.is_empty():
+		return "No routine this hour."
+	return Schedules.describe(current_activity, current_location, int(entry.get("to", 24)))
+
+
+func is_awake() -> bool:
+	return Schedules.awake(current_activity)
+
+
+func teaches_here() -> bool:
+	return Schedules.can_teach(current_location, current_activity)
+
+
+## Whether the body still has ground to cover. Sleeping bodies are at their
+## destination, so a sleeping NPC never reads as walking.
+func travelling() -> bool:
+	return simulated and settlement != null and global_position.distance_to(target) > 24.0
 
 
 func _draw() -> void:
@@ -236,6 +296,7 @@ func _draw() -> void:
 
 	var player: Node2D = Game.player as Node2D
 	if player != null and global_position.distance_to(player.global_position) < 300.0:
-		var text := "%s  ·  %s" % [display_name, current_activity]
+		var gait := "  ·  walking" if travelling() else ""
+		var text := "%s  ·  %s%s" % [display_name, current_activity, gait]
 		draw_string(ThemeDB.fallback_font, Vector2(-46, -RADIUS - 9.0), text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c8d4da"))

@@ -9,6 +9,10 @@ signal hour_changed(day: int, hour: int)
 signal day_changed(day: int)
 
 const HOURS_PER_DAY := 24.0
+## One week of seven days, independent of the 30-day seasons. Day 1 is a
+## Metalday; the last day is the market Restday, when most routines change.
+const WEEK_DAYS: Array[String] = ["Metalday", "Woodday", "Waterday", "Fireday", "Earthday", "Lightday", "Restday"]
+const REST_WEEKDAY := 6
 
 var day: int = 1
 var hour: float = 8.0
@@ -44,6 +48,27 @@ func is_night() -> bool:
 	return hour < 6.0 or hour >= 19.0
 
 
+## Weekday index 0–6 for the current day.
+func weekday() -> int:
+	return weekday_for(day)
+
+
+func weekday_name() -> String:
+	return WEEK_DAYS[weekday()]
+
+
+## The Restday is the weekly market day: merchants keep a longer stall and the
+## rest of the settlement changes its routine rather than repeating it.
+func is_rest_day() -> bool:
+	return weekday() == REST_WEEKDAY
+
+
+## Pure weekday lookup, so a schedule can be resolved for any calendar day
+## without moving the clock.
+static func weekday_for(day_value: int) -> int:
+	return posmod(day_value - 1, WEEK_DAYS.size())
+
+
 ## Light tint for the current hour: dawn, day, dusk, night.
 func ambient_tint() -> Color:
 	return ambient_for_hour(hour)
@@ -62,7 +87,7 @@ static func ambient_for_hour(value: float) -> Color:
 
 
 func label() -> String:
-	return "Day %d, %02d:%02d" % [day, int(hour), int(fmod(hour, 1.0) * 60.0)]
+	return "Day %d · %s, %02d:%02d" % [day, weekday_name(), int(hour), int(fmod(hour, 1.0) * 60.0)]
 
 
 func to_dict() -> Dictionary:

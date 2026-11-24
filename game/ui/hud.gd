@@ -275,9 +275,10 @@ func draw_world_panel(player: Player) -> void:
 	var x := w - 316.0
 	var y := 28.0
 	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 194.0), PANEL_BG)
-	_text(Vector2(x, y), "%s   %s   %s" % [Clock.label(), Weather.label(), host.current_biome_name()], 13, MUTED)
+	_text(Vector2(x, y), "%s   %s" % [Clock.label(), Weather.label()], 13, MUTED)
 	y += 18.0
-	_text(Vector2(x, y), "%s   Kills %d   Karma %d" % [player.display_name, Game.kills, Game.karma], 12, MUTED)
+	_text(Vector2(x, y), _fit("%s   %s   Kills %d   Karma %d" % [
+		player.display_name, host.current_biome_name(), Game.kills, Game.karma], 11, 292.0), 11, MUTED)
 	y += 18.0
 	_text(Vector2(x, y), "Spirit stones: %d" % Game.spirit_stones, 13, Color("#d8c070"))
 	y += 18.0
@@ -703,8 +704,8 @@ func draw_npc_dossier(_player: Player) -> void:
 	var x := 24.0
 	var y := 334.0
 	var width := 432.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 232.0), PANEL_BG)
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 232.0), Color("#5f7f8c", 0.45), false, 1.0)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 252.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 252.0), Color("#5f7f8c", 0.45), false, 1.0)
 	_text(Vector2(x, y), _fit("%s — %s" % [npc.display_name, npc.role], 15, 408.0), 15, ACCENT)
 	y += 20.0
 	var sect_part := ""
@@ -712,6 +713,9 @@ func draw_npc_dossier(_player: Player) -> void:
 		sect_part = " · " + String(npc.sect_id)
 	var realm_name := String(DB.realm(npc.realm).get("name", "Realm %d" % npc.realm))
 	_text(Vector2(x, y), _fit("Realm %d — %s%s" % [npc.realm, realm_name, sect_part], 11, 408.0), 11, MUTED)
+	y += 17.0
+	var gait := " · walking" if npc.travelling() else ""
+	_text(Vector2(x, y), _fit(npc.activity_line() + gait, 11, 408.0), 11, Color("#9fb0b8"))
 	y += 17.0
 	_text(Vector2(x, y), npc.attrs.summary(), 11, INK)
 	y += 17.0

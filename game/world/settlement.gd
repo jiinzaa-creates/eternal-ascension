@@ -44,6 +44,22 @@ func has_location(location: String) -> bool:
 	return LOCATIONS.has(location)
 
 
+## Every path in the market radiates from the plaza, so a body walking from one
+## named place to another goes through it rather than through a wall. Pure: it
+## reads the location graph and returns location ids, never positions.
+func route_from(from_location: String, to_location: String) -> Array:
+	var out: Array = []
+	if to_location == "":
+		return out
+	if from_location == "" or from_location == to_location or from_location == "plaza" \
+			or to_location == "plaza" or not LOCATIONS.has(from_location) or not LOCATIONS.has(to_location):
+		out.append(to_location)
+		return out
+	out.append("plaza")
+	out.append(to_location)
+	return out
+
+
 ## Buildings become their own nodes in the Y-sorted world layer, so they can
 ## sort against the player and fade when he walks behind a roof. Call after the
 ## settlement is in the tree (it needs its world position).

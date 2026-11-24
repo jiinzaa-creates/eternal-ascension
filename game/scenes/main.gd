@@ -232,7 +232,7 @@ func _spawn_npcs() -> void:
 	elder = _make_npc("elder_bai", "Elder Bai Qing", "Elder", "sect.azure_cloud",
 		4, schedules.get("elder", []), Vector2(-30, 40), "elder")
 	_make_npc("instructor_rui", "Instructor Rui", "Sword Instructor", "sect.azure_cloud",
-		3, schedules.get("inner_disciple", []), Vector2(64, 120), "inner_disciple")
+		3, schedules.get("disciple", []), Vector2(64, 120), "inner_disciple")
 
 	var plan := [
 		["sect_master", 1],
@@ -280,6 +280,7 @@ func _make_npc(id: String, display: String, role: String, sect: String, realm: i
 	npc.name = "Npc_" + id
 	var sheet := NpcDb.sheet(archetype, id, realm)
 	npc.setup(id, display, role, sect, realm, schedule, settlement, sheet)
+	npc.rest_schedule = DB.schedules().get(String(archetype.get("rest_schedule", "")), [])
 	world.add_child(npc)
 	npc.global_position = settlement.position_for("plaza") + offset
 	npcs.append(npc)
@@ -1693,7 +1694,8 @@ func interaction_prompt() -> String:
 		return ""
 	if best is Npc:
 		var npc := best as Npc
-		return "E  Talk to %s (%s)" % [npc.display_name, npc.role]
+		var drowsy := "" if npc.is_awake() else "  — asleep"
+		return "E  Talk to %s (%s)%s" % [npc.display_name, npc.role, drowsy]
 	var interactable := best as Interactable
 	if interactable.kind == Interactable.Kind.STORAGE:
 		return "E  %s  (%d/%d kinds stored)" % [interactable.display_label(), storage.slots_used(), Storage.CAPACITY]
@@ -1838,14 +1840,26 @@ func _teach_technique() -> void:
 
 
 func _talk(npc: Npc) -> void:
-	# Every conversation is remembered before it does anything else: a merchant
-	# with nothing to sell still remembers being spoken to.
+	if npc == null:
+		return
+	# A routine is not decoration: a sleeping body cannot be spoken to, and a
+	# teacher away from the yard has no lesson to give.
+	if not npc.is_awake():
+		Bus.toast.emit("%s is asleep. The routine will bring them back." % npc.display_name)
+		return
+	# Every real conversation is remembered: a merchant with nothing to sell still
+	# remembers being spoken to.
 	NpcDb.remember(Game.npc_memory, npc.npc_id, Clock.day)
 	if npc.npc_id == "instructor_rui":
+		if not npc.teaches_here():
+			Bus.toast.emit("Instructor Rui is %s at the %s. He teaches in the training yard from 08:00 to 12:00." % [
+				Schedules.activity_label(npc.current_activity), npc.current_location.replace("_", " ")])
+			return
 		_teach_technique()
 		return
 	if npc.npc_id != "elder_bai":
-		Bus.toast.emit("%s (%s): \"The Qi is thin today.\"" % [npc.display_name, npc.role])
+		Bus.toast.emit("%s (%s): \"%s\"" % [
+			npc.display_name, npc.role, Schedules.small_talk(npc.current_activity)])
 		return
 
 	if quests.completed:

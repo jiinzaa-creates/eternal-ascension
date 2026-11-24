@@ -73,6 +73,7 @@ func _ready() -> void:
 	_climate_tests()
 	_npc_tests()
 	_npcdb_tests()
+	_schedules_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3183,6 +3184,102 @@ func _npcdb_tests() -> void:
 	check(npc.standing_label() == NpcDb.standing_label(npc.standing()), "the body names its standing")
 	Game.npc_memory.clear()
 	npc.free()
+
+
+## The week, the rest routines, the path graph and the hours a service is open
+## are all pure, so every rule can be checked without moving a body.
+func _schedules_tests() -> void:
+	print("[schedules] the week, rest routines and service hours")
+	check(Clock.WEEK_DAYS.size() == Schedules.WEEK_LENGTH, "one week has seven named days")
+	check(Clock.weekday_for(1) == 0 and Clock.weekday_for(7) == Clock.REST_WEEKDAY,
+		"day one is the first day and day seven the Restday")
+	check(Clock.weekday_for(8) == 0, "the week wraps")
+	var saved_day: int = Clock.day
+	Clock.day = 2
+	check(Clock.weekday_name() == Clock.WEEK_DAYS[1], "the clock names its weekday")
+	check(Clock.label().contains(Clock.WEEK_DAYS[1]), "the clock line carries the weekday")
+	Clock.day = saved_day
+
+	var schedules: Dictionary = DB.schedules()
+	var disciple: Array = schedules.get("disciple", [])
+	var rest: Array = schedules.get("disciple_rest", [])
+	check(not disciple.is_empty() and not rest.is_empty(), "weekday and Restday routines are authored")
+	check(String(Schedules.resolve(disciple, 6, 0).get("location", "")) == "shrine", "06:00 puts a disciple at the shrine")
+	check(String(Schedules.resolve(disciple, 13, 0).get("location", "")) == "market", "13:00 puts a disciple in the market")
+	check(String(Schedules.resolve(disciple, 23, 0).get("activity", "")) == "sleep", "23:00 puts a disciple to bed")
+	check(String(Schedules.resolve(rest, 10, 6).get("location", "")) == "market", "a Restday moves the morning to the market")
+
+	var guard: Array = schedules.get("guard", [])
+	check(String(Schedules.resolve(guard, 13, 5).get("location", "")) == "training", "Lightday drills replace the plaza patrol")
+	check(String(Schedules.resolve(guard, 13, 0).get("location", "")) == "plaza", "other days keep the patrol")
+	check(Schedules.applies({"days": [1, 2]}, 2), "a day filter applies on a listed day")
+	check(not Schedules.applies({"days": [1, 2]}, 3), "a day filter skips other days")
+	check(Schedules.applies({}, 4), "an entry without days applies every day")
+
+	var next := Schedules.next_entry(disciple, 10, 0)
+	check(String(next.get("location", "")) == "market" and int(next.get("from", 0)) == 12,
+		"the next block is the 12:00 market")
+	var dawn := Schedules.next_entry(disciple, 23, 0)
+	check(String(dawn.get("activity", "")) == "meditate" and int(dawn.get("from", 0)) == 5,
+		"the next block after sleep is dawn meditation")
+
+	var npc := Npc.new()
+	npc.schedule = disciple
+	npc.rest_schedule = rest
+	Clock.day = 3
+	check(String(npc.resolve_schedule(10).get("activity", "")) == "train", "a weekday uses the working routine")
+	Clock.day = 7
+	check(Clock.is_rest_day(), "day seven is the Restday")
+	check(String(npc.resolve_schedule(10).get("activity", "")) == "socialize", "a Restday uses the rest routine")
+	Clock.day = saved_day
+	npc.free()
+
+	var settlement := Settlement.new()
+	check("|".join(settlement.route_from("shrine", "market")) == "plaza|market",
+		"a walk between spokes goes through the plaza")
+	check("|".join(settlement.route_from("plaza", "market")) == "market", "a walk from the plaza is direct")
+	check("|".join(settlement.route_from("market", "market")) == "market", "a walk to the same place is direct")
+	check("|".join(settlement.route_from("nowhere", "market")) == "market",
+		"an unknown origin falls back to a direct walk")
+	settlement.free()
+
+	var locations := Settlement.LOCATIONS.keys()
+	check(Schedules.validate([{"from": 0, "to": 24, "location": "plaza", "activity": "idle"}], "all_day", locations).is_empty(),
+		"a full-day entry is complete")
+	check(not Schedules.validate([{"from": 6, "to": 18, "location": "market", "activity": "sell"}], "gap", locations).is_empty(),
+		"a schedule with a gap is rejected")
+	check(not Schedules.validate([
+		{"from": 0, "to": 24, "location": "plaza", "activity": "idle"},
+		{"from": 6, "to": 8, "location": "market", "activity": "sell"},
+	], "overlap", locations).is_empty(), "overlapping entries are rejected")
+	check(not Schedules.validate([{"from": 0, "to": 24, "location": "moon", "activity": "idle"}], "bad", locations).is_empty(),
+		"an unknown location is rejected")
+	check(not Schedules.validate([
+		{"from": 0, "to": 24, "location": "plaza", "activity": "idle", "days": [9]},
+	], "days", locations).is_empty(), "an invalid weekday is rejected")
+	check(Schedules.validate([
+		{"from": 0, "to": 12, "location": "plaza", "activity": "patrol", "days": [0, 1]},
+		{"from": 0, "to": 12, "location": "market", "activity": "sell", "days": [2, 3, 4, 5, 6]},
+		{"from": 12, "to": 24, "location": "plaza", "activity": "sleep"},
+	], "split", locations).is_empty(), "disjoint day filters may share the same hours")
+	for schedule_name in schedules.keys():
+		check(Schedules.validate(schedules[schedule_name], String(schedule_name), locations).is_empty(),
+			"schedule %s is complete and legal" % String(schedule_name))
+	for value in DB.archetypes():
+		var archetype: Dictionary = value
+		var rest_name := String(archetype.get("rest_schedule", ""))
+		check(rest_name != "" and schedules.has(rest_name),
+			"archetype %s has a Restday routine" % String(archetype.get("id", "")))
+
+	check(not Schedules.awake("sleep") and Schedules.awake("train"), "sleep is not a conversation")
+	check(Schedules.can_teach("training", "train"), "the instructor teaches in the yard during training")
+	check(not Schedules.can_teach("market", "train"), "a lesson away from the yard is refused")
+	check(not Schedules.can_teach("training", "sleep"), "a sleeping instructor teaches nothing")
+	check(Schedules.activity_label("meditate") == "meditating", "activities have readable labels")
+	check(Schedules.describe("meditate", "shrine", 9) == "Meditating at the shrine until 09:00",
+		"a routine reads as a sentence")
+	check(Schedules.small_talk("sleep") == "…", "a sleeper has nothing to say")
+	check(Schedules.small_talk("sell").contains("price"), "a merchant speaks of prices")
 
 
 func _quest_tests() -> void:

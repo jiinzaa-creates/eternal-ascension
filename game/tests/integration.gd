@@ -949,6 +949,12 @@ func _run() -> void:
 	player.attrs.add("dex", 4)
 	player.cultivation.realm = 2
 	player.rebuild_stats()
+	# Rui now keeps the yard's hours: put the clock in the morning training block.
+	var m48_teach_day: int = Clock.day
+	var m48_teach_hour: float = Clock.hour
+	Clock.day = 3
+	Clock.hour = 10.0
+	instructor.snap_to_schedule()
 	var stones_before_teach: int = Game.spirit_stones
 	Game.spirit_stones = 100
 	main._talk(instructor)
@@ -960,6 +966,9 @@ func _run() -> void:
 	main._talk(instructor)
 	check(Game.spirit_stones == 500 - 180, "a known technique is not bought twice")
 	Game.spirit_stones = stones_before_teach
+	Clock.day = m48_teach_day
+	Clock.hour = m48_teach_hour
+	instructor.snap_to_schedule()
 
 	main._use_interactable(demonstration)
 	check(player.technique_ids.has("tech.sword.falling_petal"), "observing a known technique teaches nothing new")
@@ -2913,6 +2922,71 @@ func _run() -> void:
 	check(m47_common.standing() == m47_common.base_disposition + m47_regard,
 		"a loaded NPC reads the restored memory")
 	Save.delete_slot(85)
+
+	# --- schedules: the week changes the routine, and the routine has teeth ----
+	var m48_day: int = Clock.day
+	var m48_hour: float = Clock.hour
+	check(Clock.WEEK_DAYS.size() == 7, "the calendar names a seven-day week")
+	check(Schedules.validate(DB.schedules().get("disciple", []), "disciple", Settlement.LOCATIONS.keys()).is_empty(),
+		"the shipped routines are complete")
+
+	var m48_disciple: Npc = null
+	for m48_person in main.npcs:
+		var m48_resident: Npc = m48_person
+		if m48_resident.archetype_id == "inner_disciple" or m48_resident.archetype_id == "outer_disciple":
+			m48_disciple = m48_resident
+			break
+	check(m48_disciple != null, "a disciple walks the market")
+	Clock.day = 3
+	Clock.hour = 10.0
+	m48_disciple.snap_to_schedule()
+	check(m48_disciple.current_activity == "train" and m48_disciple.current_location == "training",
+		"a weekday morning sends a disciple to train")
+	check(m48_disciple.is_awake(), "a training disciple can be spoken to")
+	var m48_next: Dictionary = Schedules.next_entry(m48_disciple.active_schedule(), 10, Clock.weekday())
+	check(int(m48_next.get("from", 0)) == 12, "the routine knows when the training block ends")
+
+	Clock.day = 7
+	m48_disciple.snap_to_schedule()
+	check(Clock.is_rest_day(), "day seven is the Restday")
+	check(m48_disciple.current_location == "market" and m48_disciple.current_activity == "socialize",
+		"a Restday morning moves the disciple to the market")
+
+	Clock.day = 3
+	Clock.hour = 23.0
+	m48_disciple.snap_to_schedule()
+	check(m48_disciple.current_activity == "sleep", "the night sends a disciple to bed")
+	m48_disciple.global_position = player.global_position + Vector2(12, 0)
+	var m48_talks := int(NpcDb.memory_entry(Game.npc_memory, m48_disciple.npc_id).get("talks", 0))
+	main._talk(m48_disciple)
+	check(int(NpcDb.memory_entry(Game.npc_memory, m48_disciple.npc_id).get("talks", 0)) == m48_talks,
+		"a sleeping NPC is not spoken to")
+	check(String(main.interaction_prompt()).contains("asleep"), "the prompt warns that the body is asleep")
+
+	Clock.hour = 10.0
+	m48_disciple.snap_to_schedule()
+	main._talk(m48_disciple)
+	check(int(NpcDb.memory_entry(Game.npc_memory, m48_disciple.npc_id).get("talks", 0)) == m48_talks + 1,
+		"a wakeful NPC answers")
+
+	Clock.hour = 13.0
+	instructor.snap_to_schedule()
+	check(not instructor.teaches_here(), "the instructor is off duty after the morning block")
+	var m48_stones: int = Game.spirit_stones
+	Game.spirit_stones = maxi(Game.spirit_stones, 500)
+	var m48_purse: int = Game.spirit_stones
+	main._talk(instructor)
+	check(Game.spirit_stones == m48_purse, "an off-duty lesson costs nothing")
+	Clock.hour = 10.0
+	instructor.snap_to_schedule()
+	check(instructor.teaches_here(), "the instructor teaches during morning training")
+
+	Clock.day = m48_day
+	Clock.hour = m48_hour
+	Game.spirit_stones = m48_stones
+	for m48_node in main.npcs:
+		var m48_restore: Npc = m48_node
+		m48_restore.snap_to_schedule()
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
