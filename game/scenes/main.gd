@@ -94,6 +94,12 @@ var _warn_timer := 0.0
 ## Stable id → the display name it was spawned with, so authored ties can be
 ## named the way the player sees them.
 var _npc_names: Dictionary = {}
+## Captivity ledger: a frozen, row-selected screen of the holding yard.
+var captives_open := false
+var captive_index := 0
+## Last world day settled for the holding yard. A jump in days (inn, travel, a
+## loaded clock) is paid a day at a time instead of skipped.
+var _captive_day := 0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -548,6 +554,7 @@ func refund_attribute() -> bool:
 func _begin_run() -> void:
 	_apply_origin()
 	Game.born_day = Clock.day
+	_captive_day = Clock.day
 	Game.dead = false
 	Game.age_warning_stage = 0
 	_run_ended = false
@@ -643,6 +650,7 @@ func _process(delta: float) -> void:
 	_check_aging()
 	if String(phase) == "ended":
 		return
+	_check_captivity()
 	# Regional Qi density is derived from where the body stands, never saved.
 	if realm_instance != null:
 		Game.biome_density = 1.0
@@ -652,7 +660,7 @@ func _process(delta: float) -> void:
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
-			or alchemy_open:
+			or alchemy_open or captives_open:
 		return
 
 	_simulate_npcs()
@@ -708,6 +716,10 @@ func _process(delta: float) -> void:
 		_try_interact()
 	if Input.is_action_just_pressed("party_toggle"):
 		_toggle_party()
+	if Input.is_action_just_pressed("bind_captive"):
+		_bind_captive()
+	if Input.is_action_just_pressed("open_captives"):
+		toggle_captives()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -762,6 +774,9 @@ func _on_window_resized() -> void:
 
 func _open_shop() -> void:
 	if shop_panel == null or player == null:
+		return
+	if Captivity.wanted(Game.notoriety):
+		Bus.toast.emit("The merchant will not deal with a wanted slaver.")
 		return
 	merchant.refresh(DB, Rng, Clock.day)
 	shop_open = true
@@ -1617,6 +1632,28 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 		return
 
+	if captives_open:
+		if event.is_action_pressed("open_captives") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_captives()
+			return
+		if event.is_action_pressed("ui_down"):
+			captive_index = mini(captive_index + 1, maxi(0, Game.captives.size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			captive_index = maxi(0, captive_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			_hand_over_captive(captive_index)
+			return
+		if event.is_action_pressed("use_item"):
+			_release_captive(captive_index)
+			return
+		if event.is_action_pressed("shop_mode"):
+			_cycle_captive_policy()
+			return
+		return
+
 	if bars_open:
 		if event.is_action_pressed("open_bars") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -1878,6 +1915,210 @@ func party_members() -> Array:
 	return out
 
 
+# --------------------------------------------------------------- captivity ----
+
+
+## The nearest beaten body within binding reach. A subdued cultivator is not in
+## the interactable list: taking a person is a decision, not a door.
+func _beaten_body_near() -> Dummy:
+	if player == null or realm_instance != null:
+		return null
+	var best: Dummy = null
+	var best_dist := Captivity.bind_reach()
+	for value in get_tree().get_nodes_in_group("enemy"):
+		if not is_instance_valid(value):
+			continue
+		var body := value as Dummy
+		if body == null or not (body.can_be_bound() or body.weakened()):
+			continue
+		var dist := body.global_position.distance_to(player.global_position)
+		if dist <= best_dist:
+			best_dist = dist
+			best = body
+	return best
+
+
+## H: bind the beaten cultivator at your feet. The body leaves the world alive:
+## no kill, no loot, and a record in the yard that the market will remember.
+func _bind_captive() -> void:
+	if player == null or String(phase) != "play" or realm_instance != null:
+		return
+	var body := _beaten_body_near()
+	if body == null:
+		Bus.toast.emit("No beaten cultivator is close enough to bind.")
+		return
+	var verdict := Captivity.can_bind(Game.captives)
+	if not bool(verdict.get("ok", false)):
+		Bus.toast.emit(String(verdict.get("reason", "You cannot take another.")))
+		return
+	# Two deliberate steps: beat them down, then decide. The kill still exists as
+	# the third option — strike a subdued body and it dies as any enemy would.
+	if not body.can_be_bound():
+		if not body.subdue():
+			Bus.toast.emit("%s is still standing." % body.display_name)
+			return
+		Bus.toast.emit("%s drops to their knees. Press H to bind them, or strike to finish it." % body.display_name)
+		return
+	Game.captive_seq += 1
+	var record := Captivity.new_record(
+		"captive.%d.%d" % [Clock.day, Game.captive_seq],
+		_random_name(),
+		maxi(1, body.ilvl),
+		0, Clock.day, Game.captive_policy)
+	Game.captives.append(record)
+	Game.notoriety = mini(Captivity.notoriety_cap(),
+		Game.notoriety + Captivity.capture_notoriety())
+	body.queue_free()
+	Bus.toast.emit("%s is bound and sent to the holding yard. (%d/%d held)" % [
+		String(record.get("name", "The cultivator")), Game.captives.size(), Captivity.max_held()])
+	Bus.player_stats_changed.emit()
+
+
+func toggle_captives() -> void:
+	if captives_open:
+		_close_captives()
+		return
+	_open_captives()
+
+
+func _open_captives() -> void:
+	if player == null or String(phase) != "play" or realm_instance != null:
+		return
+	if Game.captives.is_empty():
+		Bus.toast.emit("The holding yard is empty. (H binds a beaten cultivator.)")
+		return
+	captives_open = true
+	captive_index = clampi(captive_index, 0, Game.captives.size() - 1)
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_captives() -> void:
+	if not captives_open:
+		return
+	captives_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## ENTER in the ledger: sell the person's sentence to the watch. The bounty is
+## paid in stones and the market forgets a little of what it knew.
+func _hand_over_captive(index: int) -> void:
+	if index < 0 or index >= Game.captives.size():
+		return
+	var record: Dictionary = Game.captives[index]
+	var paid := Captivity.bounty(record)
+	Game.spirit_stones += paid
+	Game.notoriety = maxi(0, Game.notoriety - Captivity.handover_relief())
+	var name := String(record.get("name", "The captive"))
+	Game.captives.remove_at(index)
+	captive_index = clampi(captive_index, 0, maxi(0, Game.captives.size() - 1))
+	Bus.toast.emit("%s is handed to the watch. You are paid %d stones. (%s)" % [
+		name, paid, Captivity.legal_label(Game.notoriety)])
+	Bus.player_stats_changed.emit()
+	if Game.captives.is_empty():
+		_close_captives()
+
+
+## U in the ledger: unbind them. Cheaper than a handover, and the mercy is not
+## free of consequence — the watch still remembers the yard existed.
+func _release_captive(index: int) -> void:
+	if index < 0 or index >= Game.captives.size():
+		return
+	var record: Dictionary = Game.captives[index]
+	var name := String(record.get("name", "The captive"))
+	Game.captives.remove_at(index)
+	Game.notoriety = maxi(0, Game.notoriety - Captivity.release_relief())
+	captive_index = clampi(captive_index, 0, maxi(0, Game.captives.size() - 1))
+	Bus.toast.emit("%s is unbound and walks out of the yard." % name)
+	if Game.captives.is_empty():
+		_close_captives()
+
+
+## TAB in the ledger: the terms apply to everyone held, because a yard with two
+## rulebooks is a yard that cannot be reasoned about.
+func _cycle_captive_policy() -> void:
+	var ids := Captivity.policy_ids()
+	if ids.is_empty():
+		return
+	var current := ids.find(Game.captive_policy)
+	var next := String(ids[0]) if current < 0 else String(ids[(current + 1) % ids.size()])
+	Game.captive_policy = next
+	for value in Game.captives:
+		if typeof(value) == TYPE_DICTIONARY:
+			(value as Dictionary)["policy"] = next
+	Bus.toast.emit("Terms: %s — %s" % [Captivity.policy_name(next), Captivity.policy_blurb(next)])
+
+
+## A day with no keeper in it still passes: loyalty drifts, rations are paid,
+## people run. Days jumped by rest or travel are settled one at a time.
+func _check_captivity() -> void:
+	if String(phase) != "play":
+		return
+	if _captive_day == 0:
+		_captive_day = Clock.day
+		return
+	var guard := 0
+	while _captive_day < Clock.day and guard < 60:
+		_captive_day += 1
+		guard += 1
+		_settle_captive_day(_captive_day)
+	if _captive_day < Clock.day:
+		_captive_day = Clock.day
+
+
+func _settle_captive_day(day: int) -> void:
+	if not Captivity.enabled():
+		return
+	if Game.captives.is_empty():
+		Game.notoriety = maxi(0, Game.notoriety - Captivity.notoriety_decay())
+		return
+	var result := Captivity.settle_day(Game.captives, day, Game.spirit_stones)
+	var kept: Variant = result.get("records", [])
+	Game.captives = (kept as Array).duplicate(true) if typeof(kept) == TYPE_ARRAY else []
+	Game.spirit_stones = maxi(0, Game.spirit_stones + int(result.get("net", 0)))
+	Game.notoriety = clampi(Game.notoriety + int(result.get("notoriety", 0)),
+		0, Captivity.notoriety_cap())
+	var escaped: Array = result.get("escaped", [])
+	if bool(result.get("rebellion", false)):
+		if player != null and player.hp_max > 0.0:
+			player.hp = maxf(1.0, player.hp - player.hp_max * Captivity.rebellion_harm())
+		Bus.toast.emit("The yard rebels! The desperate scatter, and you are struck in the scramble.")
+	elif not escaped.is_empty():
+		Bus.toast.emit("Captivity: %s slipped the guards in the night." % ", ".join(escaped))
+	else:
+		Bus.toast.emit("The yard yields %d stones; rations take %d." % [
+			int(result.get("labor", 0)), int(result.get("paid", 0))])
+	if Game.captives.is_empty():
+		Bus.toast.emit("The holding yard stands empty.")
+	Bus.player_stats_changed.emit()
+
+
+## One row per captive for the ledger and the summary panel. Every number is
+## asked of `Captivity`, so the screen cannot disagree with the day's settlement.
+func captive_rows() -> Array:
+	var out: Array = []
+	for value in Game.captives:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var record: Dictionary = value
+		var loyalty := Captivity.loyalty_of(record)
+		out.append({
+			"name": String(record.get("name", "?")),
+			"realm": maxi(1, int(record.get("realm", 1))),
+			"loyalty": loyalty,
+			"band": Captivity.loyalty_label(loyalty),
+			"colour": Captivity.loyalty_colour(loyalty),
+			"labor": Captivity.daily_labor(record),
+			"upkeep": Captivity.upkeep(record),
+			"escape": Captivity.escape_chance(record, Game.captives.size()),
+			"bounty": Captivity.bounty(record),
+			"held": maxi(0, Clock.day - int(record.get("bound_day", Clock.day))),
+		})
+	return out
+
+
 func _nearest_interactable() -> Node:
 	var best: Node = null
 	var best_dist := 96.0
@@ -1903,6 +2144,14 @@ func _nearest_interactable() -> Node:
 func interaction_prompt() -> String:
 	if player == null or phase == "creation":
 		return ""
+	# A beaten body is a decision, not furniture: it outranks the talk prompt.
+	var beaten := _beaten_body_near()
+	if beaten != null:
+		if beaten.can_be_bound():
+			return "H  Bind %s (beaten)  ·  L captives  (%d/%d held)" % [
+				beaten.display_name, Game.captives.size(), Captivity.max_held()]
+		var health := roundi(beaten.hp / maxf(1.0, beaten.hp_max) * 100.0)
+		return "H  Subdue %s (%d%% health)  ·  L captives" % [beaten.display_name, health]
 	var best := _nearest_interactable()
 	if best == null:
 		return ""
@@ -2070,6 +2319,10 @@ func _talk(npc: Npc) -> void:
 	# is not a conversation worth remembering.
 	if npc.reacting():
 		Bus.toast.emit("%s: \"%s\"" % [npc.display_name, npc.warning_line()])
+		return
+	# The watch keeps its own ledger. A name bad enough closes the guard's mouth.
+	if npc.role == "Guard" and Captivity.wanted(Game.notoriety):
+		Bus.toast.emit("%s: \"The watch knows what you keep in that yard. Move along.\"" % npc.display_name)
 		return
 	# A person who has decided against you does not pretend otherwise, and the
 	# moment is not a conversation worth remembering.
@@ -2760,8 +3013,12 @@ func _load_game(slot: int) -> void:
 		_set_overworld_active(true)
 
 	_close_bars()
+	_close_captives()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
+	# A load is not a night: the yard is settled from the saved day forward, so
+	# restoring a save cannot be farmed for a day of labour.
+	_captive_day = Clock.day
 	player.from_dict(data.get("player", {}))
 	_run_ended = false
 	player.set_physics_process(true)

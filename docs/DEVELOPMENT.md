@@ -484,6 +484,48 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   spawned bodies with the roster at spawn and after a load, putting a restored companion beside the
   player. Schema stays 2 and older saves simply have no party.
 
+## Captivity
+
+- **Two deliberate steps, never an automatic replacement for killing.** `Dummy.weakened()` is true
+  only for an aggressive humanoid (never a beast or a boss) at or below
+  `Captivity.weakened_ratio()` (25% health) with the subsystem enabled. `main._bind_captive()`
+  (**H**) first calls `Dummy.subdue()`: the body drops to 1 hp, stops acting and stays bindable for
+  `subdue_seconds`; a second **H** turns it into a record. Striking a subdued body calls the
+  ordinary death path — kill count, elite/wild table, loot — so the M43 death economy and every
+  earlier fight are untouched. A subdued body whose window expires dies the same way.
+- **The rules are pure.** `Captivity` (`game/systems/captivity.gd`) reads `data/captivity.json`:
+  policies, the loyalty ladder, escape, labour, bounty, notoriety and the legal bands.
+  `settle_day(records, day, stones)` never mutates its input and returns the kept roster, labour,
+  rations paid and unpaid, net stones, notoriety accrued, escaped names and notes. Labour is
+  earned first and rations are paid from labour plus purse, so a poor keeper's people eat before
+  the keeper profits and `net` is never negative.
+- **Consequences are real.** Loyalty drifts by policy (+1 fair, −5 harsh) and further for unpaid
+  rations; it raises daily labour continuously through `loyalty_floor`/`loyalty_span`. Escape risk
+  rises below `restless`, with a crowded yard and as a multiplier in the rebellious band. The roll
+  is `Rng.roll_float("captivity_escape", hash(id), day)` and the check is `roll < chance`, so the
+  same night cannot be rerolled by loading. `rebellion_min` people averaging below
+  `rebellion_loyalty` rebel together: every record at or below that loyalty leaves and the player
+  takes `rebellion_harm` of max hp. **Rebellion and escape are not the same check** — a rebellion
+  takes the desperate regardless of their individual roll.
+- **Legal standing is a saved number.** Capturing adds `per_capture`; each held day adds
+  `per_captive_day` (doubled under harsh terms); a handover pays `bounty` and removes
+  `handover_relief`; a release removes `release_relief`; an empty yard decays by `decay`.
+  `legal_label()`/`wanted()` read the bands, and at Wanted `main._talk()` refuses guards and
+  `main._open_shop()` refuses trade.
+- **Only what the seed cannot rebuild is saved.** `Game.captives`, `captive_policy`, `captive_seq`
+  and `notoriety` are optional keys read through `Captivity.sanitize()`: malformed entries and
+  duplicate or empty ids are dropped, realm/loyalty clamp, an unknown policy becomes authored
+  terms, and the roster caps at `max_held`. Schema stays 2; older saves simply have no yard. The
+  day cursor `_captive_day` is live only and reset on load, so loading cannot farm a day of labour.
+- **The toggle freezes, it does not erase.** With `Settings.content["captivity"]` off,
+  `Dummy.weakened()` is false, `main._settle_captive_day()` returns immediately and the roster is
+  kept intact, so the switch is safe mid-save.
+- **Tests.** Unit `_captivity_tests` covers policies, labour and upkeep, the loyalty bands, escape
+  monotonicity and the exact roll, rebellion, settlement (including unpaid rations and a rebel
+  yard), bounty, legality, sanitising and content validation. Integration beats a foe to 10% hp,
+  subdues and binds it, executes a different subdued body to prove the kill path is intact, cycles
+  the terms, settles a day, hands one over, releases another and saves/loads the yard.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

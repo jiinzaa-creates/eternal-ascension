@@ -77,6 +77,7 @@ func _ready() -> void:
 	_npcai_tests()
 	_relationships_tests()
 	_party_tests()
+	_captivity_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3648,6 +3649,172 @@ func _party_tests() -> void:
 	check(npc.hp > 0.0, "a downed companion is not dead")
 	check(Game.party_ids.is_empty(), "a downed companion leaves the saved roster")
 	npc.free()
+
+
+## Captivity is a status with consequences: labour, upkeep, loyalty drift,
+## escape, rebellion, bounty and a legal name the market remembers. Every rule
+## is a pure static, so the whole trade is checked without a body or a scene.
+func _captivity_tests() -> void:
+	print("[captivity] the holding yard is a ledger, not an inventory slot")
+	var policies := Captivity.policies()
+	check(policies.size() >= 2, "captivity ships more than one set of terms")
+	check(Captivity.policy_ids().has(Captivity.DEFAULT_POLICY), "the default terms exist")
+	check(String(Captivity.policy(Captivity.DEFAULT_POLICY).get("name", "")) != "",
+		"a policy has a name")
+	check(Captivity.policy_id_or_default("captivity.nonsense") == Captivity.default_policy_id(),
+		"an unknown policy falls back to authored terms")
+	check(Captivity.policy("captivity.nonsense").is_empty(), "an unknown policy is empty, not invented")
+
+	var fair := Captivity.new_record("captive.test.fair", "Lin Zhao", 2, 0, 4, Captivity.DEFAULT_POLICY)
+	var harsh := Captivity.new_record("captive.test.harsh", "Mo Yan", 2, 0, 4, Captivity.HARD_POLICY)
+	check(String(fair.get("policy", "")) == Captivity.DEFAULT_POLICY, "a record keeps the terms it was taken under")
+	check(int(fair.get("bound_day", 0)) == 4, "a record remembers the day")
+	check(int(fair.get("loyalty", 0)) == int(Captivity.loyalty_rules().get("start", 35)),
+		"a stranger starts at the authored loyalty")
+	var warmer := Captivity.new_record("captive.test.warm", "Su Fei", 1, 80, 4, Captivity.DEFAULT_POLICY)
+	check(int(warmer.get("loyalty", 0)) > int(fair.get("loyalty", 0)),
+		"a person already warm to you starts more loyal")
+
+	check(Captivity.daily_labor(fair) > 0, "a captive's work is worth stones")
+	check(Captivity.daily_labor(harsh) > Captivity.daily_labor(fair),
+		"harsh terms extract more labour")
+	check(Captivity.upkeep(fair) > Captivity.upkeep(harsh), "fair terms cost rations")
+	var higher := Captivity.new_record("captive.test.higher", "Han Jue", 5, 0, 4, Captivity.DEFAULT_POLICY)
+	check(Captivity.daily_labor(higher) > Captivity.daily_labor(fair),
+		"a higher realm works more")
+	var broken := fair.duplicate(true)
+	broken["loyalty"] = 0
+	check(Captivity.daily_labor(broken) < Captivity.daily_labor(fair),
+		"a broken person works less")
+	check(Captivity.daily_labor(broken) >= 0, "labour is never negative")
+
+	check(Captivity.loyalty_band(0) == Captivity.BAND_REBELLIOUS, "zero loyalty is rebellious")
+	check(Captivity.loyalty_band(20) == Captivity.BAND_RESTLESS, "a hungry person is restless")
+	check(Captivity.loyalty_band(50) == Captivity.BAND_STEADY, "an ordinary captive is steady")
+	check(Captivity.loyalty_band(90) == Captivity.BAND_BONDED, "a long-kept person can bond")
+	check(Captivity.loyalty_label(0) == "Rebellious", "the band has a player-facing name")
+	check(Captivity.loyalty_colour(0) != Captivity.loyalty_colour(90), "the bands read apart")
+
+	var chance_low := Captivity.escape_chance(broken, 1)
+	var chance_high := Captivity.escape_chance(fair, 1)
+	check(chance_low > chance_high, "desperation raises the chance of escape")
+	check(Captivity.escape_chance(fair, 4) > Captivity.escape_chance(fair, 1),
+		"a crowded yard is harder to watch")
+	check(Captivity.escape_chance(broken, 40) <= float(Captivity.escape_rules().get("max", 0.55)) + 0.0001,
+		"escape chance is capped")
+	var escape_day := 12
+	var escape_roll := float(Rng.roll_float(Captivity.ESCAPE_DOMAIN, hash(String(broken.get("id", ""))), escape_day))
+	check(Captivity.escapes(broken, escape_day, 1) == (escape_roll < Captivity.escape_chance(broken, 1)),
+		"the escape check is the documented roll, not a scripted run")
+	check(Captivity.escapes(broken, escape_day, 1) == Captivity.escapes(broken, escape_day, 1),
+		"the same night cannot be rerolled")
+
+	var calm_yard: Array = [fair, fair.duplicate(true), fair.duplicate(true)]
+	var angry_yard: Array = []
+	for i in 3:
+		var angry := fair.duplicate(true)
+		angry["id"] = "captive.test.angry.%d" % i
+		angry["loyalty"] = 8
+		angry_yard.append(angry)
+	check(not Captivity.rebellion_risk(calm_yard), "a contented yard does not rise")
+	check(Captivity.rebellion_risk(angry_yard), "enough desperate people rise together")
+	check(not Captivity.rebellion_risk([angry_yard[0], angry_yard[1]]), "two people are not a rebellion")
+
+	# One fair day: labour is earned, rations are paid out of it, loyalty rises.
+	var day_result := Captivity.settle_day([fair], 10, 0)
+	check(int(day_result.get("labor", 0)) > 0, "a day's work is counted")
+	check(int(day_result.get("paid", 0)) > 0, "rations are paid")
+	check(int(day_result.get("net", 0)) == int(day_result.get("labor", 0)) - int(day_result.get("paid", 0)),
+		"the keeper's share is labour minus rations")
+	var kept: Array = day_result.get("records", [])
+	check(kept.size() == 1, "a contented captive stays")
+	check(int((kept[0] as Dictionary).get("loyalty", 0)) > int(fair.get("loyalty", 0)),
+		"fair terms slowly win loyalty")
+	check(int(day_result.get("notoriety", 0)) > 0, "holding people is a crime the market counts")
+	check(int(fair.get("loyalty", 0)) == int(Captivity.loyalty_rules().get("start", 35)),
+		"settling a day does not mutate the saved record")
+
+	var harsh_day := Captivity.settle_day([harsh], 10, 100)
+	var harsh_kept: Array = harsh_day.get("records", [])
+	check(int((harsh_kept[0] as Dictionary).get("loyalty", 0)) < int(harsh.get("loyalty", 0)),
+		"harsh terms burn loyalty")
+	check(int(harsh_day.get("notoriety", 0)) > int(day_result.get("notoriety", 0)),
+		"harsh terms are worse for your name")
+
+	# A poor keeper: two fair captives, no stones, so the rations go unpaid.
+	var poor: Array = []
+	for i in 2:
+		var record := fair.duplicate(true)
+		record["id"] = "captive.test.poor.%d" % i
+		record["realm"] = 1
+		record["loyalty"] = 0
+		poor.append(record)
+	var poor_day := Captivity.settle_day(poor, 10, 0)
+	check(int(poor_day.get("unpaid", 0)) > 0, "rations can go unpaid")
+	check(int(poor_day.get("net", 0)) >= 0, "the keeper never pays out more than the work earns")
+	check(not (poor_day.get("notes", []) as Array).is_empty(), "an unpaid day says so")
+
+	# Rebellion takes everyone desperate at once.
+	var rising := Captivity.settle_day(angry_yard, 10, 100)
+	check(bool(rising.get("rebellion", false)), "a desperate yard rebels")
+	check((rising.get("records", []) as Array).is_empty(), "the rebels all leave")
+	check((rising.get("escaped", []) as Array).size() == 3, "every rebel is named")
+
+	check(Captivity.bounty(fair) > 0, "the watch pays for a handover")
+	check(Captivity.bounty(higher) > Captivity.bounty(fair), "a stronger cultivator is worth more")
+	check(Captivity.capture_notoriety() > 0, "taking a person costs your name something")
+	check(Captivity.handover_relief() > 0 and Captivity.release_relief() > 0,
+		"both endings give the name some relief")
+	check(Captivity.legal_label(0) != Captivity.legal_label(100), "the legal name changes with the number")
+	check(not Captivity.wanted(int(Captivity.legal_band(0).get("max", 9))),
+		"the lowest legal band is not wanted")
+	check(not Captivity.wanted(0), "an unmarked cultivator is not wanted")
+	check(Captivity.wanted(Captivity.notoriety_cap()), "a full name is wanted")
+	check(Captivity.legal_blurb(0) != "", "a legal band explains itself")
+
+	# Binding is refused for a reason the player can read.
+	var saved_toggle: bool = bool(Settings.content.get("captivity", true))
+	Settings.content["captivity"] = true
+	check(bool(Captivity.can_bind([]).get("ok", false)), "an empty yard accepts a captive")
+	var full: Array = []
+	for i in Captivity.max_held():
+		full.append(Captivity.new_record("captive.test.full.%d" % i, "Captive %d" % i, 1, 0, 1, Captivity.DEFAULT_POLICY))
+	check(not bool(Captivity.can_bind(full).get("ok", false)), "a full yard refuses another")
+	Settings.content["captivity"] = false
+	check(not Captivity.enabled(), "the subsystem can be switched off")
+	var off := Captivity.can_bind([])
+	check(not bool(off.get("ok", false)) and String(off.get("reason", "")) != "",
+		"a switched-off subsystem explains itself")
+	Settings.content["captivity"] = saved_toggle
+
+	# A save is read without trust.
+	check(Captivity.sanitize("nonsense").is_empty(), "a malformed roster becomes empty")
+	var loaded := Captivity.sanitize([
+		{"id": "captive.a", "name": "A", "realm": 99, "loyalty": 500, "policy": "nope", "labor": -4},
+		{"id": "captive.a", "name": "duplicate"},
+		{"id": "", "name": "nameless"},
+		{"id": "captive.b", "name": "B", "loyalty": -50},
+	])
+	check(loaded.size() == 2, "duplicate and nameless records are dropped")
+	check(int((loaded[0] as Dictionary).get("realm", 0)) == 12, "a loaded realm is clamped")
+	check(int((loaded[0] as Dictionary).get("loyalty", 0)) == int(Captivity.loyalty_rules().get("max", 100)),
+		"a loaded loyalty is clamped")
+	check(String((loaded[0] as Dictionary).get("policy", "")) == Captivity.default_policy_id(),
+		"an unknown policy becomes authored terms")
+	check(int((loaded[1] as Dictionary).get("loyalty", 0)) == 0, "negative loyalty floors at zero")
+	check(Captivity.describe(loaded[0]).contains("realm"), "a captive can be described in one line")
+
+	# The shipped file passes its own validator, and each broken rule fails it.
+	check(Captivity.validate(DB.captivity).is_empty(), "the shipped captivity data validates")
+	var broken_data: Dictionary = DB.captivity.duplicate(true)
+	(broken_data["policies"] as Array)[0]["labor"] = 0.0
+	check(not Captivity.validate(broken_data).is_empty(), "a policy that pays nothing is rejected")
+	var gap_data: Dictionary = DB.captivity.duplicate(true)
+	(gap_data["legal"] as Array)[1]["min"] = 40
+	check(not Captivity.validate(gap_data).is_empty(), "a gap in the legal bands is rejected")
+	var ladder_data: Dictionary = DB.captivity.duplicate(true)
+	(ladder_data["loyalty"] as Dictionary)["restless"] = 5
+	check(not Captivity.validate(ladder_data).is_empty(), "an out-of-order loyalty ladder is rejected")
 
 
 func _quest_tests() -> void:

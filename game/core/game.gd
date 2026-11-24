@@ -39,6 +39,15 @@ var npc_memory: Dictionary = {}
 ## the only party state a save carries: builds, health and positions regenerate
 ## with the people.
 var party_ids: Array = []
+## People held against their will. Unlike a bond, loyalty is the player's doing,
+## so the roster is saved whole; `Captivity.sanitize()` cleans it on load.
+var captives: Array = []
+## The terms the whole holding yard is kept under (fair or harsh).
+var captive_policy := "captivity.fair"
+## Advanced once per binding, so two people taken on one day cannot share an id.
+var captive_seq := 0
+## The market's legal memory of the player's dealings in bound labour, 0..100.
+var notoriety := 0
 
 
 func _process(delta: float) -> void:
@@ -64,6 +73,10 @@ func new_run(seed_value: int = 0) -> void:
 	professions.clear()
 	npc_memory.clear()
 	party_ids.clear()
+	captives.clear()
+	captive_policy = Captivity.default_policy_id()
+	captive_seq = 0
+	notoriety = 0
 	hitstop.clear()
 
 
@@ -103,6 +116,10 @@ func to_dict() -> Dictionary:
 		"professions": professions.duplicate(true),
 		"npc_memory": npc_memory.duplicate(true),
 		"party": party_ids.duplicate(),
+		"captives": captives.duplicate(true),
+		"captive_policy": captive_policy,
+		"captive_seq": captive_seq,
+		"notoriety": notoriety,
 	}
 
 
@@ -124,3 +141,7 @@ func from_dict(data: Dictionary) -> void:
 	professions = Professions.sanitize(data.get("professions", {}))
 	npc_memory = NpcDb.sanitize_memory(data.get("npc_memory", {}))
 	party_ids = Party.sanitize(data.get("party", []))
+	captives = Captivity.sanitize(data.get("captives", []))
+	captive_policy = Captivity.policy_id_or_default(String(data.get("captive_policy", "")))
+	captive_seq = maxi(0, int(data.get("captive_seq", 0)))
+	notoriety = clampi(int(data.get("notoriety", 0)), 0, Captivity.notoriety_cap())

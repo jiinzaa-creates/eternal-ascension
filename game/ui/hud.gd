@@ -104,10 +104,12 @@ func _draw() -> void:
 	draw_alchemy(player)
 	draw_quest(player)
 	draw_party(player)
+	draw_captives(player)
 	draw_prompt()
 	draw_realm_banner()
 	draw_tribulation()
 	draw_boss()
+	draw_captive_ledger(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -390,6 +392,81 @@ func draw_party(player: Player) -> void:
 			String(DB.realm(npc.realm).get("name", "Realm %d" % npc.realm)),
 			npc.bond_label(), roundi(npc.hp), roundi(npc.hp_max)], 10, MUTED)
 		y += 17.0
+
+
+## The holding yard at a glance, under the party: who is kept, how loyal they
+## are and what the yard yields. Empty and unremarkable until the player takes
+## someone, and never louder than the fight it sits beside.
+func draw_captives(player: Player) -> void:
+	var rows: Array = host.captive_rows()
+	if rows.is_empty() and Game.notoriety <= 0:
+		return
+	var members: Array = host.party_members()
+	var x := size.x - 316.0
+	var y := 296.0
+	if not members.is_empty():
+		y += 34.0 + float(members.size()) * 34.0
+	var shown := mini(rows.size(), 3)
+	var height := 58.0 + float(shown) * 18.0 + (16.0 if rows.size() > shown else 0.0)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, height), PANEL_BG)
+	_text(Vector2(x, y), "CAPTIVES  %d/%d · %s" % [rows.size(), Captivity.max_held(),
+		Captivity.policy_name(Game.captive_policy)], 12, ACCENT)
+	var legal_colour := Color("#d06060") if Captivity.wanted(Game.notoriety) else MUTED
+	_text(Vector2(x + 198.0, y), "%s %d" % [Captivity.legal_label(Game.notoriety), Game.notoriety], 11, legal_colour)
+	y += 20.0
+	for i in shown:
+		var entry: Dictionary = rows[i]
+		var line := "%s · %s (%d) · %d stones" % [String(entry["name"]), String(entry["band"]),
+			int(entry["loyalty"]), int(entry["labor"])]
+		_text(Vector2(x, y), _fit(line, 11, 290.0), 11, Color(String(entry["colour"])))
+		y += 18.0
+	if rows.size() > shown:
+		_text(Vector2(x, y), "+%d more · L ledger" % (rows.size() - shown), 10, MUTED)
+
+
+## The ledger: one row per person held, with the terms, the escape chance and
+## what the watch would pay. Play is frozen while it is open, because deciding a
+## person's sentence should not happen mid-swing.
+func draw_captive_ledger(player: Player) -> void:
+	if not bool(host.captives_open):
+		return
+	var rows: Array = host.captive_rows()
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.82))
+	var w := 720.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := 92.0
+	var h := 470.0
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.96))
+	draw_rect(Rect2(x, y, w, h), Color("#7fd3e0", 0.4), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "THE HOLDING YARD", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "Terms: %s — %s" % [
+		Captivity.policy_name(Game.captive_policy), Captivity.policy_blurb(Game.captive_policy)], 11, MUTED)
+	var legal_colour := Color("#d06060") if Captivity.wanted(Game.notoriety) else MUTED
+	_text(Vector2(x + 24.0, y + 78.0), "%s (%d) · %d spirit stones" % [
+		Captivity.legal_label(Game.notoriety), Game.notoriety, Game.spirit_stones], 11, legal_colour)
+	draw_line(Vector2(x + 20.0, y + 94.0), Vector2(x + w - 20.0, y + 94.0), Color("#2b343a"), 1.0)
+
+	var labour := 0
+	var upkeep := 0
+	for value in rows:
+		var row: Dictionary = value
+		labour += int(row["labor"])
+		upkeep += int(row["upkeep"])
+	var selected: int = clampi(int(host.captive_index), 0, maxi(0, rows.size() - 1))
+	for i in rows.size():
+		var entry: Dictionary = rows[i]
+		var row_y := y + 124.0 + float(i) * 46.0
+		var background := Color("#16232a", 0.92) if i == selected else Color("#111a1f", 0.6)
+		draw_rect(Rect2(x + 16.0, row_y - 18.0, w - 32.0, 40.0), background)
+		_text(Vector2(x + 28.0, row_y), "%s · realm %d · held %d day%s" % [String(entry["name"]),
+			int(entry["realm"]), int(entry["held"]), "" if int(entry["held"]) == 1 else "s"], 13, INK)
+		_text(Vector2(x + 28.0, row_y + 16.0), "%s (%d) · %d stones/day · escape %d%% · watch pays %d" % [
+			String(entry["band"]), int(entry["loyalty"]), int(entry["labor"]),
+			roundi(float(entry["escape"]) * 100.0), int(entry["bounty"])], 11, Color(String(entry["colour"])))
+
+	_text(Vector2(x + 24.0, y + h - 56.0), "Today the yard yields %d stones; rations take %d." % [labour, upkeep], 12, MUTED)
+	_text(Vector2(x + 24.0, y + h - 30.0), "UP/DOWN select · ENTER hand to the watch · U release · TAB terms · L/E close", 11, Color("#7b8b94"))
 
 
 ## The active bar only: six slots, each with its art's own cooldown sweep.
@@ -895,7 +972,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

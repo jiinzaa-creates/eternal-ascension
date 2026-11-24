@@ -40,6 +40,9 @@ var professions: Array = []
 var bonds: Array = []
 var bond_ties: Array = []
 var bond_pairs: Array = []
+## Captivity rules: keeping terms, loyalty, escape, labour, bounty and the
+## legal bands. One file, read by `Captivity` only.
+var captivity: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -91,6 +94,7 @@ func load_all() -> void:
 	bonds = bond_data.get("bands", [])
 	bond_ties = bond_data.get("ties", [])
 	bond_pairs = bond_data.get("pairs", [])
+	captivity = _read("captivity.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -629,6 +633,9 @@ func validate() -> Array:
 	# Relationship content: bands must tile the whole score range, ties must
 	# name each other, and authored pairs must reference both.
 	problems.append_array(Relationships.validate(bonds, bond_ties, bond_pairs))
+	# Captivity content: policies must pay, the loyalty ladder must be ordered,
+	# the legal bands must tile 0..cap and the binding rules must be usable.
+	problems.append_array(Captivity.validate(captivity))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())

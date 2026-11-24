@@ -17,6 +17,8 @@ const KEY_BINDINGS := {
 	"meditate": [KEY_F],
 	"interact": [KEY_E],
 	"party_toggle": [KEY_P],
+	"bind_captive": [KEY_H],
+	"open_captives": [KEY_L],
 	"breakthrough": [KEY_G],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],

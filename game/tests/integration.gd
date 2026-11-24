@@ -3343,6 +3343,143 @@ func _run() -> void:
 		m51_restored.reaction = "routine"
 		m51_restored.snap_to_schedule()
 
+	# --- captivity: beat, bind, keep, hand over, save ------------------------
+	var m52_day: int = Clock.day
+	var m52_hour: float = Clock.hour
+	var m52_home: Vector2 = player.global_position
+	var m52_toggle: bool = bool(Settings.content.get("captivity", true))
+	Clock.day = 11
+	Clock.hour = 10.0
+	player.global_position = main.settlement.position_for("plaza")
+	Game.captives.clear()
+	Game.notoriety = 0
+	Game.captive_seq = 0
+	Game.captive_policy = Captivity.default_policy_id()
+	main._captive_day = Clock.day
+	Settings.content["captivity"] = true
+	await frames(2)
+
+	var m52_body := Dummy.new()
+	m52_body.ilvl = 2
+	main.world.add_child(m52_body)
+	m52_body.global_position = player.global_position + Vector2(36, 0)
+	m52_body.profile["aggro_range"] = 0.0
+	var m52_kills: int = Game.kills
+	m52_body.hp = m52_body.hp_max * 0.1
+	check(m52_body.weakened(), "a weakened enemy can be taken")
+	check(String(main.interaction_prompt()).contains("H  Subdue"), "a weakened enemy offers the binding key")
+	main._bind_captive()
+	check(m52_body.subdued and m52_body.hp > 0.0, "subduing drops a foe without killing them")
+	check(Game.kills == m52_kills, "taking a body alive is not a kill")
+	check(m52_body.can_be_bound(), "a subdued body can still be bound")
+	check(String(main.interaction_prompt()).contains("H  Bind"), "a subdued body offers the binding key")
+
+	# Striking the subdued body is the third option: it finishes the fight.
+	var m52_exec := Dummy.new()
+	m52_exec.ilvl = 1
+	main.world.add_child(m52_exec)
+	m52_exec.global_position = player.global_position + Vector2(70, 0)
+	m52_exec.hp = m52_exec.hp_max * 0.1
+	m52_exec.subdue()
+	m52_exec.take_hit(4.0, Vector2.ZERO, 0.0, 1.0)
+	check(m52_exec.state == "dead" and Game.kills == m52_kills + 1,
+		"striking a subdued body still kills it")
+	await frames(2)
+
+	main._bind_captive()
+	check(Game.captives.size() == 1, "binding fills the holding yard")
+	check(Game.notoriety == Captivity.capture_notoriety(), "taking a person marks your name")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("holding yard"),
+		"the binding is announced")
+	var m52_record: Dictionary = Game.captives[0]
+	check(String(m52_record.get("name", "")) != "", "a captive has a name")
+	check(int(m52_record.get("realm", 0)) >= 2, "a captive keeps the realm it was beaten at")
+	check(int(m52_record.get("bound_day", 0)) == Clock.day, "a captive remembers the day it was taken")
+	await frames(2)
+
+	# The ledger is a frozen screen, and its terms change the whole yard.
+	main.toggle_captives()
+	check(main.captives_open, "the ledger opens on a full yard")
+	var m52_policy_before := Game.captive_policy
+	main._cycle_captive_policy()
+	check(Game.captive_policy != m52_policy_before, "the ledger changes the terms")
+	check(String((Game.captives[0] as Dictionary).get("policy", "")) == Game.captive_policy,
+		"the terms apply to everyone held")
+	main._cycle_captive_policy()
+	Game.captive_policy = Captivity.default_policy_id()
+	for m52_value in Game.captives:
+		(m52_value as Dictionary)["policy"] = Game.captive_policy
+	main.toggle_captives()
+	check(not main.captives_open, "the ledger closes again")
+
+	# A day of keeping: the work is paid, loyalty moves and the name grows.
+	var m52_stones: int = Game.spirit_stones
+	var m52_loyalty: int = int((Game.captives[0] as Dictionary).get("loyalty", 0))
+	var m52_notoriety: int = Game.notoriety
+	main._captive_day = Clock.day
+	Clock.day += 1
+	main._check_captivity()
+	check(Game.spirit_stones > m52_stones, "a kept person earns stones for the yard")
+	check(int((Game.captives[0] as Dictionary).get("loyalty", 0)) > m52_loyalty,
+		"fair terms win a little loyalty")
+	check(Game.notoriety > m52_notoriety, "holding people hardens your name")
+
+	# Handing the sentence to the watch pays a bounty and buys relief.
+	var m52_after_day: int = Game.spirit_stones
+	main._hand_over_captive(0)
+	check(Game.captives.is_empty(), "a handover empties the row")
+	check(Game.spirit_stones > m52_after_day, "the watch pays its bounty")
+	check(Game.notoriety < m52_notoriety + 5, "a handover buys the name some relief")
+
+	# Release is the other ending: no coin, less of a name.
+	Game.captives.append(Captivity.new_record("captive.test.release", "Wei Shan", 1, 0, Clock.day, Game.captive_policy))
+	Game.notoriety = 12
+	main._release_captive(0)
+	check(Game.captives.is_empty(), "a released captive leaves the yard")
+	check(Game.notoriety == 12 - Captivity.release_relief(), "release gives the name relief")
+
+	# The roster and the name are saved; the terms travel with them.
+	Game.captives.append(Captivity.new_record("captive.test.save", "Qiu Rou", 3, 0, Clock.day, Captivity.HARD_POLICY))
+	Game.captive_policy = Captivity.HARD_POLICY
+	Game.notoriety = 17
+	Save.delete_slot(99)
+	main._save(99)
+	Game.captives.clear()
+	Game.notoriety = 0
+	Game.captive_policy = Captivity.default_policy_id()
+	main._load_game(99)
+	check(Game.captives.size() == 1 and String((Game.captives[0] as Dictionary).get("id", "")) == "captive.test.save",
+		"the holding yard survives a save")
+	check(Game.notoriety == 17, "the legal name survives a save")
+	check(Game.captive_policy == Captivity.HARD_POLICY, "the terms survive a save")
+	Save.delete_slot(99)
+
+	# With the subsystem off, a beaten body dies as it always did.
+	Game.captives.clear()
+	Game.notoriety = 0
+	Settings.content["captivity"] = false
+	var m52_off_body := Dummy.new()
+	m52_off_body.ilvl = 1
+	main.world.add_child(m52_off_body)
+	m52_off_body.global_position = player.global_position + Vector2(40, 0)
+	m52_off_body.hp = m52_off_body.hp_max * 0.1
+	check(not m52_off_body.weakened(), "a switched-off subsystem offers no binding")
+	main._bind_captive()
+	check(Game.captives.is_empty() and not m52_off_body.subdued, "nothing is taken with captivity off")
+	m52_off_body.queue_free()
+	await frames(2)
+	Settings.content["captivity"] = m52_toggle
+
+	Game.captives.clear()
+	Game.captive_policy = Captivity.default_policy_id()
+	Game.notoriety = 0
+	Game.captive_seq = 0
+	main._close_captives()
+	main._captive_day = m52_day
+	Clock.day = m52_day
+	Clock.hour = m52_hour
+	player.global_position = m52_home
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

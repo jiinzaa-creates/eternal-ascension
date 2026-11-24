@@ -85,6 +85,11 @@ var _knock := Vector2.ZERO
 var _windup := 0.0
 var _cooldown := 0.8
 var _dead := false
+## A beaten humanoid is not necessarily dead. It goes down, cannot act, and
+## stays bindable for a short window before the wounds finish what the fight
+## started. Captivity is a status, so nothing here registers a kill or a drop.
+var subdued := false
+var _subdued_left := 0.0
 var _strikes := 0
 var _alert := 0.0
 var _provoked := false
@@ -228,6 +233,9 @@ func set_archetype(id: String) -> void:
 
 func _physics_process(delta: float) -> void:
 	if _dead:
+		return
+	if subdued:
+		_tick_subdued(delta)
 		return
 	# A landed blow freezes both sides of a fight while the freeze timer, which
 	# ticks in real time, counts down.
@@ -522,6 +530,13 @@ func take_hit(amount: float, knock: Vector2, poise_damage: float, penetration: f
 		status_payload: Dictionary = {}) -> float:
 	if _dead:
 		return 0.0
+	# Striking a subdued body is a decision: it finishes what the fight started,
+	# with the ordinary death, kill count and loot.
+	if subdued:
+		subdued = false
+		hp = 0.0
+		_die()
+		return amount
 	var effective_armor := armor_value * (1.0 - clampf(penetration, 0.0, 0.9))
 	var final := Damage.mitigate_armor(amount * Status.taken_multiplier(statuses), effective_armor)
 	hp -= final
@@ -562,6 +577,61 @@ func _tick_statuses(delta: float) -> void:
 			_die()
 
 
+## Beaten enough to be taken, but still standing. This is the only door into
+## captivity: a healthy enemy must be fought down first, and an ordinary kill
+## still kills, so loot, kill counts and every earlier fight are untouched.
+## Beasts have no terms to offer, bosses are a story that ends here, and a
+## training dummy is furniture.
+func weakened() -> bool:
+	if _dead or subdued or not Captivity.enabled():
+		return false
+	if not aggressive or is_beast or is_boss or hp <= 0.0:
+		return false
+	return hp <= hp_max * Captivity.weakened_ratio()
+
+
+## Down, not dead: the body drops its guard and waits to be bound or finished.
+## There is no kill here, so no kill count, no loot and no death channel — a
+## person who is taken is still alive.
+func subdue() -> bool:
+	if not weakened():
+		return false
+	subdued = true
+	_dead = false
+	# A beaten body is done fighting, and a body that has already been spared
+	# once cannot be subdued again when its window closes.
+	aggressive = false
+	hp = maxf(1.0, hp)
+	state = "subdued"
+	statuses.clear()
+	_windup = 0.0
+	_cooldown = 0.0
+	_knock = Vector2.ZERO
+	velocity = Vector2.ZERO
+	_subdued_left = Captivity.subdue_seconds()
+	queue_redraw()
+	return true
+
+
+## The clock on a beaten body. The window is the player's chance to decide
+## whether this one lives as a captive or dies as an enemy.
+func _tick_subdued(delta: float) -> void:
+	_subdued_left = maxf(0.0, _subdued_left - delta)
+	if _subdued_left <= 0.0:
+		subdued = false
+		_die()
+
+
+## True while the body is on the ground and can still be bound.
+func can_be_bound() -> bool:
+	return subdued and not _dead
+
+
+## Seconds left to bind this body; zero for anyone who is not beaten.
+func subdued_left() -> float:
+	return _subdued_left if subdued else 0.0
+
+
 func _die() -> void:
 	if _dead:
 		return
@@ -592,6 +662,8 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, radius + 9.0, 0.0, TAU, 32, Color(ring, 0.45), 2.0)
 		draw_arc(Vector2.ZERO, radius + 15.0, 0.0, TAU, 32, Color(ring, 0.18), 5.0)
 	var body := body_color
+	if subdued:
+		body = body.darkened(0.45)
 	if _flash > 0.0:
 		body = Color("#ffffff")
 	if poise.is_staggered():
@@ -606,6 +678,14 @@ func _draw() -> void:
 	]), body)
 	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, Color("#2a1c1c"), 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	# A beaten body wears a cold ring and a short trickle of sand: the window in
+	# which it can still be bound, and nothing about a corpse.
+	if subdued:
+		draw_arc(Vector2.ZERO, radius + 9.0, 0.0, TAU, 28, Color("#7fd3e0", 0.65), 2.0)
+		var left := clampf(_subdued_left / maxf(0.01, Captivity.subdue_seconds()), 0.0, 1.0)
+		draw_rect(Rect2(-18.0, radius + 14.0, 36.0, 3.0), Color("#102024"))
+		draw_rect(Rect2(-18.0, radius + 14.0, 36.0 * left, 3.0), Color("#7fd3e0"))
 
 	if _windup > 0.0:
 		var tint := EnemyAI.telegraph_color(profile)

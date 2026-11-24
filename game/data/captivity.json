@@ -1,0 +1,88 @@
+{
+	"policies": [
+		{
+			"id": "captivity.fair",
+			"name": "Fair keeping",
+			"labor": 1.0,
+			"loyalty_drift": 1,
+			"upkeep": 2,
+			"blurb": "Rations, a dry cell and no blows. They work slowly and hate you quietly."
+		},
+		{
+			"id": "captivity.harsh",
+			"name": "Harsh keeping",
+			"labor": 1.8,
+			"loyalty_drift": -5,
+			"upkeep": 0,
+			"blurb": "The lash instead of rice. They work hard while the fear lasts."
+		}
+	],
+	"loyalty": {
+		"start": 35,
+		"min": 0,
+		"max": 100,
+		"rebellious": 15,
+		"restless": 34,
+		"bonded": 70
+	},
+	"escape": {
+		"base": 0.02,
+		"below": 34,
+		"per_loyalty_below": 0.004,
+		"per_captive": 0.015,
+		"rebellious_mult": 1.8,
+		"unpaid_penalty": 3,
+		"max": 0.55
+	},
+	"labor": {
+		"base": 2,
+		"per_realm": 1,
+		"loyalty_floor": 0.5,
+		"loyalty_span": 1.0
+	},
+	"bounty": {
+		"base": 12,
+		"per_realm": 8
+	},
+	"notoriety": {
+		"per_capture": 4,
+		"per_captive_day": 1,
+		"harsh_mult": 2,
+		"handover_relief": 6,
+		"release_relief": 3,
+		"decay": 1,
+		"max": 100
+	},
+	"legal": [
+		{
+			"id": "legal.unmarked",
+			"label": "Unmarked",
+			"min": 0,
+			"max": 9,
+			"blurb": "The watch has no reason to know your name."
+		},
+		{
+			"id": "legal.watched",
+			"label": "Watched",
+			"min": 10,
+			"max": 29,
+			"blurb": "Guards count your prisoners and take notes."
+		},
+		{
+			"id": "legal.wanted",
+			"label": "Wanted",
+			"min": 30,
+			"max": 100,
+			"blurb": "The market will not deal with a slaver."
+		}
+	],
+	"binding": {
+		"reach": 140.0,
+		"subdue_seconds": 30.0,
+		"max_held": 8,
+		"weakened_ratio": 0.25,
+		"rebellion_min": 3,
+		"rebellion_loyalty": 18,
+		"rebellion_harm": 0.12
+	}
+}
