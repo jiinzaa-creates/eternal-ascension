@@ -91,6 +91,7 @@ func _ready() -> void:
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
 	_inheritance_tests()
+	_world_event_tests()
 	_realm_access_tests()
 	_save_tests()
 	print("-----------------------------------------------")
@@ -5371,6 +5372,196 @@ func _inheritance_tests() -> void:
 	broken = DB.inheritances_data.duplicate(true)
 	broken["default"] = "inherit.garden.cadence"
 	check(not Inheritances.validate(broken).is_empty(), "a default outside the tomb is rejected")
+
+
+# ---------------------------------------------------------- world events ----
+
+func _world_event_tests() -> void:
+	print("[events] tidings, their calendar, effects and saved progress")
+	var data: Dictionary = DB.world_events_data
+	check(not data.is_empty(), "the world event table loads")
+	check(WorldEvents.events().size() == 8, "eight tidings are authored")
+	check(WorldEvents.interval_days() == 5, "a new draw begins every five days")
+	check(WorldEvents.default_id() == "event.qi_surge", "the default tiding is authored")
+	check(WorldEvents.validate(data).is_empty(), "the authored world events validate")
+	check(not WorldEvents.find("event.beast_tide").is_empty(), "a tiding is found by id")
+	check(WorldEvents.find("event.nope").is_empty(), "an unknown tiding resolves to nothing")
+
+	# The calendar is a pure function of the day and the seed.
+	check(WorldEvents.cycle_for(1) == 0 and WorldEvents.cycle_for(5) == 0, "the first five days share a cycle")
+	check(WorldEvents.cycle_for(6) == 1 and WorldEvents.cycle_for(10) == 1, "the sixth day opens the next cycle")
+	check(WorldEvents.cycle_start(0) == 1 and WorldEvents.cycle_start(2) == 11, "a cycle starts on its first day")
+	var seed_value := 424242
+	var first: Dictionary = WorldEvents.active(9, seed_value)
+	var again: Dictionary = WorldEvents.active(9, seed_value)
+	check(String(first.get("id", "")) == String(again.get("id", "")), "the same day and seed draw the same tiding")
+	check(int(first.get("cycle", -1)) == WorldEvents.cycle_for(9), "a day reports its cycle")
+	check(int(WorldEvents.active(9, seed_value + 1).get("cycle", -1)) == int(first.get("cycle", -2)),
+		"the cycle does not depend on the seed")
+
+	# Walk four months: every live tiding stays inside its cycle, and quiet days
+	# and events both occur.
+	var seen: Dictionary = {}
+	var active_days := 0
+	var quiet_days := 0
+	var inside_window := true
+	var cycle_consistent := true
+	var tasks_readable := true
+	for d in range(1, 201):
+		var state: Dictionary = WorldEvents.active(d, seed_value)
+		if int(state.get("cycle", -1)) != WorldEvents.cycle_for(d):
+			cycle_consistent = false
+		if bool(state.get("active", false)):
+			active_days += 1
+			seen[String(state.get("id", ""))] = true
+			var start := int(state.get("start_day", 0))
+			var end := int(state.get("end_day", -1))
+			if start > d or end < d or end < start:
+				inside_window = false
+			if int(state.get("day_index", 0)) != d - start + 1:
+				inside_window = false
+			var goal := WorldEvents.goal_of(state)
+			if not goal.is_empty() and WorldEvents.progress_text(state, 0) == "":
+				tasks_readable = false
+		else:
+			quiet_days += 1
+	check(active_days > 0, "tidings occur")
+	check(quiet_days > 0, "some days are quiet")
+	check(seen.size() >= 3, "several tidings appear over four months")
+	check(inside_window, "every live tiding stays inside its cycle")
+	check(cycle_consistent, "every day reports its own cycle")
+	check(tasks_readable, "every authored task reads as progress")
+
+	# Window arithmetic on the first tiding the walk finds.
+	var live: Dictionary = {}
+	for d in range(1, 121):
+		var state: Dictionary = WorldEvents.active(d, seed_value)
+		if bool(state.get("active", false)):
+			live = state
+			break
+	check(not live.is_empty(), "a tiding appears within four months")
+	if not live.is_empty():
+		var start := int(live.get("start_day", 0))
+		var end := int(live.get("end_day", -1))
+		check(int(live.get("day_index", 0)) == 1, "the first live day is the tiding's first")
+		check(int(live.get("days", 0)) == end - start + 1, "the duration matches the window")
+		var last: Dictionary = WorldEvents.active(end, seed_value)
+		check(String(last.get("id", "")) == String(live.get("id", "")), "the tiding is live on its last day")
+		check(int(last.get("day_index", 0)) == int(live.get("days", 0)), "the last day counts the duration")
+		if WorldEvents.cycle_for(end + 1) == int(live.get("cycle", -1)):
+			check(not bool(WorldEvents.active(end + 1, seed_value).get("active", false)),
+				"the day after a tiding ends is quiet")
+	var quiet: Dictionary = WorldEvents.quiet_state(2)
+	check(not bool(quiet.get("active", false)) and String(quiet.get("id", "")) == "", "a quiet cycle has no tiding")
+	check(WorldEvents.label(quiet) == "", "a quiet day has no banner")
+
+	# Effects are data; a missing key is neutral, never a hidden buff.
+	var tide := WorldEvents.find("event.beast_tide")
+	check(is_equal_approx(WorldEvents.mult(tide, "cultivation"), 1.0), "an unauthored effect is neutral")
+	check(WorldEvents.int_effect(tide, "enemy_pop") == 2, "the beast tide adds wild foes")
+	check(WorldEvents.int_effect(tide, "harvest_extra") == 0, "the tide does not touch gathering")
+	var fair := WorldEvents.find("event.grand_market")
+	check(is_equal_approx(WorldEvents.mult(fair, "shop_buy"), 0.75), "the fair cuts market prices")
+	check(is_equal_approx(WorldEvents.mult(fair, "shop_sell"), 1.25), "the fair raises sale values")
+	check(not WorldEvents.flag(fair, "rifts_open"), "an ordinary tiding leaves rifts closed")
+	var convergence := WorldEvents.find("event.rift_convergence")
+	check(WorldEvents.flag(convergence, "rifts_open"), "the convergence holds rifts open")
+	var resonance := WorldEvents.find("event.ancestral_resonance")
+	check(is_equal_approx(WorldEvents.mult(resonance, "trial_seconds"), 1.5), "resonance lengthens altar trials")
+	var assembly := WorldEvents.find("event.sect_assembly")
+	check(is_equal_approx(WorldEvents.mult(assembly, "contribution"), 2.0), "the assembly doubles sect service")
+	var surge := WorldEvents.find("event.qi_surge")
+	check(is_equal_approx(WorldEvents.mult(surge, "cultivation"), 1.5), "the Qi surge quickens cultivation")
+	check(WorldEvents.int_effect(surge, "harvest_extra") == 1, "the Qi surge adds a herb per gathering")
+
+	# Tasks advance only for their own kind and clamp at the count.
+	var task := {
+		"active": true, "id": "event.test", "name": "Test Tiding", "description": "A test.",
+		"color": "#ffffff", "start_day": 1, "end_day": 3, "days": 3, "day_index": 2,
+		"effects": {"enemy_pop": 1}, "goal": {"kind": "kills", "count": 3},
+		"reward": {"stones": 10, "contribution": 2},
+	}
+	check(WorldEvents.advance(task, 0, "kills", 2) == 2, "a task advances with its own kind")
+	check(WorldEvents.advance(task, 2, "kills", 5) == 3, "progress clamps to the task count")
+	check(WorldEvents.advance(task, 2, "crafts", 1) == 2, "another kind never advances the task")
+	check(WorldEvents.advance(task, 2, "kills", 0) == 2, "a zero step changes nothing")
+	check(not WorldEvents.complete(task, 2) and WorldEvents.complete(task, 3), "completion needs the full count")
+	check(WorldEvents.progress_text(task, 2) == "2/3 foes felled", "progress names the task's verb")
+	check(WorldEvents.reward_text(task) == "Reward: 10 spirit stones, 2 contribution.", "the reward reads as authored")
+	check(WorldEvents.label(task).contains("day 2/3"), "the tiding banner counts its days")
+	check(WorldEvents.effect_line(task).contains("+1 wild foes"), "the effect line lists real effects")
+	check(WorldEvents.herald_text(task, 2).contains("Task"), "the herald reads the task")
+	check(WorldEvents.goal_of({"goal": {"kind": "nonsense", "count": 2}}).is_empty(), "an unknown task is not live")
+	check(WorldEvents.goal_of({"goal": {"kind": "kills", "count": 0}}).is_empty(), "a zero-count task is not live")
+	check(WorldEvents.advance({"goal": {}}, 0, "kills", 1) == 0, "a tiding without a task never advances")
+	check(not WorldEvents.complete({"goal": {}}, 5), "a tiding without a task never completes")
+	check(WorldEvents.herald_text(WorldEvents.quiet_state(0), 0).contains("no tiding"), "the herald is quiet on quiet days")
+
+	# Saved progress survives only for the same cycle and tiding.
+	var goal_day := -1
+	var goal_live: Dictionary = {}
+	for d in range(1, 201):
+		var state: Dictionary = WorldEvents.active(d, seed_value)
+		if bool(state.get("active", false)) and not WorldEvents.goal_of(state).is_empty():
+			goal_day = d
+			goal_live = state
+			break
+	check(goal_day > 0, "a task-bearing tiding appears within four months")
+	if goal_day > 0:
+		var count := int(WorldEvents.goal_of(goal_live)["count"])
+		var saved := {"cycle": int(goal_live["cycle"]), "id": String(goal_live["id"]),
+			"progress": mini(2, count), "rewarded": false}
+		var kept := WorldEvents.sanitize(saved, goal_day, seed_value)
+		check(int(kept["progress"]) == mini(2, count), "progress survives for the same tiding")
+		check(not bool(kept["rewarded"]), "an unfinished task is not marked rewarded")
+		var stale := saved.duplicate(true)
+		stale["cycle"] = int(goal_live["cycle"]) + 1
+		stale["progress"] = count
+		stale["rewarded"] = true
+		check(int(WorldEvents.sanitize(stale, goal_day, seed_value)["progress"]) == 0,
+			"a save from another cycle is discarded")
+		var wrong := saved.duplicate(true)
+		wrong["id"] = "event.elsewhere"
+		check(int(WorldEvents.sanitize(wrong, goal_day, seed_value)["progress"]) == 0,
+			"a save naming another tiding is discarded")
+		var cheat := saved.duplicate(true)
+		cheat["progress"] = 0
+		cheat["rewarded"] = true
+		check(not bool(WorldEvents.sanitize(cheat, goal_day, seed_value)["rewarded"]),
+			"a reward flag without progress is refused")
+		var overfull := saved.duplicate(true)
+		overfull["progress"] = count + 40
+		check(int(WorldEvents.sanitize(overfull, goal_day, seed_value)["progress"]) == count,
+			"saved progress is clamped to the task")
+	check(int(WorldEvents.sanitize("junk", goal_day, seed_value)["progress"]) == 0, "junk state is discarded")
+	check(WorldEvents.sanitize({}, goal_day, seed_value).has("cycle"), "an empty save still reports its cycle")
+
+	# Validation catches content mistakes rather than booting a broken calendar.
+	check(not WorldEvents.validate({}).is_empty(), "an empty event table is rejected")
+	var broken := data.duplicate(true)
+	broken["interval_days"] = 0
+	check(not WorldEvents.validate(broken).is_empty(), "a zero-day cycle is rejected")
+	broken = data.duplicate(true)
+	(broken["events"] as Array).append((broken["events"] as Array)[0])
+	check(not WorldEvents.validate(broken).is_empty(), "a duplicate tiding is rejected")
+	broken = data.duplicate(true)
+	broken["default"] = "event.nope"
+	check(not WorldEvents.validate(broken).is_empty(), "an unknown default is rejected")
+	broken = data.duplicate(true)
+	(broken["events"] as Array)[0]["days"] = 0
+	check(not WorldEvents.validate(broken).is_empty(), "a tiding that lasts no days is rejected")
+	broken = data.duplicate(true)
+	(broken["events"] as Array)[0]["effects"]["nonsense"] = 1.0
+	check(not WorldEvents.validate(broken).is_empty(), "an unknown effect is rejected")
+	broken = data.duplicate(true)
+	(broken["events"] as Array)[0]["goal"] = {"kind": "nonsense", "count": 2}
+	check(not WorldEvents.validate(broken).is_empty(), "an unknown task kind is rejected")
+	broken = data.duplicate(true)
+	(broken["events"] as Array)[0]["reward"] = {"stones": -5}
+	check(not WorldEvents.validate(broken).is_empty(), "a negative reward is rejected")
+	broken = data.duplicate(true)
+	(broken["events"] as Array)[0]["color"] = "green"
+	check(not WorldEvents.validate(broken).is_empty(), "a tiding without a hex colour is rejected")
 
 
 # ------------------------------------------------------------------- save ----

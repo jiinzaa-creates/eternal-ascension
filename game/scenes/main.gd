@@ -134,6 +134,13 @@ var realm_cleared := false
 ## Legacy tomb flag. Per-site claims live in `inheritances_taken`.
 var inheritance_taken := false
 var inheritances_taken: Dictionary = {}
+
+# The province's live tiding and the progress made against its task. The tiding
+# is derived from the calendar; only progress and the reward flag are saved.
+var world_event: Dictionary = {}
+var world_event_state: Dictionary = {}
+var world_event_herald: Interactable = null
+var _world_event_day := 0
 ## The altar trial in progress: site, offered entry, time left and echo bodies.
 var inheritance_trial: Dictionary = {}
 var inheritance_trial_nodes: Array = []
@@ -535,6 +542,15 @@ func _spawn_interactables() -> void:
 	world.add_child(board)
 	interactables.append(board)
 
+	# The town herald reads the province's tiding. The event itself is derived
+	# from the calendar, so the herald never has to be told what day it is.
+	var herald := Interactable.new()
+	herald.setup(Interactable.Kind.HERALD, "herald.market", "Town herald — read the day's tiding")
+	herald.position = settlement.position_for("market") + Vector2(-130, 10)
+	world.add_child(herald)
+	interactables.append(herald)
+	world_event_herald = herald
+
 	# Settlement services: a merchant stall and an inn counter.
 	var stall := Interactable.new()
 	stall.setup(Interactable.Kind.SHOP, "shop.market", "Merchant stall — trade")
@@ -613,6 +629,7 @@ func _begin_run() -> void:
 	player.rebuild_stats()
 	player.hp = player.hp_max
 	player.spawn_point = settlement.position_for("plaza")
+	_refresh_world_event(false)
 	_sync_realm_portal()
 	Bus.toast.emit("Azure Cloud Market. Elder Bai waits by the sect hall.")
 
@@ -704,6 +721,7 @@ func _process(delta: float) -> void:
 	_check_sect_autonomy()
 	_check_npc_progress()
 	_check_stories()
+	_tick_world_event()
 	_check_realm_access()
 	# Regional Qi density is derived from where the body stands, never saved.
 	if realm_instance != null:
@@ -794,7 +812,7 @@ func _process(delta: float) -> void:
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
 		_spawn_timer = 0.0
-		if _wild_dummy_count() < WILD_DUMMY_TARGET:
+		if _wild_dummy_count() < WILD_DUMMY_TARGET + _world_event_int("enemy_pop"):
 			_spawn_wild_dummy()
 
 
@@ -825,7 +843,7 @@ func _spawn_wild_dummy() -> void:
 		dummy.apply_biome_enemy(enemy, player.cultivation.realm)
 		# Rank is decided after the species roll so a beast never becomes an
 		# elite: beasts report on their own death channel and keep their core.
-		if elite_share.randf() < ELITE_SHARE:
+		if elite_share.randf() < ELITE_SHARE + _world_event_float("elite_bonus"):
 			dummy.make_elite()
 
 
@@ -893,6 +911,8 @@ func _show_shop(mode: String) -> void:
 ## curve, so standing can never be turned into a money loop.
 func _shop_price(item: Dictionary) -> int:
 	var mult := Factions.price_multiplier("faction.market_league", Game.faction_standing, Game.notoriety)
+	# A market tiding moves the same price the faction memory does.
+	mult *= _world_event_mult("shop_buy")
 	return maxi(1, int(ceil(float(Economy.buy_price(item)) * mult)))
 
 
@@ -906,6 +926,7 @@ func _buy_index(index: int) -> void:
 		return
 	Game.spirit_stones -= price
 	merchant.take(index)
+	_record_world_event("trade", 1)
 	player.pick_up(item)
 	Bus.toast.emit("Bought %s for %d spirit stones." % [String(item.get("name", "item")), price])
 	_show_shop("buy")
@@ -915,8 +936,8 @@ func _sell_index(index: int) -> void:
 	if index < 0 or index >= player.inventory.size():
 		return
 	var item: Dictionary = player.inventory[index]
-	# A stack is sold whole, so the price is the whole stack's.
-	var price := Economy.sell_value(item)
+	# A stack is sold whole, so the price is the whole stack's, moved by the day's tiding.
+	var price := maxi(1, int(floor(float(Economy.sell_value(item)) * _world_event_mult("shop_sell"))))
 	player.inventory.remove_at(index)
 	# Selling worn gear must not leave the stat pipeline holding a ghost.
 	var slot := String(item.get("slot", ""))
@@ -1162,6 +1183,7 @@ func _forge_make(recipe: Dictionary) -> void:
 		return
 	var item: Dictionary = result["item"]
 	player.pick_up(item)
+	_record_world_event("crafts", 1)
 	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Forged %s%s." % [String(item.get("name", "a piece")), flourish])
 	var practice := Professions.award(Game.professions, "profession.smith")
@@ -1283,6 +1305,7 @@ func _brew(recipe: Dictionary) -> void:
 		return
 	var pill: Dictionary = result["item"]
 	player.pick_up(pill)
+	_record_world_event("crafts", 1)
 	var flourish := " (exceptional brew)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Brewed %s at potency x%.2f%s." % [String(pill.get("name", "a pill")), Alchemy.potency_of(pill), flourish])
 	var practice := Professions.award(Game.professions, "profession.alchemist")
@@ -2305,8 +2328,8 @@ func _story_reward(offer: Dictionary) -> void:
 	Game.spirit_stones += maxi(0, int(offer.get("stones", 0)))
 	# A request answered in the sect's name is service, whether or not the person
 	# who asked belongs to a faction the player can name.
-	Game.sect_contribution = SectEconomy.award_contribution(
-		Game.sect_contribution, SectEconomy.story_award())
+	var service := maxi(1, roundi(float(SectEconomy.story_award()) * _world_event_mult("contribution")))
+	Game.sect_contribution = SectEconomy.award_contribution(Game.sect_contribution, service)
 	var id := String(offer.get("actor", ""))
 	if id == "":
 		return
@@ -3585,6 +3608,8 @@ func _use_interactable(node: Interactable) -> void:
 			if node.id == "board.market":
 				_hear_realm_rumor("The notice board")
 			Bus.toast.emit(node.examine_text)
+		Interactable.Kind.HERALD:
+			_read_world_event()
 		Interactable.Kind.SHOP:
 			_open_shop()
 		Interactable.Kind.INN:
@@ -3879,7 +3904,7 @@ func _start_inheritance_trial(site: Dictionary, entry: Dictionary) -> void:
 	inheritance_trial = {
 		"site_id": String(site.get("id", "")),
 		"entry": entry,
-		"seconds": float(trial["seconds"]),
+		"seconds": float(trial["seconds"]) * _world_event_mult("trial_seconds"),
 		"cleared": false,
 	}
 	Bus.toast.emit("The altar offers %s (%s). Trial: %s." % [
@@ -4058,7 +4083,12 @@ func realm_window(site_id: String = "") -> Dictionary:
 	var site := _realm_site(site_id)
 	if site.is_empty():
 		return {"open": false}
-	return RealmAccess.window_for(site, Clock.day)
+	var window := RealmAccess.window_for(site, Clock.day)
+	# A convergence is the one thing that overrides the calendar's own gate.
+	if _world_event_flag("rifts_open"):
+		window["open"] = true
+		window["forced"] = true
+	return window
 
 
 ## Walking near a rift, hearing a rumor, or loading a pre-M63 save that had
@@ -4122,6 +4152,8 @@ func _sync_realm_portal() -> void:
 			continue
 		var known := realm_known(site_id)
 		portal.label = RealmAccess.portal_label(site, Clock.day)
+		if _world_event_flag("rifts_open"):
+			portal.label = "Rift — %s (convergence)" % String(site.get("name", "hidden realm"))
 		portal.visible = known and String(phase) == "play"
 
 
@@ -4129,8 +4161,12 @@ func _try_enter_realm(site_id: String = "") -> void:
 	var site := _realm_site(site_id)
 	var verdict := RealmAccess.access(site, Clock.day, realm_known(site_id))
 	if not bool(verdict.get("ok", false)):
-		Bus.toast.emit(String(verdict.get("reason", "The rift will not open.")))
-		return
+		# A convergence holds every rift open, but never reveals an unknown one.
+		if _world_event_flag("rifts_open") and not site.is_empty() and realm_known(site_id):
+			verdict = {"ok": true, "reason": "", "days": 0, "forced": true}
+		else:
+			Bus.toast.emit(String(verdict.get("reason", "The rift will not open.")))
+			return
 	_enter_realm(site_id)
 
 
@@ -4140,10 +4176,14 @@ func _realm_map_marks() -> Array:
 		var site_id := String(site.get("id", ""))
 		if not realm_known(site_id):
 			continue
+		var window := realm_window(site_id)
+		var status := RealmAccess.status_line(site, Clock.day)
+		if bool(window.get("forced", false)):
+			status = "held open by the convergence"
 		marks.append({
 			"name": String(site.get("name", "Hidden realm")),
-			"open": bool(realm_window(site_id).get("open", false)),
-			"status": RealmAccess.status_line(site, Clock.day),
+			"open": bool(window.get("open", false)),
+			"status": status,
 		})
 	return marks
 
@@ -4352,6 +4392,7 @@ func _after_kill(ilvl: int) -> void:
 	quests.track("kill", "beast", 1)
 	if quests.step_index != before:
 		_toast_new_objective()
+	_record_world_event("kills", 1)
 	_check_story_hunts()
 
 
@@ -4389,6 +4430,116 @@ func _on_elite_died(at: Vector2, ilvl: int) -> void:
 	Bus.toast.emit("An elite falls.")
 
 
+# ------------------------------------------------------- dynamic events ----
+
+## The province keeps one tiding at a time. The event is derived from the day
+## and the seed; only the progress against its task travels through a save.
+func _tick_world_event() -> void:
+	if _world_event_day == 0:
+		_world_event_day = Clock.day
+		return
+	if Clock.day == _world_event_day:
+		return
+	_refresh_world_event(true)
+
+
+func _refresh_world_event(announce: bool, saved: Variant = null) -> void:
+	var previous_id := String(world_event.get("id", ""))
+	var previous_name := String(world_event.get("name", ""))
+	world_event = WorldEvents.active(Clock.day, Game.world_seed)
+	var candidate: Variant = saved if saved != null else world_event_state
+	world_event_state = WorldEvents.sanitize(candidate, Clock.day, Game.world_seed)
+	_world_event_day = Clock.day
+	_sync_realm_portal()
+	if not announce:
+		return
+	var current_id := String(world_event.get("id", ""))
+	if current_id != "" and current_id != previous_id:
+		Bus.toast.emit("A tiding sweeps the market: %s." % String(world_event.get("name", "a strange day")))
+	elif current_id == "" and previous_id != "":
+		Bus.toast.emit("The %s passes." % previous_name)
+
+
+func world_event_active() -> bool:
+	return bool(world_event.get("active", false)) and String(world_event.get("id", "")) != ""
+
+
+func world_event_color() -> String:
+	return String(world_event.get("color", "#8fa2ab"))
+
+
+func world_event_progress() -> int:
+	return clampi(int(world_event_state.get("progress", 0)), 0, 99)
+
+
+## One line for the HUD: the tiding's name, how far into it the day is, and the
+## task's progress when it asks for one.
+func world_event_line() -> String:
+	if not world_event_active():
+		return ""
+	var text := WorldEvents.label(world_event)
+	var goal := WorldEvents.goal_of(world_event)
+	if not goal.is_empty():
+		text += " · " + WorldEvents.progress_text(world_event, world_event_progress())
+	return text
+
+
+func _world_event_mult(key: String) -> float:
+	return WorldEvents.mult(world_event, key)
+
+
+func _world_event_int(key: String) -> int:
+	return WorldEvents.int_effect(world_event, key)
+
+
+func _world_event_float(key: String, fallback: float = 0.0) -> float:
+	var value: Variant = world_event.get("effects", {})
+	if typeof(value) != TYPE_DICTIONARY:
+		return fallback
+	return float((value as Dictionary).get(key, fallback))
+
+
+func _world_event_flag(key: String) -> bool:
+	return WorldEvents.flag(world_event, key)
+
+
+## Progress enters only through the task the live tiding actually asks for, so
+## kills during a market fair cannot answer a beast tide.
+func _record_world_event(kind: String, amount: int = 1) -> void:
+	if not world_event_active():
+		return
+	var goal := WorldEvents.goal_of(world_event)
+	if goal.is_empty() or String(goal["kind"]) != kind:
+		return
+	var before := world_event_progress()
+	var after := WorldEvents.advance(world_event, before, kind, amount)
+	if after == before:
+		return
+	world_event_state["progress"] = after
+	if WorldEvents.complete(world_event, after) and not bool(world_event_state.get("rewarded", false)):
+		_grant_world_event_reward()
+
+
+func _grant_world_event_reward() -> void:
+	var reward := WorldEvents.reward_of(world_event)
+	world_event_state["rewarded"] = true
+	Game.spirit_stones += int(reward["stones"])
+	Game.sect_contribution = SectEconomy.award_contribution(
+		Game.sect_contribution, int(reward["contribution"]))
+	Bus.player_stats_changed.emit()
+	var parts: Array[String] = []
+	if int(reward["stones"]) > 0:
+		parts.append("%d spirit stones" % int(reward["stones"]))
+	if int(reward["contribution"]) > 0:
+		parts.append("%d contribution" % int(reward["contribution"]))
+	var paid := " and ".join(parts) if not parts.is_empty() else "the province's thanks"
+	Bus.toast.emit("The %s is answered: %s." % [String(world_event.get("name", "tiding")), paid])
+
+
+func _read_world_event() -> void:
+	Bus.toast.emit(WorldEvents.herald_text(world_event, world_event_progress()))
+
+
 # ----------------------------------------------------------- save/load ----
 
 func _save(slot: int) -> void:
@@ -4418,6 +4569,7 @@ func _save(slot: int) -> void:
 		"realm_cleared": realm_cleared,
 		"inheritance_taken": inheritance_taken,
 		"inheritances_taken": inheritances_taken.duplicate(),
+		"world_events": world_event_state.duplicate(),
 		"bosses_slain": bosses_slain.duplicate(),
 	}
 	if Save.save_game(slot, data):
@@ -4523,6 +4675,7 @@ func _load_game(slot: int) -> void:
 	_progress_day = Clock.day
 	_refresh_npc_progress_all()
 	_story_day = Clock.day
+	_refresh_world_event(false, data.get("world_events", {}))
 	phase = "play"
 	_sync_realm_portal()
 	if Game.dead:

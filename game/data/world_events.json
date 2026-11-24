@@ -1,0 +1,95 @@
+{
+  "interval_days": 5,
+  "quiet_weight": 30,
+  "default": "event.qi_surge",
+  "events": [
+    {
+      "id": "event.qi_surge",
+      "name": "Qi Surge",
+      "description": "The province's meridians swell, and every breath carries a storm's worth of Qi.",
+      "color": "#8fd8c0",
+      "weight": 18,
+      "days": 2,
+      "effects": {"cultivation": 1.5, "harvest_extra": 1},
+      "goal": {},
+      "reward": {}
+    },
+    {
+      "id": "event.grand_market",
+      "name": "Grand Market Fair",
+      "description": "Traders from three circuits crowd the stalls, undercutting one another and paying over the odds.",
+      "color": "#e0c070",
+      "weight": 16,
+      "days": 2,
+      "effects": {"shop_buy": 0.75, "shop_sell": 1.25},
+      "goal": {"kind": "trade", "count": 3},
+      "reward": {"stones": 120}
+    },
+    {
+      "id": "event.beast_tide",
+      "name": "Beast Tide",
+      "description": "Something in the wilds has broken. Beasts press against the market road in numbers not seen in a generation.",
+      "color": "#d08060",
+      "weight": 16,
+      "days": 2,
+      "effects": {"enemy_pop": 2, "elite_bonus": 0.12},
+      "goal": {"kind": "kills", "count": 5},
+      "reward": {"stones": 90, "contribution": 8}
+    },
+    {
+      "id": "event.forge_conclave",
+      "name": "Forge Conclave",
+      "description": "Smiths and alchemists set their benches in the square and judge every finished work aloud.",
+      "color": "#e0a060",
+      "weight": 12,
+      "days": 2,
+      "effects": {"shop_sell": 1.1},
+      "goal": {"kind": "crafts", "count": 2},
+      "reward": {"stones": 100, "contribution": 4}
+    },
+    {
+      "id": "event.rift_convergence",
+      "name": "Rift Convergence",
+      "description": "The hidden realms drift into alignment. For a little while, no rift will refuse a seeker.",
+      "color": "#b48cff",
+      "weight": 10,
+      "days": 2,
+      "effects": {"rifts_open": true},
+      "goal": {},
+      "reward": {}
+    },
+    {
+      "id": "event.ancestral_resonance",
+      "name": "Ancestral Resonance",
+      "description": "Old altars answer before they are asked. Legacies held in them give their challengers more time.",
+      "color": "#c8b8ff",
+      "weight": 10,
+      "days": 2,
+      "effects": {"trial_seconds": 1.5},
+      "goal": {},
+      "reward": {}
+    },
+    {
+      "id": "event.sect_assembly",
+      "name": "Grand Sect Assembly",
+      "description": "The twelve houses send delegates to the market. Service done in the sect's name is counted twice.",
+      "color": "#9fd0ff",
+      "weight": 12,
+      "days": 3,
+      "effects": {"contribution": 2.0},
+      "goal": {"kind": "kills", "count": 6},
+      "reward": {"contribution": 12}
+    },
+    {
+      "id": "event.crimson_rain",
+      "name": "Crimson Rain",
+      "description": "Blood-warm rain falls without clouds. Cultivation quickens, and the beasts grow bold beneath it.",
+      "color": "#d06070",
+      "weight": 12,
+      "days": 1,
+      "effects": {"cultivation": 1.25, "elite_bonus": 0.1},
+      "goal": {},
+      "reward": {}
+    }
+  ]
+}

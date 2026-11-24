@@ -288,8 +288,14 @@ func draw_world_panel(player: Player) -> void:
 	var w := size.x
 	var x := w - 316.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 194.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 212.0), PANEL_BG)
 	_text(Vector2(x, y), "%s   %s" % [Clock.label(), Weather.label()], 13, MUTED)
+	y += 18.0
+	var tiding: String = host.world_event_line()
+	if tiding == "":
+		_text(Vector2(x, y), "Tiding: a quiet day", 11, MUTED)
+	else:
+		_text(Vector2(x, y), _fit("Tiding: " + tiding, 11, 292.0), 11, Color(host.world_event_color()))
 	y += 18.0
 	_text(Vector2(x, y), _fit("%s   %s   Kills %d   Karma %d" % [
 		player.display_name, host.current_biome_name(), Game.kills, Game.karma], 11, 292.0), 11, MUTED)

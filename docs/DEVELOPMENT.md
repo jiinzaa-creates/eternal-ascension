@@ -1303,7 +1303,7 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   landmarks and then each discovered realm, so the capped site rows cannot crowd them out.
 - **Scope.** The direct `_enter_realm()` transition remains gate-free for tests and future transitions;
   every player entrance goes through `RealmAccess.access()` at the portal. M65 closed the inheritance
-  loop; M66 owns further competition and family-specific mechanics.
+  loop; M66 adds province-wide tidings; M67 owns further competition and family-specific mechanics.
 
 ## Inheritances and altar trials
 
@@ -1343,6 +1343,40 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   grants, impossible realm/body gates, unknown affinities or attributes, a trial with no guards or too
   little time, a malformed rival flag, an unknown relic, a family with no entry, an unknown default and
   a default outside the tomb. `Inheritances.validate` runs from `DB.validate` after families load.
+
+## Dynamic world events
+
+- **The calendar is data.** `data/world_events.json` declares the draw interval (`interval_days`), a
+  quiet weight, a default and eight authored tidings. Each tiding carries a name, a herald description,
+  a HUD colour, a weight, a duration in days, effect multipliers, an optional task and an optional
+  reward. `WorldEvents` (`game/systems/world_events.gd`) is pure and is the only reader.
+- **A tiding is drawn, never hand-scheduled.** Every `interval_days` days is one cycle; the cycle's
+  draw is one weighted `Rng.pick_weighted` over a quiet slot plus every authored weight, from
+  `Rng.stream_from(world_seed, "world_event", cycle, 0)`. A tiding that lasts fewer days than its cycle
+  leaves the rest of that cycle quiet, so pacing needs no extra state. A given seed always produces the
+  same calendar, and the cycle never depends on what the player has done.
+- **Effects feed the real systems.** `mult()` reads cultivation, shop buy and sell, sect service and
+  altar-trial time; `int_effect()` reads extra wild population and extra herbs; `flag()` reads
+  `rifts_open`. A missing key is neutral, so every consumer can call them without first checking whether
+  a tiding is live. The scene applies them at the shop, the wild-spawn loop, the forge and cauldron,
+  story service, inheritance trials and the rift gate, and `Player.environment_bonus()` folds the
+  cultivation multiplier into the same weather-and-land product it already read.
+- **Tasks and rewards are authored.** A tiding may ask for kills, finished works or market purchases.
+  Only the live task's own kind advances, progress clamps at the authored count, and the reward is paid
+  once per tiding. The market herald reads the live tiding, its effects, its task and its reward; the
+  HUD world panel shows the same line, leaving the top-center banners free for living encounters.
+- **A convergence is the one gate override.** While `rifts_open` is live, every discovered rift accepts
+  entry even outside its cycle, portal labels say `(convergence)`, and the map footer reports "held open
+  by the convergence". An undiscovered site is still refused, so the tiding cannot leak content.
+- **Only progress is saved.** `world_events` is an optional top-level dictionary of `cycle`, `id`,
+  `progress` and `rewarded`. `WorldEvents.sanitize()` discards a save from another cycle or naming
+  another tiding, clamps progress to the task, and refuses a reward flag without completed progress.
+  A pre-M66 save simply loads with an empty ledger, so the schema stays 2.
+- **Validation.** `WorldEvents.validate()` rejects a malformed interval, a negative quiet weight, a
+  duplicate or unnamed tiding, a non-hex colour, a duration outside the cycle, an unknown or
+  out-of-range effect, an unknown task kind or impossible count, a bad reward key or amount, a tiding
+  that changes nothing, and a default that is not authored. It runs from `DB.validate` after the
+  inheritance checks.
 
 ## Spirit beasts and bosses
 

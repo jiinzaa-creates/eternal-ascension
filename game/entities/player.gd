@@ -1281,8 +1281,11 @@ func cultivation_changed() -> void:
 
 func environment_bonus() -> float:
 	# Weather and regional Qi density multiply: a storm in the ashen scrub is
-	# still a poor place to sit.
-	return Climate.cultivation_bonus(Weather.current) * maxf(0.0, Game.biome_density)
+	# still a poor place to sit. A province tiding stacks on top, derived from
+	# the same day and seed as the rest of the calendar, so it is never saved.
+	var tiding := WorldEvents.active(Clock.day, Game.world_seed)
+	return Climate.cultivation_bonus(Weather.current) * maxf(0.0, Game.biome_density) \
+		* WorldEvents.mult(tiding, "cultivation")
 
 
 ## The one voluntary equip route: requirements are read from the body as it is

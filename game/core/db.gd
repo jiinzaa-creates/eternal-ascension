@@ -69,6 +69,8 @@ var realm_access_data: Dictionary = {}
 var hidden_realm_family_data: Dictionary = {}
 ## Authored inheritances: per-family rarity pools, compatibility and trials.
 var inheritances_data: Dictionary = {}
+## The province's dynamic events: schedule, effects, tasks and rewards.
+var world_events_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -135,6 +137,7 @@ func load_all() -> void:
 	realm_access_data = _read("realm_access.json")
 	hidden_realm_family_data = _read("hidden_realm_families.json")
 	inheritances_data = _read("inheritances.json")
+	world_events_data = _read("world_events.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -779,6 +782,8 @@ func validate() -> Array:
 	problems.append_array(HiddenRealms.validate_families(hidden_realm_family_data))
 	# Inheritances are authored per family: compatibility, rarity and a trial.
 	problems.append_array(Inheritances.validate(inheritances_data))
+	# Dynamic events: a weighted calendar of tidings with real effects and tasks.
+	problems.append_array(WorldEvents.validate(world_events_data))
 	# Discovery sites must point at a real layout and a sane opening cycle.
 	problems.append_array(RealmAccess.validate(realm_access_data))
 

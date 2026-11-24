@@ -174,7 +174,8 @@ func _run() -> void:
 
 	var stones_before: int = Game.spirit_stones
 	var bag_before: int = Items.total_count(player.inventory)
-	var price: int = Economy.buy_price(main.merchant.stock[0])
+	# The quote is the shop's own: faction memory and the day's tiding can both move it.
+	var price: int = main._shop_price(main.merchant.stock[0])
 	main._buy_index(0)
 	check(Game.spirit_stones == stones_before - price, "buying deducts the price")
 	check(Items.total_count(player.inventory) == bag_before + 1, "buying adds the item")
@@ -192,7 +193,7 @@ func _run() -> void:
 	var sell_stones: int = Game.spirit_stones
 	var sell_index: int = player.inventory.size() - 1
 	var sell_entry: Dictionary = player.inventory[sell_index]
-	var sell_expected := Economy.sell_value(sell_entry)
+	var sell_expected := maxi(1, int(floor(float(Economy.sell_value(sell_entry)) * main._world_event_mult("shop_sell"))))
 	var sell_count := int(sell_entry.get("count", 1))
 	var bag_at_sale: int = Items.total_count(player.inventory)
 	main._sell_index(sell_index)
@@ -425,7 +426,17 @@ func _run() -> void:
 	main.world_map.setup(main.continent, 0, main._realm_map_marks())
 	check(main.world_map.realm_marks.size() == main._realm_map_marks().size(), "the map receives every mark")
 	var access_day: int = Clock.day
-	Clock.day = 5
+	# A convergence holds every rift open, so the sealed-day probe skips those
+	# days rather than assuming the calendar is the only gate.
+	var sealed_day := 5
+	for d in range(1, 200):
+		var sealed_site: Dictionary = RealmAccess.default_site()
+		var window := RealmAccess.window_for(sealed_site, d)
+		var tiding := WorldEvents.active(d, Game.world_seed)
+		if not bool(window.get("open", false)) and String(tiding.get("id", "")) != "event.rift_convergence":
+			sealed_day = d
+			break
+	Clock.day = sealed_day
 	main._sync_realm_portal()
 	check(String(main.realm_portal.label).begins_with("Sealed Rift"), "the portal reads sealed between openings")
 	main._try_enter_realm()
@@ -636,7 +647,9 @@ func _run() -> void:
 	check(Climate.KINDS.has(Weather.kind()), "the live weather is a known kind")
 	check(not Weather.label().is_empty(), "the HUD has a season and weather label")
 	check(Weather.label().contains(Weather.season_name()), "the weather label names the season")
-	check(approx(player.environment_bonus(), Climate.cultivation_bonus(Weather.current) * Game.biome_density, 0.0001), "cultivation reads the live weather and the land")
+	var expected_bonus: float = Climate.cultivation_bonus(Weather.current) * Game.biome_density \
+		* WorldEvents.mult(WorldEvents.active(Clock.day, Game.world_seed), "cultivation")
+	check(approx(player.environment_bonus(), expected_bonus, 0.0001), "cultivation reads the live weather, the land and the day's tiding")
 
 	var expected_light: Color = Climate.lighting_modulate(Clock.ambient_for_hour(Clock.hour), Weather.current)
 	if Weather.flash_strength() == 0.0:
@@ -3726,7 +3739,18 @@ func _run() -> void:
 		"the delivery earns regard")
 	check(Stories.deliver_index(Game.story_offers, m54_person.npc_id) < 0, "the delivery closes the request")
 
-	# A hunt is answered by the beasts, not by talking.
+	# A hunt is answered by the beasts, not by talking. If the day is also asking
+	# for kills, move to a day that is not: two purses for one kill would make the
+	# check ambiguous.
+	var m54_hunt_day: int = Clock.day
+	var m54_goal := WorldEvents.goal_of(WorldEvents.active(Clock.day, Game.world_seed))
+	if String(m54_goal.get("kind", "")) == "kills":
+		for d in range(m54_hunt_day + 1, m54_hunt_day + 60):
+			var candidate: Dictionary = WorldEvents.active(d, Game.world_seed)
+			if String(WorldEvents.goal_of(candidate).get("kind", "")) != "kills":
+				Clock.day = d
+				main._refresh_world_event(false)
+				break
 	var m54_hunt_entry := {"id": "story.%d.hunt" % Clock.day, "day": Clock.day,
 		"actors": [m54_person.npc_id], "names": [m54_person.display_name],
 		"place": "gate", "request": {"kind": "hunt"}}
@@ -3740,6 +3764,8 @@ func _run() -> void:
 	check(Game.story_offers.is_empty(), "the second kill answers the hunt")
 	check(Game.spirit_stones == m54_hunt_purse + int(m54_hunt.get("stones", 0)),
 		"the hunt pays its stones")
+	Clock.day = m54_hunt_day
+	main._refresh_world_event(false)
 
 	# The record is saved, and a load brings the same day back into step.
 	Save.delete_slot(100)
@@ -3789,7 +3815,10 @@ func _run() -> void:
 		"an ally's ripple warms the league a little")
 	Game.faction_standing = Factions.award(Game.faction_standing, "faction.market_league", 60)
 	var m55_quote: int = main._shop_price({"value": 100})
-	check(m55_quote == 90, "an honoured name buys at the honoured price")
+	var m55_mult: float = Factions.price_multiplier("faction.market_league", Game.faction_standing, Game.notoriety) \
+		* main._world_event_mult("shop_buy")
+	var m55_expected: int = maxi(1, int(ceil(100.0 * m55_mult)))
+	check(m55_quote == m55_expected, "an honoured name buys at the honoured price")
 	check(m55_quote < Economy.buy_price({"value": 100}), "standing actually cuts the price")
 	# Lawful houses read the holding yard; a guild does not.
 	Game.notoriety = 80
@@ -3931,9 +3960,10 @@ func _run() -> void:
 	check(Game.sect_purchases == m58_purchases + 1, "each purchase advances the counter")
 
 	var m58_story_points := Game.sect_contribution
+	var m58_service: int = maxi(1, roundi(float(SectEconomy.story_award()) * main._world_event_mult("contribution")))
 	main._story_reward({"actor": "", "stones": 0})
-	check(Game.sect_contribution == m58_story_points + SectEconomy.story_award(),
-		"answering a request pays contribution")
+	check(Game.sect_contribution == clampi(m58_story_points + m58_service, 0, SectEconomy.cap()),
+		"answering a request pays contribution at the day's rate")
 
 	Save.delete_slot(100)
 	var m58_saved_points := Game.sect_contribution
@@ -4104,6 +4134,160 @@ func _run() -> void:
 	player.rebuild_stats()
 	player.cultivation.qi = m60_qi
 	player.hp = minf(m60_hp, player.hp_max)
+
+	# --- M66: dynamic world events --------------------------------------------
+	var m66_saved_day := Clock.day
+	var m66_stones := Game.spirit_stones
+	var m66_contribution := Game.sect_contribution
+	var m66_discovered: Dictionary = Game.discovered.duplicate()
+	var m66_offers: Array = Game.story_offers.duplicate(true)
+	var m66_event_state: Dictionary = main.world_event_state.duplicate(true)
+	check(main.world_event_state.has("cycle"), "the run carries a world-event cycle")
+	check(main.world_event_state.has("id"), "the run carries the day's tiding id")
+	check(main.world_event_state.has("progress"), "the run carries task progress")
+	check(String(main.world_event_color()).begins_with("#"), "the tiding has a colour for the HUD")
+	check(main.world_event_herald != null, "the market posts a herald")
+	if main.world_event_herald != null:
+		check(main.world_event_herald.kind == Interactable.Kind.HERALD, "the herald is its own interactable")
+
+	# A task-bearing tiding is found from the seed itself, not forced.
+	var m66_day := -1
+	var m66_event: Dictionary = {}
+	for d in range(1, 1201):
+		var candidate: Dictionary = WorldEvents.active(d, Game.world_seed)
+		var candidate_goal := WorldEvents.goal_of(candidate)
+		if bool(candidate.get("active", false)) and String(candidate_goal.get("kind", "")) == "kills":
+			m66_day = d
+			m66_event = candidate
+			break
+	check(m66_day > 0, "the seed produces a kill-bearing tiding")
+	if m66_day > 0:
+		Clock.day = m66_day
+		main._refresh_world_event(false)
+		check(main.world_event_active(), "the tiding is live on its day")
+		check(String(main.world_event.get("id", "")) == String(m66_event.get("id", "")), "the scene reads the same tiding")
+		check(main.world_event_line().contains(String(m66_event.get("name", ""))), "the HUD line names the tiding")
+		var m66_toasts := _toasts.size()
+		main._read_world_event()
+		check(_toasts.size() > m66_toasts, "reading the herald speaks")
+		if _toasts.size() > m66_toasts:
+			check(String(_toasts[_toasts.size() - 1]).contains(String(m66_event.get("name", ""))), "the herald names the tiding")
+		var m66_goal := WorldEvents.goal_of(m66_event)
+		var m66_count := int(m66_goal.get("count", 0))
+		var m66_before: int = main.world_event_progress()
+		main._record_world_event("trade", 1)
+		check(main.world_event_progress() == m66_before, "an unrelated action does not advance the task")
+		# Hunks cleared temporarily so a hunt finishing mid-loop cannot change the purse.
+		Game.story_offers = []
+		var m66_stones_before := Game.spirit_stones
+		var m66_contribution_before := Game.sect_contribution
+		for i in m66_count:
+			main._after_kill(1)
+		check(main.world_event_progress() == m66_count, "kills answer the tiding's task")
+		check(bool(main.world_event_state.get("rewarded", false)), "finishing the task marks it paid")
+		var m66_reward := WorldEvents.reward_of(m66_event)
+		check(Game.spirit_stones == m66_stones_before + int(m66_reward["stones"]), "the reward pays its stones")
+		check(Game.sect_contribution == clampi(m66_contribution_before + int(m66_reward["contribution"]), 0, SectEconomy.cap()),
+			"the reward pays its contribution")
+		main._after_kill(1)
+		check(main.world_event_progress() == m66_count, "progress stays clamped after completion")
+		check(Game.spirit_stones == m66_stones_before + int(m66_reward["stones"]), "the reward is never paid twice")
+		var m66_progress: int = main.world_event_progress()
+		Save.delete_slot(106)
+		main._save(106)
+		main.world_event_state = {"cycle": 0, "id": "", "progress": 0, "rewarded": false}
+		main._load_game(106)
+		check(main.world_event_progress() == m66_progress, "task progress survives a save")
+		check(String(main.world_event.get("id", "")) == String(m66_event.get("id", "")), "a load restores the same tiding")
+		check(bool(main.world_event_state.get("rewarded", false)), "the paid reward survives a save")
+		Save.delete_slot(106)
+
+	# A market fair moves the same price the shop already charges.
+	var fair_day := -1
+	for d in range(1, 601):
+		var state: Dictionary = WorldEvents.active(d, Game.world_seed)
+		if String(state.get("id", "")) == "event.grand_market":
+			fair_day = d
+			break
+	check(fair_day > 0, "the seed produces a grand market")
+	if fair_day > 0:
+		Clock.day = fair_day
+		main._refresh_world_event(false)
+		var fair_price: int = main._shop_price({"value": 100})
+		var normal_day := -1
+		for d in range(1, 601):
+			var state: Dictionary = WorldEvents.active(d, Game.world_seed)
+			if not bool(state.get("active", false)):
+				normal_day = d
+				break
+		check(normal_day > 0, "the seed produces a quiet day")
+		if normal_day > 0:
+			Clock.day = normal_day
+			main._refresh_world_event(false)
+			var normal_price: int = main._shop_price({"value": 100})
+			check(fair_price < normal_price, "the market fair cuts the shop's price")
+
+	# A convergence holds every rift open, including one the calendar sealed.
+	var convergence_day := -1
+	for d in range(1, 601):
+		var state: Dictionary = WorldEvents.active(d, Game.world_seed)
+		if String(state.get("id", "")) == "event.rift_convergence":
+			convergence_day = d
+			break
+	check(convergence_day > 0, "the seed produces a rift convergence")
+	if convergence_day > 0:
+		Clock.day = convergence_day
+		main._refresh_world_event(false)
+		var sealed_site := ""
+		for site in RealmAccess.sites():
+			if not bool(RealmAccess.window_for(site, Clock.day).get("open", false)):
+				sealed_site = String(site.get("id", ""))
+				break
+		check(sealed_site != "", "a rift is sealed on the convergence day")
+		if sealed_site != "":
+			Game.discovered[sealed_site] = true
+			main._sync_realm_portal()
+			var sealed_portal: Interactable = main.realm_portals.get(sealed_site, null)
+			check(sealed_portal != null and String(sealed_portal.label).contains("convergence"),
+				"the portal shows the convergence")
+			check(bool(main.realm_window(sealed_site).get("forced", false)), "the window reports the override")
+			main._try_enter_realm(sealed_site)
+			check(main.realm_instance != null, "a convergence opens a sealed rift")
+			if main.realm_instance != null:
+				main._exit_realm()
+
+	# The scene reads the authored multipliers, not hardcoded ones.
+	var resonance_day := -1
+	for d in range(1, 601):
+		var state: Dictionary = WorldEvents.active(d, Game.world_seed)
+		if String(state.get("id", "")) == "event.ancestral_resonance":
+			resonance_day = d
+			break
+	check(resonance_day > 0, "the seed produces an ancestral resonance")
+	if resonance_day > 0:
+		Clock.day = resonance_day
+		main._refresh_world_event(false)
+		check(is_equal_approx(main._world_event_mult("trial_seconds"), 1.5), "the scene lengthens altar trials")
+	var tide_day := -1
+	for d in range(1, 601):
+		var state: Dictionary = WorldEvents.active(d, Game.world_seed)
+		if String(state.get("id", "")) == "event.beast_tide":
+			tide_day = d
+			break
+	check(tide_day > 0, "the seed produces a beast tide")
+	if tide_day > 0:
+		Clock.day = tide_day
+		main._refresh_world_event(false)
+		check(main._world_event_int("enemy_pop") == 2, "the scene reads the tide's extra foes")
+		check(main._world_event_float("elite_bonus") > 0.0, "the scene reads the tide's elite bonus")
+
+	# Put the run back where the rest of the suite expects it.
+	Clock.day = m66_saved_day
+	Game.spirit_stones = m66_stones
+	Game.sect_contribution = m66_contribution
+	Game.discovered = m66_discovered
+	Game.story_offers = m66_offers
+	main._refresh_world_event(false, m66_event_state)
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

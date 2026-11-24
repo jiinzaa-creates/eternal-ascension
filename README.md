@@ -201,6 +201,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - One settlement, 19 scheduled NPCs with generated records, one sect questline with event-driven steps and rewards.
 - Hidden-realm framework: layouts are content in `data/hidden_realm_templates.json` (grid, corners, loops, treasures, hazard chance, enemy tier/roster and optional warden), with three authored layouts and boot validation. The rift opens the default 5×4 Tomb of the Hollow Moon; every template is deterministic and flood-fill tested.
 - Hidden-realm discovery and access: `data/realm_access.json` places the rift, sets its reveal radius and a deterministic four-days-in-twelve opening, and carries its rumor. Approaching it, hearing a rumor in conversation, or reading the market board discovers it; the portal, map mark and route list then show open or sealed status. Discovery rides the existing saved `Game.discovered` dictionary, legacy saves with realm progress auto-discover, and a sealed rift refuses entry with its next opening day.
+- Dynamic world events: `data/world_events.json` authors eight tidings on a deterministic five-day cycle, each with a duration, effects on cultivation, prices, spawns, sect service or rift access, an optional task and a one-time reward. A town herald reads the live tiding, the HUD shows its progress, and a rift convergence is the one gate that overrides the calendar.
 - One procedural hidden realm with hazards, chests and a one-time inheritance.
 - Save/load with atomic writes, sha256 verification, 3 backups, corruption fallback, schema migration.
 - Structured logging with an in-memory ring buffer (`Log.dump()`).
@@ -211,7 +212,7 @@ Character appearance and backgrounds (all characters are still code-drawn shapes
 animated procedurally); travel between provinces; flight, domain projection, space folding
 and the other declared realm capabilities; profession tools, masters and the deeper economy; NPC
 deaths and feuds; the player being taken captive rather than being the captor;
-additional hidden-realm templates; dynamic world events; the main narrative and endgame;
+additional hidden-realm templates; the main narrative and endgame;
 UI screens beyond the HUD; audio.
 
 The full 72-milestone status ledger lives in the design document (`§19 Authoritative roadmap`).
