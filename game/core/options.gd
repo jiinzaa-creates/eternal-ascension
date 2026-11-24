@@ -19,6 +19,7 @@ const DEFAULTS := {
 	"combat_sound": true,
 	"volume": 100,
 	"captivity": true,
+	"music": true,
 }
 
 ## Actions the controls page may rebind. The list is deliberately finite: these

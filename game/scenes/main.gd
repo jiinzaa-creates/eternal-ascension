@@ -14,6 +14,8 @@ const BEAST_SHARE := 0.45
 ## Share of wild humanoids that turn up as elites. Drawn from its own stream, so
 ## tuning the share cannot reshuffle the spawns themselves.
 const ELITE_SHARE := 0.12
+## Sentinel for "no chunk resolved yet".
+const NO_CHUNK := Vector2i(-2147483648, -2147483648)
 
 var phase := "creation"  # creation | play | realm
 ## Character creation is two screens: formation points, then identity.
@@ -177,6 +179,11 @@ var realm_portal: Interactable = null
 var active_realm_id := ""
 var active_realm_seed := 0
 var _realm_access_day := -1
+## Last chunk whose Qi density was resolved. The lookup behind it (chunk hash,
+## biome table, density table) is pure but repeats every frame otherwise.
+var _density_chunk := NO_CHUNK
+## How many times the density was actually recomputed, for the optimization test.
+var density_updates := 0
 ## One rumor per day is enough; the flag is session state, not a save key.
 var _realm_rumor_day := -1
 ## Bosses already killed this save, by stable id. The tomb's warden is only
@@ -228,7 +235,14 @@ func _ready() -> void:
 	Bus.boss_defeated.connect(_on_boss_defeated)
 	Bus.tribulation_finished.connect(_on_tribulation_finished)
 	Weather.changed.connect(_on_weather_changed)
-	Bus.toast.emit("A new path opens. Assign your attributes, then press ENTER.")
+	# The title screen hands the run a slot to resume. A new life starts at
+	# creation exactly as before; a continued one skips the assembly screen.
+	if Game.pending_load_slot > 0:
+		var resumed_slot := Game.pending_load_slot
+		Game.pending_load_slot = 0
+		_load_game(resumed_slot)
+	else:
+		Bus.toast.emit("A new path opens. Assign your attributes, then press ENTER.")
 
 
 # ---------------------------------------------------------------- world ----
@@ -755,12 +769,7 @@ func _process(delta: float) -> void:
 	_check_stories()
 	_tick_world_event()
 	_check_realm_access()
-	# Regional Qi density is derived from where the body stands, never saved.
-	if realm_instance != null:
-		Game.biome_density = 1.0
-	else:
-		Game.biome_density = Biome.qi_density(
-			DB.biome(Biome.for_chunk(chunks.world_to_chunk(player.global_position), Game.world_seed)))
+	_update_biome_density()
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
@@ -857,6 +866,24 @@ func _process(delta: float) -> void:
 		_spawn_timer = 0.0
 		if _wild_dummy_count() < WILD_DUMMY_TARGET + _world_event_int("enemy_pop"):
 			_spawn_wild_dummy()
+
+
+## Regional Qi density is derived from where the body stands, never saved. It
+## is pure but not free, so resolve it only when the body changes chunk; the
+## hidden realm has no province biome and reads a flat density.
+func _update_biome_density() -> void:
+	if player == null or chunks == null:
+		return
+	if realm_instance != null:
+		Game.biome_density = 1.0
+		_density_chunk = NO_CHUNK
+		return
+	var standing: Vector2i = chunks.world_to_chunk(player.global_position)
+	if standing == _density_chunk:
+		return
+	_density_chunk = standing
+	Game.biome_density = Biome.qi_density(DB.biome(Biome.for_chunk(standing, Game.world_seed)))
+	density_updates += 1
 
 
 func _wild_dummy_count() -> int:
@@ -3627,6 +3654,11 @@ func _apply_options() -> void:
 	if Options == null:
 		return
 	Options.apply_runtime(hud, combat_audio, Game.hitstop, damage_numbers)
+	# The score follows the same volume as the combat voices and has its own
+	# switch, so a player can keep one and silence the other.
+	if Music != null:
+		Music.set_enabled(Options.get_bool("music"))
+		Music.set_volume(Options.get_int("volume"))
 
 
 func _option_row(key: String, label: String, detail: String) -> Dictionary:
@@ -3662,6 +3694,8 @@ func settings_rows() -> Array:
 		})
 		out.append(_option_row("captivity", "Captivity content",
 			"Whether people can be subdued, bound and kept. Turning it off refuses new binds; a run that already holds captives keeps them."))
+		out.append(_option_row("music", "Ambient music",
+			"The synthesized score that plays under the title and the province. It shares the volume above and is never required to play."))
 	else:
 		for action in Options.REBINDABLE:
 			out.append({
@@ -5532,7 +5566,7 @@ func _save(slot: int) -> void:
 		Bus.toast.emit("The heavens do not pause for a save.")
 		return
 	var data := {
-		"version": "0.2.0",
+		"version": String(ProjectSettings.get_setting("application/config/version", "1.0.0")),
 		"clock": Clock.to_dict(),
 		"game": Game.to_dict(),
 		"player": player.to_dict(),
@@ -5567,8 +5601,11 @@ func _save(slot: int) -> void:
 func _toggle_audio() -> void:
 	if combat_audio == null:
 		return
-	combat_audio.set_muted(not combat_audio.is_muted())
-	Bus.toast.emit("Combat sound %s." % ("off" if combat_audio.is_muted() else "on"))
+	var muted := not combat_audio.is_muted()
+	combat_audio.set_muted(muted)
+	if Music != null:
+		Music.set_enabled(Options.get_bool("music") and not muted)
+	Bus.toast.emit("Sound %s." % ("off" if muted else "on"))
 
 
 func _load_game(slot: int) -> void:

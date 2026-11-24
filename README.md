@@ -2,16 +2,37 @@
 
 A 2D top-down open-world xianxia cultivation action RPG, built with **Godot 4.4** (GDScript).
 
-Current build: **0.2.0**. It contains a playable slice: a streamed province, a populated
-settlement with scheduled NPCs, a sect initiation quest, real-time frame-data combat,
-cultivation with breakthroughs, deterministic procedural items, nine procedural hidden-realm
-families with their own wardens and inheritances, and a crash-safe save system.
+Current build: **1.0.0**, the release build. It is a complete playable sandbox: a streamed
+province, a populated settlement with scheduled NPCs, real-time frame-data combat, cultivation
+with breakthroughs, deterministic procedural items, nine hidden-realm families with their own
+wardens and inheritances, four quest chains, twelve sect storylines, a four-thread narrative
+archive and one irreversible ending, plus a crash-safe save system. The release adds a title
+screen with painted key art, a synthesized ambient score, a settings and accessibility layer,
+a live character sheet, and Linux and Web export presets.
 
-## Run it in the Godot editor
+## Run it
+
+### In the Godot editor
 
 1. Install [Godot 4.4](https://godotengine.org/download) (standard build, not .NET).
 2. Open `game/project.godot` as a project.
-3. Press **F5**.
+3. Press **F5**. The game opens on the title screen; **Begin a new life** starts creation,
+   **Continue** resumes the highest populated save slot.
+
+### A built release
+
+`game/export_presets.cfg` carries two release presets. With Godot 4.4.1 and its export
+templates installed:
+
+```bash
+mkdir -p game/build/linux game/build/web
+godot --headless --path game --export-release "Linux"
+godot --headless --path game --export-release "Web"
+```
+
+The Linux preset writes one self-contained executable to `game/build/linux/eternal-ascension.x86_64`;
+the Web preset writes `game/build/web/index.html` plus its wasm and pck. Release notes and known
+limits are in [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md).
 
 ## Controls
 
@@ -53,6 +74,8 @@ families with their own wardens and inheritances, and a crash-safe save system.
 | Routes: travel / set waypoint | T, then 1–6 then ENTER / V |
 | Continent map | M |
 | Toggle help | F1 |
+| Mute combat and music | F2 |
+| Title menu | ↑ ↓ choose, ENTER confirm, ESC quit |
 
 Gamepad: left stick moves, right stick aims, **X** performs the selected technique, **D-pad
 right** strikes with the equipped weapon, **LS click** guards, **A** dodges, **B** interacts, **Y**
@@ -92,10 +115,13 @@ On the creation screen: **1–6** allocate a point to STR / DEX / AGI / INT / WI
 ## Verification
 
 ```sh
-godot --headless --path game --editor --quit                              # import check
+godot --headless --path game --import                                    # import check
 godot --headless --path game res://tests/run_tests.tscn                   # unit + content
 godot --headless --path game res://tests/integration.tscn                 # real-scene smoke
 godot --headless --path game --quit-after 240                             # boot smoke
+mkdir -p game/build/linux game/build/web
+godot --headless --path game --export-release "Linux"                    # release build
+godot --headless --path game --export-release "Web"                      # release build
 ```
 
 Each suite prints `RESULT: PASS n / FAIL 0` and exits `0` on success. CI runs the same
@@ -110,7 +136,8 @@ meditating, breaking through, entering/exiting the hidden realm, and saving/load
 
 ```
 game/
-  core/       autoloads: log, bus, rng, db, clock, settings, save, game
+  assets/     the painted title key art (the only imported image)
+  core/       autoloads: log, bus, rng, db, clock, settings, options, music, save, game
   data/       JSON: realms, roots, methods, techniques, items, passives, quests, npcs
   systems/    attributes, stat_block, cultivation, damage, itemgen, quests
   entities/   player, dummy, npc, interactable
@@ -234,16 +261,31 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
   method, root and physique, attributes and derived stats, arts and passives, gear and professions,
   and the house's rank, hall, party and deeds. The sheet owns no state, so it cannot disagree with
   the run it describes.
+- Title screen: the game boots to painted key art and three actions — a new life, a continued life
+  (the highest populated slot) or quit. Keyboard and mouse both work, the version is printed, and
+  the screen hands the main scene a single pending slot rather than owning run state. The title
+  uses the same high-contrast palette as the HUD.
+- Ambient score: a twelve-second loop synthesized in code, a slow drone under a pentatonic bell
+  figure, started on the title and carried across the scene change. It shares the interface volume,
+  has its own **Ambient music** switch on the DISPLAY page, and F2 mutes it with the combat voices.
+  No audio file ships; the loop is deterministic and loop-seam safe.
+- Performance: the HUD now redraws at 30 Hz instead of once per frame and only rebuilds its toast
+  list when a toast expires; the standing biome's Qi density is resolved on a chunk crossing rather
+  than every frame. Both paths are covered by integration checks that count the work performed.
+- Release: version 1.0.0 is carried by the project and the save header, Linux and Web presets ship
+  in `game/export_presets.cfg`, and a tag-triggered CI job builds both artifacts.
 - One procedural hidden realm with hazards, chests and a one-time inheritance.
 - Save/load with atomic writes, sha256 verification, 3 backups, corruption fallback, schema migration.
 - Structured logging with an in-memory ring buffer (`Log.dump()`).
 
 ## Not implemented yet
 
-Character appearance and backgrounds (all characters are still code-drawn shapes, now
-animated procedurally); travel between provinces; flight, domain projection, space folding
-and the other declared realm capabilities; profession tools, masters and the deeper economy; NPC
-deaths and feuds; the player being taken captive rather than being the captor;
-additional hidden-realm templates; screens beyond the HUD; audio.
+Character appearance art and painted backgrounds (characters and the province are still
+code-drawn, with the title key art as the one painted asset); travel between provinces; flight,
+domain projection, space folding and the other declared realm capabilities; profession tools,
+masters and the deeper economy; NPC deaths and feuds; the player being taken captive rather than
+being the captor; additional hidden-realm templates. The 1.0.0 interface, audio and release
+packaging are complete; this list is deliberate scope, not missing UI.
 
-The full 72-milestone status ledger lives in the design document (`§19 Authoritative roadmap`).
+Each system is described in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md); the release notes are
+in [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md).

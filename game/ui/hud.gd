@@ -43,6 +43,12 @@ var host: Node
 var _font: Font
 var _toasts: Array = []
 var _help_visible := true
+## The HUD draws live values, but sixty redraws a second buys nothing a player
+## can see. Thirty is the authored cap; tests read `redraw_requests` to prove it.
+const REDRAW_HZ := 30.0
+const REDRAW_INTERVAL := 1.0 / REDRAW_HZ
+var redraw_requests := 0
+var _redraw_accum := 0.0
 
 
 func _ready() -> void:
@@ -51,6 +57,7 @@ func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	Bus.toast.connect(_on_toast)
 	Bus.help_toggled.connect(func(visible: bool) -> void: _help_visible = visible)
+	queue_redraw()
 
 
 func _on_toast(text: String) -> void:
@@ -60,10 +67,23 @@ func _on_toast(text: String) -> void:
 
 
 func _process(delta: float) -> void:
+	# Only rebuild the toast list when something actually expired, instead of
+	# allocating a filtered array every frame.
+	var expired := false
 	for toast in _toasts:
-		toast["ttl"] = float(toast["ttl"]) - delta
-	_toasts = _toasts.filter(func(t: Dictionary) -> bool: return float(t["ttl"]) > 0.0)
-	queue_redraw()
+		var ttl := float(toast["ttl"]) - delta
+		toast["ttl"] = ttl
+		if ttl <= 0.0:
+			expired = true
+	if expired:
+		_toasts = _toasts.filter(func(t: Dictionary) -> bool: return float(t["ttl"]) > 0.0)
+	# Clamp before testing: a long frame (a paused editor, a load hitch) must not
+	# leave a debt that makes the next frames redraw faster than the cap.
+	_redraw_accum = minf(_redraw_accum + delta, REDRAW_INTERVAL)
+	if _redraw_accum >= REDRAW_INTERVAL:
+		_redraw_accum = 0.0
+		redraw_requests += 1
+		queue_redraw()
 
 
 func _text(pos: Vector2, text: String, font_size: int = 14, color: Color = INK) -> void:

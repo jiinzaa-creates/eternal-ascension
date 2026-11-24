@@ -1618,6 +1618,11 @@ func _run() -> void:
 	var parry_hp := player.hp
 	var parry_qi := player.cultivation.qi
 	var parry_poise: float = guard_dummy.poise.current
+	# The dummy stands to the player's right. Its own AI may have turned it
+	# during an earlier frame, so face it at the player and reopen the parry
+	# window: this check is about the stance, not about the AI's last turn.
+	guard_dummy._facing = Vector2.LEFT
+	player._guard_time = 0.0
 	guard_dummy._release_attack(player)
 	check(approx(player.hp, parry_hp), "a parry turns the blow aside")
 	check(approx(player.cultivation.qi, parry_qi), "a parry costs no Qi")
@@ -2781,7 +2786,9 @@ func _run() -> void:
 			m44_swords_before += 1
 	var m44_stones_before := Game.spirit_stones
 	var m44_ore_before: int = int(Crafting.material_counts(player.inventory).get("ore", 0))
+	var m44_isolation := _isolate_craft_rewards(main)
 	main.forge_act()
+	_restore_craft_rewards(main, m44_isolation)
 	var m44_swords_after := 0
 	for entry in player.inventory:
 		if String((entry as Dictionary).get("base", "")) == "base.sword.iron_jian":
@@ -2807,7 +2814,9 @@ func _run() -> void:
 	main.forge_index = m44_refine_index
 	var m44_refine_stones := Game.spirit_stones
 	var m44_refine_ore: int = int(Crafting.material_counts(player.inventory).get("ore", 0))
+	var m44_refine_isolation := _isolate_craft_rewards(main)
 	main.forge_act()
+	_restore_craft_rewards(main, m44_refine_isolation)
 	check(Game.spirit_stones == m44_refine_stones - 40, "refining charges its stones")
 	check(int(Crafting.material_counts(player.inventory).get("ore", 0)) == m44_refine_ore - 2, "refining spends its ore")
 
@@ -2861,7 +2870,12 @@ func _run() -> void:
 	for entry in player.inventory:
 		if String((entry as Dictionary).get("base", "")) == "base.pill.qi_gathering":
 			m45_pills_before += int((entry as Dictionary).get("count", 1))
+	# Brewing reports a craft. An open errand or tiding completing on that report
+	# would pay its stones back into the same purse, so keep the charge check
+	# isolated from rewards; the spend path itself is unchanged.
+	var m45_isolation := _isolate_craft_rewards(main)
 	main.alchemy_act()
+	_restore_craft_rewards(main, m45_isolation)
 	var m45_pills_after := 0
 	for entry in player.inventory:
 		if String((entry as Dictionary).get("base", "")) == "base.pill.qi_gathering":
@@ -2969,7 +2983,9 @@ func _run() -> void:
 	check(int(m46_award["level"]) == 2 and bool(m46_award["leveled"]), "practice earns the adept rank")
 	check(bool(Professions.gate(DB.recipe("recipe.forge.spirit_iron_ring"), Game.professions, DB).get("ok", false)),
 		"the adept may take the masterwork")
+	var m46_isolation := _isolate_craft_rewards(main)
 	main.forge_act()
+	_restore_craft_rewards(main, m46_isolation)
 	check(Game.crafts_made == m46_attempts + 1, "an unlocked recipe is a real attempt")
 	check(Game.spirit_stones == m46_stones - 160, "an unlocked recipe charges its stones")
 	main.close_forge()
@@ -4758,7 +4774,7 @@ func _run() -> void:
 	check(not player.is_physics_processing(), "the settings screen freezes the player")
 	check(main.settings_tab == 0, "the display page is shown first")
 	var m71_display: Array = main.settings_rows()
-	check(m71_display.size() == 6, "the display page holds six switches")
+	check(m71_display.size() == 7, "the display page holds seven settings")
 	check(String((m71_display[0] as Dictionary).get("label", "")) == "High contrast",
 		"the first switch is high contrast")
 	check(String((m71_display[0] as Dictionary).get("value", "")) == "OFF", "contrast starts off")
@@ -4866,6 +4882,58 @@ func _run() -> void:
 	check(main.damage_numbers.enabled, "damage numbers are restored")
 	check(bool(Settings.content.get("captivity", true)), "captivity content is restored")
 
+	# --- M72: title, score, redraw cap and release ---------------------------
+	var m72_title: Control = (load("res://scenes/title.tscn") as PackedScene).instantiate()
+	add_child(m72_title)
+	await frames(1)
+	check(m72_title.is_inside_tree(), "the title screen loads")
+	check(m72_title.menu_items().size() == 3, "the title offers new life, continue and quit")
+	check(m72_title.newest_slot_of([4, 9, 2]) == 9, "continue takes the newest populated slot")
+	check(String(m72_title.version_string()) == "1.0.0", "the title names the release")
+	m72_title.queue_free()
+	await frames(1)
+
+	# The score follows the player's options and shares their volume.
+	Options.set_value("music", false)
+	main._apply_options()
+	check(not Music.is_enabled(), "the music switch silences the score")
+	check(not Music.playing, "a silenced score is not playing")
+	Options.set_value("music", true)
+	main._apply_options()
+	check(Music.is_enabled(), "the music switch restores the score")
+	check(Options.get_int("volume") == Music.volume, "the score shares the interface volume")
+
+	# The HUD redraws at its authored cap, not once per frame.
+	main.hud.redraw_requests = 0
+	main.hud._redraw_accum = 0.0
+	for i in 60:
+		main.hud._process(1.0 / 60.0)
+	check(main.hud.redraw_requests >= 29 and main.hud.redraw_requests <= 31,
+		"the HUD redraws about thirty times a second (%d in sixty frames)" % main.hud.redraw_requests)
+
+	# Qi density is resolved on a chunk crossing, not every frame.
+	main.density_updates = 0
+	main._density_chunk = Vector2i(-2147483648, -2147483648)
+	main._update_biome_density()
+	main._update_biome_density()
+	check(main.density_updates == 1, "the standing chunk is resolved once")
+	var m72_density := Game.biome_density
+	main._update_biome_density()
+	check(main.density_updates == 1 and is_equal_approx(Game.biome_density, m72_density),
+		"a repeated frame reuses the resolved density")
+	var m72_position: Vector2 = player.global_position
+	player.global_position += Vector2(ChunkManager.CHUNK_SIZE, 0.0)
+	main._update_biome_density()
+	check(main.density_updates == 2, "crossing a chunk resolves a new density")
+	player.global_position = m72_position
+	main._update_biome_density()
+
+	# The release identifies itself and ships its art.
+	check(String(ProjectSettings.get_setting("application/config/version", "")) == "1.0.0",
+		"the project carries the release version")
+	check(ResourceLoader.exists("res://assets/title_key_art.jpg"), "the title key art is importable")
+	check(FileAccess.file_exists("res://export_presets.cfg"), "the export presets ship with the project")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
@@ -4917,6 +4985,27 @@ func _m70_row(rows: Array, id: String) -> Dictionary:
 		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
 			return value
 	return {}
+
+
+## Brewing and forging report a craft, and an open errand or tiding completing
+## on that report would pay its stones back into the same purse. Snapshot and
+## clear the reward ledgers for the charge check, then put them back.
+func _isolate_craft_rewards(main_node: Node) -> Dictionary:
+	var snapshot := {
+		"quests": main_node.quests.to_dict(),
+		"storylines": main_node.storylines.to_dict(),
+		"event": main_node.world_event_state.duplicate(true),
+	}
+	main_node.quests = QuestLog.new()
+	main_node.storylines = SectStorylines.new()
+	main_node.world_event_state["rewarded"] = true
+	return snapshot
+
+
+func _restore_craft_rewards(main_node: Node, snapshot: Dictionary) -> void:
+	main_node.quests.from_dict(snapshot["quests"])
+	main_node.storylines.from_dict(snapshot["storylines"])
+	main_node.world_event_state = snapshot["event"]
 
 
 func _m71_index(rows: Array, action: String) -> int:

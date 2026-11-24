@@ -4,6 +4,7 @@ dist/
 # Godot
 game/.godot/
 .godot/
+game/build/
 *.tmp
 .import/
 .env

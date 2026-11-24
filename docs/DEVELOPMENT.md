@@ -1605,6 +1605,50 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   screens, checks the freeze, applies each switch to its live node, captures a conflicting key, resets
   the bindings, reads all six sheet cards, reloads the file, and restores the player's options.
 
+## Title, score, performance and release
+
+- **The title owns no run.** `scenes/title.tscn` boots before the main scene and offers only three
+  actions: begin a new life, continue the highest populated save slot, or quit. Continue does not
+  load anything itself; it sets `Game.pending_load_slot` and the main scene consumes it once in
+  `_ready`, so the hand-off cannot survive into a save or a second scene change. A missing save
+  leaves Continue disabled and the cursor skips it. The screen answers arrows/ENTER/ESC and mouse
+  motion/clicks, and paints its menu over `assets/title_key_art.jpg` with the same high-contrast
+  palette as the HUD. The key art is the one painted asset the project ships; every other visual
+  is still drawn in code.
+- **The score is synthesized, not imported.** `systems/music.gd` (autoload `Music`) builds one
+  twelve-second `AudioStreamWAV` from a slow 110/165/220 Hz drone and a pentatonic bell every three
+  seconds. Frequencies complete whole cycles in the loop and the last bell has decayed before the
+  seam, so `LOOP_FORWARD` does not click. The build is pure and deterministic, like `Sfx`; the drone
+  amplitudes stay low enough that the score sits under combat rather than competing with it. The
+  title and the run share the autoload, so changing scenes does not restart the music. It follows
+  the interface volume, has its own `music` switch, and F2 mutes both it and the combat voices.
+  A headless run never builds the stream: there is no output device, and the suite can inspect a
+  static `build_loop()` without paying for half a megabyte of samples at boot.
+- **The HUD redraws at 30 Hz, not every frame.** `_process` accumulates frame time and requests a
+  redraw at `REDRAW_HZ`; sixty frames ask for about thirty draws instead of sixty. The toast list is
+  filtered only when a toast actually expires, instead of allocating a filtered array every frame.
+  `redraw_requests` is the counter the integration suite reads; the check runs sixty simulated
+  frames and bounds the result to 29–31. This is a measured reduction in draw requests, not a
+  claim about frame rate on hardware the build environment does not have.
+- **Qi density is resolved on a chunk crossing.** The standing biome's density is pure but not free
+  (chunk hash, biome table, density table), and the old code repeated it every frame. `_update_biome_density()`
+  remembers the chunk and only recomputes when it changes; the hidden realm forces 1.0 and resets
+  the remembered chunk so the overworld is recomputed on return. `density_updates` counts the real
+  work; the integration check proves two frames in one chunk cost one lookup and a chunk crossing
+  costs the next.
+- **Release is versioned in one place.** `application/config/version` is `1.0.0`; the save header and
+  the title read it through `ProjectSettings`, so a release bump is one edit. `export_presets.cfg`
+  carries Linux/X11 (`embed_pck`, one executable) and Web (non-threaded) presets. A tag-triggered CI
+  job installs the matching export templates, exports both, and uploads them; ordinary pushes still
+  run only the test suites. Release tags follow `vMAJOR.MINOR.PATCH` on a verified build.
+- **No save key.** M72 changes no saved state. The version string in the header is informational;
+  the schema stays 2 and a pre-release save loads with its run intact. Title and score choices are
+  in `user://options.cfg` with the rest of the options.
+- **Tests.** The unit suite checks the loop's rate, length, loop points, determinism, non-silence
+  and volume clamping, the title's items, slot choice, version and art, and the seventh option. The
+  integration suite loads the title scene, applies the music switch, measures the redraw cap, proves
+  the density cache, and checks the release version and presets.
+
 ## Spirit beasts and bosses
 
 - **A beast is a species, not a new body.** `Beasts` reads `data/spirit_beasts.json` and normalises each
@@ -2007,6 +2051,8 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - M71 adds no save key. Interface options and key bindings live in `user://options.cfg`, separate from
   every run, so the schema stays 2 and a save can move between machines without carrying one player's
   contrast or volume.
+- M72 adds no save key. The release version is written into the header for diagnostics only; the
+  schema stays 2 and every pre-release save loads unchanged.
 - Add a migration step in `Save._migrate()` for every bump, and a test that loads a
   hand-written older payload (`schema 0`) and asserts the migrated result.
 - Never delete a migration step: old saves in the wild depend on the whole chain.

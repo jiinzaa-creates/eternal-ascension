@@ -41,3 +41,65 @@ jobs:
 
       - name: Boot smoke test
         run: godot --headless --path game --quit-after 240
+
+  export:
+    name: Release exports
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unzip libfontconfig1
+          curl -sSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /opt/godot
+          sudo ln -sf "/opt/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+
+      - name: Restore export templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates
+          key: godot-templates-${{ env.GODOT_VERSION }}
+
+      - name: Install export templates if missing
+        run: |
+          set -euo pipefail
+          target="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          if [ ! -f "$target/version.txt" ]; then
+            curl -sSL -o /tmp/templates.tpz \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+            mkdir -p "$target"
+            unzip -o -j /tmp/templates.tpz \
+              "templates/version.txt" "templates/linux_release.x86_64" \
+              "templates/web_nothreads_release.zip" -d "$target" >/dev/null
+          fi
+
+      - name: Import project
+        run: godot --headless --path game --import
+
+      - name: Export Linux and Web
+        run: |
+          set -euo pipefail
+          mkdir -p game/build/linux game/build/web
+          godot --headless --path game --export-release "Linux"
+          godot --headless --path game --export-release "Web"
+          test -x game/build/linux/eternal-ascension.x86_64
+          test -f game/build/web/index.wasm
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eternal-ascension-${{ github.ref_name }}
+          path: |
+            game/build/linux/eternal-ascension.x86_64
+            game/build/web/index.html
+            game/build/web/index.wasm
+            game/build/web/index.pck

@@ -93,6 +93,8 @@ func _ready() -> void:
 	_main_narrative_tests()
 	_endgame_tests()
 	_options_tests()
+	_music_tests()
+	_title_tests()
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
 	_inheritance_tests()
@@ -5899,12 +5901,13 @@ func _endgame_entry(data: Dictionary, id: String) -> Dictionary:
 func _options_tests() -> void:
 	print("[options] persistent settings, bindings and accessibility switches")
 	var options := _options_model()
-	check(int(options.values.size()) == 6, "the options hold six values")
+	check(int(options.values.size()) == 7, "the options hold seven values")
 	check(not options.get_bool("high_contrast"), "contrast starts at the authored palette")
 	check(options.get_bool("damage_numbers"), "damage numbers start on")
 	check(options.get_int("volume") == 100, "volume starts at the authored level")
 	check(options.get_bool("combat_sound"), "combat sound starts on")
 	check(options.get_bool("captivity"), "captivity content starts on")
+	check(options.get_bool("music"), "ambient music starts on")
 	check(options.get_value("nope") == null, "an unknown option resolves to nothing")
 	check(options.set_value("nope", true) == null, "an unknown option cannot be written")
 
@@ -5914,6 +5917,7 @@ func _options_tests() -> void:
 	check(options.set_value("volume", "loud") == 100, "a non-number volume falls back")
 	check(options.set_value("high_contrast", true) == true, "a boolean toggle is stored")
 	check(options.set_value("high_contrast", "yes") == false, "a non-boolean toggle falls back")
+	check(options.set_value("music", 0) == true, "a numeric music switch falls back to its default")
 	check(options.toggle("combat_sound") == false, "toggling flips the stored value")
 	check(options.toggle("combat_sound") == true, "toggling twice restores it")
 	options.set_value("volume", 50)
@@ -6043,6 +6047,57 @@ func _options_tests() -> void:
 	check(not bool(Settings.content.get("captivity", true)), "the content switch reaches captivity")
 	Settings.content["captivity"] = true
 	applied_numbers.queue_free()
+
+
+func _music_tests() -> void:
+	print("[music] the synthesized ambient score")
+	check(Music.sample_count() == 264600, "the score is twelve seconds at 22 050 Hz")
+	var stream := Music.build_loop()
+	check(stream != null, "the score builds a stream")
+	check(stream.format == AudioStreamWAV.FORMAT_16_BITS, "the score is 16-bit")
+	check(stream.mix_rate == 22050 and not stream.stereo, "the score is mono at the authored rate")
+	check(stream.loop_mode == AudioStreamWAV.LOOP_FORWARD, "the score loops forward")
+	check(stream.loop_begin == 0 and stream.loop_end == Music.sample_count(), "the whole score is the loop")
+	check(stream.data.size() == Music.sample_count() * 2, "every sample is two bytes")
+	var nonzero := false
+	for i in range(0, mini(stream.data.size(), 4000), 2):
+		if stream.data.decode_s16(i) != 0:
+			nonzero = true
+			break
+	check(nonzero, "the score is not silence")
+	var again := Music.build_loop()
+	check(again.data == stream.data, "the score is deterministic")
+
+	var score: Node = load("res://systems/music.gd").new()
+	add_child(score)
+	check(score.is_enabled(), "the score starts enabled")
+	score.set_volume(0)
+	check(score.volume == 0, "the score accepts true silence")
+	score.set_volume(140)
+	check(score.volume == 100, "the score volume is capped")
+	score.set_volume(50)
+	check(score.volume == 50, "the score stores a middle level")
+	score.set_enabled(false)
+	check(not score.playing, "a disabled score is not playing")
+	score.queue_free()
+
+
+func _title_tests() -> void:
+	print("[title] key art, menu and version")
+	var title: Control = (load("res://scenes/title.tscn") as PackedScene).instantiate()
+	add_child(title)
+	var items: Array = title.menu_items()
+	check(items.size() == 3, "the title offers three ways in")
+	check(String(items[0]) == "Begin a new life", "the first item begins a run")
+	check(String(items[1]) == "Continue", "the second item continues")
+	check(String(items[2]) == "Quit", "the last item quits")
+	check(title.newest_slot_of([3, 7, 1]) == 7, "continue takes the highest populated slot")
+	check(title.newest_slot_of([]) == 0, "no saves means no continue slot")
+	check(String(title.version_string()) == "1.0.0", "the title names the release")
+	check(ResourceLoader.exists("res://assets/title_key_art.jpg"), "the title key art ships")
+	check(String(ProjectSettings.get_setting("application/run/main_scene", "")) == "res://scenes/title.tscn",
+		"the game boots to the title")
+	title.queue_free()
 
 
 func _options_model() -> Node:
