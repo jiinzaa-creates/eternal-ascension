@@ -119,6 +119,7 @@ func _draw() -> void:
 	draw_council(player)
 	draw_player_sect(player)
 	draw_storylines(player)
+	draw_narrative(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -982,6 +983,125 @@ func draw_storylines(_player: Player) -> void:
 
 	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER take a stance   ·   F6 / E / ESC — close",
 		10, Color("#7b8b94"))
+
+
+## The archive: four questions, each a chain of four records. A record is only
+## printed once it is discovered; the one after it shows what the world still
+## has to prove. A reading screen, frozen like the ledger.
+func draw_narrative(_player: Player) -> void:
+	if not bool(host.narrative_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.88))
+	var w := 1100.0
+	var h := 664.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0c1114", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#8fb0c0", 0.42), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "THE ARCHIVE", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "Four questions the province never answered. No prophecy, no chosen reader.", 11, MUTED)
+	var total := 0
+	var count := 0
+	if host.narrative != null:
+		total = host.narrative.total_count()
+		count = host.narrative.known.size()
+	_text(Vector2(x + 24.0, y + 78.0), "%d of %d records recovered · opening the archive also reads the world" % [
+		count, total], 11, Color("#c8d8e0"))
+	draw_line(Vector2(x + 20.0, y + 94.0), Vector2(x + w - 20.0, y + 94.0), Color("#2b343a"), 1.0)
+
+	var threads: Array = host.narrative_threads()
+	var thread_cursor := clampi(int(host.narrative_thread_index), 0, maxi(0, threads.size() - 1))
+	var card_y := y + 112.0
+	for i in threads.size():
+		var thread_row: Dictionary = threads[i]
+		var selected := i == thread_cursor
+		var colour := Color(String(thread_row.get("colour", "#b8b8b8")))
+		if selected:
+			draw_rect(Rect2(x + 18.0, card_y - 6.0, 336.0, 112.0), Color("#162026", 0.96))
+			draw_rect(Rect2(x + 18.0, card_y - 6.0, 3.0, 112.0), colour)
+		_text(Vector2(x + 30.0, card_y + 14.0), _fit(String(thread_row.get("name", "?")), 13, 240.0), 13,
+			colour if selected else Color("#a8b8c0"))
+		var progress := String(thread_row.get("progress", ""))
+		_text(Vector2(x + 344.0 - _text_width(progress, 10), card_y + 14.0), progress, 10, MUTED)
+		_text(Vector2(x + 30.0, card_y + 34.0), _fit(String(thread_row.get("question", "")), 10, 310.0), 10,
+			Color("#8fa2ab"))
+		var blurb_lines := _wrapped(String(thread_row.get("blurb", "")), 9, 306.0)
+		for line_index in mini(blurb_lines.size(), 2):
+			_text(Vector2(x + 30.0, card_y + 54.0 + float(line_index) * 13.0), blurb_lines[line_index], 9,
+				Color("#6f7f88"))
+		var known_count := int(thread_row.get("known", 0))
+		if known_count == int(thread_row.get("total", 0)) and known_count > 0:
+			_text(Vector2(x + 30.0, card_y + 92.0), "THREAD COMPLETE", 9, colour.lerp(Color("#ffffff"), 0.35))
+		card_y += 122.0
+
+	var fragments: Array = host.narrative_thread_fragments()
+	var fragment_cursor := clampi(int(host.narrative_revelation_index), 0, maxi(0, fragments.size() - 1))
+	var row_y := y + 112.0
+	for i in fragments.size():
+		var row: Dictionary = fragments[i]
+		var selected := i == fragment_cursor
+		var known := bool(row.get("known", false))
+		if selected:
+			draw_rect(Rect2(x + 376.0, row_y - 10.0, 700.0, 62.0), Color("#162026", 0.96))
+		var title_colour := Color("#e6eef2") if known else Color("#6f7f88")
+		if bool(row.get("next", false)):
+			title_colour = Color("#e0c880")
+		_text(Vector2(x + 388.0, row_y + 8.0), "%02d" % (i + 1), 11, Color("#4f5f68"))
+		_text(Vector2(x + 420.0, row_y + 8.0), _fit(String(row.get("title", "?")), 13, 470.0), 13, title_colour)
+		var status := "UNRECORDED"
+		if known:
+			status = "RECORDED"
+		elif bool(row.get("next", false)):
+			status = "NEXT"
+		_text(Vector2(x + 1064.0 - _text_width(status, 10), row_y + 8.0), status, 10,
+			Color("#a8d8c0") if known else (Color("#e0c880") if status == "NEXT" else Color("#4f5f68")))
+		var line := String(row.get("summary", "")) if known else String(row.get("hint", ""))
+		_text(Vector2(x + 420.0, row_y + 27.0), _fit(line, 10, 620.0), 10,
+			Color("#8fa2ab") if known else Color("#6f7f88"))
+		row_y += 66.0
+
+	var detail_rect := Rect2(x + 376.0, y + 392.0, 700.0, 218.0)
+	draw_rect(detail_rect, Color("#0a0f12", 0.94))
+	draw_rect(detail_rect, Color("#2b343a"), false, 1.0)
+	if not fragments.is_empty():
+		var detail: Dictionary = fragments[fragment_cursor]
+		var detail_known := bool(detail.get("known", false))
+		_text(Vector2(x + 396.0, y + 420.0), _fit(String(detail.get("title", "")), 15, 640.0), 15,
+			Color("#e6eef2") if detail_known else Color("#8fa2ab"))
+		var detail_lines: PackedStringArray
+		if detail_known:
+			_text(Vector2(x + 396.0, y + 440.0), _fit("Source: " + String(detail.get("source", "")), 9, 650.0), 9,
+				Color("#6f7f88"))
+			detail_lines = _wrapped(String(detail.get("text", "")), 11, 640.0)
+		else:
+			_text(Vector2(x + 396.0, y + 440.0), "This page has not been found yet.", 10, Color("#6f7f88"))
+			detail_lines = _wrapped(String(detail.get("hint", "")), 11, 640.0)
+		var text_y := y + 466.0
+		for line_index in mini(detail_lines.size(), 7):
+			_text(Vector2(x + 396.0, text_y + float(line_index) * 18.0), detail_lines[line_index], 11,
+				Color("#c8d4da") if detail_known else Color("#8fa2ab"))
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "←/→ thread   ·   ↑/↓ record   ·   F7 / E / ESC — close",
+		10, Color("#7b8b94"))
+
+
+## Draw-time word wrap for the archive's prose. No layout node, no reflow pass:
+## the same line breaks are used for every frame of the reading screen.
+func _wrapped(text: String, font_size: int, max_width: float) -> PackedStringArray:
+	var lines := PackedStringArray()
+	var line := ""
+	for word in text.split(" ", false):
+		var candidate := word if line == "" else line + " " + word
+		if _text_width(candidate, font_size) <= max_width:
+			line = candidate
+			continue
+		if line != "":
+			lines.append(line)
+		line = word
+	if line != "":
+		lines.append(line)
+	return lines
 
 
 ## The active bar only: six slots, each with its art's own cooldown sweep.

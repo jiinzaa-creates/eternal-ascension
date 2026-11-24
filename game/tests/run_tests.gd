@@ -90,6 +90,7 @@ func _ready() -> void:
 	_quest_tests()
 	_quest_architecture_tests()
 	_sect_storyline_tests()
+	_main_narrative_tests()
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
 	_inheritance_tests()
@@ -5466,6 +5467,221 @@ func _sect_storyline_tests() -> void:
 	broken = DB.sect_storylines_data.duplicate(true)
 	_storyline_entry(broken, "storyline.heavenly_sword")["sect"] = "sect.azure_cloud"
 	check(not SectStorylines.validate(broken).is_empty(), "two arcs for one house are rejected")
+
+
+# ---------------------------------------------------------- main narrative ----
+
+func _main_narrative_tests() -> void:
+	print("[narrative] four threads, sixteen records, cross-thread convergence")
+	check(not DB.main_narrative_data.is_empty(), "main narrative data loads")
+	check(MainNarrative.validate(DB.main_narrative_data).is_empty(), "the authored main narrative validates")
+	var ledger := MainNarrative.new()
+	check(ledger.threads().size() == 4, "the main line is four threads")
+	check(ledger.total_count() == 16, "four records per thread")
+	check(ledger.known.is_empty(), "the archive starts empty")
+	check(ledger.revelation("lore.severed_heaven.1").size() > 0, "a record resolves by id")
+	check(ledger.revelation("lore.nope").is_empty(), "an unknown record resolves to nothing")
+	check(ledger.thread_id_of("lore.severed_heaven.1") == "thread.severed_heaven",
+		"a record knows its thread")
+	check(ledger.thread("thread.nope").is_empty(), "an unknown thread resolves to nothing")
+	check(ledger.thread_of("lore.nope").is_empty(), "an unknown record has no thread")
+	check(ledger.next_in_thread("thread.severed_heaven").get("id", "") == "lore.severed_heaven.1",
+		"a fresh thread points at its first record")
+	check(ledger.progress_text("thread.severed_heaven") == "0 / 4 records", "progress starts at zero")
+	check(ledger.evaluate(_narrative_context({})).is_empty(), "an untouched province opens no record")
+
+	# The tomb is the first page: entering it at realm 2 opens exactly one record.
+	var tomb := _narrative_context({"realm": 2, "discovered": ["realm.hollow_moon"]})
+	var opened := ledger.evaluate(tomb)
+	check(opened.size() == 1, "one record opens on the first discovery")
+	check(String((opened[0] as Dictionary).get("id", "")) == "lore.severed_heaven.1",
+		"the tomb opens the Severed Heaven")
+	check(String((opened[0] as Dictionary).get("thread", "")) == "The Severed Heaven",
+		"an opening names its thread")
+	check(ledger.is_known("lore.severed_heaven.1"), "the record is held")
+	check(ledger.evaluate(tomb).is_empty(), "reading the archive twice opens nothing twice")
+	check(ledger.known_in_thread("thread.severed_heaven") == 1, "the thread counts one record")
+	check(ledger.progress_text("thread.severed_heaven") == "1 / 4 records", "progress follows the discovery")
+	check(ledger.next_in_thread("thread.severed_heaven").get("id", "") == "lore.severed_heaven.2",
+		"the thread moves to its second record")
+
+	# The chain is real: a later record does not open without its predecessor.
+	var no_claim := _narrative_context({"realm": 3, "discovered": ["realm.hollow_moon"]})
+	var fresh := MainNarrative.new()
+	fresh.evaluate(no_claim)
+	check(fresh.is_known("lore.severed_heaven.1"), "the first record opens on its own gates")
+	check(not fresh.is_known("lore.severed_heaven.2"), "an altar claim is still required")
+	var two := _narrative_context({"realm": 3, "inheritances": 1,
+		"discovered": ["realm.hollow_moon"]})
+	var chain := fresh.evaluate(two)
+	check(chain.size() == 1 and String((chain[0] as Dictionary).get("id", "")) == "lore.severed_heaven.2",
+		"the altar claim opens the second record")
+	check(not fresh.is_known("lore.severed_heaven.3"), "the third record still wants its own gates")
+
+	# Hints name the exact missing thing, and a met record has no hint.
+	var hint := fresh.condition_hint(fresh.revelation("lore.severed_heaven.3"), two)
+	check(hint.contains("the completed story The Hoarded Vein"), "a hint names the missing house story")
+	check(hint.contains("120 contribution"), "a hint names the missing contribution")
+	check(fresh.condition_hint(fresh.revelation("lore.severed_heaven.2"), two) == "",
+		"a met record needs no hint")
+
+	# The four threads converge without a fixed order: the Root Question's last
+	# record waits for the Severed Heaven's third and the Pavilion's second.
+	var crossing := _narrative_context({
+		"realm": 5, "kills": 25, "contribution": 120, "inheritances": 2, "crafts": 4,
+		"quests": ["quest.realm.first_descent"],
+		"discovered": ["realm.hollow_moon", "realm.immortal_ruin"],
+	})
+	var before := MainNarrative.new()
+	before.evaluate(crossing)
+	check(before.is_known("lore.root_question.3"), "the Root Question reaches the altar")
+	check(before.is_known("lore.pavilion_book.2"), "the Pavilion reaches its drifting archive")
+	check(not before.is_known("lore.severed_heaven.3"), "the Severed Heaven waits for a house story")
+	check(not before.is_known("lore.root_question.4"), "the Root Question's last record is held")
+	check(before.condition_hint(before.revelation("lore.root_question.4"), crossing).contains(
+		"the record The Houses Built on a Fracture"), "the hint names the missing thread record")
+	var open_score := crossing.duplicate(true)
+	open_score["storylines"] = ["storyline.azure_cloud"]
+	var both := before.evaluate(open_score)
+	check(before.is_known("lore.severed_heaven.3"), "the house story opens the fracture")
+	check(before.is_known("lore.root_question.4"), "the convergence opens in the same reading")
+	var fracture_at := -1
+	var convergence_at := -1
+	for i in both.size():
+		var opened_id := String((both[i] as Dictionary).get("id", ""))
+		if opened_id == "lore.severed_heaven.3":
+			fracture_at = i
+		elif opened_id == "lore.root_question.4":
+			convergence_at = i
+	check(fracture_at >= 0 and convergence_at > fracture_at, "records are returned in authored order")
+
+	# Every thread's final record must actually converge two other threads.
+	var threads_ok := true
+	for thread_value in ledger.threads():
+		var records: Array = (thread_value as Dictionary).get("revelations", [])
+		var last: Dictionary = records[records.size() - 1]
+		var requires: Dictionary = last.get("requires", {})
+		var others: Dictionary = {}
+		for link in requires.get("threads", []):
+			var link_thread := ledger.thread_id_of(String(link))
+			if link_thread != "" and link_thread != String((thread_value as Dictionary).get("id", "")):
+				others[link_thread] = true
+		if others.size() < 2:
+			threads_ok = false
+	check(threads_ok, "every thread converges at least two others")
+
+	# A save carries discoveries, never gates; a hand-edited save cannot skip.
+	var save := before.to_dict()
+	check(int(save.get("version", 0)) == 1, "the narrative save is versioned")
+	check((save.get("known", []) as Array).size() == before.known.size(), "every held record is saved")
+	var restored := MainNarrative.new()
+	restored.from_dict(save)
+	check(restored.known.size() == before.known.size(), "a save restores every record")
+	check(restored.is_known("lore.root_question.4"), "a convergence survives a save")
+	var dirty := MainNarrative.new()
+	dirty.from_dict({"version": 1, "known": ["lore.nope", "lore.severed_heaven.3", "lore.severed_heaven.1"]})
+	check(not dirty.is_known("lore.nope"), "an unknown record is dropped from a save")
+	check(not dirty.is_known("lore.severed_heaven.3"), "an out-of-order record is dropped from a save")
+	check(dirty.is_known("lore.severed_heaven.1"), "the record whose gates it meets is kept")
+	var forged := MainNarrative.new()
+	forged.from_dict({"version": 1, "known": [
+		"lore.severed_heaven.1", "lore.severed_heaven.2", "lore.severed_heaven.3",
+		"lore.severed_heaven.4", "lore.severed_heaven.1"]})
+	check(forged.is_known("lore.severed_heaven.3"), "a reached record is kept")
+	check(not forged.is_known("lore.severed_heaven.4"), "a forged convergence is dropped")
+	check(forged.known.size() == 3, "duplicates do not inflate a save")
+
+	# Validation refuses malformed threads and records, not just bad ids.
+	var broken: Dictionary = DB.main_narrative_data.duplicate(true)
+	broken["threads"] = []
+	check(not MainNarrative.validate(broken).is_empty(), "an empty thread list is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	(broken["threads"] as Array).pop_back()
+	check(not MainNarrative.validate(broken).is_empty(), "a missing thread is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_thread_entry(broken, "thread.root_question")["id"] = "thread.severed_heaven"
+	check(not MainNarrative.validate(broken).is_empty(), "two threads sharing an id are rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_thread_entry(broken, "thread.root_question")["colour"] = "not-a-colour"
+	check(not MainNarrative.validate(broken).is_empty(), "an invalid thread colour is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	(_narrative_thread_entry(broken, "thread.root_question")["revelations"] as Array).pop_back()
+	check(not MainNarrative.validate(broken).is_empty(), "a short thread is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["summary"] = ""
+	check(not MainNarrative.validate(broken).is_empty(), "a record without a summary is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {}
+	check(not MainNarrative.validate(broken).is_empty(), "a record with no gates is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"min_mana": 4}
+	check(not MainNarrative.validate(broken).is_empty(), "an unknown condition is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"min_realm": 0}
+	check(not MainNarrative.validate(broken).is_empty(), "an impossible realm gate is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"min_rank": "rank.nope"}
+	check(not MainNarrative.validate(broken).is_empty(), "an unknown rank gate is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"quests": ["quest.nope"]}
+	check(not MainNarrative.validate(broken).is_empty(), "an unknown quest gate is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"discovered": ["realm.nope"]}
+	check(not MainNarrative.validate(broken).is_empty(), "an unknown discovery is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"storylines": ["storyline.nope"]}
+	check(not MainNarrative.validate(broken).is_empty(), "an unknown storyline gate is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"threads": ["lore.nope"]}
+	check(not MainNarrative.validate(broken).is_empty(), "an unknown record link is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {"threads": ["lore.severed_heaven.1"]}
+	check(not MainNarrative.validate(broken).is_empty(), "a record requiring itself is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.1")["requires"] = {
+		"min_realm": 2, "threads": ["lore.root_question.4"]}
+	check(not MainNarrative.validate(broken).is_empty(), "a first record cannot start from another record")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.2")["requires"] = {
+		"min_realm": 3, "min_inheritances": 1}
+	check(not MainNarrative.validate(broken).is_empty(), "a record must require its predecessor")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.root_question.4")["requires"] = {
+		"min_realm": 5, "threads": ["lore.root_question.3", "lore.severed_heaven.3"]}
+	check(not MainNarrative.validate(broken).is_empty(), "a final record without two threads is rejected")
+	broken = DB.main_narrative_data.duplicate(true)
+	_narrative_record(broken, "lore.severed_heaven.2")["requires"] = {
+		"min_realm": 3, "min_inheritances": 1,
+		"threads": ["lore.severed_heaven.1", "lore.root_question.4"]}
+	check(not MainNarrative.validate(broken).is_empty(), "a prerequisite cycle is rejected")
+
+
+func _narrative_context(overrides: Dictionary = {}) -> Dictionary:
+	var context := {
+		"realm": 1, "kills": 0, "contribution": 0, "inheritances": 0, "crafts": 0,
+		"rank": "rank.servant", "sect_seat": false, "founded_sect": false,
+		"quests": [], "storylines": [], "storyline_regard": {}, "discovered": [],
+	}
+	for key in overrides.keys():
+		context[key] = overrides[key]
+	return context
+
+
+func _narrative_thread_entry(data: Dictionary, id: String) -> Dictionary:
+	for value in data.get("threads", []):
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
+			return value
+	return {}
+
+
+func _narrative_record(data: Dictionary, id: String) -> Dictionary:
+	for thread_value in data.get("threads", []):
+		if typeof(thread_value) != TYPE_DICTIONARY:
+			continue
+		for value in (thread_value as Dictionary).get("revelations", []):
+			if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
+				return value
+	return {}
 
 
 # ---------------------------------------------------------- hidden realms ----

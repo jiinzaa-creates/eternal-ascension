@@ -4527,6 +4527,108 @@ func _run() -> void:
 	Game.sect_contribution = m68_contribution
 	Game.faction_standing = m68_standing
 
+	# --- M69: the main narrative ---------------------------------------------
+	var m69_realm: int = player.cultivation.realm
+	var m69_sublevel: int = player.cultivation.sublevel
+	var m69_stones := Game.spirit_stones
+	var m69_contribution := Game.sect_contribution
+	var m69_kills := Game.kills
+	var m69_crafts := Game.crafts_made
+	var m69_discovered: Dictionary = Game.discovered.duplicate(true)
+	var m69_claims: Dictionary = main.inheritances_taken.duplicate(true)
+	var m69_legacy: bool = main.inheritance_taken
+
+	check(main.narrative != null, "the archive loads in the scene")
+	check(main.narrative.threads().size() == 4, "the scene holds four narrative threads")
+	check(main.narrative.total_count() == 16, "the scene holds sixteen records")
+
+	# A controlled first page: the tomb at realm 2 is exactly one record, and the
+	# screen shows the next record's real requirements.
+	main.narrative = MainNarrative.new()
+	Game.discovered.clear()
+	Game.discovered["realm.hollow_moon"] = true
+	Game.sect_contribution = 0
+	Game.crafts_made = 0
+	Game.kills = 0
+	main.inheritances_taken.clear()
+	main.inheritance_taken = false
+	player.cultivation.realm = 2
+	player.cultivation.sublevel = 1
+	player.rebuild_stats()
+	main._open_narrative()
+	check(main.narrative_open, "the archive screen opens")
+	check(not player.is_physics_processing(), "the archive freezes the player")
+	check(main.narrative.known.size() == 1, "only the earned record is held")
+	check(main.narrative.is_known("lore.severed_heaven.1"), "the tomb opens the Severed Heaven")
+	var m69_toast_seen := false
+	for toast_text in _toasts:
+		if String(toast_text).contains("The record opens") and String(toast_text).contains("A Door With No Lintel"):
+			m69_toast_seen = true
+	check(m69_toast_seen, "opening a record is announced")
+	var m69_threads: Array = main.narrative_threads()
+	check(m69_threads.size() == 4, "the screen lists four threads")
+	check(int((m69_threads[0] as Dictionary).get("known", 0)) == 1, "the thread row shows its count")
+	check(String((m69_threads[0] as Dictionary).get("progress", "")) == "1 / 4 records",
+		"the thread row shows its progress")
+	var m69_rows: Array = main.narrative_thread_fragments()
+	check(m69_rows.size() == 4, "the selected thread shows four records")
+	check(bool((m69_rows[0] as Dictionary).get("known", false)), "the recovered record reads recorded")
+	check(bool((m69_rows[1] as Dictionary).get("next", false)), "the next record is marked")
+	check(String((m69_rows[1] as Dictionary).get("hint", "")).contains("1 altar claims"),
+		"an unrecorded page names the altar it still needs")
+	check(String((m69_rows[1] as Dictionary).get("text", "")) != "", "the page keeps its prose")
+	main._close_narrative()
+	check(not main.narrative_open, "the archive closes")
+	check(player.is_physics_processing(), "closing the archive restores the player")
+
+	# Real progression opens the chain: realm, altar claims, work, a house's story
+	# and the discovered library all feed the same ledger.
+	player.cultivation.realm = 4
+	player.rebuild_stats()
+	Game.sect_contribution = 300
+	Game.crafts_made = 4
+	Game.kills = 25
+	Game.discovered["realm.immortal_ruin"] = true
+	main.inheritance_taken = true
+	main.inheritances_taken["realm.hollow_moon"] = true
+	main.inheritances_taken["realm.immortal_ruin"] = true
+	var m69_before: int = main.narrative.known.size()
+	main._evaluate_narrative()
+	check(main.narrative.known.size() > m69_before, "real progress opens more records")
+	check(main.narrative.is_known("lore.severed_heaven.2"), "an altar claim opens the scar")
+	check(main.narrative.is_known("lore.severed_heaven.3"), "the house story opens the fracture")
+	check(main.narrative.is_known("lore.root_question.2"), "kills and the first record open the ladder")
+	check(main.narrative.is_known("lore.pavilion_book.1"), "the sunken library opens the page")
+	check(main.narrative.is_known("lore.pavilion_book.2"), "copying work opens the drifting archive")
+	check(not main.narrative.is_known("lore.root_question.4"), "a convergence still waits for another thread")
+	var m69_after: int = main.narrative.known.size()
+	main._evaluate_narrative()
+	check(main.narrative.known.size() == m69_after, "a second reading opens nothing new")
+
+	# The whole archive is saved, and a reload does not need to rediscover it.
+	Save.delete_slot(109)
+	main._save(109)
+	main.narrative = MainNarrative.new()
+	main._load_game(109)
+	check(main.narrative.known.size() == m69_after, "the archive survives a save")
+	check(main.narrative.is_known("lore.severed_heaven.3"), "a late record survives a save")
+	main._open_narrative()
+	check(main.narrative.known.size() == m69_after, "reading a loaded archive opens nothing twice")
+	main._close_narrative()
+	Save.delete_slot(109)
+
+	# Put the run back where the remaining suite expects it.
+	player.cultivation.realm = m69_realm
+	player.cultivation.sublevel = m69_sublevel
+	player.rebuild_stats()
+	Game.spirit_stones = m69_stones
+	Game.sect_contribution = m69_contribution
+	Game.kills = m69_kills
+	Game.crafts_made = m69_crafts
+	Game.discovered = m69_discovered
+	main.inheritances_taken = m69_claims
+	main.inheritance_taken = m69_legacy
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

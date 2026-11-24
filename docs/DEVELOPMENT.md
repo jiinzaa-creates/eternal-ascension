@@ -1486,6 +1486,49 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   out-of-range amount, an unknown technique/passive/faction, endings that are too few, unordered or
   without a zero floor, and a roster without exactly one local arc.
 
+## Main narrative
+
+- **Four questions, sixteen records.** `data/main_narrative.json` authors four threads — the Severed
+  Heaven (why the old ascent failed), the Root Question (where roots come from), the Physique Bloodlines
+  (who distributed the old blood) and the Pavilion's Book (who wrote the text that rewrites readers).
+  Each thread declares `id`, `name`, `question`, `blurb`, `colour` and exactly four `revelations`;
+  each revelation declares `id`, `title`, `summary`, `text`, `source` and `requires`.
+  `MainNarrative` (`game/systems/main_narrative.gd`) is the only reader. The line is deliberately
+  archaeological: no prophecy, no chosen one, and the final record of each thread poses the choice
+  rather than answering it.
+- **A record opens from real state, never from a flag.** The scene passes one context snapshot to
+  `evaluate()`: realm, kills, contribution, claimed altars, finished works, rank, the open master's
+  seat, a founded hall, completed quests, completed house stories, each accepted house's regard, and
+  discovered sites. A `requires` block may name any of `min_realm`, `min_kills`, `min_contribution`,
+  `min_inheritances`, `min_crafts`, `min_rank`, `sect_seat`, `founded_sect`, `quests`, `any_quests`,
+  `storylines`, `any_storylines`, `storyline_regard`, `discovered` and `threads`. `threads` is checked
+  against the ledger's own `known` set, not the caller's dictionary, so a context cannot fake a
+  convergence.
+- **Chains are explicit and validated.** Record two of a thread must name record one in
+  `requires.threads`; the first record may not start from another record. Every thread's fourth record
+  must name records from at least two other threads, which is what makes the four converge without
+  fixing which thread is read first.
+- **Discovery is reported, not polled.** `_report_quests()` evaluates the archive after every event,
+  opening the archive evaluates it again, and a load evaluates it once against the restored world.
+  `evaluate()` runs to a fixed point: a record opened in this pass can open the next in the same pass,
+  and the result is returned in authored order. There is no per-frame scan and no frame delay.
+- **The archive is a reading screen.** **F7** freezes play and shows four thread cards with live
+  progress and each thread's question, the four records of the selected thread, and the selected
+  page's prose and source. An unrecorded page shows the exact missing conditions in the world's words.
+  ←/→ changes thread, ↑/↓ changes page; the archive opens on the next unrecorded page.
+- **Saves are discoveries only.** `main_narrative` is an optional top-level block (`version`, `known`)
+  under schema 2. `from_dict()` drops unknown ids and accepts a record only once the earlier records it
+  names are already accepted, so out-of-order records and a forged final record fall away. A pre-M69
+  save loads with an empty archive and discovers it from the run's real progress on the next event or
+  archive read.
+- **Validation.** `MainNarrative.validate()` runs from `DB.validate` and rejects a missing or
+  non-array thread list, a wrong thread count, a bad/duplicate/unnamed thread, a missing question or
+  blurb, an invalid colour, a wrong record count, a missing/duplicate/malformed record, missing title,
+  summary, text or source, an empty or unknown `requires`, an impossible realm, kill, contribution,
+  craft, inheritance, rank, regard, quest, storyline or site gate, a self-link, an unknown record
+  link, a first record that starts from another record, a record that skips or inverts its predecessor,
+  a final record that converges fewer than two other threads, and a prerequisite cycle.
+
 ## Spirit beasts and bosses
 
 - **A beast is a species, not a new body.** `Beasts` reads `data/spirit_beasts.json` and normalises each
@@ -1879,6 +1922,9 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   the primary quest's state on load, so the schema stays 2 and no old run loses its place.
 - M68 adds the optional `sect_storylines` block (`version`, `states`). A pre-M68 save loads every arc
   fresh and unaccepted, so the schema stays 2 and no old run loses a decision it never made.
+- M69 adds the optional `main_narrative` block (`version`, `known`). A pre-M69 save loads an empty
+  archive; its real progress opens records on the next reported event or archive read, so the schema
+  stays 2 and no old run starts with a record it did not earn.
 - Add a migration step in `Save._migrate()` for every bump, and a test that loads a
   hand-written older payload (`schema 0`) and asserts the migrated result.
 - Never delete a migration step: old saves in the wild depend on the whole chain.

@@ -126,6 +126,12 @@ var player_sect_index := 0
 var storylines: SectStorylines
 var storylines_open := false
 var storyline_index := 0
+## The province's four archaeological threads. Records open from real progress
+## and are read on a frozen archive screen; the rules live in MainNarrative.
+var narrative: MainNarrative
+var narrative_open := false
+var narrative_thread_index := 0
+var narrative_revelation_index := 0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -191,6 +197,7 @@ func _ready() -> void:
 	_name_rng = Rng.stream("npc_names", 0)
 	quests = QuestLog.new()
 	storylines = SectStorylines.new()
+	narrative = MainNarrative.new()
 	_build_world()
 	_spawn_player()
 	_build_hud()
@@ -739,7 +746,7 @@ func _process(delta: float) -> void:
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
-			or sect_ledger_open or council_open or player_sect_open or storylines_open:
+			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open:
 		return
 
 	_tick_inheritance_trial(delta)
@@ -816,6 +823,8 @@ func _process(delta: float) -> void:
 		toggle_player_sect()
 	if Input.is_action_just_pressed("open_storylines"):
 		toggle_storylines()
+	if Input.is_action_just_pressed("open_narrative"):
+		toggle_narrative()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1832,6 +1841,27 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.is_action_pressed("accept"):
 			_storylines_activate(storyline_index)
+			return
+		return
+
+	if narrative_open:
+		if event.is_action_pressed("open_narrative") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_narrative()
+			return
+		if event.is_action_pressed("ui_right"):
+			narrative_thread_index = mini(narrative_thread_index + 1, maxi(0, narrative_threads().size() - 1))
+			narrative_revelation_index = maxi(0, _narrative_next_index(narrative_thread_index))
+			return
+		if event.is_action_pressed("ui_left"):
+			narrative_thread_index = maxi(0, narrative_thread_index - 1)
+			narrative_revelation_index = maxi(0, _narrative_next_index(narrative_thread_index))
+			return
+		if event.is_action_pressed("ui_down"):
+			narrative_revelation_index = mini(narrative_revelation_index + 1, maxi(0, narrative_thread_fragments().size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			narrative_revelation_index = maxi(0, narrative_revelation_index - 1)
 			return
 		return
 
@@ -3106,6 +3136,155 @@ func _close_storylines() -> void:
 		player.set_process(true)
 
 
+# -------------------------------------------------------- main narrative ----
+
+
+func toggle_narrative() -> void:
+	if narrative_open:
+		_close_narrative()
+	else:
+		_open_narrative()
+
+
+## Opening the archive is also a reading of the world: progress earned since the
+## last reported event is recorded before the first page is drawn.
+func _open_narrative() -> void:
+	if player == null or String(phase) != "play":
+		return
+	_evaluate_narrative()
+	narrative_open = true
+	narrative_thread_index = clampi(narrative_thread_index, 0, maxi(0, narrative_threads().size() - 1))
+	var next := _narrative_next_index(narrative_thread_index)
+	narrative_revelation_index = clampi(narrative_revelation_index, 0, maxi(0, narrative_thread_fragments().size() - 1))
+	if next >= 0:
+		narrative_revelation_index = next
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_narrative() -> void:
+	if not narrative_open:
+		return
+	narrative_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+func narrative_threads() -> Array:
+	if narrative == null:
+		return []
+	var out: Array = []
+	for value in narrative.threads():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		out.append({
+			"id": id,
+			"name": String(entry.get("name", "")),
+			"question": String(entry.get("question", "")),
+			"blurb": String(entry.get("blurb", "")),
+			"colour": String(entry.get("colour", "#b8b8b8")),
+			"known": narrative.known_in_thread(id),
+			"total": narrative.revelations_of(id).size(),
+			"progress": narrative.progress_text(id),
+		})
+	return out
+
+
+func narrative_thread_fragments() -> Array:
+	if narrative == null:
+		return []
+	var threads := narrative.threads()
+	if threads.is_empty():
+		return []
+	var thread_index := clampi(narrative_thread_index, 0, threads.size() - 1)
+	var thread_id := String((threads[thread_index] as Dictionary).get("id", ""))
+	var context := _narrative_context()
+	var next_id := String(narrative.next_in_thread(thread_id).get("id", ""))
+	var out: Array = []
+	for value in narrative.revelations_of(thread_id):
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var known := narrative.is_known(id)
+		out.append({
+			"id": id,
+			"title": String(entry.get("title", "")),
+			"summary": String(entry.get("summary", "")),
+			"text": String(entry.get("text", "")),
+			"source": String(entry.get("source", "")),
+			"known": known,
+			"next": id == next_id,
+			"hint": "" if known else narrative.condition_hint(entry, context),
+		})
+	return out
+
+
+func _narrative_next_index(thread_index: int) -> int:
+	narrative_thread_index = clampi(thread_index, 0, maxi(0, narrative_threads().size() - 1))
+	var rows := narrative_thread_fragments()
+	for i in rows.size():
+		if bool((rows[i] as Dictionary).get("next", false)):
+			return i
+	return -1
+
+
+## What the four threads are judged against: the body, the run and the houses'
+## memory of it. Nothing is copied onto the narrative ledger.
+func _narrative_context() -> Dictionary:
+	var claims := 0
+	for value in RealmAccess.sites():
+		if typeof(value) == TYPE_DICTIONARY \
+				and _inheritance_claimed(String((value as Dictionary).get("id", ""))):
+			claims += 1
+	var regard: Dictionary = {}
+	if storylines != null:
+		for value in storylines.storylines():
+			if typeof(value) != TYPE_DICTIONARY:
+				continue
+			var id := String((value as Dictionary).get("id", ""))
+			if storylines.is_accepted(id) or storylines.is_completed(id):
+				regard[id] = storylines.regard_of(id)
+	var completed_quests: Array = quests.completed_ids() if quests != null else []
+	var completed_storylines: Array = storylines.completed_ids() if storylines != null else []
+	return {
+		"realm": player.cultivation.realm if player != null else 0,
+		"kills": Game.kills,
+		"contribution": Game.sect_contribution,
+		"inheritances": claims,
+		"crafts": Game.crafts_made,
+		"rank": _player_rank_id(),
+		"sect_seat": Game.sect_seat_open,
+		"founded_sect": not Game.player_sect.is_empty(),
+		"quests": completed_quests,
+		"storylines": completed_storylines,
+		"storyline_regard": regard,
+		"discovered": Game.discovered.keys(),
+	}
+
+
+## A record is announced where it is earned. Every reported event is a chance to
+## open one, and so is opening the archive; nothing is polled.
+func _evaluate_narrative() -> void:
+	if narrative == null or player == null:
+		return
+	if String(phase) != "play" and String(phase) != "realm":
+		return
+	var opened := narrative.evaluate(_narrative_context())
+	for value in opened:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		Bus.toast.emit("The record opens — %s: %s" % [
+			String(entry.get("thread", "")), String(entry.get("title", ""))])
+		Log.info("narrative", "recorded %s" % String(entry.get("id", "")))
+	if not opened.is_empty():
+		Bus.player_stats_changed.emit()
+
+
 ## What a house's gates are judged against: the body and the run, never a copy
 ## stored on the storyline.
 func _storyline_context() -> Dictionary:
@@ -4157,6 +4336,7 @@ func _report_quests(kind: String, target: String, amount: int = 1) -> Array:
 	_announce_quest_advancements(advancements)
 	if storylines != null:
 		_announce_storyline_advancements(storylines.report(kind, target, amount))
+	_evaluate_narrative()
 	return advancements
 
 
@@ -4886,6 +5066,7 @@ func _save(slot: int) -> void:
 		"ground_items": ground_items,
 		"quests": quests.to_dict(),
 		"sect_storylines": storylines.to_dict(),
+		"main_narrative": narrative.to_dict(),
 		"used_interactables": used_interactables.duplicate(),
 		"chunk_deltas": world_delta.to_dict(),
 		"shop": merchant.to_dict(),
@@ -4945,6 +5126,7 @@ func _load_game(slot: int) -> void:
 	_close_council()
 	_close_player_sect()
 	_close_storylines()
+	_close_narrative()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.
@@ -4959,6 +5141,7 @@ func _load_game(slot: int) -> void:
 	ground_items = data.get("ground_items", []).duplicate(true)
 	quests.from_dict(data.get("quests", {}))
 	storylines.from_dict(data.get("sect_storylines", {}))
+	narrative.from_dict(data.get("main_narrative", {}))
 	used_interactables = data.get("used_interactables", []).duplicate()
 	realm_seed = int(data.get("realm_seed", 0))
 	realm_cleared = bool(data.get("realm_cleared", false))
@@ -5009,6 +5192,10 @@ func _load_game(slot: int) -> void:
 	_sync_realm_portal()
 	if Game.dead:
 		_end_run()
+	else:
+		# The archive is read once against the restored world, so records the save
+		# already earned do not wait for the next walk to appear.
+		_evaluate_narrative()
 	Log.info("scene", "loaded slot %d" % slot)
 	Bus.toast.emit("Loaded slot %d." % slot)
 

@@ -1,0 +1,252 @@
+{
+  "threads": [
+    {
+      "id": "thread.severed_heaven",
+      "name": "The Severed Heaven",
+      "question": "Why did the old civilisation's ascent fail?",
+      "blurb": "The tombs and ruins are not graves. They are the cut ends of a road that used to leave the world.",
+      "colour": "#b8a8e8",
+      "revelations": [
+        {
+          "id": "lore.severed_heaven.1",
+          "title": "A Door With No Lintel",
+          "summary": "The tomb's first chamber was built to be entered from somewhere else.",
+          "text": "The Tomb of the Hollow Moon has no doorway. Its first chamber begins at a seam in the stone, and the seam is smooth on both faces, as if the rest of the room was withdrawn rather than sealed. Whatever the old builders made here, they did not intend it to be reached from the province.",
+          "source": "the first chamber of the Tomb of the Hollow Moon",
+          "requires": {
+            "min_realm": 2,
+            "discovered": ["realm.hollow_moon"]
+          }
+        },
+        {
+          "id": "lore.severed_heaven.2",
+          "title": "The Scar That Is Not a Wound",
+          "summary": "An altar inheritance is a piece of a road, not a gift.",
+          "text": "The altar did not give you a technique. It matched a fragment of an older practice to the shape of your body and let the fragment continue. The tomb's carvings call the process 'rejoining'. They never call it inheritance, and they never name a donor.",
+          "source": "an altar trial in a hidden realm",
+          "requires": {
+            "min_realm": 3,
+            "min_inheritances": 1,
+            "threads": ["lore.severed_heaven.1"]
+          }
+        },
+        {
+          "id": "lore.severed_heaven.3",
+          "title": "The Houses Built on a Fracture",
+          "summary": "The Azure Cloud's hoarded vein is a splinter of the severed road.",
+          "text": "The Hoarded Vein is not a mine. Its walls carry the same smooth seam as the tomb, and the sect's oldest ledger records the first elders breaking pieces off it to fund the house. Every sect in the province is fed by a fragment of the same failure, and none of them wrote down what it was a fragment of.",
+          "source": "the Hoarded Vein, after Elder Bai's account",
+          "requires": {
+            "min_contribution": 120,
+            "storylines": ["storyline.azure_cloud"],
+            "threads": ["lore.severed_heaven.2"]
+          }
+        },
+        {
+          "id": "lore.severed_heaven.4",
+          "title": "The Primordial Scar",
+          "summary": "The old world was not destroyed. It was amputated.",
+          "text": "Set the three accounts side by side and the shape is plain: one road, cut in many places, with the province growing in the stump. The Primordial Scar is not a wound in the world to be healed by force. It is the place where ascent was removed from the world on purpose, and the removal left a door that still opens inward.",
+          "source": "the convergence of the tomb, the ladder and the bloodlines",
+          "requires": {
+            "min_realm": 4,
+            "threads": [
+              "lore.severed_heaven.3",
+              "lore.root_question.2",
+              "lore.physique_bloodlines.2"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "thread.root_question",
+      "name": "The Root Question",
+      "question": "Where do spirit roots come from, if not from birth?",
+      "blurb": "Every root in the province has a seam. Seams are made by someone.",
+      "colour": "#7fd3e0",
+      "revelations": [
+        {
+          "id": "lore.root_question.1",
+          "title": "The Root That Was Installed",
+          "summary": "A spirit root has a seam that no living body grows.",
+          "text": "The sect's appraisal calls your root 'cloud-veined, late-opening, serviceable'. The old woman who reads it for the tithe uses a different word: fitted. She will not explain, and the appraisal form has no box for the question. But a root with a seam did not grow; it was joined to you.",
+          "source": "the Azure Cloud's root appraisal",
+          "requires": {
+            "min_realm": 3,
+            "min_contribution": 60
+          }
+        },
+        {
+          "id": "lore.root_question.2",
+          "title": "A Ladder With No Bottom",
+          "summary": "The realms are numbered like shelves, not like seasons.",
+          "text": "Beasts do not climb the realms, and the old growth does not either. Only people are numbered. A ladder that begins at one and ends at nine was not found in nature; it was built to be climbed, and the first rung is missing from every record in the province.",
+          "source": "a battlefield account of a beast that never ascended",
+          "requires": {
+            "min_kills": 25,
+            "threads": [
+              "lore.severed_heaven.1",
+              "lore.root_question.1"
+            ]
+          }
+        },
+        {
+          "id": "lore.root_question.3",
+          "title": "The Altar's Question",
+          "summary": "The trial tests compatibility, not worth.",
+          "text": "Instructor Rui's descent ends at an altar that asks nothing and offers everything. The legacy fits too well to be a reward; it is a key cut for a lock, and the lock is a body. The trial is not asking whether you deserve the road. It is asking whether the road still fits you.",
+          "source": "the First Descent, at the altar",
+          "requires": {
+            "quests": ["quest.realm.first_descent"],
+            "threads": ["lore.root_question.2"]
+          }
+        },
+        {
+          "id": "lore.root_question.4",
+          "title": "Whoever Made the Ladder",
+          "summary": "The root seams and the rewriting book share an author.",
+          "text": "The same hand that cut the seams into roots wrote the marginalia in the Pavilion's book. One installed the climb; the other wrote its instructions. Neither signed a name, and neither is dead: the seams are still being fitted, and the book is still being copied.",
+          "source": "the convergence of the root, the scar and the book",
+          "requires": {
+            "min_realm": 5,
+            "threads": [
+              "lore.root_question.3",
+              "lore.severed_heaven.3",
+              "lore.pavilion_book.2"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "thread.physique_bloodlines",
+      "name": "The Physique Bloodlines",
+      "question": "Who decided which bodies would carry the old blood?",
+      "blurb": "A physique is inherited like a debt: the body pays, and the ledger is kept somewhere else.",
+      "colour": "#e0a0c0",
+      "revelations": [
+        {
+          "id": "lore.physique_bloodlines.1",
+          "title": "The Body That Was Chosen",
+          "summary": "Refining your own body shows marks you did not earn.",
+          "text": "Three finished works in, the cauldron's residue begins to trace lines under your skin that were not there when you started. They are not scars and they are not veins. The forge-master calls them 'the pedigree showing through' and then changes the subject to the price of coal.",
+          "source": "the sect forge, after repeated refining",
+          "requires": {
+            "min_realm": 2,
+            "min_crafts": 3
+          }
+        },
+        {
+          "id": "lore.physique_bloodlines.2",
+          "title": "The Houses That Collect Carriers",
+          "summary": "Two houses keep records of bodies, not people.",
+          "text": "The Communion's beast pens and the Plague They Made's wards use the same intake form: lineage, physique, survival, disposition. Neither house asks what the carrier wants. Both have been filling the same columns for longer than either house has existed.",
+          "source": "a completed house story",
+          "requires": {
+            "any_storylines": [
+              "storyline.thousand_beast",
+              "storyline.eternal_medicine"
+            ],
+            "threads": [
+              "lore.severed_heaven.1",
+              "lore.physique_bloodlines.1"
+            ]
+          }
+        },
+        {
+          "id": "lore.physique_bloodlines.3",
+          "title": "A Bloodline Is a Receipt",
+          "summary": "The Azure Cloud's regard buys access to a ledger of carriers.",
+          "text": "At high regard, the sect opens a vault it calls the pedigree. It is not a family tree. It is a receipt book: each primordial physique is entered against a bloodline, a date, and a recipient house, and the final column is blank. The blank column is the one the elders check.",
+          "source": "the Azure Cloud's pedigree vault",
+          "requires": {
+            "min_inheritances": 2,
+            "storyline_regard": {
+              "storyline.azure_cloud": 20
+            },
+            "threads": ["lore.physique_bloodlines.2"]
+          }
+        },
+        {
+          "id": "lore.physique_bloodlines.4",
+          "title": "The Carriers Were Chosen",
+          "summary": "Physiques were placed in bloodlines like seeds in labelled packets.",
+          "text": "The pedigree, the altar's compatibility test and the seams in the roots describe one operation: old blood was divided among families and left to grow until a body was worth collecting. Nobody in the province was chosen by heaven. They were chosen by a clerk, and the clerk is still working.",
+          "source": "the convergence of the pedigree, the altar and the book",
+          "requires": {
+            "min_realm": 5,
+            "threads": [
+              "lore.physique_bloodlines.3",
+              "lore.root_question.3",
+              "lore.pavilion_book.3"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "thread.pavilion_book",
+      "name": "The Pavilion's Book",
+      "question": "Who wrote the book that rewrites the people who read it?",
+      "blurb": "The page pavilion sells copies of a text that has no author and remembers every reader.",
+      "colour": "#d8c070",
+      "revelations": [
+        {
+          "id": "lore.pavilion_book.1",
+          "title": "A Page With No Author",
+          "summary": "The sunken library holds a page with no ink and no writer.",
+          "text": "The page recovered from the Sunken Immortal Ruin is blank until it is read, and then it contains the reader's own account of finding it. The ink is not ink. The library's catalogue lists the page under a title that changes with the tide, and the acquisition date is always tomorrow.",
+          "source": "the Sunken Immortal Ruin's flooded catalogue",
+          "requires": {
+            "min_contribution": 80,
+            "discovered": ["realm.immortal_ruin"]
+          }
+        },
+        {
+          "id": "lore.pavilion_book.2",
+          "title": "The Archive That Drifts",
+          "summary": "The Floating Archive moves to avoid being catalogued.",
+          "text": "Every copy of the book in the province is a slightly different book, and the differences are always in the passages about the copyist. The archive does not preserve a text; it preserves a reader, and it moves whenever someone tries to fix it in place.",
+          "source": "the Floating Archive, after copying a page",
+          "requires": {
+            "min_crafts": 4,
+            "threads": [
+              "lore.severed_heaven.1",
+              "lore.pavilion_book.1"
+            ]
+          }
+        },
+        {
+          "id": "lore.pavilion_book.3",
+          "title": "The Book That Reads Back",
+          "summary": "The rewriting page and the failing array are the same diagram.",
+          "text": "The Void Scripture's page and the Celestial Formation's broken array are drawn with the same strokes. One edits a reader; the other edits a world. The houses call them enemies. The diagrams call them two halves of one instrument, and the instrument has a maker's mark worn smooth by copying.",
+          "source": "a completed house story",
+          "requires": {
+            "any_storylines": [
+              "storyline.void_scripture",
+              "storyline.celestial_formation"
+            ],
+            "threads": ["lore.pavilion_book.2"]
+          }
+        },
+        {
+          "id": "lore.pavilion_book.4",
+          "title": "The Reader Who Finishes",
+          "summary": "The book is the ladder's instruction manual, and finishing it is a choice.",
+          "text": "The four questions are one question. A road was cut out of the world, roots were fitted to climb it, bloodlines were stocked to supply the climbers, and a book was written to make each climber believe the road was theirs. The book has one page left, and it is blank because the reader writes it. No one is chosen. Someone has to volunteer.",
+          "source": "the convergence of all four threads",
+          "requires": {
+            "min_realm": 5,
+            "threads": [
+              "lore.pavilion_book.3",
+              "lore.severed_heaven.2",
+              "lore.physique_bloodlines.3"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
