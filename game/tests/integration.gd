@@ -3741,6 +3741,84 @@ func _run() -> void:
 	main.toggle_hierarchy()
 	check(not main.hierarchy_open and player.is_physics_processing(), "closing the hierarchy resumes play")
 
+	# --- M58: the sect economy ------------------------------------------------
+	var m58_stones := Game.spirit_stones
+	var m58_contribution := Game.sect_contribution
+	var m58_stipend_day := Game.sect_stipend_day
+	var m58_purchases := Game.sect_purchases
+	var m58_inventory: Array = player.inventory.duplicate(true)
+	Game.spirit_stones = 100
+	Game.sect_contribution = 20
+	Game.sect_stipend_day = SectEconomy.DEFAULT_STIPEND_DAY
+	var m58_rows: Array = main.sect_ledger_rows()
+	check(m58_rows.size() == 6, "the ledger lists the stipend, two donations and three services")
+	check(String((m58_rows[0] as Dictionary).get("kind", "")) == "stipend", "the stipend heads the ledger")
+	main.toggle_sect_ledger()
+	check(main.sect_ledger_open, "the sect ledger opens")
+	check(not player.is_physics_processing(), "the ledger freezes play")
+	main.toggle_sect_ledger()
+	check(not main.sect_ledger_open and player.is_physics_processing(), "closing the ledger resumes play")
+
+	var m58_net := SectEconomy.stipend_net(main._player_rank_id())
+	var m58_before_pay := Game.spirit_stones
+	main._sect_ledger_activate(0)
+	check(Game.spirit_stones == m58_before_pay + m58_net, "claiming the stipend pays its net")
+	check(Game.sect_stipend_day == Clock.day, "the claim records the day")
+	var m58_after_pay := Game.spirit_stones
+	main._sect_ledger_activate(0)
+	check(Game.spirit_stones == m58_after_pay, "the stipend cannot be claimed twice in a day")
+
+	var m58_donation_index := -1
+	var m58_service_index := -1
+	for m58_i in m58_rows.size():
+		var m58_row: Dictionary = m58_rows[m58_i]
+		if String(m58_row.get("kind", "")) == "donation" and String(m58_row.get("id", "")) == "donation.small":
+			m58_donation_index = m58_i
+		if String(m58_row.get("kind", "")) == "service" and String(m58_row.get("id", "")) == "service.qi_pill":
+			m58_service_index = m58_i
+	check(m58_donation_index >= 0 and m58_service_index >= 0, "the ledger names both counters")
+	var m58_before_donation := Game.spirit_stones
+	var m58_before_points := Game.sect_contribution
+	main._sect_ledger_activate(m58_donation_index)
+	check(Game.spirit_stones == m58_before_donation - 10, "a small donation spends ten stones")
+	check(Game.sect_contribution == m58_before_points + 1, "a small donation pays one contribution")
+
+	Game.sect_contribution = 50
+	var m58_pills := 0
+	for m58_item in player.inventory:
+		if String((m58_item as Dictionary).get("base", "")) == "base.pill.qi_gathering":
+			m58_pills += 1
+	main._sect_ledger_activate(m58_service_index)
+	var m58_pills_after := 0
+	for m58_item in player.inventory:
+		if String((m58_item as Dictionary).get("base", "")) == "base.pill.qi_gathering":
+			m58_pills_after += 1
+	check(Game.sect_contribution == 44, "the quartermaster takes exactly the service cost")
+	check(m58_pills_after == m58_pills + 1, "the quartermaster hands over a real pill")
+	check(Game.sect_purchases == m58_purchases + 1, "each purchase advances the counter")
+
+	var m58_story_points := Game.sect_contribution
+	main._story_reward({"actor": "", "stones": 0})
+	check(Game.sect_contribution == m58_story_points + SectEconomy.story_award(),
+		"answering a request pays contribution")
+
+	Save.delete_slot(100)
+	var m58_saved_points := Game.sect_contribution
+	var m58_saved_day := Game.sect_stipend_day
+	main._save(100)
+	Game.sect_contribution = 0
+	Game.sect_stipend_day = SectEconomy.DEFAULT_STIPEND_DAY
+	main._load_game(100)
+	check(Game.sect_contribution == m58_saved_points, "contribution survives a save")
+	check(Game.sect_stipend_day == m58_saved_day, "the last pay day survives a save")
+	Save.delete_slot(100)
+
+	Game.spirit_stones = m58_stones
+	Game.sect_contribution = m58_contribution
+	Game.sect_stipend_day = m58_stipend_day
+	Game.sect_purchases = m58_purchases
+	player.inventory = m58_inventory
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

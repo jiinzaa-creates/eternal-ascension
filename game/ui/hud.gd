@@ -114,6 +114,7 @@ func _draw() -> void:
 	draw_factions(player)
 	draw_sects(player)
 	draw_hierarchy(player)
+	draw_sect_ledger(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -668,6 +669,8 @@ func draw_hierarchy(player: Player) -> void:
 	_text(Vector2(right, y + 140.0), _fit(String(current.get("name", "")), 18, 348.0), 18, Color("#d8c898"))
 	_text(Vector2(right, y + 160.0), _fit(Hierarchy.duty(String(current.get("id", ""))), 10, 348.0), 10, INK)
 	_text(Vector2(right, y + 176.0), _fit("Privilege: " + Hierarchy.privilege(String(current.get("id", ""))), 10, 348.0), 10, MUTED)
+	_text(Vector2(right, y + 192.0), "Contribution %d · stipend %d/day" % [Game.sect_contribution,
+		SectEconomy.stipend_net(String(current.get("id", "")))], 10, Color("#d8c070"))
 	var next := Hierarchy.next_rank(String(current.get("id", "")))
 	var next_line := "No rung above this one."
 	if not next.is_empty():
@@ -677,10 +680,10 @@ func draw_hierarchy(player: Player) -> void:
 			next_line = "Next: %s — ready." % String(next.get("name", ""))
 		else:
 			next_line = "Next: %s — %s" % [String(next.get("name", "")), ", ".join(missing)]
-	_text(Vector2(right, y + 196.0), _fit(next_line, 10, 348.0), 10, Color("#a8d8c0"))
-	draw_line(Vector2(right, y + 214.0), Vector2(x + w - 24.0, y + 214.0), Color("#2b343a"), 1.0)
-	_text(Vector2(right, y + 234.0), "OFFICES", 12, ACCENT)
-	var office_y := y + 256.0
+	_text(Vector2(right, y + 208.0), _fit(next_line, 10, 348.0), 10, Color("#a8d8c0"))
+	draw_line(Vector2(right, y + 224.0), Vector2(x + w - 24.0, y + 224.0), Color("#2b343a"), 1.0)
+	_text(Vector2(right, y + 244.0), "OFFICES", 12, ACCENT)
+	var office_y := y + 266.0
 	for i in range(7, mini(rows.size(), 9)):
 		var office: Dictionary = rows[i]
 		_text(Vector2(right, office_y), "%s · authority %d" % [String(office.get("name", "?")), int(office.get("authority", 0))], 12, Color("#c8b8e8"))
@@ -690,6 +693,51 @@ func draw_hierarchy(player: Player) -> void:
 		office_y += 48.0
 
 	_text(Vector2(x + 24.0, y + h - 22.0), "N / E / ESC — close   ·   rank follows Azure Cloud standing and realm; no rank counter is saved",
+		10, Color("#7b8b94"))
+
+
+## The sect ledger: the daily stipend, the two donation rates, and the
+## quartermaster's shelves. A row that cannot be taken still shows why.
+func draw_sect_ledger(player: Player) -> void:
+	if not bool(host.sect_ledger_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
+	var w := 820.0
+	var h := 500.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "SECT LEDGER", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "Contribution is earned in service and spent at the quartermaster's counter.", 11, MUTED)
+	var rank := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
+		Game.notoriety, Hierarchy.seat_available())
+	var rank_id := String(rank.get("id", "rank.servant"))
+	_text(Vector2(x + 24.0, y + 78.0), _fit(SectEconomy.summary_line(rank_id, Game.sect_contribution,
+		Game.sect_stipend_day, Clock.day), 11, w - 48.0), 11, Color("#d8c898"))
+	_text(Vector2(x + w - 24.0 - 150.0, y + 78.0), "%d stones" % Game.spirit_stones, 11, Color("#e0c880"))
+	draw_line(Vector2(x + 20.0, y + 94.0), Vector2(x + w - 20.0, y + 94.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.sect_ledger_rows()
+	var cursor := clampi(int(host.sect_ledger_index), 0, maxi(0, rows.size() - 1))
+	var row_y := y + 112.0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var enabled := bool(row.get("enabled", false))
+		if i == cursor:
+			draw_rect(Rect2(x + 18.0, row_y - 14.0, w - 36.0, 44.0), Color("#1b2328", 0.92))
+		var title := String(row.get("label", "?"))
+		_text(Vector2(x + 28.0, row_y), _fit(title, 13, w - 56.0), 13,
+			ACCENT if i == cursor else (INK if enabled else Color("#6f7f88")))
+		var detail := String(row.get("detail", ""))
+		if not enabled and String(row.get("reason", "")) != "":
+			detail += "   — " + String(row.get("reason", ""))
+		_text(Vector2(x + 28.0, row_y + 17.0), _fit(detail, 10, w - 56.0), 10,
+			MUTED if enabled else Color("#8a7070"))
+		row_y += 50.0
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER transact   ·   O / E / ESC — close",
 		10, Color("#7b8b94"))
 
 
@@ -1213,7 +1261,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

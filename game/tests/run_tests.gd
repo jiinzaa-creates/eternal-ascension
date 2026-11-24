@@ -83,6 +83,7 @@ func _ready() -> void:
 	_factions_tests()
 	_sects_tests()
 	_hierarchy_tests()
+	_sect_economy_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -4440,6 +4441,128 @@ func _hierarchy_tests() -> void:
 	broken = DB.hierarchy_data.duplicate(true)
 	broken["seat_held"] = "yes"
 	check(not Hierarchy.validate(broken).is_empty(), "a non-boolean seat flag is rejected")
+
+
+## Sect economy: contribution is earned, donated and spent; the stipend is paid
+## once a day by rank, with dues taken from the pay rather than the purse.
+func _sect_economy_tests() -> void:
+	print("[sect economy] contribution, stipend and the quartermaster")
+	check(SectEconomy.quest_award() == 40, "a completed sect quest pays contribution")
+	check(SectEconomy.story_award() == 3, "an answered request pays a little contribution")
+	check(SectEconomy.boss_award() == 25, "a fallen enemy of the sect pays contribution")
+	check(SectEconomy.cap() == 9999, "contribution has a ceiling")
+	check(SectEconomy.donation("donation.small").get("points", 0) == 1, "small donations are 10 stones for 1")
+	check(SectEconomy.donation("donation.large").get("points", 0) == 6, "large donations pay a bulk bonus")
+	check(SectEconomy.donation("donation.nope").is_empty(), "an unknown donation is empty")
+	check(SectEconomy.stipend_for("rank.outer_disciple").get("stones", 0) == 6, "a rank draws its own pay")
+	check(SectEconomy.stipend_net("rank.outer_disciple") == 5, "dues come out of the stipend")
+	check(SectEconomy.stipend_net("rank.elder") == 24, "an elder's pay is larger")
+	check(SectEconomy.stipend_net("rank.nope") == 0, "an unknown rank draws nothing")
+	check(SectEconomy.service("service.qi_pill").get("base", "") == "base.pill.qi_gathering",
+		"a service names a real consumable")
+	check(SectEconomy.service("service.nope").is_empty(), "an unknown service is empty")
+
+	check(SectEconomy.award_contribution(0, 40) == 40, "service awards contribution")
+	check(SectEconomy.award_contribution(9998, 5) == 9999, "contribution clamps at the cap")
+	check(SectEconomy.award_contribution(10, -5) == 10, "a negative award cannot tax the record")
+
+	var claim := SectEconomy.claim("rank.outer_disciple", 7, -1, 100)
+	check(bool(claim.get("ok", false)), "a fresh day can claim the stipend")
+	check(int(claim.get("stones", 0)) == 105, "the net stipend reaches the purse")
+	check(int(claim.get("net", 0)) == 5 and int(claim.get("dues", 0)) == 1, "pay and dues are reported")
+	check(int(claim.get("day", -1)) == 7, "the claim records the day")
+	check(not bool(SectEconomy.claim("rank.outer_disciple", 7, 7, 100).get("ok", false)),
+		"the same day cannot be claimed twice")
+	check(int(SectEconomy.claim("rank.servant", 7, -1, 0).get("stones", 0)) == 2,
+		"the lowest rung still eats")
+
+	var donated := SectEconomy.donate("donation.small", 100, 0)
+	check(bool(donated.get("ok", false)), "a donation is accepted when the purse covers it")
+	check(int(donated.get("stones", 0)) == 90 and int(donated.get("contribution", 0)) == 1,
+		"ten stones become one contribution")
+	check(not bool(SectEconomy.donate("donation.small", 5, 0).get("ok", false)),
+		"a donation cannot overdraw the purse")
+	check(int(SectEconomy.donate("donation.large", 60, 9999).get("contribution", 0)) == 9999,
+		"donations clamp at the cap")
+	check(not bool(SectEconomy.donate("donation.nope", 100, 0).get("ok", false)),
+		"an unknown donation is refused")
+
+	check(SectEconomy.can_use("service.qi_pill", "rank.outer_disciple"), "an outer disciple may buy a Qi pill")
+	check(not SectEconomy.can_use("service.mending_pill", "rank.outer_disciple"),
+		"the mending shelf is above an outer disciple")
+	check(SectEconomy.can_use("service.mending_pill", "rank.inner_disciple"), "an inner disciple may buy it")
+	var bought := SectEconomy.buy("service.qi_pill", 10, "rank.outer_disciple")
+	check(bool(bought.get("ok", false)) and int(bought.get("contribution", 0)) == 4,
+		"a purchase spends exactly its cost")
+	check(not bool(SectEconomy.buy("service.qi_pill", 5, "rank.outer_disciple").get("ok", false)),
+		"a purchase cannot overdraw contribution")
+	check(not bool(SectEconomy.buy("service.mending_pill", 20, "rank.outer_disciple").get("ok", false)),
+		"rank gates the counter")
+	check(not bool(SectEconomy.buy("service.nope", 20, "rank.elder").get("ok", false)),
+		"an unknown service is refused")
+
+	var summary := SectEconomy.summary_line("rank.outer_disciple", 24, -1, 7)
+	check(summary.contains("Contribution 24") and summary.contains("6 stones"), "the ledger header reads")
+	check(SectEconomy.summary_line("rank.outer_disciple", 24, 7, 7).contains("today claimed"),
+		"a paid day says so")
+	check(Game.to_dict().has("sect_contribution") and Game.to_dict().has("sect_stipend_day"),
+		"the contribution record and pay day are saved")
+	check(Game.sect_contribution == 0 and Game.sect_stipend_day == SectEconomy.DEFAULT_STIPEND_DAY,
+		"a run starts with no contribution and no pay day")
+	check(Game.to_dict().has("sect_purchases"), "the purchase counter is saved so ids stay unique")
+
+	check(SectEconomy.validate(DB.sect_economy_data).is_empty(), "the shipped economy validates")
+	var broken: Dictionary = DB.sect_economy_data.duplicate(true)
+	broken["cap"] = 0
+	check(not SectEconomy.validate(broken).is_empty(), "a zero cap is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["awards"] as Dictionary).erase("quest")
+	check(not SectEconomy.validate(broken).is_empty(), "a missing award is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["awards"] as Dictionary)["story"] = 0
+	check(not SectEconomy.validate(broken).is_empty(), "a zero award is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["donations"] as Array).clear()
+	check(not SectEconomy.validate(broken).is_empty(), "an empty donation list is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["donations"] as Array).append((DB.sect_economy_data["donations"] as Array)[0].duplicate(true))
+	check(not SectEconomy.validate(broken).is_empty(), "a duplicate donation is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["donations"] as Array)[0]["stones"] = 0
+	check(not SectEconomy.validate(broken).is_empty(), "a free donation is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["donations"] as Array)[0]["points"] = 0
+	check(not SectEconomy.validate(broken).is_empty(), "a donation that pays nothing is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["donations"] as Array)[0]["label"] = " "
+	check(not SectEconomy.validate(broken).is_empty(), "an unlabelled donation is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["stipends"] as Array).pop_back()
+	check(not SectEconomy.validate(broken).is_empty(), "a rank without a stipend is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["stipends"] as Array)[0]["rank"] = "rank.nope"
+	check(not SectEconomy.validate(broken).is_empty(), "a stipend for an unknown rank is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["stipends"] as Array)[1]["dues"] = 99
+	check(not SectEconomy.validate(broken).is_empty(), "dues above the pay are rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["services"] as Array).clear()
+	check(not SectEconomy.validate(broken).is_empty(), "an empty service shelf is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["services"] as Array)[0]["base"] = "base.nope"
+	check(not SectEconomy.validate(broken).is_empty(), "a service with an unknown base is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["services"] as Array)[0]["base"] = "base.sword.iron_jian"
+	check(not SectEconomy.validate(broken).is_empty(), "a service selling equipment is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["services"] as Array)[0]["rank"] = "rank.nope"
+	check(not SectEconomy.validate(broken).is_empty(), "a service gated on an unknown rank is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["services"] as Array)[0]["cost"] = 0
+	check(not SectEconomy.validate(broken).is_empty(), "a free service is rejected")
+	broken = DB.sect_economy_data.duplicate(true)
+	(broken["services"] as Array).append((DB.sect_economy_data["services"] as Array)[0].duplicate(true))
+	check(not SectEconomy.validate(broken).is_empty(), "a duplicate service is rejected")
 
 
 func _quest_tests() -> void:

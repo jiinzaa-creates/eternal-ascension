@@ -23,6 +23,7 @@ const KEY_BINDINGS := {
 	"open_factions": [KEY_K],
 	"open_sects": [KEY_Y],
 	"open_hierarchy": [KEY_N],
+	"open_ledger": [KEY_O],
 	"breakthrough": [KEY_G],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],

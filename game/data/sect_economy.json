@@ -1,0 +1,44 @@
+{
+  "cap": 9999,
+  "awards": {
+    "quest": 40,
+    "story": 3,
+    "boss": 25
+  },
+  "donations": [
+    {"id": "donation.small", "label": "Donate 10 spirit stones", "stones": 10, "points": 1},
+    {"id": "donation.large", "label": "Donate 50 spirit stones", "stones": 50, "points": 6}
+  ],
+  "stipends": [
+    {"rank": "rank.servant", "stones": 2, "dues": 0},
+    {"rank": "rank.outer_disciple", "stones": 6, "dues": 1},
+    {"rank": "rank.inner_disciple", "stones": 12, "dues": 2},
+    {"rank": "rank.core_disciple", "stones": 20, "dues": 4},
+    {"rank": "rank.elder", "stones": 30, "dues": 6},
+    {"rank": "rank.deputy", "stones": 45, "dues": 10},
+    {"rank": "rank.sect_master", "stones": 60, "dues": 15}
+  ],
+  "services": [
+    {
+      "id": "service.qi_pill",
+      "name": "Qi Gathering Pill",
+      "base": "base.pill.qi_gathering",
+      "cost": 6,
+      "rank": "rank.outer_disciple"
+    },
+    {
+      "id": "service.mending_pill",
+      "name": "Mending Pill",
+      "base": "base.pill.mending",
+      "cost": 12,
+      "rank": "rank.inner_disciple"
+    },
+    {
+      "id": "service.cleansing_pill",
+      "name": "Cleansing Pill",
+      "base": "base.pill.cleansing",
+      "cost": 18,
+      "rank": "rank.core_disciple"
+    }
+  ]
+}

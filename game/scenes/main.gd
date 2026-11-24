@@ -114,6 +114,9 @@ var factions_open := false
 var sects_open := false
 ## The sect hierarchy: the ladder, who holds each rung, and where the player stands.
 var hierarchy_open := false
+## The sect ledger: stipend, donations and the quartermaster's shelf.
+var sect_ledger_open := false
+var sect_ledger_index := 0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -678,7 +681,8 @@ func _process(delta: float) -> void:
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
-			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open:
+			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
+			or sect_ledger_open:
 		return
 
 	_simulate_npcs()
@@ -746,6 +750,8 @@ func _process(delta: float) -> void:
 		toggle_sects()
 	if Input.is_action_just_pressed("open_hierarchy"):
 		toggle_hierarchy()
+	if Input.is_action_just_pressed("open_ledger"):
+		toggle_sect_ledger()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1683,6 +1689,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close_hierarchy()
 		return
 
+	if sect_ledger_open:
+		if event.is_action_pressed("open_ledger") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_sect_ledger()
+			return
+		if event.is_action_pressed("ui_down"):
+			sect_ledger_index = mini(sect_ledger_index + 1, maxi(0, sect_ledger_rows().size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			sect_ledger_index = maxi(0, sect_ledger_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			_sect_ledger_activate(sect_ledger_index)
+			return
+		return
+
 	if chronicle_open:
 		if event.is_action_pressed("open_chronicle") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -2201,6 +2223,10 @@ func _check_story_hunts() -> void:
 ## regard in the same memory the next conversation reads.
 func _story_reward(offer: Dictionary) -> void:
 	Game.spirit_stones += maxi(0, int(offer.get("stones", 0)))
+	# A request answered in the sect's name is service, whether or not the person
+	# who asked belongs to a faction the player can name.
+	Game.sect_contribution = SectEconomy.award_contribution(
+		Game.sect_contribution, SectEconomy.story_award())
 	var id := String(offer.get("actor", ""))
 	if id == "":
 		return
@@ -2420,6 +2446,172 @@ func hierarchy_rows() -> Array:
 				"you": id == current_id,
 			})
 	return out
+
+
+# ----------------------------------------------------------- sect ledger ----
+
+
+func toggle_sect_ledger() -> void:
+	if sect_ledger_open:
+		_close_sect_ledger()
+	else:
+		_open_sect_ledger()
+
+
+func _open_sect_ledger() -> void:
+	if player == null or String(phase) != "play":
+		return
+	sect_ledger_open = true
+	sect_ledger_index = clampi(sect_ledger_index, 0, maxi(0, sect_ledger_rows().size() - 1))
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_sect_ledger() -> void:
+	if not sect_ledger_open:
+		return
+	sect_ledger_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+func _player_rank_id() -> String:
+	if player == null:
+		return "rank.servant"
+	return String(Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
+		Game.notoriety, Hierarchy.seat_available()).get("id", "rank.servant"))
+
+
+## The ledger is one list of real transactions: today's stipend, the two
+## donation rates, and the quartermaster's three shelves. A row that cannot be
+## taken still appears, with the reason, so the cost is never a surprise.
+func sect_ledger_rows() -> Array:
+	var rank_id := _player_rank_id()
+	var out: Array = []
+	var claim := SectEconomy.claim(rank_id, Clock.day, Game.sect_stipend_day, Game.spirit_stones)
+	var claim_detail := "%s · %d stones − %d dues = %d stones" % [
+		Hierarchy.title(rank_id), SectEconomy.stipend_stones(rank_id),
+		SectEconomy.stipend_dues(rank_id), SectEconomy.stipend_net(rank_id)]
+	if not bool(claim.get("ok", false)):
+		claim_detail = "Already paid today. Next stipend tomorrow."
+	out.append({
+		"kind": "stipend",
+		"id": "stipend",
+		"label": "Claim daily stipend",
+		"detail": claim_detail,
+		"enabled": bool(claim.get("ok", false)),
+		"reason": String(claim.get("reason", "")),
+	})
+	for value in SectEconomy.donations():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var result := SectEconomy.donate(id, Game.spirit_stones, Game.sect_contribution)
+		out.append({
+			"kind": "donation",
+			"id": id,
+			"label": String(entry.get("label", id)),
+			"detail": "%d stones → +%d contribution" % [int(entry.get("stones", 0)), int(entry.get("points", 0))],
+			"enabled": bool(result.get("ok", false)),
+			"reason": String(result.get("reason", "")),
+		})
+	for value in SectEconomy.services():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var result := SectEconomy.buy(id, Game.sect_contribution, rank_id)
+		var required := String(entry.get("rank", ""))
+		out.append({
+			"kind": "service",
+			"id": id,
+			"label": String(entry.get("name", id)),
+			"detail": "%d contribution · needs %s" % [int(entry.get("cost", 0)), Hierarchy.title(required)],
+			"enabled": bool(result.get("ok", false)),
+			"reason": String(result.get("reason", "")),
+		})
+	return out
+
+
+func _sect_ledger_activate(index: int) -> void:
+	var rows := sect_ledger_rows()
+	if index < 0 or index >= rows.size():
+		return
+	var row: Dictionary = rows[index]
+	if not bool(row.get("enabled", false)):
+		var reason := String(row.get("reason", ""))
+		if reason == "":
+			Bus.toast.emit("The ledger refuses.")
+		else:
+			Bus.toast.emit("The ledger refuses: %s." % reason)
+		return
+	match String(row.get("kind", "")):
+		"stipend":
+			_sect_claim_stipend(row)
+		"donation":
+			_sect_donate(row)
+		"service":
+			_sect_buy_service(row)
+
+
+func _sect_claim_stipend(row: Dictionary) -> void:
+	var result := SectEconomy.claim(_player_rank_id(), Clock.day, Game.sect_stipend_day, Game.spirit_stones)
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The ledger refuses: %s." % String(result.get("reason", "")))
+		return
+	Game.spirit_stones = int(result.get("stones", Game.spirit_stones))
+	Game.sect_stipend_day = int(result.get("day", Clock.day))
+	Bus.toast.emit("Sect stipend: +%d stones (%d pay, %d dues)." % [
+		int(result.get("net", 0)), int(result.get("stipend", 0)), int(result.get("dues", 0))])
+	Bus.player_stats_changed.emit()
+
+
+func _sect_donate(row: Dictionary) -> void:
+	var result := SectEconomy.donate(String(row.get("id", "")), Game.spirit_stones, Game.sect_contribution)
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The ledger refuses: %s." % String(result.get("reason", "")))
+		return
+	Game.spirit_stones = int(result.get("stones", Game.spirit_stones))
+	Game.sect_contribution = int(result.get("contribution", Game.sect_contribution))
+	Bus.toast.emit("Donated to the hall. Contribution +%d." % int(result.get("points", 0)))
+	Bus.player_stats_changed.emit()
+
+
+func _sect_buy_service(row: Dictionary) -> void:
+	var entry := SectEconomy.service(String(row.get("id", "")))
+	if entry.is_empty():
+		return
+	var result := SectEconomy.buy(String(row.get("id", "")), Game.sect_contribution, _player_rank_id())
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The ledger refuses: %s." % String(result.get("reason", "")))
+		return
+	var item := _sect_service_item(entry)
+	if item.is_empty():
+		Bus.toast.emit("The quartermaster has nothing on that shelf.")
+		return
+	Game.sect_contribution = int(result.get("contribution", Game.sect_contribution))
+	Game.sect_purchases += 1
+	player.inventory = Items.add_to_inventory(player.inventory, item)
+	Bus.toast.emit("The quartermaster hands over %s. Contribution −%d." % [
+		String(item.get("name", "a pill")), int(result.get("cost", 0))])
+	Bus.player_stats_changed.emit()
+
+
+## A quartermaster pill is a real consumable from the same base table alchemy
+## uses. The purchase counter keeps every issued id stable and unique.
+func _sect_service_item(entry: Dictionary) -> Dictionary:
+	var base_id := String(entry.get("base", ""))
+	if base_id == "":
+		return {}
+	var item := ItemGen.new(DB, Rng).generate(
+		1, hash("sect." + String(entry.get("id", ""))), Game.sect_purchases, 0, "consumable", base_id)
+	if item.is_empty():
+		return {}
+	item["count"] = 1
+	item["potency"] = 1.0
+	return Items.normalize_item(item)
 
 
 # --------------------------------------------------------------- captivity ----
@@ -3198,8 +3390,9 @@ func _grant_reward() -> void:
 	# The sect keeps a record of who carried its invitation: a completed quest is
 	# the largest single act of standing in the game.
 	Game.faction_standing = Factions.award(Game.faction_standing, "faction.azure_cloud", Factions.quest_award())
-	Bus.toast.emit("Azure Cloud Sect remembers: %s" % Factions.describe(
-		"faction.azure_cloud", Game.faction_standing, Game.notoriety))
+	Game.sect_contribution = SectEconomy.award_contribution(Game.sect_contribution, SectEconomy.quest_award())
+	Bus.toast.emit("Azure Cloud Sect remembers: %s (+%d contribution)" % [Factions.describe(
+		"faction.azure_cloud", Game.faction_standing, Game.notoriety), SectEconomy.quest_award()])
 	Bus.player_stats_changed.emit()
 
 
@@ -3397,6 +3590,11 @@ func _grant_unique(source: String) -> void:
 ## loot roll: stones and one guaranteed piece at the declared rarity.
 func _on_boss_defeated(id: String, _at: Vector2) -> void:
 	bosses_slain[id] = true
+	# The hall counts a fallen enemy of the sect as service, paid in contribution
+	# rather than stones: the player spends it at the quartermaster.
+	Game.sect_contribution = SectEconomy.award_contribution(Game.sect_contribution, SectEconomy.boss_award())
+	if SectEconomy.boss_award() > 0:
+		Bus.toast.emit("The sect records the deed: +%d contribution." % SectEconomy.boss_award())
 	# A boss can belong to a faction. Killing its warden costs that faction face
 	# and, through the rival ripple, warms the houses that oppose it.
 	var owner := Factions.for_boss(id)
@@ -3545,6 +3743,7 @@ func _load_game(slot: int) -> void:
 	_close_factions()
 	_close_sects()
 	_close_hierarchy()
+	_close_sect_ledger()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.

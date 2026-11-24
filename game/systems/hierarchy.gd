@@ -46,6 +46,11 @@ static func authority(id: String) -> int:
 	return clampi(int(rank(id).get("authority", 0)), 0, 100)
 
 
+## The rung's numeric level; −1 for an office or an unknown id.
+static func level(id: String) -> int:
+	return int(rank(id).get("level", -1))
+
+
 static func duty(id: String) -> String:
 	return String(rank(id).get("duty", ""))
 

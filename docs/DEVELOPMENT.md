@@ -724,6 +724,50 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   line, guard and merchant placement, the player's derived station, the nine-row screen, the
   single highlighted rung, and the freeze.
 
+## Sect economy
+
+- **Contribution is a record, not a currency with a purse.** `data/sect_economy.json` sets the
+  awards (`quest` 40, `story` 3, `boss` 25), a cap (9999), two donation rates and one stipend per
+  ladder rung. `SectEconomy` (`game/systems/sect_economy.gd`) never mutates `Game`; `claim()`,
+  `donate()` and `buy()` take the current purse/points/day and return the resulting values plus
+  `ok` and `reason`. The scene applies a result only after `ok`, so a refused transaction cannot
+  half-spend stones or contribution.
+- **The stipend is daily and rank-based.** `claim()` pays `stones − dues` once per world day;
+  claiming on the same day is refused even at a different rank. Dues come out of the pay, never
+  the purse, and validation rejects a rank whose dues exceed its pay. `Game.sect_stipend_day`
+  stores the last claimed day and starts at −1.
+- **Awards enter where standing already does.** A completed Azure Cloud quest, `_story_reward()`
+  (even for an actorless offer) and `_on_boss_defeated()` each add their configured contribution
+  through `award_contribution()`, which clamps to the cap. No new event path was added: these are
+  the same three places M55 already awards faction standing.
+- **Services make real items.** A quartermaster service names a consumable base from `items.json`,
+  a contribution cost and a minimum rank. The scene generates the item through
+  `ItemGen.generate()` with the key `sect.<service id>` and counter `Game.sect_purchases`, then
+  adds it with `Items.add_to_inventory()`. The counter advances per purchase, so two pills can
+  never share an id; a failed generation leaves contribution untouched.
+- **Rank gates read the derived station.** `Hierarchy.level(id)` returns the rung's numeric level
+  (−1 for an office or unknown id); `SectEconomy.can_use()` compares it with the service's named
+  rank. The player's rank is `Hierarchy.player_rank()` at the current realm, Azure Cloud effective
+  standing and notoriety, exactly as the **N** screen reads it. Nothing about rank is saved.
+- **The ledger.** **O** opens a frozen screen: today's stipend, both donation rates and the three
+  services, with the current contribution, spirit stones and a stipend summary. Arrows select,
+  ENTER transacts, and **O**, **E** or **ESC** closes. Rows that cannot be taken stay visible with
+  the reason (already paid today, not enough stones, below the counter, not enough contribution).
+  The **N** screen also prints contribution and the daily net stipend beside the player's station.
+- **Saved keys and validation.** `Game.sect_contribution`, `Game.sect_stipend_day` and
+  `Game.sect_purchases` are optional keys under schema 2, reset in `new_run()` and sanitized in
+  `from_dict()`. `SectEconomy.validate()` runs at boot: it rejects an empty economy, a non-positive
+  cap, missing or non-positive awards, missing/duplicate/unlabelled donations with no cost or no
+  points, a missing rung or duplicate stipend, unknown ranks, negative pay or dues above pay,
+  missing/duplicate services with no name or cost, unknown service bases, bases that are not
+  consumables, and services gated on an unknown rank.
+- **Tests.** Unit `_sect_economy_tests` covers every award, the cap and negative awards, stipend
+  pay/dues/net and the once-a-day rule, donations including overdraw and cap, every rank gate,
+  purchases, the summary line, the saved keys, the shipped data and eighteen validation negatives.
+  Integration covers the six-row ledger, opening/closing and the freeze, claiming once and being
+  refused twice, a small donation, a quartermaster purchase that grants a real pill and advances
+  the counter, the story award, and contribution/day surviving a save and load.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an
