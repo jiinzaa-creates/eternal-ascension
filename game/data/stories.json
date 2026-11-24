@@ -1,0 +1,90 @@
+{
+  "rules": {
+    "per_day": 2,
+    "chronicle_cap": 40,
+    "offer_cap": 4,
+    "offer_days": 4,
+    "rumor_days": 4,
+    "witnesses": 2,
+    "hunt_target": 2,
+    "deliver_base": "base.pill.mending",
+    "deliver_name": "Mending Pill",
+    "deliver_regard": 8,
+    "deliver_stones": 20,
+    "hunt_regard": 5,
+    "hunt_stones": 45
+  },
+  "templates": [
+    {
+      "id": "story.dispute",
+      "kind": "dispute",
+      "weight": 3,
+      "actors": 2,
+      "goals": ["goal.wealth", "goal.status", "goal.survive"],
+      "venues": ["market", "tavern"],
+      "headline": "%s and %s argue over the price of spirit rice",
+      "detail": "Voices carry across the stalls, and neither will name a fair number first."
+    },
+    {
+      "id": "story.lesson",
+      "kind": "lesson",
+      "weight": 2,
+      "actors": 2,
+      "goals": ["goal.teach", "goal.pursue_dao"],
+      "venues": ["training", "sect_hall"],
+      "headline": "%s drills %s until the training yard is dark",
+      "detail": "The same cut, a hundred times, until the body stops asking why."
+    },
+    {
+      "id": "story.meditation",
+      "kind": "meditation",
+      "weight": 2,
+      "actors": 1,
+      "goals": ["goal.pursue_dao"],
+      "venues": ["shrine"],
+      "headline": "%s sits at the shrine until the incense burns out",
+      "detail": "Whatever the meditation found, it is not being shared."
+    },
+    {
+      "id": "story.harvest",
+      "kind": "harvest",
+      "weight": 2,
+      "actors": 1,
+      "goals": ["goal.family", "goal.survive"],
+      "venues": ["fields"],
+      "headline": "%s brings in a harvest before the weather turns",
+      "detail": "The grain is thin this year, but the barn will not be empty."
+    },
+    {
+      "id": "story.patrol",
+      "kind": "patrol",
+      "weight": 2,
+      "actors": 1,
+      "goals": ["goal.protect_sect", "goal.survive"],
+      "venues": ["gate", "plaza"],
+      "headline": "%s finds beast tracks closer to the gate than last week",
+      "detail": "The watch has doubled the night rounds and still wants the herd thinned.",
+      "request": {"kind": "hunt"}
+    },
+    {
+      "id": "story.trade",
+      "kind": "trade",
+      "weight": 2,
+      "actors": 1,
+      "goals": ["goal.wealth", "goal.wander"],
+      "venues": ["market"],
+      "headline": "%s sells a bolt of cloud silk to a traveller from the next province",
+      "detail": "The traveller paid in old stones and asked too many questions about the road east."
+    },
+    {
+      "id": "story.dream",
+      "kind": "dream",
+      "weight": 1,
+      "actors": 1,
+      "goals": ["goal.wander", "goal.family"],
+      "venues": ["tavern"],
+      "headline": "%s talks of leaving the market before the first snow",
+      "detail": "It is the third year the same table has heard the same plan."
+    }
+  ]
+}

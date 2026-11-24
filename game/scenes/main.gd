@@ -103,6 +103,11 @@ var _captive_day := 0
 ## Last world day the town's cultivation was re-derived for. Progression is a
 ## pure function of the day, so this only avoids repeating the refresh.
 var _progress_day := 0
+## Last world day the chronicle was brought up to. Skipped days still get their
+## small news, a day at a time.
+var _story_day := 0
+## The chronicle screen: the market's recent news and the requests it carries.
+var chronicle_open := false
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -559,6 +564,7 @@ func _begin_run() -> void:
 	Game.born_day = Clock.day
 	_captive_day = Clock.day
 	_progress_day = Clock.day
+	_story_day = Clock.day
 	Game.dead = false
 	Game.age_warning_stage = 0
 	_run_ended = false
@@ -656,6 +662,7 @@ func _process(delta: float) -> void:
 		return
 	_check_captivity()
 	_check_npc_progress()
+	_check_stories()
 	# Regional Qi density is derived from where the body stands, never saved.
 	if realm_instance != null:
 		Game.biome_density = 1.0
@@ -665,7 +672,7 @@ func _process(delta: float) -> void:
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
-			or alchemy_open or captives_open:
+			or alchemy_open or captives_open or chronicle_open:
 		return
 
 	_simulate_npcs()
@@ -725,6 +732,8 @@ func _process(delta: float) -> void:
 		_bind_captive()
 	if Input.is_action_just_pressed("open_captives"):
 		toggle_captives()
+	if Input.is_action_just_pressed("open_chronicle"):
+		toggle_chronicle()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1637,6 +1646,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 		return
 
+	if chronicle_open:
+		if event.is_action_pressed("open_chronicle") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_chronicle()
+		return
+
 	if captives_open:
 		if event.is_action_pressed("open_captives") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -1973,6 +1988,232 @@ func _check_npc_progress() -> void:
 		Bus.toast.emit("%d more of the market advanced today." % (lines.size() - 3))
 	if not lines.is_empty():
 		Bus.player_stats_changed.emit()
+
+
+# ----------------------------------------------------------------- stories ----
+
+
+## The market keeps talking. On every day the calendar turns, real progression
+## events become entries, the day's small beats are drawn from the residents'
+## goals and routines, and each entry finds its witnesses and any request it
+## carries. Skipped days (rest, travel) are walked one at a time, so the town is
+## never silent just because the player slept through it.
+func _check_stories() -> void:
+	if String(phase) != "play":
+		return
+	if _story_day == 0:
+		_story_day = Clock.day
+		return
+	if Clock.day <= _story_day:
+		return
+	var people := Stories.people_from(npcs)
+	var rule := Stories.rules()
+	var cap := int(rule.get("chronicle_cap", 40))
+	var offer_cap := int(rule.get("offer_cap", 4))
+	var visited := 0
+	var announced := 0
+	while _story_day < Clock.day and visited < 60:
+		_story_day += 1
+		visited += 1
+		var entries: Array = []
+		# The day being lived: real progression events, at most two.
+		if _story_day == Clock.day:
+			var events := 0
+			for node in npcs:
+				if events >= 2 or not is_instance_valid(node):
+					continue
+				var npc := node as Npc
+				if npc == null:
+					continue
+				var state := npc.progress
+				if int(state.get("last_event_day", 0)) != _story_day:
+					continue
+				var beat := Stories.event_beat(String(state.get("last_event", "")),
+					{"id": npc.npc_id, "name": npc.display_name}, _story_day,
+					{"realm_name": Realms.name_of(npc.realm), "place": npc.current_location})
+				if beat.is_empty():
+					continue
+				entries.append(beat)
+				events += 1
+		entries.append_array(Stories.ambient(people, _story_day, Game.world_seed))
+		for value in entries:
+			if typeof(value) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = (value as Dictionary).duplicate(true)
+			entry["witnesses"] = Stories.witnesses(entry, people, Game.world_seed)
+			Game.chronicle = Stories.append(Game.chronicle, entry, cap)
+			var offer := Stories.offer_for(entry, rule)
+			if not offer.is_empty() and Game.story_offers.size() < offer_cap \
+					and not _has_story_offer(String(offer.get("id", ""))):
+				Game.story_offers.append(offer)
+				if _story_near(entry):
+					Bus.toast.emit("A request: " + Stories.offer_text(offer))
+			elif _story_day == Clock.day and String(entry.get("kind", "")) != Stories.BREAKTHROUGH \
+					and String(entry.get("kind", "")) != Stories.DEVIATION \
+					and announced < 2 and _story_near(entry):
+				Bus.toast.emit("Word travels: " + String(entry.get("headline", "")))
+				announced += 1
+	Game.story_offers = Stories.expire_offers(Game.story_offers, Clock.day)
+
+
+## Whether the player is close enough to hear about an entry: a known face, or
+## someone standing within earshot.
+func _story_near(entry: Dictionary) -> bool:
+	var actors: Variant = entry.get("actors", [])
+	if typeof(actors) != TYPE_ARRAY:
+		return false
+	for value in actors:
+		var id := String(value)
+		if Game.npc_memory.has(id):
+			return true
+		var npc := _story_npc(id)
+		if npc != null and player != null and npc.global_position.distance_to(player.global_position) <= 520.0:
+			return true
+	return false
+
+
+func _story_npc(id: String) -> Npc:
+	for node in npcs:
+		if not is_instance_valid(node):
+			continue
+		var npc := node as Npc
+		if npc != null and npc.npc_id == id:
+			return npc
+	return null
+
+
+func _has_story_offer(id: String) -> bool:
+	for value in Game.story_offers:
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
+			return true
+	return false
+
+
+## What a person adds to a greeting: their own request first, then the newest
+## thing they have heard. Empty for someone with neither.
+func _story_suffix(npc: Npc) -> String:
+	if npc == null:
+		return ""
+	var index := Stories.offer_index_for(Game.story_offers, npc.npc_id)
+	if index >= 0:
+		return " " + Stories.offer_text(Game.story_offers[index] as Dictionary)
+	var rumor := Stories.rumor_for(npc.npc_id, Game.chronicle, Clock.day,
+		int(Stories.rules().get("rumor_days", 4)))
+	if rumor.is_empty():
+		return ""
+	return " \"%s\"" % String(rumor.get("headline", ""))
+
+
+func _story_has_item(base_id: String) -> bool:
+	if base_id == "" or player == null:
+		return false
+	for value in player.inventory:
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("base", "")) == base_id:
+			return true
+	return false
+
+
+## Takes one unit of the requested base, preferring a whole stack, and returns
+## whether anything changed hands.
+func _story_consume_item(base_id: String) -> bool:
+	if base_id == "" or player == null:
+		return false
+	for i in player.inventory.size():
+		var item: Dictionary = player.inventory[i]
+		if String(item.get("base", "")) != base_id:
+			continue
+		var left := int(item.get("count", 1)) - 1
+		if left <= 0:
+			player.inventory.remove_at(i)
+		else:
+			item["count"] = left
+			player.inventory[i] = item
+		return true
+	return false
+
+
+func _story_deliver(index: int, npc: Npc) -> void:
+	if index < 0 or index >= Game.story_offers.size():
+		return
+	var offer: Dictionary = Game.story_offers[index]
+	if not _story_consume_item(String(offer.get("target", ""))):
+		return
+	Game.story_offers = Stories.without(Game.story_offers, index)
+	_story_reward(offer)
+	Bus.toast.emit("%s takes the %s. (+%d stones, +%d regard)" % [
+		npc.display_name, String(offer.get("target_name", "pill")),
+		int(offer.get("stones", 0)), int(offer.get("regard", 0))])
+
+
+## A kill answers the oldest hunt request only; a second request is answered by
+## the next beast, so one hunt cannot settle the whole watch's work.
+func _check_story_hunts() -> void:
+	if Game.story_offers.is_empty():
+		return
+	var result := Stories.advance_hunt(Game.story_offers, Clock.day)
+	Game.story_offers = result.get("offers", [])
+	for value in result.get("completed", []):
+		var offer: Dictionary = value
+		_story_reward(offer)
+		Bus.toast.emit("%s's request is answered. (+%d stones, +%d regard)" % [
+			String(offer.get("actor_name", "Someone")), int(offer.get("stones", 0)),
+			int(offer.get("regard", 0))])
+
+
+## Rewards land where the rest of the run can see them: stones in the purse and
+## regard in the same memory the next conversation reads.
+func _story_reward(offer: Dictionary) -> void:
+	Game.spirit_stones += maxi(0, int(offer.get("stones", 0)))
+	var id := String(offer.get("actor", ""))
+	if id == "":
+		return
+	var record := NpcDb.memory_entry(Game.npc_memory, id)
+	record["met"] = true
+	record["regard"] = clampi(int(record.get("regard", 0)) + int(offer.get("regard", 0)),
+		NpcDb.REGARD_MIN, NpcDb.REGARD_MAX)
+	Game.npc_memory[id] = record
+	Bus.player_stats_changed.emit()
+
+
+# --------------------------------------------------------------- chronicle ----
+
+
+func toggle_chronicle() -> void:
+	if chronicle_open:
+		_close_chronicle()
+	else:
+		_open_chronicle()
+
+
+func _open_chronicle() -> void:
+	if player == null or String(phase) != "play":
+		return
+	chronicle_open = true
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_chronicle() -> void:
+	if not chronicle_open:
+		return
+	chronicle_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## Newest first, capped for the screen. The full list stays in `Game.chronicle`.
+func chronicle_rows() -> Array:
+	var out: Array = []
+	for i in range(Game.chronicle.size() - 1, -1, -1):
+		out.append(Game.chronicle[i])
+		if out.size() >= 12:
+			break
+	return out
+
+
+func story_offer_rows() -> Array:
+	return Game.story_offers.duplicate(true)
 
 
 # --------------------------------------------------------------- captivity ----
@@ -2393,6 +2634,12 @@ func _talk(npc: Npc) -> void:
 	# Every real conversation is remembered: a merchant with nothing to sell still
 	# remembers being spoken to.
 	NpcDb.remember(Game.npc_memory, npc.npc_id, Clock.day)
+	# A request answered in person: the pill changes hands before the greeting.
+	var story_index := Stories.deliver_index(Game.story_offers, npc.npc_id)
+	if story_index >= 0 and _story_has_item(String((Game.story_offers[story_index] as Dictionary).get("target", ""))):
+		_story_deliver(story_index, npc)
+		return
+	var story_suffix := _story_suffix(npc)
 	if npc.npc_id == "instructor_rui":
 		if not npc.teaches_here():
 			Bus.toast.emit("Instructor Rui is %s at the %s. He teaches in the training yard from 08:00 to 12:00." % [
@@ -2407,11 +2654,12 @@ func _talk(npc: Npc) -> void:
 		var greeting := Relationships.greeting(String(bond.get("band", "")))
 		if greeting != "":
 			line += " " + greeting
+		line += story_suffix
 		Bus.toast.emit(line)
 		return
 
 	if quests.completed:
-		Bus.toast.emit("Elder Bai: \"You are Azure Cloud now. Climb, and do not look down.\"")
+		Bus.toast.emit("Elder Bai: \"You are Azure Cloud now. Climb, and do not look down.\"" + story_suffix)
 		return
 
 	var advanced := quests.track("talk", "elder_bai")
@@ -2421,7 +2669,7 @@ func _talk(npc: Npc) -> void:
 	elif advanced:
 		_toast_new_objective()
 	else:
-		Bus.toast.emit("Elder Bai: \"%s\"" % quests.objective_text())
+		Bus.toast.emit(("Elder Bai: \"%s\"" % quests.objective_text()) + story_suffix)
 
 
 func _use_interactable(node: Interactable) -> void:
@@ -2971,6 +3219,7 @@ func _after_kill(ilvl: int) -> void:
 	quests.track("kill", "beast", 1)
 	if quests.step_index != before:
 		_toast_new_objective()
+	_check_story_hunts()
 
 
 ## Rolls one table and lays its pieces on the ground. The counter advances by
@@ -3074,8 +3323,11 @@ func _load_game(slot: int) -> void:
 
 	_close_bars()
 	_close_captives()
+	_close_chronicle()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
+	# Offers expire against the saved day, not the day the load happened to run.
+	Game.story_offers = Stories.expire_offers(Game.story_offers, Clock.day)
 	# A load is not a night: the yard is settled from the saved day forward, so
 	# restoring a save cannot be farmed for a day of labour.
 	_captive_day = Clock.day
@@ -3110,6 +3362,7 @@ func _load_game(slot: int) -> void:
 	# strong as the seed says it should be on that day.
 	_progress_day = Clock.day
 	_refresh_npc_progress_all()
+	_story_day = Clock.day
 	phase = "play"
 	if Game.dead:
 		_end_run()

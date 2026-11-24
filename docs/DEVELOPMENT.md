@@ -567,6 +567,51 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   checks the elder's realm, grown sheet, dossier line, companion build and the same ladder after a
   save/load.
 
+## Emergent stories
+
+- **The day is the author.** `Stories` (`game/systems/stories.gd`) draws at most `per_day` beats
+  from `data/stories.json` for a given `(world_seed, day, slot)` with `Rng.stream_from`. A
+  template is eligible only where a resident's current place is one of its venues and at least one
+  of their ambitions is one of its goals, so a price argument happens in the market between people
+  who care about wealth, and a lesson happens in the training yard. Weighted choice, actors and
+  headline names all come from the same stream, so a rebuilt save tells the same story and two
+  worlds do not.
+- **Real events are entries too.** On the day the clock turns, a resident whose
+  `NpcProgress.last_event` is a breakthrough or a deviation contributes an entry before the daily
+  draw. A breakthrough names the new realm; a deviation becomes a request, because the injured
+  body needs a mending pill. This is why the chronicle is not flavour text: every entry points at
+  state the simulation already produced.
+- **Witnesses, then rumour.** Each entry names its actors plus a deterministic `witnesses` count
+  of people standing in the same place (`story_witness`, keyed by the entry id). Talking to a
+  witness repeats the newest entry they know within `rumor_days`; an outsider has heard nothing and
+  old news ages out. The chronicle screen shows the player the whole record, but a resident only
+  knows what reached them.
+- **Requests have two shapes and one gate.** An entry with a `request` becomes an offer with
+  `deadline = day + offer_days`, a reward in stones and regard, and one of two kinds: **deliver**
+  (one `base.pill.mending` handed over when speaking to the actor) or **hunt** (two beasts, one kill
+  per request, answered by the ordinary death path). Completion removes the offer, pays the purse
+  and writes regard through `Game.npc_memory`, so the next conversation sees it. A request lapses at
+  its deadline and is dropped.
+- **The screen.** **J** opens a frozen chronicle listing the newest twelve entries and the open
+  requests. It is a reading screen like the holding ledger: the player's physics and process are
+  stopped while it is open, and closing resumes them.
+- **Bounded and saved, but not authoritative.** `Game.chronicle` is capped by `chronicle_cap`
+  (40) and `Game.story_offers` by `offer_cap`; both are optional save keys cleaned by
+  `sanitize_chronicle()` and `sanitize_offers()`, which drop malformed entries, clamp days and
+  discard expired offers. `_story_day` is a live cursor that walks skipped days (rest, travel) one
+  at a time and is reset on load. Schema stays 2.
+- **Content checks.** `Stories.validate()` runs inside `DB.validate()` and rejects a missing rules
+  block, a per-day count outside 1..6, a bad cap, a non-positive offer window, a delivery base that
+  is missing or not a consumable, duplicate template ids, a zero weight, an actor count outside 1..2,
+  a headline whose `%s` count disagrees with its actors, an unknown goal, an empty venue or an
+  unknown request kind.
+- **Tests.** Unit `_stories_tests` covers the shipped data, determinism across the same and
+  different days/worlds, actor/venue/goal fit, witness locality and ageing, both event kinds, both
+  offer kinds, hunt progress and expiry, chronicle dedupe and trim, load sanitising and content
+  rejection. Integration advances a day with a clean chronicle, checks the screen and its bound,
+  hands a mending pill to an injured resident, advances and completes a two-kill hunt, and saves and
+  loads the record.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

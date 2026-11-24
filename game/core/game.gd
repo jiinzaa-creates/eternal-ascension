@@ -48,6 +48,13 @@ var captive_policy := "captivity.fair"
 var captive_seq := 0
 ## The market's legal memory of the player's dealings in bound labour, 0..100.
 var notoriety := 0
+## What the market has been saying, oldest first. Bounded by the story rules;
+## entries are generated, so this is a record of what the player heard rather
+## than the source of the simulation.
+var chronicle: Array = []
+## Requests the player has been told about and can still answer, with progress
+## for the hunt work. Expired offers are dropped on the day they lapse.
+var story_offers: Array = []
 
 
 func _process(delta: float) -> void:
@@ -77,6 +84,8 @@ func new_run(seed_value: int = 0) -> void:
 	captive_policy = Captivity.default_policy_id()
 	captive_seq = 0
 	notoriety = 0
+	chronicle.clear()
+	story_offers.clear()
 	hitstop.clear()
 
 
@@ -120,6 +129,8 @@ func to_dict() -> Dictionary:
 		"captive_policy": captive_policy,
 		"captive_seq": captive_seq,
 		"notoriety": notoriety,
+		"chronicle": chronicle.duplicate(true),
+		"story_offers": story_offers.duplicate(true),
 	}
 
 
@@ -145,3 +156,5 @@ func from_dict(data: Dictionary) -> void:
 	captive_policy = Captivity.policy_id_or_default(String(data.get("captive_policy", "")))
 	captive_seq = maxi(0, int(data.get("captive_seq", 0)))
 	notoriety = clampi(int(data.get("notoriety", 0)), 0, Captivity.notoriety_cap())
+	chronicle = Stories.sanitize_chronicle(data.get("chronicle", []))
+	story_offers = Stories.sanitize_offers(data.get("story_offers", []), Clock.day)

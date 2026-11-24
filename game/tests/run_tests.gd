@@ -79,6 +79,7 @@ func _ready() -> void:
 	_party_tests()
 	_captivity_tests()
 	_npc_progress_tests()
+	_stories_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3932,6 +3933,165 @@ func _npc_progress_tests() -> void:
 	var no_discipline: Dictionary = DB.npc_data.duplicate(true)
 	(no_discipline["archetypes"] as Array)[0].erase("progression")
 	check(not NpcProgress.validate(no_discipline).is_empty(), "an archetype without a discipline is rejected")
+
+
+## The market's tongue: deterministic daily news, local witnesses, requests with
+## a deadline, and a chronicle that is derived content rather than saved truth.
+func _stories_tests() -> void:
+	print("[stories] the market keeps its own record")
+	var rule := Stories.rules()
+	check(not rule.is_empty(), "story rules are loaded")
+	check(int(rule.get("per_day", 0)) >= 1, "a day carries at least one beat")
+	check(not Stories.templates().is_empty(), "story templates are loaded")
+	check(not Stories.template("story.dispute").is_empty(), "a template is found by id")
+	check(Stories.template("story.nope").is_empty(), "an unknown template is empty")
+	check(Stories.validate(DB.stories).is_empty(), "the shipped story data validates")
+
+	var people: Array = [
+		{"id": "a", "name": "Lin Zhao", "archetype": "merchant", "place": "market", "goals": ["goal.wealth"]},
+		{"id": "b", "name": "Su Fei", "archetype": "farmer", "place": "fields", "goals": ["goal.family"]},
+		{"id": "c", "name": "Han Yan", "archetype": "guard", "place": "gate", "goals": ["goal.protect_sect"]},
+		{"id": "d", "name": "Mo Xue", "archetype": "inner_disciple", "place": "training", "goals": ["goal.pursue_dao"]},
+		{"id": "e", "name": "Wei Rou", "archetype": "inner_disciple", "place": "training", "goals": ["goal.pursue_dao"]},
+		{"id": "f", "name": "Gu Shan", "archetype": "elder", "place": "shrine", "goals": ["goal.teach"]},
+	]
+	var story_seed := 9911
+	var day_one := Stories.ambient(people, 1, story_seed)
+	check(day_one.size() == int(rule.get("per_day", 2)), "a day draws the configured number of beats")
+	check(str(day_one) == str(Stories.ambient(people, 1, story_seed)), "the same day draws the same news")
+	check(str(day_one) != str(Stories.ambient(people, 2, story_seed)), "another day draws different news")
+	check(str(day_one) != str(Stories.ambient(people, 1, story_seed + 1)), "another world draws different news")
+	check(day_one.size() >= 2 and String((day_one[0] as Dictionary).get("id", "")) !=
+		String((day_one[1] as Dictionary).get("id", "")), "two beats in a day do not share an id")
+	for value in day_one:
+		var entry: Dictionary = value
+		check(String(entry.get("headline", "")).contains(" "), "a beat reads as a sentence")
+		check(String(entry.get("detail", "")) != "", "a beat has a detail")
+		var actors := entry.get("actors", []) as Array
+		check(actors.size() >= 1, "a beat has an actor")
+		var known := false
+		for person in people:
+			if String((person as Dictionary).get("id", "")) == String(actors[0]):
+				known = true
+		check(known, "a beat names a real resident")
+		var tpl := Stories.template(String(entry.get("template", "")))
+		if not tpl.is_empty():
+			check((tpl.get("venues", []) as Array).has(String(entry.get("place", ""))),
+				"a beat happens where its template puts it")
+			var actor_person: Dictionary = {}
+			for person in people:
+				if String((person as Dictionary).get("id", "")) == String(actors[0]):
+					actor_person = person
+			var shared := false
+			for goal in actor_person.get("goals", []):
+				if (tpl.get("goals", []) as Array).has(String(goal)):
+					shared = true
+			check(shared, "a beat follows one of its actor's goals")
+
+	# Witnesses are local and deterministic, and a rumour ages out.
+	var first: Dictionary = (day_one[0] as Dictionary).duplicate(true)
+	var witnesses := Stories.witnesses(first, people, story_seed)
+	first["witnesses"] = witnesses
+	check(witnesses.has(String((first.get("actors", []) as Array)[0])), "the actor knows their own news")
+	check(str(witnesses) == str(Stories.witnesses(first, people, story_seed)), "witnesses are deterministic")
+	check(witnesses.size() <= 1 + int(rule.get("witnesses", 2)), "witnesses stay bounded")
+	check(Stories.rumor_for("nobody", [first], 1).is_empty(), "an outsider has not heard it")
+	var gossiper := String(witnesses[0])
+	check(not Stories.rumor_for(gossiper, [first], 2, 4).is_empty(), "news lasts a few days")
+	check(Stories.rumor_for(gossiper, [first], 30, 4).is_empty(), "news does not last a month")
+
+	# A real progression event becomes a beat; failure asks for help.
+	var actor := {"id": "d", "name": "Mo Xue"}
+	var breakthrough := Stories.event_beat(Stories.BREAKTHROUGH, actor, 9,
+		{"realm_name": "Foundation Establishment"})
+	check(not breakthrough.is_empty(), "a breakthrough becomes a beat")
+	check(String(breakthrough.get("headline", "")).contains("Mo Xue"), "the beat names the person")
+	check(String(breakthrough.get("headline", "")).contains("Foundation"), "the beat names the realm")
+	check((breakthrough.get("request", {}) as Dictionary).is_empty(), "a breakthrough asks nothing")
+	var deviation := Stories.event_beat(Stories.DEVIATION, actor, 10)
+	check(String(deviation.get("headline", "")).contains("Mo Xue"), "a failure names the person")
+	check(String((deviation.get("request", {}) as Dictionary).get("kind", "")) == Stories.DELIVER,
+		"a failed breakthrough asks for a mending pill")
+	check(Stories.event_beat("nonsense", actor, 1).is_empty(), "unknown event kinds are refused")
+
+	var offer := Stories.offer_for(deviation)
+	check(String(offer.get("kind", "")) == Stories.DELIVER, "a failure produces a delivery request")
+	check(int(offer.get("deadline", 0)) == 10 + int(rule.get("offer_days", 4)), "the request has a deadline")
+	check(String(offer.get("target", "")) == String(rule.get("deliver_base", "")), "the request names the pill")
+	check(int(offer.get("stones", 0)) > 0 and int(offer.get("regard", 0)) > 0, "the request pays")
+	check(Stories.offer_text(offer).contains("Mending"), "the request reads as a request")
+	check(Stories.deliver_index([offer], "d") == 0, "the delivery is found by actor")
+	check(Stories.deliver_index([offer], "a") < 0, "another resident owns no such request")
+
+	var hunt_entry := {"id": "story.1.0", "day": 1, "actors": ["c"], "names": ["Han Yan"],
+		"place": "gate", "request": {"kind": "hunt"}}
+	var hunt := Stories.offer_for(hunt_entry)
+	check(String(hunt.get("kind", "")) == Stories.HUNT, "a patrol produces a hunt request")
+	check(int(hunt.get("count", 0)) == int(rule.get("hunt_target", 0)), "the hunt asks for the configured number")
+	var hunt_first := Stories.advance_hunt([hunt], 1)
+	check((hunt_first.get("offers", []) as Array).size() == 1, "one kill does not finish a two-beast request")
+	check((hunt_first.get("completed", []) as Array).is_empty(), "nothing is completed early")
+	var hunt_second := Stories.advance_hunt(hunt_first.get("offers", []), 1)
+	check((hunt_second.get("completed", []) as Array).size() == 1, "the second kill answers it")
+	check((hunt_second.get("offers", []) as Array).is_empty(), "a finished request leaves the list")
+	check(Stories.expire_offers([hunt], 999).is_empty(), "a request lapses after its deadline")
+
+	# The chronicle is bounded, refuses duplicates and keeps the newest news.
+	var chronicle: Array = []
+	chronicle = Stories.append(chronicle, deviation, 3)
+	chronicle = Stories.append(chronicle, breakthrough, 3)
+	check(chronicle.size() == 2, "the chronicle records both entries")
+	chronicle = Stories.append(chronicle, deviation, 3)
+	check(chronicle.size() == 2, "the same entry is not repeated")
+	var third := Stories.event_beat(Stories.DEVIATION, {"id": "e", "name": "Wei Rou"}, 11)
+	chronicle = Stories.append(chronicle, third, 2)
+	check(chronicle.size() == 2, "the chronicle respects its cap")
+	check(String((chronicle[1] as Dictionary).get("id", "")) == String(third.get("id", "")),
+		"the newest entry survives the trim")
+
+	var garbage := Stories.sanitize_chronicle([null, {"id": "x"},
+		{"id": "y", "headline": "Y", "day": -4, "actors": "bad"}])
+	check(garbage.size() == 1 and int((garbage[0] as Dictionary).get("day", -1)) == 0,
+		"malformed entries are dropped and days clamped")
+	var bad_offers := Stories.sanitize_offers([
+		{"id": "o", "kind": "nope"},
+		{"id": "p", "kind": "deliver", "actor": "d", "deadline": 2, "count": 1},
+	], 3)
+	check(bad_offers.is_empty(), "expired and malformed requests are dropped on load")
+	check(Stories.sanitize_offers([offer], 10).size() == 1, "a live request survives a load")
+
+	# A resident becomes a story person without the system touching the node.
+	var body := Npc.new()
+	body.npc_id = "npc.story.unit"
+	body.display_name = "Test Person"
+	body.current_location = "market"
+	body.goals = ["goal.wealth"]
+	var snapshot := Stories.people_from([body])
+	check(snapshot.size() == 1, "a resident becomes a story person")
+	check(String((snapshot[0] as Dictionary).get("place", "")) == "market", "the snapshot keeps the place")
+	body.free()
+
+	check(Game.to_dict().has("chronicle"), "the chronicle is a save key")
+	check(Game.to_dict().has("story_offers"), "open requests are a save key")
+
+	var broken: Dictionary = DB.stories.duplicate(true)
+	(broken["rules"] as Dictionary)["per_day"] = 0
+	check(not Stories.validate(broken).is_empty(), "a day with no beats is rejected")
+	broken = DB.stories.duplicate(true)
+	(broken["templates"] as Array)[0]["actors"] = 3
+	check(not Stories.validate(broken).is_empty(), "a headline naming the wrong number of actors is rejected")
+	broken = DB.stories.duplicate(true)
+	(broken["templates"] as Array)[0]["goals"] = ["goal.nope"]
+	check(not Stories.validate(broken).is_empty(), "an unknown story goal is rejected")
+	broken = DB.stories.duplicate(true)
+	(broken["templates"] as Array)[0]["weight"] = 0
+	check(not Stories.validate(broken).is_empty(), "a template with no weight is rejected")
+	broken = DB.stories.duplicate(true)
+	(broken["templates"] as Array)[0]["request"] = {"kind": "dance"}
+	check(not Stories.validate(broken).is_empty(), "an unknown request kind is rejected")
+	broken = DB.stories.duplicate(true)
+	(broken["rules"] as Dictionary)["deliver_base"] = "base.nope"
+	check(not Stories.validate(broken).is_empty(), "a delivery of an unknown item is rejected")
 
 
 func _quest_tests() -> void:

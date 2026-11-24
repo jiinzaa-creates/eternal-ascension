@@ -19,6 +19,7 @@ const KEY_BINDINGS := {
 	"party_toggle": [KEY_P],
 	"bind_captive": [KEY_H],
 	"open_captives": [KEY_L],
+	"open_chronicle": [KEY_J],
 	"breakthrough": [KEY_G],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],

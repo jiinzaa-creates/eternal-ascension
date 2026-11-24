@@ -3531,6 +3531,109 @@ func _run() -> void:
 	main._captive_day = m53_day
 	main._refresh_npc_progress_all()
 
+	# --- emergent stories: the market keeps its own record --------------------
+	var m54_day: int = Clock.day
+	var m54_hour: float = Clock.hour
+	var m54_home: Vector2 = player.global_position
+	var m54_chronicle: Array = Game.chronicle.duplicate(true)
+	var m54_offers: Array = Game.story_offers.duplicate(true)
+	var m54_inventory: Array = player.inventory.duplicate(true)
+	var m54_memory: Dictionary = Game.npc_memory.duplicate(true)
+	var m54_stones: int = Game.spirit_stones
+	var m54_kills: int = Game.kills
+	# Isolate the day: earlier tests have already filled the bounded chronicle,
+	# so a fresh record is what proves this day wrote anything at all.
+	Game.chronicle = []
+	Game.story_offers = []
+	main._story_day = Clock.day
+	Clock.day += 1
+	main._check_stories()
+	check(Game.chronicle.size() > 0, "a day writes the market's news")
+	check(Game.chronicle.size() <= int(Stories.rules().get("chronicle_cap", 40)), "the chronicle is bounded")
+	var m54_rows: Array = main.chronicle_rows()
+	check(not m54_rows.is_empty(), "the chronicle screen has rows")
+	check(String((m54_rows[0] as Dictionary).get("headline", "")) != "", "the newest row reads")
+	check(Game.story_offers.size() <= int(Stories.rules().get("offer_cap", 4)), "requests respect their cap")
+	main.toggle_chronicle()
+	check(main.chronicle_open, "the chronicle opens")
+	main.toggle_chronicle()
+	check(not main.chronicle_open, "the chronicle closes")
+
+	# A failed breakthrough becomes a delivery a resident asks for in person.
+	var m54_person: Npc = null
+	for m54_node in main.npcs:
+		var m54_candidate: Npc = m54_node
+		if m54_candidate.npc_id == "elder_bai" or m54_candidate.npc_id == "instructor_rui":
+			continue
+		if m54_candidate.role == "Guard":
+			continue
+		m54_person = m54_candidate
+		break
+	check(m54_person != null, "a resident is available to ask for help")
+	Clock.hour = 12.0
+	m54_person.current_activity = "socialize"
+	m54_person.current_location = "market"
+	m54_person.global_position = player.global_position + Vector2(40, 0)
+	var m54_deviation := Stories.event_beat(Stories.DEVIATION,
+		{"id": m54_person.npc_id, "name": m54_person.display_name}, Clock.day)
+	var m54_offer := Stories.offer_for(m54_deviation)
+	Game.story_offers = [m54_offer]
+	check(main._story_suffix(m54_person).contains("Mending"), "the request is offered in conversation")
+	var m54_kept: Array = []
+	for m54_value in player.inventory:
+		if String((m54_value as Dictionary).get("base", "")) != "base.pill.mending":
+			m54_kept.append(m54_value)
+	player.inventory = m54_kept
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m54.mend", "base": "base.pill.mending", "slot": "consumable",
+		"name": "Mending Pill", "ilvl": 1, "potency": 1.0}))
+	var m54_purse: int = Game.spirit_stones
+	var m54_regard: int = int(NpcDb.memory_entry(Game.npc_memory, m54_person.npc_id).get("regard", 0))
+	main._talk(m54_person)
+	check(not main._story_has_item("base.pill.mending"), "the pill changes hands")
+	check(Game.spirit_stones == m54_purse + int(m54_offer.get("stones", 0)), "the delivery pays its stones")
+	check(int(NpcDb.memory_entry(Game.npc_memory, m54_person.npc_id).get("regard", 0)) > m54_regard,
+		"the delivery earns regard")
+	check(Stories.deliver_index(Game.story_offers, m54_person.npc_id) < 0, "the delivery closes the request")
+
+	# A hunt is answered by the beasts, not by talking.
+	var m54_hunt_entry := {"id": "story.%d.hunt" % Clock.day, "day": Clock.day,
+		"actors": [m54_person.npc_id], "names": [m54_person.display_name],
+		"place": "gate", "request": {"kind": "hunt"}}
+	var m54_hunt := Stories.offer_for(m54_hunt_entry)
+	Game.story_offers = [m54_hunt]
+	var m54_hunt_purse: int = Game.spirit_stones
+	main._after_kill(1)
+	check(Game.story_offers.size() == 1 and int((Game.story_offers[0] as Dictionary).get("progress", 0)) == 1,
+		"one kill advances the hunt")
+	main._after_kill(1)
+	check(Game.story_offers.is_empty(), "the second kill answers the hunt")
+	check(Game.spirit_stones == m54_hunt_purse + int(m54_hunt.get("stones", 0)),
+		"the hunt pays its stones")
+
+	# The record is saved, and a load brings the same day back into step.
+	Save.delete_slot(100)
+	main._save(100)
+	main._load_game(100)
+	check(not Game.chronicle.is_empty(), "the chronicle survives a save")
+	check(int((Game.chronicle[-1] as Dictionary).get("day", 0)) == Clock.day,
+		"the newest entry belongs to the saved day")
+	Save.delete_slot(100)
+
+	Game.chronicle = m54_chronicle
+	Game.story_offers = m54_offers
+	Game.npc_memory = m54_memory
+	Game.spirit_stones = m54_stones
+	Game.kills = m54_kills
+	player.inventory = m54_inventory
+	Clock.day = m54_day
+	Clock.hour = m54_hour
+	player.global_position = m54_home
+	main._story_day = m54_day
+	main._progress_day = m54_day
+	main._captive_day = m54_day
+	main._refresh_npc_progress_all()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

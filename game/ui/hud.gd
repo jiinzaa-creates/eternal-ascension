@@ -110,6 +110,7 @@ func _draw() -> void:
 	draw_tribulation()
 	draw_boss()
 	draw_captive_ledger(player)
+	draw_chronicle(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -467,6 +468,50 @@ func draw_captive_ledger(player: Player) -> void:
 
 	_text(Vector2(x + 24.0, y + h - 56.0), "Today the yard yields %d stones; rations take %d." % [labour, upkeep], 12, MUTED)
 	_text(Vector2(x + 24.0, y + h - 30.0), "UP/DOWN select · ENTER hand to the watch · U release · TAB terms · L/E close", 11, Color("#7b8b94"))
+
+
+## The chronicle: what the market is saying and what it wants. A frozen reading
+## screen like the holding ledger, because news should not be read mid-swing.
+func draw_chronicle(player: Player) -> void:
+	if not bool(host.chronicle_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.82))
+	var w := 760.0
+	var h := 500.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.96))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.4), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "THE MARKET'S TONGUE", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "Day %d — word travels faster than feet." % Clock.day, 11, MUTED)
+	draw_line(Vector2(x + 20.0, y + 74.0), Vector2(x + w - 20.0, y + 74.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.chronicle_rows()
+	var cursor := y + 96.0
+	if rows.is_empty():
+		_text(Vector2(x + 24.0, cursor), "Nothing worth repeating yet.", 12, MUTED)
+	for i in mini(rows.size(), 8):
+		var entry: Dictionary = rows[i]
+		_text(Vector2(x + 24.0, cursor), _fit("Day %d · %s" % [int(entry.get("day", 0)),
+			String(entry.get("headline", ""))], 12, w - 48.0), 12, INK)
+		cursor += 20.0
+		var detail := String(entry.get("detail", ""))
+		if detail != "":
+			_text(Vector2(x + 32.0, cursor), _fit(detail, 10, w - 64.0), 10, MUTED)
+			cursor += 18.0
+
+	var offers: Array = host.story_offer_rows()
+	draw_line(Vector2(x + 20.0, y + h - 148.0), Vector2(x + w - 20.0, y + h - 148.0), Color("#2b343a"), 1.0)
+	_text(Vector2(x + 24.0, y + h - 124.0), "REQUESTS", 12, Color("#e0c880"))
+	cursor = y + h - 104.0
+	if offers.is_empty():
+		_text(Vector2(x + 24.0, cursor), "Nobody is asking anything of you today.", 11, MUTED)
+	for i in mini(offers.size(), 4):
+		var offer: Dictionary = offers[i]
+		_text(Vector2(x + 24.0, cursor), _fit(Stories.offer_text(offer), 11, w - 48.0), 11, Color("#b8d8c0"))
+		cursor += 18.0
+	_text(Vector2(x + 24.0, y + h - 26.0), "J / E / ESC — close", 11, Color("#7b8b94"))
 
 
 ## The active bar only: six slots, each with its art's own cooldown sweep.

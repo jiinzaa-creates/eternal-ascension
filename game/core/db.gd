@@ -43,6 +43,8 @@ var bond_pairs: Array = []
 ## Captivity rules: keeping terms, loyalty, escape, labour, bounty and the
 ## legal bands. One file, read by `Captivity` only.
 var captivity: Dictionary = {}
+## The market's story content: daily beat rules and goal-gated templates.
+var stories: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -95,6 +97,7 @@ func load_all() -> void:
 	bond_ties = bond_data.get("ties", [])
 	bond_pairs = bond_data.get("pairs", [])
 	captivity = _read("captivity.json")
+	stories = _read("stories.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -125,6 +128,7 @@ func load_all() -> void:
 	_index("profession", professions)
 	_index("bond", bonds)
 	_index("bond_tie", bond_ties)
+	_index("story", story_templates())
 
 
 func _read(file: String) -> Dictionary:
@@ -282,6 +286,22 @@ func archetypes() -> Array:
 
 func npc_goal(id: String) -> Dictionary:
 	return by_id("npc_goal", id)
+
+
+## Story rules, or an empty dictionary when the data failed to load; the
+## validator is what reports that, so readers never have to guess.
+func story_rules() -> Dictionary:
+	var value: Variant = stories.get("rules", {})
+	return value if typeof(value) == TYPE_DICTIONARY else {}
+
+
+func story_templates() -> Array:
+	var value: Variant = stories.get("templates", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func story_template(id: String) -> Dictionary:
+	return by_id("story", id)
 
 
 func bond(id: String) -> Dictionary:
@@ -636,6 +656,9 @@ func validate() -> Array:
 	# Captivity content: policies must pay, the loyalty ladder must be ordered,
 	# the legal bands must tile 0..cap and the binding rules must be usable.
 	problems.append_array(Captivity.validate(captivity))
+	# Story content: the daily beat rules, template weights, goal and venue
+	# references, actor counts and request kinds must all be usable.
+	problems.append_array(Stories.validate(stories))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())
