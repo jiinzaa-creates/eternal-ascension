@@ -21,6 +21,7 @@ DB="*res://core/db.gd"
 Clock="*res://core/clock.gd"
 Weather="*res://systems/weather.gd"
 Settings="*res://core/settings.gd"
+Options="*res://core/options.gd"
 Save="*res://core/save.gd"
 Game="*res://core/game.gd"
 

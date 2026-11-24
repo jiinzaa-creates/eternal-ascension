@@ -39,6 +39,8 @@ families with their own wardens and inheritances, and a crash-safe save system.
 | Sect storylines (houses, regard, choices) | F6, then arrows, ENTER |
 | Main narrative archive (four threads, records) | F7, then ←/→, ↑/↓ |
 | The blank page (four resolutions, one choice) | F8, then ↑/↓, ENTER twice |
+| Character sheet (body, cultivation, gear, house) | C |
+| Settings & accessibility (display, controls) | F10, then TAB, arrows, ENTER |
 | Satchel grid (wear, sort) | I, then arrows, R, ENTER |
 | Forge: recipes / refine / disassemble | E at the forge, then TAB, arrows, ENTER |
 | Brew a pill / drink a pill | E at the cauldron then arrows + ENTER; I, select, U |
@@ -219,6 +221,19 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
   and coloured pages with real prose, and that every proof kind is understood and used once. Saves add
   an optional `endgame` block: an unknown page, or one written into a save whose archive does not hold
   all four final records, is dropped.
+- Settings and accessibility: `Options` (`game/core/options.gd`) persists high contrast, reduced motion,
+  damage numbers, combat sound and volume, and captivity content to `user://options.cfg` — never into a
+  run's save, so the choices survive every new life. **F10** opens a two-page screen: DISPLAY applies
+  each switch the moment it changes, and CONTROLS rebinds twenty-two keyboard actions by capturing
+  one real key, naming any action displaced by a conflict and unbinding with BACKSPACE. Mouse and
+  gamepad buttons are never lost to a key rebind. High contrast repaints the HUD with brighter ink,
+  an opaque panel and a gold accent; reduced motion removes the impact freeze while damage still
+  lands; the volume reaches every combat voice and zero is true silence. Every edge of the file is
+  sanitised, so a hand-edited volume, toggle or negative keycode falls back instead of breaking.
+- Character sheet: **C** opens six frozen cards read live from the body — identity and age, realm,
+  method, root and physique, attributes and derived stats, arts and passives, gear and professions,
+  and the house's rank, hall, party and deeds. The sheet owns no state, so it cannot disagree with
+  the run it describes.
 - One procedural hidden realm with hazards, chests and a one-time inheritance.
 - Save/load with atomic writes, sha256 verification, 3 backups, corruption fallback, schema migration.
 - Structured logging with an in-memory ring buffer (`Log.dump()`).

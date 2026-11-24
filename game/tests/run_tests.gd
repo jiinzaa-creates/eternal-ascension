@@ -92,6 +92,7 @@ func _ready() -> void:
 	_sect_storyline_tests()
 	_main_narrative_tests()
 	_endgame_tests()
+	_options_tests()
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
 	_inheritance_tests()
@@ -5891,6 +5892,164 @@ func _endgame_entry(data: Dictionary, id: String) -> Dictionary:
 		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
 			return value
 	return {}
+
+
+# ---------------------------------------------------------- interface options ----
+
+func _options_tests() -> void:
+	print("[options] persistent settings, bindings and accessibility switches")
+	var options := _options_model()
+	check(int(options.values.size()) == 6, "the options hold six values")
+	check(not options.get_bool("high_contrast"), "contrast starts at the authored palette")
+	check(options.get_bool("damage_numbers"), "damage numbers start on")
+	check(options.get_int("volume") == 100, "volume starts at the authored level")
+	check(options.get_bool("combat_sound"), "combat sound starts on")
+	check(options.get_bool("captivity"), "captivity content starts on")
+	check(options.get_value("nope") == null, "an unknown option resolves to nothing")
+	check(options.set_value("nope", true) == null, "an unknown option cannot be written")
+
+	# Every value is sanitised against its authored type and range.
+	check(options.set_value("volume", 140) == 100, "volume is capped at full")
+	check(options.set_value("volume", -5) == 0, "volume cannot go negative")
+	check(options.set_value("volume", "loud") == 100, "a non-number volume falls back")
+	check(options.set_value("high_contrast", true) == true, "a boolean toggle is stored")
+	check(options.set_value("high_contrast", "yes") == false, "a non-boolean toggle falls back")
+	check(options.toggle("combat_sound") == false, "toggling flips the stored value")
+	check(options.toggle("combat_sound") == true, "toggling twice restores it")
+	options.set_value("volume", 50)
+	check(options.adjust_volume(5) == 55, "volume steps by five")
+	check(options.adjust_volume(100) == 100, "volume stops at full")
+	check(options.adjust_volume(-500) == 0, "volume stops at silence")
+
+	# Bindings: defaults come from Settings, conflicts displace, unbind clears.
+	check(Options.REBINDABLE.size() == 22, "the controls page owns twenty-two keys")
+	check(options.binding_of("dodge") == KEY_SPACE, "dodge starts on the authored key")
+	check(options.binding_of("not_an_action") == 0, "an unknown action has no binding")
+	options.rebind("dodge", KEY_Q)
+	check(options.binding_of("dodge") == KEY_Q, "a rebind stores the new key")
+	check(Settings.action_keycode("dodge") == OS.get_keycode_string(KEY_Q), "a rebind reaches the engine")
+	var kept_pad := false
+	for ev in InputMap.action_get_events("dodge"):
+		if ev is InputEventJoypadButton:
+			kept_pad = true
+	check(kept_pad, "rebinding a key keeps the gamepad button")
+	var displaced: Array = options.rebind("dodge", KEY_A)
+	check(displaced.has("move_left"), "a conflicting key displaces its old action")
+	check(options.binding_of("move_left") == 0, "the displaced action is unbound")
+	check(options.binding_label("move_left") == "unbound", "an unbound action reads unbound")
+	options.unbind("sprint")
+	check(options.binding_of("sprint") == 0, "unbind clears a key")
+	options.reset_bindings()
+	check(options.binding_of("move_left") == KEY_A, "reset restores the displaced key")
+	check(options.binding_of("dodge") == KEY_SPACE, "reset restores the rebind")
+	options.unbind("sprint")
+	check(Settings.action_keycode("sprint") == "unbound", "the engine agrees an action is unbound")
+	options.reset_bindings()
+
+	# Persistence: values and keys survive a real ConfigFile round trip.
+	var path := "user://m71_options_test.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	options.set_value("high_contrast", true)
+	options.set_value("volume", 35)
+	options.set_value("damage_numbers", false)
+	options.rebind("dodge", KEY_Q)
+	check(options.save_to(path), "the options write to disk")
+	var loaded := _options_model()
+	loaded.load_from(path)
+	check(loaded.get_bool("high_contrast"), "a saved contrast survives")
+	check(loaded.get_int("volume") == 35, "a saved volume survives")
+	check(not loaded.get_bool("damage_numbers"), "a saved toggle survives")
+	check(loaded.binding_of("dodge") == KEY_Q, "a saved binding survives")
+	check(loaded.get_bool("combat_sound"), "an unset value loads its default")
+	loaded.reset_defaults()
+	loaded.load_from("user://m71_missing.cfg")
+	check(loaded.binding_of("dodge") == KEY_SPACE, "a missing file loads the defaults")
+	check(loaded.get_int("volume") == 100, "a missing file loads the default volume")
+
+	var corrupt := ConfigFile.new()
+	corrupt.set_value("options", "volume", 999)
+	corrupt.set_value("options", "high_contrast", "yes")
+	corrupt.set_value("options", "damage_numbers", 0)
+	corrupt.set_value("bindings", "dodge", -4)
+	corrupt.save(path)
+	loaded.load_from(path)
+	check(loaded.get_int("volume") == 100, "a hand-edited volume is clamped")
+	check(not loaded.get_bool("high_contrast"), "a hand-edited toggle falls back")
+	check(loaded.get_bool("damage_numbers"), "a numeric toggle falls back to its default")
+	check(loaded.binding_of("dodge") == KEY_SPACE, "a negative keycode falls back")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	loaded.reset_bindings()
+
+	var round_trip: Dictionary = options.to_dict()
+	var copied := _options_model()
+	copied.from_dict(round_trip)
+	check(copied.get_int("volume") == 35, "a dictionary round trip keeps a value")
+	check(copied.binding_of("dodge") == KEY_Q, "a dictionary round trip keeps a binding")
+	var blank := _options_model()
+	blank.from_dict({})
+	check(blank.get_int("volume") == 100 and blank.binding_of("dodge") == KEY_SPACE,
+		"an empty dictionary resets the options")
+	options.reset_defaults()
+	options.reset_bindings()
+
+	# The switches reach the systems they claim to change.
+	var palette := Hud.palette(false)
+	var contrast := Hud.palette(true)
+	check((contrast["ink"] as Color).get_luminance() > (palette["ink"] as Color).get_luminance(),
+		"high contrast brightens the ink")
+	check((contrast["muted"] as Color).get_luminance() > (palette["muted"] as Color).get_luminance(),
+		"high contrast brightens the secondary text")
+	check((contrast["panel"] as Color).a > (palette["panel"] as Color).a, "high contrast closes the panels")
+
+	var freeze := Hitstop.new()
+	check(freeze.enabled, "impact freeze starts enabled")
+	check(freeze.punch(30.0, true, true) > 0.0, "an enabled freeze takes a blow")
+	freeze.clear()
+	freeze.enabled = false
+	check(freeze.punch(30.0, true, true) == 0.0, "a reduced-motion freeze ignores a blow")
+	check(not freeze.is_frozen(), "a reduced-motion freeze never holds the world")
+	freeze.enabled = true
+	check(freeze.punch(30.0) > 0.0, "re-enabling restores the freeze")
+	freeze.clear()
+
+	var numbers := DamageNumbers.new()
+	add_child(numbers)
+	check(numbers.add(12.0, Vector2.ZERO).size() > 0, "damage numbers spawn while enabled")
+	numbers.enabled = false
+	check(numbers.add(12.0, Vector2.ZERO).is_empty(), "damage numbers stay silent when disabled")
+	numbers.enabled = true
+	numbers.queue_free()
+
+	var audio := CombatAudio.new()
+	add_child(audio)
+	audio.set_volume(0)
+	check(audio.volume == 0, "volume accepts true silence")
+	audio.set_volume(150)
+	check(audio.volume == 100, "volume is capped at full")
+	audio.set_volume(50)
+	check(audio.volume == 50, "volume stores a middle level")
+	audio.queue_free()
+
+	var applied := _options_model()
+	applied.set_value("reduce_motion", true)
+	applied.set_value("damage_numbers", false)
+	applied.set_value("captivity", false)
+	var applied_freeze := Hitstop.new()
+	var applied_numbers := DamageNumbers.new()
+	add_child(applied_numbers)
+	applied.apply_runtime(null, null, applied_freeze, applied_numbers)
+	check(not applied_freeze.enabled, "reduce motion reaches the impact freeze")
+	check(not applied_numbers.enabled, "the damage-number switch reaches the node")
+	check(not bool(Settings.content.get("captivity", true)), "the content switch reaches captivity")
+	Settings.content["captivity"] = true
+	applied_numbers.queue_free()
+
+
+func _options_model() -> Node:
+	var script: Script = load("res://core/options.gd")
+	var node: Node = script.new()
+	node.reset_defaults()
+	return node
 
 
 # ---------------------------------------------------------- hidden realms ----

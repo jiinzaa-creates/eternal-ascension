@@ -5,10 +5,39 @@ extends Control
 ## Code-drawn UI is a deliberate art direction, not a placeholder: it keeps the
 ## interface legible at any resolution and avoids shipping borrowed asset packs.
 
-const PANEL_BG := Color("#0d1216", 0.74)
-const INK := Color("#e6eef2")
-const MUTED := Color("#8fa2ab")
-const ACCENT := Color("#9fe0c0")
+## The palette is mutable so the accessibility option can raise contrast for
+## every panel at once. Defaults are the authored colours.
+var PANEL_BG := Color("#0d1216", 0.74)
+var INK := Color("#e6eef2")
+var MUTED := Color("#8fa2ab")
+var ACCENT := Color("#9fe0c0")
+
+
+## The two palettes as pure data, so the contrast choice is testable without a
+## rendered frame.
+static func palette(high_contrast: bool) -> Dictionary:
+	if high_contrast:
+		return {
+			"panel": Color("#000000", 0.93),
+			"ink": Color("#ffffff"),
+			"muted": Color("#dce6ec"),
+			"accent": Color("#ffe066"),
+		}
+	return {
+		"panel": Color("#0d1216", 0.74),
+		"ink": Color("#e6eef2"),
+		"muted": Color("#8fa2ab"),
+		"accent": Color("#9fe0c0"),
+	}
+
+
+func apply_palette(high_contrast: bool) -> void:
+	var colours := palette(high_contrast)
+	PANEL_BG = colours["panel"]
+	INK = colours["ink"]
+	MUTED = colours["muted"]
+	ACCENT = colours["accent"]
+	queue_redraw()
 
 var host: Node
 var _font: Font
@@ -121,6 +150,8 @@ func _draw() -> void:
 	draw_storylines(player)
 	draw_narrative(player)
 	draw_endgame(player)
+	draw_character(player)
+	draw_settings(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -1235,6 +1266,126 @@ func _draw_page_choices(x: float, y: float, w: float) -> void:
 		Color("#6f7f88"))
 
 
+## The character sheet: six cards of live body data, all read from the same
+## objects that fight, craft and climb. A read-only screen, frozen like the
+## ledger, so no number here can drift from the run.
+func draw_character(_player: Player) -> void:
+	if host == null or not bool(host.character_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
+	var w := 1120.0
+	var h := 664.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0c1012", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#9fe0c0", 0.42), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "CHARACTER SHEET", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "Everything the body carries, read from the run itself.", 11, MUTED)
+	_text(Vector2(x + w - 250.0, y + 34.0), "C / E / ESC — close", 10, Color("#7b8b94"))
+
+	var sections: Array = host.character_sections()
+	var card_w := 348.0
+	var card_h := 250.0
+	for i in mini(sections.size(), 6):
+		var section: Dictionary = sections[i]
+		var column := i % 3
+		var row_index := 0 if i < 3 else 1
+		var cx := x + 24.0 + float(column) * (card_w + 12.0)
+		var cy := y + 96.0 + float(row_index) * (card_h + 12.0)
+		draw_rect(Rect2(cx, cy, card_w, card_h), Color("#0a0f12", 0.94))
+		draw_rect(Rect2(cx, cy, card_w, card_h), Color("#2b343a"), false, 1.0)
+		var colour := Color(String(section.get("colour", "#9fe0c0")))
+		_text(Vector2(cx + 14.0, cy + 24.0), String(section.get("title", "")), 12, colour)
+		draw_line(Vector2(cx + 14.0, cy + 32.0), Vector2(cx + card_w - 14.0, cy + 32.0),
+			Color("#2b343a"), 1.0)
+		var line_y := cy + 48.0
+		var lines: Array = section.get("lines", [])
+		for line_value in lines:
+			var wrapped := _wrapped(String(line_value), 10, card_w - 28.0)
+			for piece in wrapped:
+				if line_y > cy + card_h - 10.0:
+					break
+				_text(Vector2(cx + 14.0, line_y), piece, 10, Color("#c8d4da"))
+				line_y += 14.0
+			if line_y > cy + card_h - 10.0:
+				break
+
+
+## Settings and accessibility: two pages, every switch applied the moment it is
+## changed and written to `user://options.cfg`, never to the run's save.
+func draw_settings(_player: Player) -> void:
+	if host == null or not bool(host.settings_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
+	var w := 1000.0
+	var h := 600.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0c1012", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#9fe0c0", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "SETTINGS & ACCESSIBILITY", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "These belong to you, not to the run: they survive every new life.", 11, MUTED)
+
+	var tab_names: Array[String] = ["DISPLAY", "CONTROLS"]
+	var tab := clampi(int(host.settings_tab), 0, 1)
+	for i in tab_names.size():
+		var label := ("[ %s ]" % tab_names[i]) if i == tab else ("  %s  " % tab_names[i])
+		_text(Vector2(x + 24.0 + float(i) * 150.0, y + 84.0), label, 12,
+			ACCENT if i == tab else Color("#7b8b94"))
+	if String(host.settings_rebind_action) != "":
+		_text(Vector2(x + 360.0, y + 84.0), "PRESS A KEY — ESC cancels, BACKSPACE unbinds", 11,
+			Color("#e8c060"))
+
+	var rows: Array = host.settings_rows()
+	if rows.is_empty():
+		_text(Vector2(x + 24.0, y + 120.0), "Nothing to configure.", 11, MUTED)
+		return
+	var cursor := clampi(int(host.settings_index), 0, rows.size() - 1)
+	var first := maxi(0, cursor - 11)
+	var row_y := y + 116.0
+	for i in range(first, mini(rows.size(), first + 12)):
+		var row: Dictionary = rows[i]
+		var selected := i == cursor
+		if selected:
+			draw_rect(Rect2(x + 18.0, row_y - 14.0, 520.0, 30.0), Color("#162026", 0.96))
+		_text(Vector2(x + 30.0, row_y), _fit(String(row.get("label", "?")), 12, 350.0), 12,
+			ACCENT if selected else INK)
+		var value := String(row.get("value", ""))
+		if String(host.settings_rebind_action) == String(row.get("action", "")):
+			value = "press a key…"
+		var value_colour := Color("#a8d8c0") if value == "ON" else MUTED
+		if value == "OFF":
+			value_colour = Color("#a86f6f")
+		elif value != "ON" and value != "OFF":
+			value_colour = Color("#d8c898")
+		_text(Vector2(x + 524.0 - _text_width(value, 11), row_y), value, 11, value_colour)
+		row_y += 30.0
+
+	var chosen: Dictionary = rows[cursor]
+	var px := x + 568.0
+	var pw := 408.0
+	var py := y + 104.0
+	draw_rect(Rect2(px, py, pw, 430.0), Color("#0a0f12", 0.94))
+	draw_rect(Rect2(px, py, pw, 430.0), Color("#2b343a"), false, 1.0)
+	_text(Vector2(px + 20.0, py + 30.0), _fit(String(chosen.get("label", "")), 16, pw - 40.0), 16, ACCENT)
+	var detail := _wrapped(String(chosen.get("detail", "")), 11, pw - 40.0)
+	var detail_y := py + 56.0
+	for line in detail:
+		if detail_y > py + 330.0:
+			break
+		_text(Vector2(px + 20.0, detail_y), line, 11, Color("#a8b8c0"))
+		detail_y += 16.0
+	_text(Vector2(px + 20.0, py + 350.0), "Current: " + String(chosen.get("value", "")), 11,
+		Color("#d8c898"))
+	_text(Vector2(px + 20.0, py + 376.0), String(chosen.get("hint", "")), 10, Color("#7f9098"))
+
+	_text(Vector2(x + 24.0, y + h - 22.0),
+		"TAB page   ·   ↑/↓ choose   ·   ←/→ adjust   ·   ENTER change   ·   F10 / E / ESC — close",
+		10, Color("#7b8b94"))
+
+
 ## Draw-time word wrap for the archive's prose. No layout node, no reflow pass:
 ## the same line breaks are used for every frame of the reading screen.
 func _wrapped(text: String, font_size: int, max_width: float) -> PackedStringArray:
@@ -1788,7 +1939,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · F4 sect · F6 stories · F7 archive · F8 blank page · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · F4 sect · F6 stories · F7 archive · F8 blank page · C sheet · F10 settings · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

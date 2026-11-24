@@ -10,6 +10,8 @@ extends Node2D
 
 const MAX_ENTRIES := 48
 
+## A player option can hide the numbers without disconnecting the bus.
+var enabled := true
 var entries: Array = []
 var _font: Font
 var _spawned := 0
@@ -32,6 +34,8 @@ func _process(delta: float) -> void:
 ## Spawns one number. `at` is a world position; the drift counter fans numbers
 ## out so two blows on the same spot stay readable.
 func add(amount: float, at: Vector2, critical := false, tint := "") -> Dictionary:
+	if not enabled:
+		return {}
 	var drift := float((_spawned % 5) - 2) * 7.0
 	var entry_data := CombatText.entry(amount, critical, tint, drift)
 	if entry_data.is_empty():

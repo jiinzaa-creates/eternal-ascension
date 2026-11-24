@@ -12,6 +12,8 @@ const VOICES := 8
 
 ## Muted audio still counts dispatches, so a test can check routing.
 var muted := false
+## Percent of the authored level, 0..100. A player option owns this.
+var volume := 100
 ## How many sounds were dispatched, for tests and telemetry.
 var played := 0
 var streams: Dictionary = {}
@@ -29,6 +31,7 @@ func _ready() -> void:
 		player.volume_db = -6.0
 		add_child(player)
 		_players.append(player)
+	set_volume(volume)
 	Bus.hit_landed.connect(_on_hit_landed)
 	Bus.enemy_died.connect(_on_enemy_died)
 	Bus.elite_died.connect(_on_enemy_died)
@@ -46,6 +49,15 @@ func set_muted(value: bool) -> void:
 
 func is_muted() -> bool:
 	return muted
+
+
+## Applies a 0..100 player volume to every voice. Zero is true silence rather
+## than a very quiet hit, so the setting cannot leak a sound the player muted.
+func set_volume(percent: int) -> void:
+	volume = clampi(percent, 0, 100)
+	var db := -60.0 if volume <= 0 else linear_to_db(float(volume) / 100.0) - 6.0
+	for player in _players:
+		player.volume_db = db
 
 
 ## Dispatches one sound. Returns false when muted or when the kind is unknown.

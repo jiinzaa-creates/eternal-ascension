@@ -1563,6 +1563,48 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   regard, an unknown house, more than one refusal, and a set of pages that does not use every kind of
   proof.
 
+## Settings, accessibility and the character sheet
+
+- **Options belong to the player, not the run.** `Options` (`game/core/options.gd`, autoload) holds six
+  values — high contrast, reduced motion, damage numbers, combat sound, combat volume and captivity
+  content — plus the keyboard binding for the twenty-two actions the controls page exposes. They
+  live in `user://options.cfg` through `ConfigFile`, so a new life, a new save and a loaded save all
+  keep them. They are deliberately **not** part of a save and do not touch schema 2.
+- **Every edge is sanitised.** `set_value()` checks a value against its authored default's type and
+  range; volume is clamped to 0–100, toggles accept only real booleans, unknown keys are refused, and
+  `load_from()` clamps a hand-edited file. Bindings accept only the curated `REBINDABLE` list, and a
+  negative keycode falls back to the authored key. `to_dict`/`from_dict` are the pure form used by the
+  tests. `Options.save()` is called after each change, not on exit, so a crash cannot lose a setting.
+- **The screen is two pages.** **F10** freezes play and shows DISPLAY (six rows; ←/→ adjusts
+  volume and sets toggles, ENTER changes them) and CONTROLS (every rebindable action, its current key,
+  and a reset row). TAB switches page, ↑/↓ chooses and scrolls a window of twelve rows. A change is
+  applied and persisted immediately and announced with a toast.
+- **The settings key itself stays fixed.** F10 is not rebindable or unbindable: the screen is the
+  recovery path for every other key, so it cannot be locked away from the player. Every other key on
+  the page can move or be unbound and restored with the reset row.
+- **Rebinding captures one real key.** ENTER on a controls row arms the capture; the next
+  `InputEventKey` resolves it. ESC cancels, BACKSPACE unbinds, and any other action already holding the
+  key is unbound and named in the toast, so a key never belongs to two actions. Mouse and gamepad
+  events are untouched: `Settings.rebind()` replaces keyboard events only, and `Settings.unbind()`
+  removes them without erasing a controller button.
+- **The switches reach real systems.** `Options.apply_runtime()` pushes the palette into `Hud`, mute and
+  volume into `CombatAudio`, `enabled` into `Hitstop` (reduced motion) and `DamageNumbers`, and the
+  captivity flag into `Settings.content`. High contrast is `Hud.palette(true)`: brighter ink and muted
+  text, an opaque panel and a gold accent, applied to every panel at once. Reduced motion leaves
+  damage and combat rules untouched; it only stops the freeze frame. Volume 0 sets the voices to
+  −60 dB, which is silence rather than a quiet hit.
+- **The character sheet is read-only.** **C** freezes play and draws six cards from
+  `character_sections()`: body (name, origin, age and lifespan, karma, stones, HP, poise), cultivation
+  (stage, realm, method, root, physique, Qi, meridians, enlightenments), attributes and derived stats,
+  arts with mastery and passives, worn gear and profession levels, and house (rank, master's seat,
+  founded hall, party, captives, kills, crafts, days). It stores nothing and reads the same objects the
+  fight does.
+- **Tests.** The unit suite exercises defaults, sanitisation, clamping, toggles, conflicts, unbind,
+  reset, a real `ConfigFile` round trip, a corrupt file, the two palettes, the disabled freeze and
+  damage-number node, audio volume clamping, and `apply_runtime`. The integration suite opens both
+  screens, checks the freeze, applies each switch to its live node, captures a conflicting key, resets
+  the bindings, reads all six sheet cards, reloads the file, and restores the player's options.
+
 ## Spirit beasts and bosses
 
 - **A beast is a species, not a new body.** `Beasts` reads `data/spirit_beasts.json` and normalises each
@@ -1962,6 +2004,9 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - M70 adds the optional `endgame` block (`version`, `chosen`). A pre-M70 save loads with the blank page
   unwritten; a choice whose archive lacks the four final records is discarded on load, so the schema
   stays 2 and no old run starts with an ending it never chose.
+- M71 adds no save key. Interface options and key bindings live in `user://options.cfg`, separate from
+  every run, so the schema stays 2 and a save can move between machines without carrying one player's
+  contrast or volume.
 - Add a migration step in `Save._migrate()` for every bump, and a test that loads a
   hand-written older payload (`schema 0`) and asserts the migrated result.
 - Never delete a migration step: old saves in the wild depend on the whole chain.

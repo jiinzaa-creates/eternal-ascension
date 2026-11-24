@@ -437,11 +437,16 @@ func _run() -> void:
 			sealed_day = d
 			break
 	Clock.day = sealed_day
+	# The tiding is cached for the day it was read on. Moving the calendar has to
+	# move the tiding too, or a convergence from the access day keeps every rift
+	# open and the sealed-day probe tests nothing.
+	main._refresh_world_event(false)
 	main._sync_realm_portal()
 	check(String(main.realm_portal.label).begins_with("Sealed Rift"), "the portal reads sealed between openings")
 	main._try_enter_realm()
 	check(main.realm_instance == null, "a sealed rift refuses entry")
 	Clock.day = access_day
+	main._refresh_world_event(false)
 	main._sync_realm_portal()
 	main._enter_realm()
 	await frames(3)
@@ -787,10 +792,12 @@ func _run() -> void:
 		var step: int = 0 if poi_window == WorldDelta.PERMANENT else mini(poi_window, 5000)
 		Clock.day += step
 		player.global_position = Vector2(12200, 12200)
-		await frames(2)
+		# Give the streamer a stable window to unload the old chunk before it is
+		# asked to rebuild it. Two frames is a race, not a refill test.
+		await frames(6)
 		main.chunks.settle()
 		player.global_position = poi_position
-		await frames(2)
+		await frames(6)
 		main.chunks.settle()
 		var back: Interactable = _find_interactable(main.interactables, poi_id)
 		if poi_window == WorldDelta.PERMANENT:
@@ -4310,6 +4317,18 @@ func _run() -> void:
 	player.cultivation.realm = 4
 	player.cultivation.sublevel = 1
 	player.rebuild_stats()
+	# The suite has been running for minutes of in-game time. Put the clock back
+	# into the morning so the elder's routine leaves him awake and in the sect;
+	# a conversation test must not depend on how long the earlier tests took.
+	Clock.hour = 9.0
+	await frames(2)
+	# Conversation is gated by the routine and by alarms. A quest test needs a
+	# controlled interlocutor, not whatever the clock and the last fight left him
+	# doing, so put him at his post and stand the alarm down.
+	main.elder.current_activity = "idle"
+	main.elder.reaction = "routine"
+	main.elder.alarm_left = 0.0
+	check(main.elder.is_awake(), "the elder is awake for the conversation")
 	main._talk(main.elder)
 	check(main.quests.is_accepted(m67_temper_id), "Elder Bai offers the tempering errand after the initiation")
 	check(main.quests.current_kind(m67_temper_id) == "kill" or main.quests.current_kind(m67_temper_id) == "collect",
@@ -4433,6 +4452,9 @@ func _run() -> void:
 	player.cultivation.sublevel = 1
 	player.rebuild_stats()
 	Game.sect_contribution = 20
+	main.elder.current_activity = "idle"
+	main.elder.reaction = "routine"
+	main.elder.alarm_left = 0.0
 	main._talk(main.elder)
 	check(main.storylines.is_accepted(m68_local), "Elder Bai opens the local story")
 	check(not main.storylines.is_available("storyline.heavenly_sword", main._storyline_context()),
@@ -4719,6 +4741,131 @@ func _run() -> void:
 	main.narrative = m70_narrative
 	main.endgame = m70_endgame
 
+	# --- M71: settings, accessibility and the character sheet ----------------
+	var m71_options: Dictionary = Options.to_dict()
+	var m71_path: String = Options.path
+	var m71_test_path := "user://m71_integration_options.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(m71_test_path))
+	Options.path = m71_test_path
+	Options.reset_defaults()
+	main._apply_options()
+	check(main.hud != null, "the HUD is available to the options layer")
+	check(not bool(main.settings_open), "the settings screen starts closed")
+
+	# The display page is real: each switch applies immediately and is written.
+	main._open_settings()
+	check(main.settings_open, "the settings screen opens")
+	check(not player.is_physics_processing(), "the settings screen freezes the player")
+	check(main.settings_tab == 0, "the display page is shown first")
+	var m71_display: Array = main.settings_rows()
+	check(m71_display.size() == 6, "the display page holds six switches")
+	check(String((m71_display[0] as Dictionary).get("label", "")) == "High contrast",
+		"the first switch is high contrast")
+	check(String((m71_display[0] as Dictionary).get("value", "")) == "OFF", "contrast starts off")
+	var m71_dark_ink: Color = main.hud.INK
+	main.settings_index = 0
+	main._settings_activate(0)
+	check(Options.get_bool("high_contrast"), "the contrast switch reaches the model")
+	check(main.hud.INK != m71_dark_ink, "the contrast switch repaints the HUD")
+	check(main.hud.INK.get_luminance() > m71_dark_ink.get_luminance(), "the new ink is brighter")
+	check(FileAccess.file_exists(m71_test_path), "a change is written to disk immediately")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("High contrast on"),
+		"the change is announced")
+
+	main.settings_index = 1
+	main._settings_activate(1)
+	check(not Game.hitstop.enabled, "reduce motion switches the impact freeze off")
+	check(Game.hitstop.punch(30.0, true, true) == 0.0, "the reduced-motion world does not stop")
+	main.settings_index = 2
+	main._settings_activate(2)
+	check(not main.damage_numbers.enabled, "the damage-number switch reaches the node")
+	Options.set_value("volume", 50)
+	main.settings_index = 4
+	main._settings_adjust(1)
+	check(Options.get_int("volume") == 55, "←/→ sweeps the combat volume")
+	check(main.combat_audio.volume == 55, "the volume reaches the audio voices")
+	main.settings_index = 5
+	main._settings_activate(5)
+	check(not Options.get_bool("captivity"), "the content switch reaches the model")
+	check(not bool(Settings.content.get("captivity", true)), "the content switch reaches captivity")
+	main._close_settings()
+	check(not main.settings_open, "the settings screen closes")
+	check(player.is_physics_processing(), "closing the settings restores the player")
+
+	# The controls page captures one real key and never costs a gamepad button.
+	main._open_settings()
+	main.settings_tab = 1
+	main.settings_index = 0
+	var m71_controls: Array = main.settings_rows()
+	check(m71_controls.size() == Options.REBINDABLE.size() + 1, "the controls page lists every key and a reset")
+	var m71_dodge := _m71_index(m71_controls, "dodge")
+	check(m71_dodge >= 0, "dodge is on the controls page")
+	main.settings_index = m71_dodge
+	main._settings_activate(m71_dodge)
+	check(String(main.settings_rebind_action) == "dodge", "ENTER begins a key capture")
+	var m71_key := InputEventKey.new()
+	m71_key.physical_keycode = KEY_Q
+	m71_key.pressed = true
+	check(main._settings_capture(m71_key), "the captured key is consumed")
+	check(Options.binding_of("dodge") == KEY_Q, "the captured key becomes the binding")
+	check(main.settings_rebind_action == "", "the capture ends")
+	var m71_pad := false
+	for ev in InputMap.action_get_events("dodge"):
+		if ev is InputEventJoypadButton:
+			m71_pad = true
+	check(m71_pad, "a key rebind keeps the gamepad button")
+	var m71_conflict := InputEventKey.new()
+	m71_conflict.physical_keycode = KEY_A
+	m71_conflict.pressed = true
+	main.settings_index = m71_dodge
+	main._settings_activate(m71_dodge)
+	main._settings_capture(m71_conflict)
+	check(Options.binding_of("dodge") == KEY_A, "a conflicting key is taken")
+	check(Options.binding_of("move_left") == 0, "the displaced action loses its key")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("lost that key"),
+		"the displaced action is named")
+	main.settings_index = m71_controls.size() - 1
+	main._settings_activate(m71_controls.size() - 1)
+	check(Options.binding_of("dodge") == KEY_SPACE, "reset restores the default dodge key")
+	check(Options.binding_of("move_left") == KEY_A, "reset restores the displaced key")
+	main._close_settings()
+
+	# The character sheet reads the live body and owns no state.
+	main._open_character()
+	check(main.character_open, "the character sheet opens")
+	check(not player.is_physics_processing(), "the character sheet freezes the player")
+	var m71_sections: Array = main.character_sections()
+	check(m71_sections.size() == 6, "the sheet has six cards")
+	check(String((m71_sections[0] as Dictionary).get("title", "")) == "THE BODY", "the first card is the body")
+	check((m71_sections[0] as Dictionary).get("lines", []).size() >= 5, "the body card carries its lines")
+	check(String(((m71_sections[0] as Dictionary).get("lines", []) as Array)[0]) == String(player.display_name),
+		"the sheet names the body it describes")
+	check((m71_sections[2] as Dictionary).get("lines", []).size() >= 2, "the attribute card carries attributes and derived stats")
+	check(String((m71_sections[0] as Dictionary).get("colour", "")) != "", "each card has its colour")
+	main._close_character()
+	check(not main.character_open, "the character sheet closes")
+	check(player.is_physics_processing(), "closing the sheet restores the player")
+
+	# Values and bindings survive a fresh read of the file.
+	Options.set_value("high_contrast", true)
+	Options.set_value("volume", 42)
+	Options.rebind("dodge", KEY_Q)
+	Options.save()
+	Options.reset_defaults()
+	Options.load_from(m71_test_path)
+	check(Options.get_bool("high_contrast"), "the saved contrast survives a reload")
+	check(Options.get_int("volume") == 42, "the saved volume survives a reload")
+	check(Options.binding_of("dodge") == KEY_Q, "the saved binding survives a reload")
+
+	# Put the options and the live scene back where the remaining suite expects.
+	Options.from_dict(m71_options)
+	Options.path = m71_path
+	main._apply_options()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(m71_test_path))
+	check(Game.hitstop.enabled, "the impact freeze is restored")
+	check(main.damage_numbers.enabled, "damage numbers are restored")
+	check(bool(Settings.content.get("captivity", true)), "captivity content is restored")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
@@ -4770,3 +4917,10 @@ func _m70_row(rows: Array, id: String) -> Dictionary:
 		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
 			return value
 	return {}
+
+
+func _m71_index(rows: Array, action: String) -> int:
+	for i in rows.size():
+		if typeof(rows[i]) == TYPE_DICTIONARY and String((rows[i] as Dictionary).get("action", "")) == action:
+			return i
+	return -1

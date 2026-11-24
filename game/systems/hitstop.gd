@@ -21,6 +21,8 @@ const DAMAGE_CAP := 0.05
 const CRIT_BONUS := 0.03
 const HEAVY_BONUS := 0.018
 
+## A player option can switch the freeze off without changing any combat rule.
+var enabled := true
 ## Seconds left in the current freeze.
 var remaining := 0.0
 ## How many blows were ever asked to freeze, for tests and telemetry.
@@ -40,9 +42,11 @@ static func duration_for(amount: float, critical := false, heavy := false) -> fl
 	return clampf(seconds, MIN, MAX)
 
 
-## Requests a freeze; never shortens a longer one already running.
+## Requests a freeze; never shortens a longer one already running. A disabled
+## freeze accepts the request and does nothing, so every damage site stays
+## unaware of the option.
 func request(seconds: float) -> float:
-	if seconds <= 0.0:
+	if not enabled or seconds <= 0.0:
 		return remaining
 	requests += 1
 	remaining = maxf(remaining, clampf(seconds, 0.0, MAX))

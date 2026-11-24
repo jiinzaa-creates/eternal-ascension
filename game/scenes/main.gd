@@ -139,6 +139,13 @@ var endgame_open := false
 var endgame_index := 0
 ## -1 until ENTER has armed the selected page; a second ENTER writes it.
 var endgame_confirm_index := -1
+## The character sheet and the persistent options screen. Both freeze play.
+var character_open := false
+var settings_open := false
+var settings_tab := 0
+var settings_index := 0
+## The action waiting for its next key, or "" when the controls page is idle.
+var settings_rebind_action := ""
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -210,6 +217,10 @@ func _ready() -> void:
 	_spawn_player()
 	_build_hud()
 	_build_feedback()
+	# Bindings are pushed into the engine once; the rest of the options need the
+	# HUD, the audio node and the damage-number node to exist first.
+	Options.apply_bindings()
+	_apply_options()
 	Bus.enemy_died.connect(_on_enemy_died)
 	Bus.elite_died.connect(_on_elite_died)
 	Bus.beast_slain.connect(_on_beast_slain)
@@ -755,7 +766,7 @@ func _process(delta: float) -> void:
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
 			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open \
-			or endgame_open:
+			or endgame_open or character_open or settings_open:
 		return
 
 	_tick_inheritance_trial(delta)
@@ -836,6 +847,10 @@ func _process(delta: float) -> void:
 		toggle_narrative()
 	if Input.is_action_just_pressed("open_endgame"):
 		toggle_endgame()
+	if Input.is_action_just_pressed("open_character"):
+		toggle_character()
+	if Input.is_action_just_pressed("open_settings"):
+		toggle_settings()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1891,6 +1906,43 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.is_action_pressed("accept"):
 			_endgame_activate(endgame_index)
+			return
+		return
+
+	if character_open:
+		if event.is_action_pressed("open_character") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_character()
+		return
+
+	if settings_open:
+		# A capture owns the keyboard until it resolves: no arrow, letter or
+		# escape may leak past it into the screen.
+		if settings_rebind_action != "":
+			_settings_capture(event)
+			return
+		if event.is_action_pressed("open_settings") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_settings()
+			return
+		if event.is_action_pressed("shop_mode"):
+			settings_tab = 1 - settings_tab
+			settings_index = 0
+			return
+		if event.is_action_pressed("ui_down"):
+			settings_index = mini(settings_index + 1, maxi(0, settings_rows().size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			settings_index = maxi(0, settings_index - 1)
+			return
+		if event.is_action_pressed("ui_left"):
+			_settings_adjust(-1)
+			return
+		if event.is_action_pressed("ui_right"):
+			_settings_adjust(1)
+			return
+		if event.is_action_pressed("accept"):
+			_settings_activate(settings_index)
 			return
 		return
 
@@ -3421,6 +3473,288 @@ func _endgame_choose(index: int) -> bool:
 	Log.info("endgame", "wrote %s" % id)
 	Bus.toast.emit("The blank page is written — %s." % String(endgame.chosen().get("title", "")))
 	Bus.player_stats_changed.emit()
+	return true
+
+
+# ------------------------------------------------------- interface options ----
+
+
+func toggle_character() -> void:
+	if character_open:
+		_close_character()
+	else:
+		_open_character()
+
+
+func _open_character() -> void:
+	if player == null or String(phase) != "play":
+		return
+	character_open = true
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_character() -> void:
+	if not character_open:
+		return
+	character_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## Six cards, every line read live from the body. The sheet owns no state, so it
+## cannot disagree with the stats, gear or arts the run is actually using.
+func character_sections() -> Array:
+	if player == null:
+		return []
+	var age := Game.age_years()
+	var lifespan := player.stats.lifespan_years()
+	var root: Dictionary = player.cultivation.root_data()
+	var method: Dictionary = player.cultivation.method_data()
+	var root_line := "Root: unread"
+	if player.cultivation.identified:
+		root_line = "Root: %s (tier %d, %s)" % [
+			String(root.get("name", "?")), player.cultivation.root_tier,
+			Roots.purity_label(float(root.get("purity", 0.5)))]
+
+	var body: Array[String] = [
+		String(player.display_name),
+		"Origin: " + String(DB.origin(Game.origin_id).get("name", "Wanderer")),
+		Aging.age_text(age, lifespan),
+		"Karma %d · notoriety %d" % [Game.karma, Game.notoriety],
+		"%d spirit stones · %d contribution" % [Game.spirit_stones, Game.sect_contribution],
+		"HP %d / %d" % [int(player.hp), int(player.hp_max)],
+		"Poise %d / %d" % [int(player.poise.current), int(player.poise.maximum)],
+	]
+
+	var cultivation: Array[String] = [
+		player.cultivation.stage_title(),
+		"Realm %d — %s" % [player.cultivation.realm, Realms.name_of(player.cultivation.realm)],
+		"Method: " + String(method.get("name", "?")),
+		root_line,
+		"Physique: %s (tier %d)" % [Physiques.name_of(player.physique_id), Physiques.tier_of(player.physique_id)],
+		"Qi %d / %d" % [int(player.cultivation.qi), int(player.cultivation.qi_max(player.stats))],
+		"Meridians %d / %d · enlightenments %d" % [
+			Meridians.count(player.cultivation.meridians), Meridians.all().size(), player.enlightenments.size()],
+	]
+
+	var attributes: Array[String] = [
+		"Attributes: " + player.attrs.summary(),
+		"Derived: " + player.stats.summary(),
+	]
+
+	var arts: Array[String] = []
+	for id_value in player.technique_ids:
+		var id := String(id_value)
+		arts.append("%s — %s" % [String(DB.technique(id).get("name", id)), player.mastery_label(id)])
+	if arts.is_empty():
+		arts.append("No arts learned.")
+	var passive_line := "Passives: "
+	var passive_names: Array[String] = []
+	for id_value in player.passives:
+		var id := String(id_value)
+		passive_names.append(String(DB.by_id("passive", id).get("name", id)))
+	passive_line += ", ".join(passive_names) if not passive_names.is_empty() else "none awakened"
+	arts.append(passive_line)
+
+	var gear: Array[String] = []
+	for slot in ["weapon", "armor", "ring", "talisman"]:
+		var item_value: Variant = player.equipment.get(slot, {})
+		if typeof(item_value) == TYPE_DICTIONARY and not (item_value as Dictionary).is_empty():
+			var item: Dictionary = item_value
+			gear.append("%s: %s" % [String(slot).capitalize(), String(item.get("name", "?"))])
+	if gear.is_empty():
+		gear.append("Nothing worn.")
+	for entry in DB.professions:
+		var profession_id := String(entry.get("id", ""))
+		gear.append("%s — level %d" % [
+			String(entry.get("name", profession_id)), Professions.level_of(Game.professions, profession_id)])
+
+	var hall := "none founded"
+	if not Game.player_sect.is_empty():
+		hall = String(Game.player_sect.get("name", "your hall"))
+	var house: Array[String] = [
+		"Rank: " + Hierarchy.title(_player_rank_id()),
+		"Master's seat: " + ("open" if Game.sect_seat_open else "closed"),
+		"Hall: " + hall,
+		"Party %d · captives %d" % [Game.party_ids.size(), Game.captives.size()],
+		"%d kills · %d crafts" % [Game.kills, Game.crafts_made],
+		"%d days in the world" % maxi(0, Clock.day - Game.born_day),
+	]
+
+	return [
+		{"title": "THE BODY", "colour": "#9fe0c0", "lines": body},
+		{"title": "CULTIVATION", "colour": "#7fd3e0", "lines": cultivation},
+		{"title": "ATTRIBUTES", "colour": "#c8b8e8", "lines": attributes},
+		{"title": "ARTS & PASSIVES", "colour": "#8fd8e8", "lines": arts},
+		{"title": "GEAR & WORK", "colour": "#d8c070", "lines": gear},
+		{"title": "HOUSE & DEEDS", "colour": "#e0a0c0", "lines": house},
+	]
+
+
+func toggle_settings() -> void:
+	if settings_open:
+		_close_settings()
+	else:
+		_open_settings()
+
+
+func _open_settings() -> void:
+	if player == null or String(phase) != "play":
+		return
+	_apply_options()
+	settings_open = true
+	settings_rebind_action = ""
+	settings_index = clampi(settings_index, 0, maxi(0, settings_rows().size() - 1))
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_settings() -> void:
+	if not settings_open:
+		return
+	settings_open = false
+	settings_rebind_action = ""
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## Pushes every option into the live scene. Called on boot, on each change, and
+## when the screen opens so it always shows the truth.
+func _apply_options() -> void:
+	if Options == null:
+		return
+	Options.apply_runtime(hud, combat_audio, Game.hitstop, damage_numbers)
+
+
+func _option_row(key: String, label: String, detail: String) -> Dictionary:
+	return {
+		"kind": "toggle",
+		"key": key,
+		"action": key,
+		"label": label,
+		"value": "ON" if Options.get_bool(key) else "OFF",
+		"detail": detail,
+		"hint": "ENTER or ←/→ changes it. The choice is written immediately.",
+	}
+
+
+func settings_rows() -> Array:
+	if Options == null:
+		return []
+	var out: Array = []
+	if settings_tab == 0:
+		out.append(_option_row("high_contrast", "High contrast",
+			"Brighter text, opaque panels and a gold accent on every screen. Useful in bright rooms and for low-vision readers."))
+		out.append(_option_row("reduce_motion", "Reduce motion",
+			"Removes the impact freeze-frame from combat. Attacks still land; the world simply does not stop for them."))
+		out.append(_option_row("damage_numbers", "Damage numbers",
+			"Shows the floating number over a body that was struck. Turning it off quiets the screen without changing any damage."))
+		out.append(_option_row("combat_sound", "Combat sound",
+			"Synthesised hits, guards, arts and deaths. The run never depends on hearing them."))
+		out.append({
+			"kind": "volume", "key": "volume", "action": "volume", "label": "Combat volume",
+			"value": "%d%%" % Options.get_int("volume"),
+			"detail": "The level of every combat voice. Zero is true silence, so a muted setting cannot leak a hit.",
+			"hint": "←/→ adjusts in steps of five. ENTER steps up by ten.",
+		})
+		out.append(_option_row("captivity", "Captivity content",
+			"Whether people can be subdued, bound and kept. Turning it off refuses new binds; a run that already holds captives keeps them."))
+	else:
+		for action in Options.REBINDABLE:
+			out.append({
+				"kind": "binding", "key": action, "action": action,
+				"label": String(Options.LABELS.get(action, action)),
+				"value": Options.binding_label(action),
+				"detail": "The keyboard key for %s. Mouse and gamepad buttons are never touched by a key rebind." % String(Options.LABELS.get(action, action)),
+				"hint": "ENTER, then press the new key. ESC cancels; BACKSPACE unbinds.",
+			})
+		out.append({
+			"kind": "reset", "key": "reset", "action": "reset", "label": "Reset all bindings",
+			"value": "ENTER",
+			"detail": "Returns every key on this page to its authored default. Gamepad and mouse bindings were never changed.",
+			"hint": "This cannot be undone; rebind again if you preferred a custom key.",
+		})
+	return out
+
+
+func _settings_activate(index: int) -> void:
+	var rows := settings_rows()
+	if rows.is_empty():
+		return
+	var row: Dictionary = rows[clampi(index, 0, rows.size() - 1)]
+	match String(row.get("kind", "")):
+		"toggle":
+			var key := String(row.get("key", ""))
+			var on := Options.toggle(key)
+			Bus.toast.emit("%s %s." % [String(row.get("label", key)), "on" if on else "off"])
+		"volume":
+			Options.adjust_volume(10)
+		"binding":
+			settings_rebind_action = String(row.get("action", ""))
+			Bus.toast.emit("Press the new key for %s. ESC cancels." % String(row.get("label", "action")))
+			return
+		"reset":
+			Options.reset_bindings()
+			Bus.toast.emit("Every key binding is back to its default.")
+	_apply_options()
+	Options.save()
+	Bus.player_stats_changed.emit()
+
+
+## Left/right adjusts rather than toggles so a volume can be swept without
+## pressing ENTER ten times. Toggles still answer both directions.
+func _settings_adjust(delta: int) -> void:
+	var rows := settings_rows()
+	if rows.is_empty() or delta == 0:
+		return
+	var row: Dictionary = rows[clampi(settings_index, 0, rows.size() - 1)]
+	match String(row.get("kind", "")):
+		"toggle":
+			Options.set_value(String(row.get("key", "")), delta > 0)
+		"volume":
+			Options.adjust_volume(5 * delta)
+		_:
+			return
+	_apply_options()
+	Options.save()
+
+
+## The next real key resolves the capture. Mouse motion and releases are
+## swallowed, so a stray click cannot become a binding.
+func _settings_capture(event: InputEvent) -> bool:
+	if settings_rebind_action == "":
+		return false
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return true
+	var key := (event as InputEventKey).physical_keycode
+	if key == 0:
+		key = (event as InputEventKey).keycode
+	if key == KEY_ESCAPE:
+		settings_rebind_action = ""
+		Bus.toast.emit("Rebinding cancelled.")
+		return true
+	var action := settings_rebind_action
+	if key == KEY_BACKSPACE:
+		Options.unbind(action)
+		settings_rebind_action = ""
+		Options.save()
+		_apply_options()
+		Bus.toast.emit("%s is unbound." % String(Options.LABELS.get(action, action)))
+		return true
+	var displaced := Options.rebind(action, key)
+	settings_rebind_action = ""
+	Options.save()
+	_apply_options()
+	var line := "%s is now %s." % [String(Options.LABELS.get(action, action)), Options.binding_label(action)]
+	if not displaced.is_empty():
+		var lost: Array[String] = []
+		for other in displaced:
+			lost.append(String(Options.LABELS.get(String(other), String(other))))
+		line += " %s lost that key." % ", ".join(lost)
+	Bus.toast.emit(line)
 	return true
 
 
@@ -5268,6 +5602,8 @@ func _load_game(slot: int) -> void:
 	_close_storylines()
 	_close_narrative()
 	_close_endgame()
+	_close_character()
+	_close_settings()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.

@@ -29,6 +29,7 @@ const KEY_BINDINGS := {
 	"open_storylines": [KEY_F6],
 	"open_narrative": [KEY_F7],
 	"open_endgame": [KEY_F8],
+	"open_settings": [KEY_F10],
 	"breakthrough": [KEY_G],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],
@@ -180,13 +181,26 @@ func _has_event(action: String, probe: InputEvent) -> bool:
 func rebind(action: String, keycode: int) -> void:
 	if not InputMap.has_action(action):
 		return
+	if keycode == 0:
+		unbind(action)
+		return
 	for ev in InputMap.action_get_events(action):
 		if ev is InputEventKey:
 			InputMap.action_erase_event(action, ev)
 	_add_key(action, keycode)
 
 
+## Removes the keyboard binding but keeps mouse and gamepad events.
+func unbind(action: String) -> void:
+	if not InputMap.has_action(action):
+		return
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey:
+			InputMap.action_erase_event(action, ev)
+	bindings[action] = 0
+
+
 func action_keycode(action: String) -> String:
-	if not bindings.has(action):
+	if not bindings.has(action) or int(bindings[action]) == 0:
 		return "unbound"
 	return OS.get_keycode_string(int(bindings[action]))
