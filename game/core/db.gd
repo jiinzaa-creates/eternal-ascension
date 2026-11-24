@@ -1284,6 +1284,26 @@ func _validate_npc_data(problems: Array) -> void:
 		if disposition < -100 or disposition > 100:
 			problems.append("npc archetype %s has disposition outside -100..100" % id)
 
+		# The brain is data too: a response naming a verb nobody implements, or a
+		# refuge that is not a real place, would only show up as a frozen crowd.
+		var brain_data: Variant = archetype.get("ai", null)
+		if typeof(brain_data) != TYPE_DICTIONARY:
+			problems.append("npc archetype %s has no ai block" % id)
+		else:
+			var brain: Dictionary = brain_data
+			var nerve: float = float(brain.get("nerve", -1.0))
+			if nerve < 0.0 or nerve > 1.0:
+				problems.append("npc archetype %s has nerve outside 0..1" % id)
+			var alert_range: float = float(brain.get("alert_range", 0.0))
+			if alert_range < 40.0 or alert_range > 900.0:
+				problems.append("npc archetype %s has an alert range outside 40..900" % id)
+			if not NpcAi.RESPONSES.has(String(brain.get("response", ""))):
+				problems.append("npc archetype %s has unknown ai response %s" % [id, String(brain.get("response", ""))])
+			if not Settlement.LOCATIONS.has(String(brain.get("refuge", ""))):
+				problems.append("npc archetype %s has unknown refuge %s" % [id, String(brain.get("refuge", ""))])
+			if typeof(brain.get("shout", null)) != TYPE_BOOL:
+				problems.append("npc archetype %s has a non-boolean shout flag" % id)
+
 		var attrs: Variant = archetype.get("attrs", null)
 		if typeof(attrs) != TYPE_DICTIONARY:
 			problems.append("npc archetype %s has no attribute block" % id)

@@ -20,7 +20,8 @@
       "physiques": ["physique.nine_yin", "physique.sword_bone", "physique.pure_yang"],
       "techniques": ["tech.formation.sealing_array", "tech.palm.azure_cloud", "tech.body.golden_bell"],
       "gear": ["base.staff.azure_rod", "base.robe.cloud_silk", "base.ring.spirit_iron", "base.talisman.wind_charm"],
-      "goals": ["goal.protect_sect", "goal.status", "goal.pursue_dao"]
+      "goals": ["goal.protect_sect", "goal.status", "goal.pursue_dao"],
+      "ai": {"nerve": 0.95, "alert_range": 400.0, "response": "confront", "refuge": "sect_hall", "shout": true}
     },
     {
       "id": "elder", "role": "Elder", "realm": 4, "weight": 1, "schedule": "elder", "rest_schedule": "elder_rest", "sect": "sect.azure_cloud",
@@ -29,7 +30,8 @@
       "physiques": ["physique.pure_yang", "physique.nine_yin", "physique.wind_stepping"],
       "techniques": ["tech.palm.azure_cloud", "tech.sword.azure_cleave", "tech.step.cloud_step"],
       "gear": ["base.staff.azure_rod", "base.robe.cloud_silk", "base.ring.jade"],
-      "goals": ["goal.teach", "goal.pursue_dao", "goal.protect_sect"]
+      "goals": ["goal.teach", "goal.pursue_dao", "goal.protect_sect"],
+      "ai": {"nerve": 0.9, "alert_range": 380.0, "response": "confront", "refuge": "sect_hall", "shout": true}
     },
     {
       "id": "inner_disciple", "role": "Inner Disciple", "realm": 2, "weight": 5, "schedule": "disciple", "rest_schedule": "disciple_rest", "sect": "sect.azure_cloud",
@@ -38,7 +40,8 @@
       "physiques": ["physique.sword_bone", "physique.wind_stepping", "physique.iron_bone"],
       "techniques": ["tech.sword.azure_cleave", "tech.sword.piercing_thrust", "tech.step.cloud_step"],
       "gear": ["base.sword.iron_jian", "base.robe.cloud_silk", "base.ring.jade"],
-      "goals": ["goal.pursue_dao", "goal.status", "goal.wander"]
+      "goals": ["goal.pursue_dao", "goal.status", "goal.wander"],
+      "ai": {"nerve": 0.6, "alert_range": 280.0, "response": "confront", "refuge": "training", "shout": true}
     },
     {
       "id": "outer_disciple", "role": "Outer Disciple", "realm": 1, "weight": 8, "schedule": "disciple", "rest_schedule": "disciple_rest", "sect": "sect.azure_cloud",
@@ -47,7 +50,8 @@
       "physiques": ["physique.iron_bone", "physique.mortal_frame"],
       "techniques": ["tech.sword.azure_cleave", "tech.step.cloud_step"],
       "gear": ["base.sword.iron_jian", "base.robe.cloud_silk"],
-      "goals": ["goal.pursue_dao", "goal.status", "goal.survive"]
+      "goals": ["goal.pursue_dao", "goal.status", "goal.survive"],
+      "ai": {"nerve": 0.4, "alert_range": 240.0, "response": "shelter", "refuge": "dorms", "shout": true}
     },
     {
       "id": "merchant", "role": "Merchant", "realm": 1, "weight": 3, "schedule": "merchant", "rest_schedule": "merchant_rest", "sect": "",
@@ -56,7 +60,8 @@
       "physiques": ["physique.mortal_frame", "physique.pure_yang"],
       "techniques": ["tech.step.cloud_step"],
       "gear": ["base.robe.cloud_silk", "base.ring.jade", "base.talisman.wind_charm"],
-      "goals": ["goal.wealth", "goal.family", "goal.wander"]
+      "goals": ["goal.wealth", "goal.family", "goal.wander"],
+      "ai": {"nerve": 0.25, "alert_range": 220.0, "response": "shelter", "refuge": "tavern", "shout": true}
     },
     {
       "id": "guard", "role": "Guard", "realm": 2, "weight": 2, "schedule": "guard", "rest_schedule": "guard_rest", "sect": "sect.azure_cloud",
@@ -65,7 +70,8 @@
       "physiques": ["physique.iron_bone"],
       "techniques": ["tech.fist.iron_bone", "tech.sword.azure_cleave"],
       "gear": ["base.sword.heavy_saber", "base.robe.iron_plate", "base.ring.jade"],
-      "goals": ["goal.protect_sect", "goal.survive", "goal.family"]
+      "goals": ["goal.protect_sect", "goal.survive", "goal.family"],
+      "ai": {"nerve": 0.85, "alert_range": 360.0, "response": "confront", "refuge": "gate", "shout": true}
     },
     {
       "id": "farmer", "role": "Farmer", "realm": 1, "weight": 3, "schedule": "farmer", "rest_schedule": "farmer_rest", "sect": "",
@@ -74,7 +80,8 @@
       "physiques": ["physique.mortal_frame"],
       "techniques": ["tech.step.cloud_step"],
       "gear": ["base.robe.cloud_silk"],
-      "goals": ["goal.family", "goal.survive", "goal.wealth"]
+      "goals": ["goal.family", "goal.survive", "goal.wealth"],
+      "ai": {"nerve": 0.2, "alert_range": 200.0, "response": "flee", "refuge": "fields", "shout": true}
     }
   ],
   "schedules": {

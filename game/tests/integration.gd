@@ -2988,6 +2988,113 @@ func _run() -> void:
 		var m48_restore: Npc = m48_node
 		m48_restore.snap_to_schedule()
 
+	# --- NPC intelligence: the market notices trouble and does something -------
+	var m49_day: int = Clock.day
+	var m49_hour: float = Clock.hour
+	# The town is only simulated near the player, so the scenario stands in the
+	# market rather than watching a sleeping settlement from across the province.
+	var m49_player_home: Vector2 = player.global_position
+	Clock.day = 3
+	Clock.hour = 10.0
+	player.global_position = main.settlement.position_for("plaza")
+	await frames(2)
+
+	var m49_guard: Npc = null
+	var m49_farmer: Npc = null
+	var m49_merchant: Npc = null
+	for m49_entry in main.npcs:
+		var m49_resident: Npc = m49_entry
+		if m49_guard == null and m49_resident.archetype_id == "guard":
+			m49_guard = m49_resident
+		elif m49_farmer == null and m49_resident.archetype_id == "farmer":
+			m49_farmer = m49_resident
+		elif m49_merchant == null and m49_resident.archetype_id == "merchant":
+			m49_merchant = m49_resident
+	check(m49_guard != null and m49_farmer != null and m49_merchant != null,
+		"the market keeps a guard, a farmer and a merchant")
+
+	var m49_plaza: Vector2 = main.settlement.position_for("plaza")
+	for m49_row in [m49_guard, m49_farmer, m49_merchant]:
+		var m49_person: Npc = m49_row
+		m49_person.wake()
+		m49_person.stand_down()
+	check(m49_guard.simulated and m49_farmer.simulated and m49_merchant.simulated,
+		"a body in the market is simulated")
+	m49_guard.global_position = m49_plaza + Vector2(60, 0)
+	m49_farmer.global_position = m49_plaza + Vector2(-40, 40)
+	m49_merchant.global_position = m49_plaza + Vector2(0, -300)
+	check(not m49_guard.reacting(), "a quiet market is nobody's alarm")
+
+	var m49_threat := Dummy.new()
+	m49_threat.aggressive = true
+	m49_threat.display_name = "Test Beast"
+	main.world.add_child(m49_threat)
+	m49_threat.global_position = m49_plaza + Vector2(90, 0)
+	# A threat that will not chase: this block is about who notices it, not a fight.
+	m49_threat.profile["aggro_range"] = 1.0
+	await frames(2)
+	main._alert_timer = 0.0
+	main._direct_npcs(0.3)
+
+	check(m49_guard.reacting() and m49_guard.reaction == "confront",
+		"a guard stands its ground against a body in the market")
+	check(m49_farmer.reacting() and m49_farmer.reaction == "flee",
+		"a farmer runs from the same body")
+	check(m49_merchant.reacting() and m49_merchant.reaction == "shelter",
+		"a merchant shuts the stall")
+	check(m49_merchant.threat_distance > float(m49_merchant.ai.get("alert_range", 0.0)),
+		"the merchant answers a neighbour's shout, not its own sighting")
+	check(m49_guard.reaction_line().contains("paces"), "the dossier reads the alarm")
+	check(m49_guard.goal_position().distance_to(m49_threat.global_position) < 120.0,
+		"a confronting body closes on the threat")
+	check(m49_farmer.goal_position().distance_to(main.settlement.position_for("fields")) < 1.0,
+		"a fleeing body heads for the fields")
+	check(m49_merchant.goal_position().distance_to(main.settlement.position_for("tavern")) < 1.0,
+		"a sheltering body heads indoors")
+
+	m49_guard.global_position = player.global_position + Vector2(14, 0)
+	var m49_talks := int(NpcDb.memory_entry(Game.npc_memory, m49_guard.npc_id).get("talks", 0))
+	main._talk(m49_guard)
+	check(int(NpcDb.memory_entry(Game.npc_memory, m49_guard.npc_id).get("talks", 0)) == m49_talks,
+		"an alarmed guard answers with the alarm, not the routine")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("Get behind me"),
+		"the guard shouts its warning")
+
+	m49_threat.queue_free()
+	await frames(2)
+	for m49_sweep in [m49_guard, m49_farmer, m49_merchant]:
+		var m49_calm: Npc = m49_sweep
+		m49_calm.alarm_left = 0.0
+		m49_calm.stand_down()
+		check(not m49_calm.reacting() and m49_calm.reaction == "routine",
+			"%s returns to the routine" % m49_calm.display_name)
+	check(m49_guard.current_activity == "patrol" and m49_guard.current_location == "gate",
+		"a stood-down guard walks back to the gate")
+
+	Clock.hour = 23.0
+	m49_guard.snap_to_schedule()
+	var m49_night := Dummy.new()
+	m49_night.aggressive = true
+	main.world.add_child(m49_night)
+	m49_night.global_position = m49_guard.global_position + Vector2(40, 0)
+	m49_night.profile["aggro_range"] = 1.0
+	await frames(2)
+	main._alert_timer = 0.0
+	main._direct_npcs(0.3)
+	check(not m49_guard.is_awake(), "the night puts the guard to bed")
+	check(not m49_guard.reacting(), "a sleeping body is not alarmed")
+	m49_night.queue_free()
+	await frames(2)
+
+	Clock.day = m49_day
+	Clock.hour = m49_hour
+	player.global_position = m49_player_home
+	for m49_restore_row in main.npcs:
+		var m49_restored: Npc = m49_restore_row
+		m49_restored.alarm_left = 0.0
+		m49_restored.reaction = "routine"
+		m49_restored.snap_to_schedule()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

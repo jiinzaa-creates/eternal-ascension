@@ -48,6 +48,16 @@ var current_location := ""
 var target := Vector2.ZERO
 var animator := Animator.new()
 
+## The archetype's brain, from `NpcAi.profile`. A reaction is live state and is
+## never saved: a threat does not survive a load, so neither does the alarm.
+var ai: Dictionary = {}
+## `routine`, `confront`, `flee` or `shelter`.
+var reaction := "routine"
+## Seconds of alarm left. The reaction lasts exactly as long as this does.
+var alarm_left := 0.0
+var threat_position := Vector2.ZERO
+var threat_distance := 0.0
+
 ## Off-screen simulation. A sleeping NPC costs nothing per frame and snaps to its
 ## schedule when the player returns: absence is free, but not amnesia.
 var simulated := true
@@ -131,17 +141,25 @@ func goal_labels() -> Array[String]:
 func _ready() -> void:
 	collision_layer = 1
 	collision_mask = 1
+	if ai.is_empty():
+		ai = NpcAi.profile({})
 	if settlement != null:
 		_set_destination("plaza")
 
 
 func _physics_process(delta: float) -> void:
+	_tick_reaction(delta)
 	_update_activity()
 	_advance_route()
-	var to_target := target - global_position
-	if to_target.length() > 14.0:
-		velocity = to_target.normalized() * speed
+	var goal := goal_position()
+	var gap := NpcAi.hold_at(reaction, ai) if reacting() else 0.0
+	var to_goal := goal - global_position
+	if to_goal.length() > maxf(14.0, gap):
+		velocity = to_goal.normalized() * speed
 		_wander = Vector2.ZERO
+	elif reacting():
+		# A body holding a line stands still; it does not pace about a threat.
+		velocity = Vector2.ZERO
 	else:
 		_idle_timer -= delta
 		if _idle_timer <= 0.0:
@@ -167,6 +185,83 @@ func _update_activity() -> void:
 		return
 	current_activity = String(entry.get("activity", "idle"))
 	_set_destination(String(entry.get("location", "plaza")))
+
+
+## The archetype's temperament and standing orders, clamped by NpcAi.
+func apply_ai(entry: Dictionary) -> void:
+	ai = NpcAi.profile(entry)
+
+
+## Whether an alarm is in force. A reaction whose clock has run out is over, even
+## if the fields have not been cleared yet.
+func reacting() -> bool:
+	return reaction != "routine" and alarm_left > 0.0
+
+
+## Raises or refreshes a reaction. The clock is always pushed forward while the
+## danger lasts, so a sighting keeps the town alarmed instead of lapsing under
+## it, but only a *new* order reports true: that is what lets the scene shout
+## once instead of every frame.
+func react(kind: String, at: Vector2, seconds: float, distance: float) -> bool:
+	if kind == "" or kind == "routine":
+		return false
+	threat_position = at
+	threat_distance = maxf(0.0, distance)
+	var fresh := kind != reaction or alarm_left <= 0.0
+	reaction = kind
+	alarm_left = maxf(alarm_left, maxf(0.0, seconds))
+	return fresh
+
+
+## Ends a reaction and walks back into the routine from where the body stands. No
+## teleport: a person who ran to the hall walks back out of it.
+func stand_down() -> void:
+	if reaction == "routine" and alarm_left <= 0.0:
+		return
+	reaction = "routine"
+	alarm_left = 0.0
+	threat_position = Vector2.ZERO
+	threat_distance = 0.0
+	var entry := resolve_schedule(int(Clock.hour))
+	if entry.is_empty():
+		return
+	current_activity = String(entry.get("activity", "idle"))
+	_set_destination(String(entry.get("location", "plaza")))
+
+
+func _tick_reaction(delta: float) -> void:
+	if reaction == "routine":
+		return
+	alarm_left = maxf(0.0, alarm_left - delta)
+	if alarm_left <= 0.0:
+		stand_down()
+
+
+## Where the body is actually walking: the reaction's target while alarmed, the
+## routine's target otherwise.
+func goal_position() -> Vector2:
+	if not reacting() or settlement == null:
+		return target
+	var refuge := settlement.position_for(String(ai.get("refuge", "sect_hall")))
+	return NpcAi.target_for(reaction, global_position, threat_position, refuge, ai)
+
+
+## One line for the dossier while alarmed; empty in an ordinary hour.
+func reaction_line() -> String:
+	if not reacting():
+		return ""
+	return NpcAi.describe(reaction, threat_distance)
+
+
+## What the body says instead of small talk while alarmed.
+func warning_line() -> String:
+	if not reacting():
+		return ""
+	return NpcAi.warning_line(reaction)
+
+
+func nerve_label() -> String:
+	return NpcAi.nerve_label(float(ai.get("nerve", 0.5)))
 
 
 ## A weekday routine, replaced whole on a Restday when data names one.
@@ -206,6 +301,12 @@ func sleep() -> void:
 	if not simulated:
 		return
 	simulated = false
+	# Distance ends a reaction: a body that leaves the simulation is not still
+	# staring at a threat nobody is rendering.
+	reaction = "routine"
+	alarm_left = 0.0
+	threat_position = Vector2.ZERO
+	threat_distance = 0.0
 	velocity = Vector2.ZERO
 	set_physics_process(false)
 
@@ -265,7 +366,7 @@ func teaches_here() -> bool:
 ## Whether the body still has ground to cover. Sleeping bodies are at their
 ## destination, so a sleeping NPC never reads as walking.
 func travelling() -> bool:
-	return simulated and settlement != null and global_position.distance_to(target) > 24.0
+	return simulated and settlement != null and global_position.distance_to(goal_position()) > 24.0
 
 
 func _draw() -> void:
@@ -292,11 +393,19 @@ func _draw() -> void:
 		"socialize":
 			activity_color = Color("#c09ad8")
 	draw_arc(Vector2.ZERO, RADIUS + 4.0, -PI * 0.5, -PI * 0.5 + TAU * 0.99, 18, activity_color, 1.5)
+	# A second, wider ring is the alarm: warm for a body holding ground, cold for
+	# one leaving. It is drawn outside the routine ring so both stay readable.
+	if reacting():
+		var reaction_color := Color("#ff9a70") if reaction == "confront" else Color("#a8c8ff")
+		draw_arc(Vector2.ZERO, RADIUS + 7.5, -PI * 0.5, -PI * 0.5 + TAU * 0.75, 18, reaction_color, 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	var player: Node2D = Game.player as Node2D
 	if player != null and global_position.distance_to(player.global_position) < 300.0:
 		var gait := "  ·  walking" if travelling() else ""
-		var text := "%s  ·  %s%s" % [display_name, current_activity, gait]
+		var alarm := ""
+		if reacting():
+			alarm = "  ·  " + NpcAi.short_label(reaction)
+		var text := "%s  ·  %s%s%s" % [display_name, current_activity, gait, alarm]
 		draw_string(ThemeDB.fallback_font, Vector2(-46, -RADIUS - 9.0), text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c8d4da"))

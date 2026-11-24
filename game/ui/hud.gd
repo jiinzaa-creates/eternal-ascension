@@ -712,10 +712,19 @@ func draw_npc_dossier(_player: Player) -> void:
 	if String(npc.sect_id) != "":
 		sect_part = " · " + String(npc.sect_id)
 	var realm_name := String(DB.realm(npc.realm).get("name", "Realm %d" % npc.realm))
-	_text(Vector2(x, y), _fit("Realm %d — %s%s" % [npc.realm, realm_name, sect_part], 11, 408.0), 11, MUTED)
+	_text(Vector2(x, y), _fit("Realm %d — %s%s · nerve %s" % [
+		npc.realm, realm_name, sect_part, npc.nerve_label()], 11, 408.0), 11, MUTED)
 	y += 17.0
-	var gait := " · walking" if npc.travelling() else ""
-	_text(Vector2(x, y), _fit(npc.activity_line() + gait, 11, 408.0), 11, Color("#9fb0b8"))
+	# An alarm replaces the routine line: what the body is doing about the threat
+	# matters more than what the hour had planned for it.
+	var routine := npc.activity_line()
+	var routine_color := Color("#9fb0b8")
+	if npc.reacting():
+		routine = npc.reaction_line()
+		routine_color = Color("#ffb08f")
+	elif npc.travelling():
+		routine += " · walking"
+	_text(Vector2(x, y), _fit(routine, 11, 408.0), 11, routine_color)
 	y += 17.0
 	_text(Vector2(x, y), npc.attrs.summary(), 11, INK)
 	y += 17.0

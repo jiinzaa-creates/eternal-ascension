@@ -375,6 +375,45 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **No new save state.** The clock already saves the day and hour, so the routine, the weekday and
   the route are all derived after a load. Memory remains the only NPC state a save carries.
 
+## NPC intelligence
+
+- **The mind is pure; the body acts.** `NpcAi` (`game/systems/npc_ai.gd`) never touches a node or
+  the scene tree. `nearest_threat()` answers what is in reach, `decide()` answers what the trade
+  does about it, `target_for()` answers where that sends the body, and `Npc` owns the timer and the
+  walk. This is what lets a panicking market be tested headlessly.
+- **The brain is data.** Every archetype carries an `ai` block: `nerve` (0–1), `alert_range`, a
+  `response` of `confront`, `flee` or `shelter`, a `refuge` location and a `shout` flag.
+  `NpcAi.profile()` clamps all of it, so a missing field degrades to a cautious resident rather
+  than crashing. `DB.validate()` rejects an unknown response or refuge, an out-of-range nerve or
+  alert range, and a non-boolean shout at boot.
+- **Nerve is a rule, not a flavour number.** A body whose order is `confront` but whose nerve is
+  below `CONFRONT_NERVE` (0.55) takes shelter instead. That is the one place the two fields
+  interact: a frightened guard behaves like a shopkeeper, and the data decides how frightened.
+- **Only the market's trouble counts.** `main._direct_npcs` collects `aggressive` bodies that are
+  not dead, then `NpcAi.watched()` keeps the ones inside `WATCH_RADIUS` (360) of the plaza. Wild
+  bodies spawn at 420+, so the wilds are the player's business until a chase brings a beast in. A
+  training dummy or a sparring partner is not a threat: `aggressive == false` means furniture.
+- **One shout, once.** A body raises an alarm only when its order changes; the scene then hands the
+  warning to every simulated, waking body inside `SHOUT_RADIUS` (340). A listener keeps its **own**
+  distance to the trouble, because a shout carries the warning, not the crier's eyesight — which is
+  how a merchant 300 paces away with a 220 alert range still shuts the stall. The scan is throttled
+  to `NPC_ALERT_TICK` (0.25 s) and is skipped inside a hidden realm.
+- **Sleepers are exempt.** `is_awake()` gates the whole layer: a sleeping body is behind a door, so
+  it neither sees nor answers. `Npc.sleep()` clears any reaction, so distance cannot leave a body
+  permanently alarmed when it wakes.
+- **The reaction outranks the routine for `ALARM_SECONDS` (12) and then ends.** `Npc.react()`
+  sets the order and the clock, `_tick_reaction()` counts it down, and `stand_down()` walks the body
+  back to whatever the schedule says now — no teleport, because a person who ran to the hall walks
+  back out of it. `goal_position()` is the single answer to "where is this body going", and
+  `travelling()` reads it, so the nameplate never calls a reacting body idle.
+- **Alarm has consequences in conversation.** `_talk()` answers with `NpcAi.warning_line()` instead
+  of small talk and records no memory: a body shouted at by a beast did not have a conversation
+  worth remembering. The dossier replaces the routine line with the alarm and shows the nerve.
+- **No new save state.** A reaction is live only: a threat does not survive a load, so neither does
+  the alarm. The routine, the weekday and the position are all derived as before.
+- **Tests must stand in the market.** `_simulate_npcs` sleeps the town beyond `NPC_SIM_RADIUS`, so
+  the integration scenario moves the player to the plaza for the block and restores them after.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

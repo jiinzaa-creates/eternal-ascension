@@ -74,6 +74,7 @@ func _ready() -> void:
 	_npc_tests()
 	_npcdb_tests()
 	_schedules_tests()
+	_npcai_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3280,6 +3281,119 @@ func _schedules_tests() -> void:
 		"a routine reads as a sentence")
 	check(Schedules.small_talk("sleep") == "…", "a sleeper has nothing to say")
 	check(Schedules.small_talk("sell").contains("price"), "a merchant speaks of prices")
+
+
+func _npcai_tests() -> void:
+	print("[npc ai] nerve, alarms and reactions")
+	var timid := NpcAi.profile({"nerve": 0.2, "alert_range": 200.0, "response": "flee",
+		"refuge": "fields", "shout": false})
+	check(approx(float(timid["nerve"]), 0.2) and approx(float(timid["alert_range"]), 200.0),
+		"a profile keeps the values it is given")
+	check(String(timid["response"]) == "flee" and String(timid["refuge"]) == "fields",
+		"a profile keeps its orders and its refuge")
+	check(not bool(timid["shout"]), "a quiet body does not shout")
+
+	var fallback := NpcAi.profile({"response": "dance", "nerve": 4.0, "alert_range": -10.0})
+	check(String(fallback["response"]) == "shelter", "an unknown response falls back to shelter")
+	check(approx(float(fallback["nerve"]), 1.0), "nerve is clamped to its ceiling")
+	check(approx(float(fallback["alert_range"]), 40.0), "the alert range is clamped to its floor")
+	check(String(NpcAi.profile({})["refuge"]) == "sect_hall", "a body with no data takes the default refuge")
+
+	var threats := [
+		{"id": "beast.a", "position": Vector2(300, 0)},
+		{"id": "beast.b", "position": Vector2(120, 0)},
+		{"id": "junk", "position": "not a vector"},
+		42,
+	]
+	var near := NpcAi.nearest_threat(Vector2.ZERO, threats, 200.0)
+	check(String(near.get("id", "")) == "beast.b", "the closest threat wins")
+	check(approx(float(near.get("distance", 0.0)), 120.0), "distance is measured from the body")
+	check(NpcAi.nearest_threat(Vector2.ZERO, threats, 50.0).is_empty(),
+		"a threat outside the alert range is not seen")
+	check(NpcAi.nearest_threat(Vector2.ZERO, [], 500.0).is_empty(), "an empty world is quiet")
+	check(NpcAi.nearest_threat(Vector2.ZERO, threats, 0.0).is_empty(), "a blind body sees nothing")
+	check(NpcAi.watched(threats, Vector2.ZERO, 360.0).size() == 2,
+		"the watch ring keeps the real bodies and drops the rest")
+	check(NpcAi.watched([{"id": "far", "position": Vector2(400, 0)}], Vector2.ZERO, 360.0).is_empty(),
+		"a body in the wilds is nobody's alarm")
+
+	check(NpcAi.decide(false, false, timid) == "routine", "an ordinary hour follows the routine")
+	check(NpcAi.decide(true, false, timid) == "flee", "a seen threat is answered")
+	check(NpcAi.decide(false, true, timid) == "flee", "a shout is answered without a sighting")
+	var brave := NpcAi.profile({"nerve": 0.9, "response": "confront"})
+	var shaky := NpcAi.profile({"nerve": 0.2, "response": "confront"})
+	check(NpcAi.decide(true, false, brave) == "confront", "a steady body holds its ground")
+	check(NpcAi.decide(true, false, shaky) == "shelter",
+		"a faint-hearted guard takes shelter instead of standing")
+	check(NpcAi.CONFRONT_NERVE > 0.2 and NpcAi.CONFRONT_NERVE < 0.9,
+		"the nerve threshold separates the steady from the shaky")
+
+	check(NpcAi.hears(Vector2.ZERO, Vector2(300, 0)), "a shout carries across the market")
+	check(not NpcAi.hears(Vector2.ZERO, Vector2(500, 0)), "a shout has a limit")
+	check(NpcAi.hears(Vector2.ZERO, Vector2(500, 0), 600.0), "a louder shout carries further")
+
+	var hold := NpcAi.approach_point(Vector2.ZERO, Vector2(300, 0), NpcAi.CONFRONT_GAP)
+	check(approx(hold.distance_to(Vector2(300, 0)), NpcAi.CONFRONT_GAP),
+		"a confronting body stops at the hold gap")
+	var inside := NpcAi.approach_point(Vector2(260, 0), Vector2(300, 0), NpcAi.CONFRONT_GAP)
+	check(inside == Vector2(260, 0), "a body already inside the gap holds where it stands")
+	check(NpcAi.target_for("shelter", Vector2.ZERO, Vector2(300, 0), Vector2(-200, 70), fallback) == Vector2(-200, 70),
+		"a sheltering body runs to its refuge")
+	check(NpcAi.target_for("routine", Vector2(5, 5), Vector2(300, 0), Vector2.ZERO, fallback) == Vector2(5, 5),
+		"a routine body has no reaction target")
+	check(NpcAi.hold_at("confront", brave) > 0.0 and approx(NpcAi.hold_at("flee", timid), 0.0),
+		"only a confronting body keeps a distance")
+
+	check(NpcAi.label("confront") == "Standing ground", "a reaction has a label")
+	check(NpcAi.label("routine") == "About their business", "a calm body reads as calm")
+	check(NpcAi.short_label("shelter") == "sheltering", "the nameplate tag is short")
+	check(NpcAi.describe("routine", 120.0) == "", "a calm body has no alarm line")
+	check(NpcAi.describe("confront", 240.0).contains("24 paces"), "the alarm line reads a distance in paces")
+	check(NpcAi.warning_line("flee").contains("Run"), "a fleeing body shouts a warning")
+	check(NpcAi.warning_line("routine") == "", "a calm body warns nobody")
+	check(NpcAi.nerve_label(0.9) == "steady" and NpcAi.nerve_label(0.1) == "timid",
+		"nerve reads as a word")
+
+	var npc := Npc.new()
+	npc.apply_ai({"nerve": 0.9, "response": "confront", "refuge": "gate"})
+	check(not npc.reacting(), "an unalarmed body is not reacting")
+	check(npc.react("confront", Vector2(300, 0), NpcAi.ALARM_SECONDS, 300.0),
+		"sighting a threat raises an alarm")
+	check(npc.reacting() and npc.reaction == "confront", "the reaction is in force while the alarm lasts")
+	check(not npc.react("confront", Vector2(320, 0), NpcAi.ALARM_SECONDS, 320.0),
+		"the same alarm is not raised twice")
+	npc.alarm_left = 1.0
+	npc.react("confront", Vector2(320, 0), NpcAi.ALARM_SECONDS, 320.0)
+	check(approx(npc.alarm_left, NpcAi.ALARM_SECONDS),
+		"a fresh sighting keeps the alarm alive while the danger lasts")
+	check(npc.react("shelter", Vector2(320, 0), NpcAi.ALARM_SECONDS, 320.0),
+		"a new order is a new alarm")
+	check(npc.reaction_line().contains("paces") and npc.warning_line() != "",
+		"an alarmed body reads and speaks its alarm")
+	npc.alarm_left = 0.0
+	check(not npc.reacting(), "an expired alarm ends the reaction")
+	npc.free()
+
+	var guard_brain := {}
+	var farmer_brain := {}
+	var merchant_brain := {}
+	for value in DB.archetypes():
+		var archetype: Dictionary = value
+		var data: Dictionary = archetype.get("ai", {})
+		var brain := NpcAi.profile(data)
+		check(not data.is_empty() and Settlement.LOCATIONS.has(String(brain["refuge"])),
+			"archetype %s has a real refuge" % String(archetype.get("id", "")))
+		var archetype_id := String(archetype.get("id", ""))
+		if archetype_id == "guard":
+			guard_brain = brain
+		elif archetype_id == "farmer":
+			farmer_brain = brain
+		elif archetype_id == "merchant":
+			merchant_brain = brain
+	check(String(guard_brain.get("response", "")) == "confront" and NpcAi.decide(true, false, guard_brain) == "confront",
+		"a guard stands its ground")
+	check(String(farmer_brain.get("response", "")) == "flee", "a farmer runs")
+	check(String(merchant_brain.get("response", "")) == "shelter", "a merchant shuts the stall")
 
 
 func _quest_tests() -> void:

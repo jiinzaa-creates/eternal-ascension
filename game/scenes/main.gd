@@ -81,7 +81,11 @@ var travel_sites: Dictionary = {}
 ## Off-screen simulation: NPCs sleep beyond this distance, and changes they lived
 ## through wait in a short report shown when the player is back in the settlement.
 const NPC_SIM_RADIUS := 1500.0
+## How often the settlement looks for trouble. A quarter second is well under a
+## frame of walking, and it keeps a crowd of residents off the enemy list.
+const NPC_ALERT_TICK := 0.25
 var _npc_seen: Dictionary = {}
+var _alert_timer := 0.0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -281,6 +285,7 @@ func _make_npc(id: String, display: String, role: String, sect: String, realm: i
 	var sheet := NpcDb.sheet(archetype, id, realm)
 	npc.setup(id, display, role, sect, realm, schedule, settlement, sheet)
 	npc.rest_schedule = DB.schedules().get(String(archetype.get("rest_schedule", "")), [])
+	npc.apply_ai(archetype.get("ai", {}))
 	world.add_child(npc)
 	npc.global_position = settlement.position_for("plaza") + offset
 	npcs.append(npc)
@@ -617,6 +622,7 @@ func _process(delta: float) -> void:
 		return
 
 	_simulate_npcs()
+	_direct_npcs(delta)
 	_flush_away_report()
 
 	if Travel.has_arrived(player.global_position, waypoint_position):
@@ -1246,6 +1252,68 @@ func _simulate_npcs() -> void:
 			node.sleep()
 
 
+## The settlement's watch. Hostile bodies inside the market ring are filtered
+## once, then every waking resident decides for itself: notice one, hear a
+## neighbour's shout, or carry on. A new alarm is shouted once, never per frame.
+## Threats in the wilds are not the town's business until they walk in.
+func _direct_npcs(delta: float) -> void:
+	_alert_timer -= delta
+	if _alert_timer > 0.0 or npcs.is_empty() or realm_instance != null:
+		return
+	_alert_timer = NPC_ALERT_TICK
+	var center: Vector2 = settlement.position_for("plaza")
+	var bodies: Array = []
+	for node in get_tree().get_nodes_in_group("enemy"):
+		if not is_instance_valid(node):
+			continue
+		var body := node as Dummy
+		# Only a hostile body is a threat. A training dummy and a sparring
+		# partner are furniture with a health bar.
+		if body == null or body.state == "dead" or not body.aggressive:
+			continue
+		bodies.append({"id": String(body.name), "position": body.global_position})
+	var threats: Array = NpcAi.watched(bodies, center)
+
+	var shouted: Array = []
+	for value in npcs:
+		if not is_instance_valid(value):
+			continue
+		var npc := value as Npc
+		# A sleeping body is behind a door: it neither sees nor answers an alarm.
+		if npc == null or not npc.simulated or not npc.is_awake():
+			continue
+		var radius := float(npc.ai.get("alert_range", 260.0))
+		var threat: Dictionary = NpcAi.nearest_threat(npc.global_position, threats, radius)
+		var kind := NpcAi.decide(not threat.is_empty(), npc.reacting(), npc.ai)
+		if kind == "routine":
+			continue
+		var at: Vector2 = npc.threat_position
+		var distance := npc.threat_distance
+		if not threat.is_empty():
+			at = threat["position"]
+			distance = float(threat["distance"])
+		if npc.react(kind, at, NpcAi.ALARM_SECONDS, distance):
+			shouted.append(npc)
+
+	for value in shouted:
+		var crier := value as Npc
+		if not bool(crier.ai.get("shout", true)):
+			continue
+		for other in npcs:
+			if not is_instance_valid(other) or other == crier:
+				continue
+			var listener := other as Npc
+			if listener == null or not listener.simulated or not listener.is_awake():
+				continue
+			if not NpcAi.hears(crier.global_position, listener.global_position):
+				continue
+			# The listener keeps its own distance to the trouble: a shout carries the
+			# warning, not the crier's eyesight.
+			var heard_at: Vector2 = crier.threat_position
+			listener.react(NpcAi.decide(false, true, listener.ai), heard_at,
+				NpcAi.ALARM_SECONDS, listener.global_position.distance_to(heard_at))
+
+
 func _flush_away_report() -> void:
 	if _wilds_recovered > 0 and realm_instance == null:
 		Bus.toast.emit("The wilds recover while you were away (%d)." % _wilds_recovered)
@@ -1846,6 +1914,11 @@ func _talk(npc: Npc) -> void:
 	# teacher away from the yard has no lesson to give.
 	if not npc.is_awake():
 		Bus.toast.emit("%s is asleep. The routine will bring them back." % npc.display_name)
+		return
+	# An alarmed body answers with the alarm, not with its trade, and the moment
+	# is not a conversation worth remembering.
+	if npc.reacting():
+		Bus.toast.emit("%s: \"%s\"" % [npc.display_name, npc.warning_line()])
 		return
 	# Every real conversation is remembered: a merchant with nothing to sell still
 	# remembers being spoken to.
