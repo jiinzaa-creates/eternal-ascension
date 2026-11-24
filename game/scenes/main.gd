@@ -120,6 +120,9 @@ var sect_ledger_index := 0
 ## The council: three blocs, their support, and the vote on the master's seat.
 var council_open := false
 var council_index := 0
+## The player's own hall: founding, roster and the daily levy.
+var player_sect_open := false
+var player_sect_index := 0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -685,7 +688,7 @@ func _process(delta: float) -> void:
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
-			or sect_ledger_open or council_open:
+			or sect_ledger_open or council_open or player_sect_open:
 		return
 
 	_simulate_npcs()
@@ -757,6 +760,8 @@ func _process(delta: float) -> void:
 		toggle_sect_ledger()
 	if Input.is_action_just_pressed("open_council"):
 		toggle_council()
+	if Input.is_action_just_pressed("open_player_sect"):
+		toggle_player_sect()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1723,6 +1728,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.is_action_pressed("accept"):
 			_council_activate(council_index)
+			return
+		return
+
+	if player_sect_open:
+		if event.is_action_pressed("open_player_sect") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_player_sect()
+			return
+		if event.is_action_pressed("ui_down"):
+			player_sect_index = mini(player_sect_index + 1, maxi(0, player_sect_rows().size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			player_sect_index = maxi(0, player_sect_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			_player_sect_activate(player_sect_index)
 			return
 		return
 
@@ -2731,6 +2752,213 @@ func _council_vote() -> void:
 		Hierarchy.seat_available(Game.sect_seat_open))
 	if String(station.get("id", "")) == "rank.sect_master":
 		Bus.toast.emit("The hall rises: you are Sect Master.")
+	Bus.player_stats_changed.emit()
+
+
+# ---------------------------------------------------------- player sect ----
+
+
+func toggle_player_sect() -> void:
+	if player_sect_open:
+		_close_player_sect()
+	else:
+		_open_player_sect()
+
+
+func _open_player_sect() -> void:
+	if player == null or String(phase) != "play":
+		return
+	player_sect_open = true
+	player_sect_index = clampi(player_sect_index, 0, maxi(0, player_sect_rows().size() - 1))
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_player_sect() -> void:
+	if not player_sect_open:
+		return
+	player_sect_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## The real people standing in the hall. A member who is not currently spawned
+## simply does not appear and does not pay a levy that day.
+func player_sect_members() -> Array:
+	var out: Array = []
+	if Game.player_sect.is_empty():
+		return out
+	var roster: Variant = Game.player_sect.get("members", [])
+	if typeof(roster) != TYPE_ARRAY:
+		return out
+	for value in (roster as Array):
+		var npc := _npc_by_id(String(value))
+		if npc == null:
+			continue
+		out.append({
+			"id": npc.npc_id,
+			"name": npc.display_name,
+			"realm": npc.realm,
+			"rank": PlayerSect.member_rank(npc.realm),
+		})
+	return out
+
+
+func _player_sect_realms() -> Array:
+	var realms: Array = []
+	for value in player_sect_members():
+		realms.append(int((value as Dictionary).get("realm", 1)))
+	return realms
+
+
+## Before founding: three doctrines with the cost and station still required.
+## After: the daily levy and every friend who trusts the player enough to join.
+## The roster and candidate rows are both live reads of the town, not a cache.
+func player_sect_rows() -> Array:
+	var out: Array = []
+	if Game.player_sect.is_empty():
+		var missing := PlayerSect.can_found(Game.player_sect, Game.spirit_stones, _player_rank_id())
+		var reason := ", ".join(missing)
+		for value in PlayerSect.doctrines():
+			if typeof(value) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = value
+			out.append({
+				"kind": "doctrine",
+				"id": String(entry.get("id", "")),
+				"label": String(entry.get("sect_name", entry.get("name", ""))),
+				"detail": "%s · capacity %d · levy +%d" % [String(entry.get("name", "")),
+					int(entry.get("capacity", 0)), int(entry.get("tribute", 0))],
+				"blurb": String(entry.get("blurb", "")),
+				"enabled": missing.is_empty(),
+				"reason": reason,
+			})
+		return out
+
+	var check := PlayerSect.can_collect(Game.player_sect, Clock.day)
+	var levy := PlayerSect.tribute_for(String(Game.player_sect.get("doctrine", "")), _player_sect_realms())
+	out.append({
+		"kind": "levy",
+		"id": "levy",
+		"label": "Gather the daily levy",
+		"detail": "+%d stones · treasury %d" % [levy, int(Game.player_sect.get("treasury", 0))],
+		"blurb": "The hall's share, gathered once a day.",
+		"enabled": bool(check.get("ok", false)),
+		"reason": String(check.get("reason", "")),
+	})
+	var candidates := 0
+	for node in npcs:
+		if not is_instance_valid(node):
+			continue
+		var npc := node as Npc
+		if npc == null or npc.npc_id == "":
+			continue
+		if PlayerSect.is_member(Game.player_sect, npc.npc_id):
+			continue
+		if Game.party_ids.has(npc.npc_id) or _is_captive_id(npc.npc_id):
+			continue
+		var bond := int(npc.bond_to_player().get("score", 0))
+		if not Relationships.warns(bond):
+			continue
+		if candidates >= 7:
+			break
+		var result := PlayerSect.can_recruit(Game.player_sect, npc.npc_id, bond,
+			PlayerSect.member_count(Game.player_sect))
+		out.append({
+			"kind": "recruit",
+			"id": npc.npc_id,
+			"label": "Recruit %s" % npc.display_name,
+			"detail": "%s · %s · %s (+%d)" % [Realms.name_of(npc.realm), PlayerSect.member_rank(npc.realm),
+				npc.bond_label(), bond],
+			"blurb": "A %d-stone gift from the treasury." % PlayerSect.recruit_cost(),
+			"enabled": bool(result.get("ok", false)),
+			"reason": String(result.get("reason", "")),
+		})
+		candidates += 1
+	if candidates == 0:
+		out.append({
+			"kind": "info",
+			"id": "info",
+			"label": "No candidates",
+			"detail": "No friend in the market trusts you far enough to leave their hall yet.",
+			"blurb": "",
+			"enabled": false,
+			"reason": "",
+		})
+	return out
+
+
+func _player_sect_activate(index: int) -> void:
+	var rows := player_sect_rows()
+	if index < 0 or index >= rows.size():
+		return
+	var row: Dictionary = rows[index]
+	var kind := String(row.get("kind", ""))
+	if kind == "info":
+		return
+	if kind == "doctrine":
+		_found_player_sect(String(row.get("id", "")))
+		return
+	if not bool(row.get("enabled", false)):
+		var reason := String(row.get("reason", ""))
+		if reason == "":
+			Bus.toast.emit("The hall refuses.")
+		else:
+			Bus.toast.emit("The hall refuses: %s." % reason)
+		return
+	match kind:
+		"levy":
+			_collect_player_sect_levy()
+		"recruit":
+			_recruit_player_sect_member(String(row.get("id", "")))
+
+
+func _is_captive_id(npc_id: String) -> bool:
+	for value in Game.captives:
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == npc_id:
+			return true
+	return false
+
+
+func _found_player_sect(doctrine_id: String) -> void:
+	if not PlayerSect.can_found(Game.player_sect, Game.spirit_stones, _player_rank_id()).is_empty():
+		Bus.toast.emit("You cannot found a hall yet.")
+		return
+	var result := PlayerSect.found(doctrine_id, Game.spirit_stones, Clock.day)
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The hall refuses: %s." % String(result.get("reason", "")))
+		return
+	Game.spirit_stones = int(result.get("stones", Game.spirit_stones))
+	Game.player_sect = (result.get("sect", {}) as Dictionary).duplicate(true)
+	player_sect_index = 0
+	Bus.toast.emit("%s is founded. The hall is yours." % String(Game.player_sect.get("name", "Your sect")))
+	Bus.player_stats_changed.emit()
+
+
+func _collect_player_sect_levy() -> void:
+	var result := PlayerSect.collect(Game.player_sect, Clock.day, _player_sect_realms())
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The hall refuses: %s." % String(result.get("reason", "")))
+		return
+	Game.player_sect = (result.get("sect", {}) as Dictionary).duplicate(true)
+	Bus.toast.emit("Levy gathered: +%d stones." % int(result.get("amount", 0)))
+	Bus.player_stats_changed.emit()
+
+
+func _recruit_player_sect_member(npc_id: String) -> void:
+	var npc := _npc_by_id(npc_id)
+	if npc == null:
+		Bus.toast.emit("They are no longer here to ask.")
+		return
+	var result := PlayerSect.recruit(Game.player_sect, npc_id, int(npc.bond_to_player().get("score", 0)),
+		PlayerSect.member_count(Game.player_sect))
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The hall refuses: %s." % String(result.get("reason", "")))
+		return
+	Game.player_sect = (result.get("sect", {}) as Dictionary).duplicate(true)
+	Bus.toast.emit("%s joins %s as %s." % [npc.display_name, String(Game.player_sect.get("name", "the hall")),
+		PlayerSect.member_rank(npc.realm)])
 	Bus.player_stats_changed.emit()
 
 
@@ -3880,6 +4108,7 @@ func _load_game(slot: int) -> void:
 	_close_hierarchy()
 	_close_sect_ledger()
 	_close_council()
+	_close_player_sect()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.

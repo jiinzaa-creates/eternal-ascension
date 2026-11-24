@@ -72,6 +72,9 @@ var sect_lobby: Dictionary = {}
 ## Set once the council has opened the master's seat. It stays open for the rest
 ## of the run; the top rung's own standing and realm gates still apply.
 var sect_seat_open := false
+## The player's own hall: empty until founded, then name, doctrine, treasury and
+## member ids. Member realms and ranks are derived, never stored.
+var player_sect: Dictionary = {}
 
 
 func _process(delta: float) -> void:
@@ -109,6 +112,7 @@ func new_run(seed_value: int = 0) -> void:
 	sect_purchases = 0
 	sect_lobby.clear()
 	sect_seat_open = false
+	player_sect.clear()
 	hitstop.clear()
 
 
@@ -160,6 +164,7 @@ func to_dict() -> Dictionary:
 		"sect_purchases": sect_purchases,
 		"sect_lobby": sect_lobby.duplicate(true),
 		"sect_seat_open": sect_seat_open,
+		"player_sect": player_sect.duplicate(true),
 	}
 
 
@@ -193,3 +198,4 @@ func from_dict(data: Dictionary) -> void:
 	sect_purchases = maxi(0, int(data.get("sect_purchases", 0)))
 	sect_lobby = SectPolitics.sanitize_lobby(data.get("sect_lobby", {}))
 	sect_seat_open = bool(data.get("sect_seat_open", false))
+	player_sect = PlayerSect.sanitize(data.get("player_sect", {}))

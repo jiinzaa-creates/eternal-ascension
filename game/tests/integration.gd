@@ -3900,6 +3900,79 @@ func _run() -> void:
 	player.cultivation.qi = m59_qi
 	player.hp = minf(m59_hp, player.hp_max)
 
+	# --- M60: founding the player's own hall -----------------------------------
+	var m60_stones := Game.spirit_stones
+	var m60_sect: Dictionary = Game.player_sect.duplicate(true)
+	var m60_standing: Dictionary = Game.faction_standing.duplicate(true)
+	var m60_notoriety := Game.notoriety
+	var m60_realm: int = player.cultivation.realm
+	var m60_sublevel: int = player.cultivation.sublevel
+	var m60_qi: float = player.cultivation.qi
+	var m60_hp: float = player.hp
+	var m60_memory: Dictionary = Game.npc_memory.duplicate(true)
+	var m60_party: Array = Game.party_ids.duplicate()
+	Game.spirit_stones = 2000
+	Game.player_sect = {}
+	Game.faction_standing["faction.azure_cloud"] = 100
+	Game.notoriety = 0
+	Game.party_ids = []
+	player.cultivation.realm = 6
+	player.cultivation.sublevel = 1
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	check(main._player_rank_id() == "rank.deputy", "a deputy may found a hall")
+	check(main.player_sect_rows().size() == 3, "the founding screen offers three doctrines")
+	main.toggle_player_sect()
+	check(main.player_sect_open, "the player sect screen opens")
+	check(not player.is_physics_processing(), "the player sect screen freezes play")
+	main.toggle_player_sect()
+	check(not main.player_sect_open and player.is_physics_processing(), "closing the player sect resumes play")
+
+	main._player_sect_activate(0)
+	check(not Game.player_sect.is_empty(), "a doctrine founds the hall")
+	check(String(Game.player_sect.get("name", "")) == "Dawn Blade Hall", "the sword hall is named")
+	check(Game.spirit_stones == 1500, "the founding fee leaves the purse")
+	check(int(Game.player_sect.get("treasury", 0)) == 500, "the endowment seeds the treasury")
+	var m60_elder: Npc = main.elder
+	Game.npc_memory[m60_elder.npc_id] = {"met": true, "talks": 1, "last_day": Clock.day, "regard": 30}
+	var m60_recruit_index := -1
+	for m60_i in main.player_sect_rows().size():
+		var m60_row: Dictionary = main.player_sect_rows()[m60_i]
+		if String(m60_row.get("kind", "")) == "recruit" and String(m60_row.get("id", "")) == m60_elder.npc_id:
+			m60_recruit_index = m60_i
+	check(m60_recruit_index >= 0, "a friend appears as a recruit")
+	main._player_sect_activate(m60_recruit_index)
+	check(PlayerSect.is_member(Game.player_sect, m60_elder.npc_id), "the friend joins the hall")
+	check(int(Game.player_sect.get("treasury", 0)) == 475, "the gift leaves the treasury")
+	var m60_levy := 1 + floori(float(m60_elder.realm) / 2.0)
+	main._player_sect_activate(0)
+	check(int(Game.player_sect.get("treasury", 0)) == 475 + m60_levy, "the levy pays the hall")
+	check(int(Game.player_sect.get("tribute_day", -1)) == Clock.day, "the levy records the day")
+	var m60_after_levy := int(Game.player_sect.get("treasury", 0))
+	main._player_sect_activate(0)
+	check(int(Game.player_sect.get("treasury", 0)) == m60_after_levy, "the levy cannot be gathered twice")
+
+	Save.delete_slot(102)
+	main._save(102)
+	Game.player_sect.clear()
+	main._load_game(102)
+	check(not Game.player_sect.is_empty(), "the hall survives a save")
+	check(PlayerSect.is_member(Game.player_sect, m60_elder.npc_id), "the roster survives a save")
+	check(int(Game.player_sect.get("treasury", 0)) == m60_after_levy, "the treasury survives a save")
+	Save.delete_slot(102)
+
+	Game.spirit_stones = m60_stones
+	Game.player_sect = m60_sect
+	Game.faction_standing = m60_standing
+	Game.notoriety = m60_notoriety
+	Game.party_ids = m60_party
+	Game.npc_memory = m60_memory
+	player.cultivation.realm = m60_realm
+	player.cultivation.sublevel = m60_sublevel
+	player.rebuild_stats()
+	player.cultivation.qi = m60_qi
+	player.hp = minf(m60_hp, player.hp_max)
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

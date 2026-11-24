@@ -811,6 +811,49 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   successful vote at 160 support, the qualified player becoming Sect Master, and the seat and
   lobbies surviving a save and load.
 
+## Player sect
+
+- **One late, irreversible founding.** `data/player_sect.json` sets a 500-stone founding fee, a
+  25-stone recruitment gift, a Deputy minimum station, three doctrines and four member ranks.
+  `PlayerSect.can_found()` refuses a second hall, a lower station, or a short purse; `found()`
+  spends the fee and moves it into the new hall's treasury, so the endowment is not destroyed. The
+  scene applies the result only on success.
+- **Doctrine is identity and capacity.** Sword Creed (six members, no levy bonus), Alchemy Creed
+  (five members, +2 per member) and Formation Creed (seven members, +1 per member) each carry
+  their own hall name, motto and blurb. The doctrine is stored as an id; the name, capacity and
+  levy are read from data, so retuning a doctrine never rewrites an old save.
+- **The treasury is the hall's, not the player's.** Recruitment gifts and future upkeep come from
+  the treasury, not the purse. `PlayerSect.collect()` adds one day's levy: every member pays
+  `1 + floor(realm / 2)` and the doctrine adds its flat bonus per member. A member not currently
+  spawned earns nothing that day, which is why `collect()` takes the realms the scene can actually
+  find rather than reading saved numbers.
+- **Recruitment is a relationship, not a shop.** `can_recruit()` requires the friend band
+  (`Relationships.warns`), a free roster slot, a treasury that can pay the gift, and an id not
+  already in the hall. The scene additionally skips party members, captives and sleeping bodies;
+  only waking residents can accept. A successful recruit subtracts the gift and appends the stable
+  NPC id, never a copy of the person.
+- **Member rank is derived.** `member_rank()` reads the member's current realm through the data's
+  ordered thresholds (Initiate → Disciple → Steward → Elder). No member realm or rank is saved;
+  M53's progression remains the only source, and a member who breaks through is promoted the next
+  time the screen is read.
+- **The screen.** **F4** opens a frozen screen. Before founding it lists the three doctrines with
+  their names, capacities and levies, and why founding is not yet possible. After founding it
+  lists the daily levy (with its amount and the treasury), every eligible friend as a recruit row
+  with realm, derived rank, bond and gift, and a roster panel with each member's name, rank and
+  realm. Arrows select, ENTER founds/levies/recruits, and **F4**, **E** or **ESC** closes.
+- **Saved key and validation.** `Game.player_sect` is an optional schema-2 key: `{name, doctrine,
+  founded_day, treasury, members, tribute_day}`. `PlayerSect.sanitize()` discards an unknown
+  doctrine, falls back to the doctrine's name, drops duplicate/empty members, caps the roster at
+  the doctrine's own size and clamps the treasury and founding day. `PlayerSect.validate()` runs at boot:
+  it rejects missing founding rules, a zero fee, a negative gift, an unknown founding rank,
+  missing/wrong-count/duplicate/incomplete doctrines, rosters outside 1..12, negative levies, and
+  missing, out-of-range or out-of-order member ranks.
+- **Tests.** Unit `_player_sect_tests` covers the three doctrines, costs, ranks, founding, tribute
+  totals, once-a-day collection, every recruitment refusal, roster cleaning, the saved key and
+  fifteen validation negatives. Integration covers the three-row founding screen, freeze, founding
+  fee and treasury, recruiting Elder Bai after raising his regard, a levy that pays by realm and
+  cannot repeat, and the hall, roster and treasury surviving a save and load.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

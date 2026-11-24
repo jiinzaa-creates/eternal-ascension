@@ -1,0 +1,42 @@
+{
+  "founding": {
+    "stones": 500,
+    "recruit_cost": 25,
+    "min_rank": "rank.deputy"
+  },
+  "doctrines": [
+    {
+      "id": "doctrine.sword",
+      "name": "Sword Creed",
+      "sect_name": "Dawn Blade Hall",
+      "motto": "One clean edge answers more than a hundred arguments.",
+      "blurb": "A hall of duelists. Few members, but every one of them a blade.",
+      "capacity": 6,
+      "tribute": 0
+    },
+    {
+      "id": "doctrine.alchemy",
+      "name": "Alchemy Creed",
+      "sect_name": "Green Cauldron Court",
+      "motto": "What the body lacks, the furnace can supply.",
+      "blurb": "A hall of refiners. Fewer swords, but the treasury fills faster.",
+      "capacity": 5,
+      "tribute": 2
+    },
+    {
+      "id": "doctrine.formation",
+      "name": "Formation Creed",
+      "sect_name": "Nine Gate Pavilion",
+      "motto": "A wall is only the outermost line of a formation.",
+      "blurb": "A hall of wardens. The widest roster and a modest levy.",
+      "capacity": 7,
+      "tribute": 1
+    }
+  ],
+  "member_ranks": [
+    {"min_realm": 1, "name": "Initiate"},
+    {"min_realm": 2, "name": "Disciple"},
+    {"min_realm": 4, "name": "Steward"},
+    {"min_realm": 6, "name": "Elder"}
+  ]
+}

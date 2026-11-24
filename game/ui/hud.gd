@@ -116,6 +116,7 @@ func _draw() -> void:
 	draw_hierarchy(player)
 	draw_sect_ledger(player)
 	draw_council(player)
+	draw_player_sect(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -798,6 +799,73 @@ func draw_council(player: Player) -> void:
 		10, Color("#7b8b94"))
 
 
+## The player's hall: founding choices before the hall exists, then the daily
+## levy and live recruitment beside the roster. Status is always read fresh.
+func draw_player_sect(player: Player) -> void:
+	if not bool(host.player_sect_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
+	var w := 880.0
+	var h := 560.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	var founded := not Game.player_sect.is_empty()
+	if founded:
+		_text(Vector2(x + 24.0, y + 34.0), _fit(String(Game.player_sect.get("name", "YOUR SECT")), 22, 520.0),
+			22, ACCENT)
+		_text(Vector2(x + 24.0, y + 58.0), PlayerSect.summary_line(Game.player_sect), 11, MUTED)
+	else:
+		_text(Vector2(x + 24.0, y + 34.0), "FOUND A SECT", 22, ACCENT)
+		_text(Vector2(x + 24.0, y + 58.0), "Your own hall, your own creed. The choice cannot be taken back.",
+			11, MUTED)
+		var missing := PlayerSect.can_found(Game.player_sect, Game.spirit_stones, host._player_rank_id())
+		var need := "Ready to found." if missing.is_empty() else "Needs " + ", ".join(missing)
+		_text(Vector2(x + 24.0, y + 78.0), _fit(need, 11, w - 48.0), 11,
+			Color("#a8d8c0") if missing.is_empty() else Color("#d8a080"))
+		draw_line(Vector2(x + 20.0, y + 94.0), Vector2(x + w - 20.0, y + 94.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.player_sect_rows()
+	var cursor := clampi(int(host.player_sect_index), 0, maxi(0, rows.size() - 1))
+	var row_y := y + 112.0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var enabled := bool(row.get("enabled", false))
+		if i == cursor:
+			draw_rect(Rect2(x + 18.0, row_y - 14.0, 520.0, 48.0), Color("#1b2328", 0.92))
+		_text(Vector2(x + 28.0, row_y), _fit(String(row.get("label", "?")), 13, 490.0), 13,
+			ACCENT if i == cursor else (INK if enabled else Color("#6f7f88")))
+		_text(Vector2(x + 28.0, row_y + 17.0), _fit(String(row.get("detail", "")), 10, 490.0), 10,
+			MUTED if enabled else Color("#8a7070"))
+		var blurb := String(row.get("blurb", ""))
+		if not enabled and String(row.get("reason", "")) != "":
+			blurb = String(row.get("reason", ""))
+		_text(Vector2(x + 28.0, row_y + 31.0), _fit(blurb, 10, 490.0), 10, Color("#7b8b94"))
+		row_y += 52.0
+
+	if founded:
+		draw_line(Vector2(x + 556.0, y + 106.0), Vector2(x + 556.0, y + h - 44.0), Color("#2b343a"), 1.0)
+		_text(Vector2(x + 576.0, y + 126.0), "ROSTER", 12, ACCENT)
+		_text(Vector2(x + 576.0, y + 148.0), "%d / %d members · %d stones" % [
+			PlayerSect.member_count(Game.player_sect), PlayerSect.capacity(Game.player_sect),
+			int(Game.player_sect.get("treasury", 0))], 10, Color("#d8c898"))
+		var members: Array = host.player_sect_members()
+		var member_y := y + 176.0
+		if members.is_empty():
+			_text(Vector2(x + 576.0, member_y), "No one has joined yet.", 10, MUTED)
+		for value in members:
+			var member: Dictionary = value
+			_text(Vector2(x + 576.0, member_y), _fit("%s — %s" % [String(member.get("name", "?")),
+				String(member.get("rank", ""))], 10, 260.0), 10, INK)
+			_text(Vector2(x + 576.0, member_y + 14.0), Realms.name_of(int(member.get("realm", 1))), 9, MUTED)
+			member_y += 38.0
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER found / levy / recruit   ·   F4 / E / ESC — close",
+		10, Color("#7b8b94"))
+
+
 ## The active bar only: six slots, each with its art's own cooldown sweep.
 ## Occupancy of the other two bars and any art off the bars are named on the
 ## line beneath, so the readout never hides a known technique.
@@ -1318,7 +1386,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · F4 sect · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

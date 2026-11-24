@@ -85,6 +85,7 @@ func _ready() -> void:
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
+	_player_sect_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -4691,6 +4692,146 @@ func _sect_politics_tests() -> void:
 	broken = DB.politics_data.duplicate(true)
 	(broken["vote"] as Dictionary)["min_rank"] = "rank.nope"
 	check(not SectPolitics.validate(broken).is_empty(), "a vote gated on an unknown rank is rejected")
+
+
+## Player sect: one late, irreversible founding, three doctrines, a treasury fed
+## by a daily levy, and a roster of people who already trust the founder.
+func _player_sect_tests() -> void:
+	print("[player sect] founding, doctrines, levy and recruitment")
+	check(PlayerSect.doctrines().size() == 3, "three doctrines are offered")
+	check(PlayerSect.doctrine("doctrine.sword").get("sect_name", "") == "Dawn Blade Hall",
+		"a doctrine names the hall")
+	check(PlayerSect.doctrine("doctrine.nope").is_empty(), "an unknown doctrine is empty")
+	check(PlayerSect.founding_cost() == 500, "founding costs its stones")
+	check(PlayerSect.recruit_cost() == 25, "recruitment costs its gift")
+	check(PlayerSect.min_rank() == "rank.deputy", "only a deputy may found a hall")
+	check(PlayerSect.capacity({"doctrine": "doctrine.sword"}) == 6, "the sword hall holds six")
+	check(PlayerSect.capacity({"doctrine": "doctrine.formation"}) == 7, "the formation hall holds seven")
+	check(PlayerSect.capacity({}) == 0, "an unformed hall holds nobody")
+	check(PlayerSect.member_rank(1) == "Initiate" and PlayerSect.member_rank(2) == "Disciple",
+		"a member's rank follows their realm")
+	check(PlayerSect.member_rank(4) == "Steward" and PlayerSect.member_rank(9) == "Elder",
+		"higher realms carry the higher offices")
+
+	check(PlayerSect.can_found({}, 500, "rank.deputy").is_empty(), "a deputy with the stones may found")
+	check(not PlayerSect.can_found({}, 499, "rank.deputy").is_empty(), "the fee cannot be short")
+	check(not PlayerSect.can_found({}, 500, "rank.outer_disciple").is_empty(),
+		"an outer disciple cannot found a hall")
+	check(not PlayerSect.can_found({"name": "Old"}, 500, "rank.deputy").is_empty(),
+		"a second hall cannot be founded")
+	var found := PlayerSect.found("doctrine.sword", 1500, 9)
+	check(bool(found.get("ok", false)), "the founding succeeds")
+	check(int(found.get("stones", 0)) == 1000, "the fee leaves the purse")
+	var sect: Dictionary = found.get("sect", {})
+	check(String(sect.get("name", "")) == "Dawn Blade Hall", "the doctrine names the new hall")
+	check(int(sect.get("treasury", 0)) == 500, "the fee becomes the first treasury")
+	check(int(sect.get("founded_day", 0)) == 9 and int(sect.get("tribute_day", 0)) == -1,
+		"the hall records its founding and no levy yet")
+	check(not bool(PlayerSect.found("doctrine.nope", 1500, 9).get("ok", false)),
+		"an unknown doctrine cannot be founded")
+	check(not bool(PlayerSect.found("doctrine.sword", 499, 9).get("ok", false)),
+		"a short purse cannot found")
+
+	check(PlayerSect.tribute_for("doctrine.sword", [1, 3, 6]) == 7, "a realm decides a member's share")
+	check(PlayerSect.tribute_for("doctrine.alchemy", [1, 3, 6]) == 13, "a doctrine adds its levy")
+	check(PlayerSect.tribute_for("doctrine.formation", [2]) == 3, "formation taxes one disciple")
+	check(PlayerSect.tribute_for("doctrine.nope", [6]) == 0, "an unknown doctrine pays nothing")
+	check(not bool(PlayerSect.can_collect({}, 9).get("ok", false)), "an unformed hall cannot levy")
+	check(not bool(PlayerSect.can_collect(sect, 9).get("ok", false)), "an empty hall cannot levy")
+	var staffed := sect.duplicate(true)
+	staffed["members"] = ["npc.a", "npc.b"]
+	check(bool(PlayerSect.can_collect(staffed, 9).get("ok", false)), "a staffed hall can levy")
+	var collected := PlayerSect.collect(staffed, 9, [1, 3])
+	check(bool(collected.get("ok", false)), "the levy is gathered")
+	check(int(collected.get("amount", 0)) == 3, "the levy follows the members' realms")
+	check(int((collected.get("sect", {}) as Dictionary).get("treasury", 0)) == 503,
+		"the levy reaches the treasury")
+	check(not bool(PlayerSect.collect(collected["sect"], 9, [1, 3]).get("ok", false)),
+		"the levy is gathered once a day")
+
+	var can := PlayerSect.can_recruit(staffed, "npc.c", 30, 2)
+	check(bool(can.get("ok", false)), "a friend may be recruited")
+	check(not bool(PlayerSect.can_recruit(staffed, "npc.c", 10, 2).get("ok", false)),
+		"a stranger is not recruited")
+	check(not bool(PlayerSect.can_recruit(staffed, "npc.a", 30, 2).get("ok", false)),
+		"a member cannot be recruited twice")
+	check(not bool(PlayerSect.can_recruit(staffed, "npc.c", 30, 6).get("ok", false)),
+		"a full hall is refused")
+	var broke := staffed.duplicate(true)
+	broke["treasury"] = 5
+	check(not bool(PlayerSect.can_recruit(broke, "npc.c", 30, 2).get("ok", false)),
+		"a poor treasury cannot pay the gift")
+	var recruited := PlayerSect.recruit(staffed, "npc.c", 30, 2)
+	check(bool(recruited.get("ok", false)), "the recruit joins")
+	check(int((recruited.get("sect", {}) as Dictionary).get("treasury", 0)) == 475,
+		"the gift leaves the treasury")
+	check(PlayerSect.is_member(recruited["sect"], "npc.c"), "the roster holds the new member")
+	check(PlayerSect.member_count(recruited["sect"]) == 3, "the roster grows by one")
+
+	check(PlayerSect.sanitize([]).is_empty(), "junk sect data is dropped")
+	check(PlayerSect.sanitize({"doctrine": "doctrine.nope"}).is_empty(),
+		"an unknown doctrine discards the hall")
+	var clean := PlayerSect.sanitize({"doctrine": "doctrine.sword", "members": ["a", "a", "", "b"],
+		"treasury": -5, "founded_day": 0, "tribute_day": 4})
+	check(String(clean.get("name", "")) == "Dawn Blade Hall", "a nameless hall falls back to its doctrine")
+	check((clean.get("members", []) as Array).size() == 2, "duplicate and empty members are dropped")
+	check(int(clean.get("treasury", -1)) == 0 and int(clean.get("founded_day", 0)) == 1,
+		"a loaded treasury and founding are clamped")
+	check(int(clean.get("tribute_day", 0)) == 4, "the last levy day is kept")
+	var crowded: Array = []
+	for i in 20:
+		crowded.append("npc.%d" % i)
+	check((PlayerSect.sanitize({"doctrine": "doctrine.sword", "members": crowded}).get("members", []) as Array).size() == 6,
+		"a loaded roster caps at the doctrine's size")
+	check(Game.to_dict().has("player_sect"), "the hall is saved")
+	check(Game.player_sect.is_empty(), "a run starts without a hall")
+
+	check(PlayerSect.validate(DB.player_sect_data).is_empty(), "the shipped player sect validates")
+	var broken_data: Dictionary = DB.player_sect_data.duplicate(true)
+	broken_data.erase("founding")
+	check(not PlayerSect.validate(broken_data).is_empty(), "missing founding rules are rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["founding"] as Dictionary)["stones"] = 0
+	check(not PlayerSect.validate(broken_data).is_empty(), "a free founding is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["founding"] as Dictionary)["recruit_cost"] = -1
+	check(not PlayerSect.validate(broken_data).is_empty(), "a negative gift is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["founding"] as Dictionary)["min_rank"] = "rank.nope"
+	check(not PlayerSect.validate(broken_data).is_empty(), "an unknown founding rank is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["doctrines"] as Array).clear()
+	check(not PlayerSect.validate(broken_data).is_empty(), "a doctrineless sect is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["doctrines"] as Array).pop_back()
+	check(not PlayerSect.validate(broken_data).is_empty(), "a missing doctrine is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["doctrines"] as Array).append((DB.player_sect_data["doctrines"] as Array)[0].duplicate(true))
+	check(not PlayerSect.validate(broken_data).is_empty(), "a duplicate doctrine is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["doctrines"] as Array)[0]["sect_name"] = " "
+	check(not PlayerSect.validate(broken_data).is_empty(), "a hall without a name is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["doctrines"] as Array)[0]["capacity"] = 0
+	check(not PlayerSect.validate(broken_data).is_empty(), "a hall that holds nobody is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["doctrines"] as Array)[0]["capacity"] = PlayerSect.ROSTER_CAP + 1
+	check(not PlayerSect.validate(broken_data).is_empty(), "a roster above the hard cap is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["doctrines"] as Array)[0]["tribute"] = -1
+	check(not PlayerSect.validate(broken_data).is_empty(), "a negative doctrine levy is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["member_ranks"] as Array).clear()
+	check(not PlayerSect.validate(broken_data).is_empty(), "a hall with no ranks is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["member_ranks"] as Array)[0]["min_realm"] = 0
+	check(not PlayerSect.validate(broken_data).is_empty(), "a rank below realm 1 is rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["member_ranks"] as Array).reverse()
+	check(not PlayerSect.validate(broken_data).is_empty(), "out-of-order member ranks are rejected")
+	broken_data = DB.player_sect_data.duplicate(true)
+	(broken_data["member_ranks"] as Array)[0]["name"] = " "
+	check(not PlayerSect.validate(broken_data).is_empty(), "a nameless member rank is rejected")
 
 
 func _quest_tests() -> void:
