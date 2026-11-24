@@ -763,7 +763,7 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   consumables, and services gated on an unknown rank.
 - **Tests.** Unit `_sect_economy_tests` covers every award, the cap and negative awards, stipend
   pay/dues/net and the once-a-day rule, donations including overdraw and cap, every rank gate,
-  purchases, the summary line, the saved keys, the shipped data and eighteen validation negatives.
+  purchases, the summary line, the saved keys, the shipped data and seventeen validation negatives.
   Integration covers the six-row ledger, opening/closing and the freeze, claiming once and being
   refused twice, a small donation, a quartermaster purchase that grants a real pill and advances
   the counter, the story award, and contribution/day surviving a save and load.
