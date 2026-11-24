@@ -1303,8 +1303,8 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   landmarks and then each discovered realm, so the capped site rows cannot crowd them out.
 - **Scope.** The direct `_enter_realm()` transition remains gate-free for tests and future transitions;
   every player entrance goes through `RealmAccess.access()` at the portal. M65 closed the inheritance
-  loop; M66 adds province-wide tidings; M67 builds the quest graph; M68 owns further competition and
-  family-specific mechanics.
+  loop; M66 adds province-wide tidings; M67 builds the quest graph; M68 turns the twelve houses into
+  storylines; later milestones own further competition and family-specific mechanics.
 
 ## Inheritances and altar trials
 
@@ -1434,6 +1434,57 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   prerequisite id, a self-prerequisite, a prerequisite cycle, a malformed reward, an unknown
   technique/passive, a negative amount, an unknown reward key, a reward that pays nothing, a missing
   primary quest and a primary quest that does not start itself.
+
+## Sect storylines
+
+- **One arc per house, three shared stakes.** `data/sect_storylines.json` authors a storyline for each
+  of the twelve sects. Every arc uses the same three stakes — `stake.welcome`, `stake.fault` and
+  `stake.future` — once each, but the work behind them is sect-specific: Cliffspire asks for kills and
+  forge-work, Green Hollow for herbs and brews, the Floating Archive for a copied page. A chapter
+  declares `id`, `title`, `stake`, `brief`, one `test` (`kind`, `target`, `count`, `text`) and exactly
+  two `choices`. `SectStorylines` (`game/systems/sect_storylines.gd`) is the only reader.
+- **Gates are read when asked for.** A storyline declares `unlock` (`min_realm`, `min_contribution`),
+  `requires_storylines` and `excludes`. The local Azure Cloud arc opens from Elder Bai at realm 2 and
+  20 contribution. Every distant house writes to the market board and waits for the local arc to be
+  completed; only one non-local correspondence may be open at a time (`foreign_active_id()`). Blood
+  Moon and Frozen Heaven name each other in `excludes`, so accepting one closes the other. The scene
+  passes `{realm, contribution}` from the body and the run, never from a stored copy.
+- **Tests listen to real events.** The scene's one `_report_quests()` now also calls
+  `storylines.report(kind, target, amount)`, so the storyline ledger hears exactly what the quest log
+  hears: kills, gathered herbs, the shrine, market purchases, forge and cauldron work, realm entry,
+  altar trials, board reads and conversations. Only the live chapter's own kind and target move; a
+  partial count stays partial. Once the count is paid, the chapter enters `awaiting_choice` and stops
+  accepting events, so the decision cannot be farmed.
+- **A choice is a stance with a price.** Each chapter offers exactly two authored stances. A stance's
+  `effects` may move `regard`, pay `stones` or `contribution`, move `notoriety` or `karma`, grant a
+  technique or passive, or move a faction's `standing`. `choose()` applies regard itself and returns
+  the rest to the scene, which owns the purse, the satchel and the standing; the same guard marks the
+  chapter decided, so one stance pays once. Regard starts at the authored `start_regard` (10), is
+  clamped to 0–100, and a defiant stance can spend it to zero.
+- **The ending is derived from regard.** Each arc authors at least two endings ordered by
+  `min_regard`, with a zero floor last. The first floor the house's regard meets names the ending, so
+  the same arc can finish in the house's favour or in its resentment without a second branch system.
+  The completed chapter's choice remains in `choices`, one entry per chapter.
+- **The screen is a reading screen.** **F6** opens a frozen list of all twelve arcs: house and title,
+  the live chapter's own counter, that house's regard, and why a locked arc is closed. A pending
+  decision inserts the two stance rows under its arc, with their authored consequences; arrows select,
+  ENTER takes a stance, and the screen never accepts an arc itself. Acceptance stays in conversation:
+  Elder Bai for the local house, the notice board for the eleven correspondents.
+- **Saves are decisions only.** `sect_storylines` is an optional top-level block (`version`, `states`)
+  under schema 2. `from_dict()` drops unknown arcs and stances, clamps chapter and regard, keeps
+  counters only for the live chapter, clamps them to the authored count, and derives `awaiting_choice`
+  from the counter. The live chapter is the first chapter without a recorded stance, so a hand-edited
+  save cannot replay a decided chapter for a second payment; three recorded stances mark the arc
+  complete. A pre-M68 save simply loads with every arc fresh.
+- **Validation.** `SectStorylines.validate()` runs from `DB.validate` and rejects a bad `start_regard`,
+  missing or duplicate stakes, a wrong stake count, a missing/duplicate/unnamed arc, an unknown or
+  doubled house, an arc without a giver, an impossible realm or contribution gate, unknown
+  prerequisites, self-links and cycles, asymmetric or unknown refusals, a wrong chapter count, a
+  missing/duplicate/unnamed chapter or brief, a missing or unknown stake, a reused stake, an unknown
+  test kind, no target, an impossible count, a missing test text, a chapter without exactly two
+  stances, a duplicate or unnamed stance, a stance that changes nothing, an unknown effect, an
+  out-of-range amount, an unknown technique/passive/faction, endings that are too few, unordered or
+  without a zero floor, and a roster without exactly one local arc.
 
 ## Spirit beasts and bosses
 
@@ -1826,6 +1877,8 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - M67 replaced the scalar quest fields with an optional `quests` block (`version`, `states` and the
   legacy mirrors). A pre-M67 save's `step_index`/`counters`/`completed`/`rewarded` are migrated into
   the primary quest's state on load, so the schema stays 2 and no old run loses its place.
+- M68 adds the optional `sect_storylines` block (`version`, `states`). A pre-M68 save loads every arc
+  fresh and unaccepted, so the schema stays 2 and no old run loses a decision it never made.
 - Add a migration step in `Save._migrate()` for every bump, and a test that loads a
   hand-written older payload (`schema 0`) and asserts the migrated result.
 - Never delete a migration step: old saves in the wild depend on the whole chain.

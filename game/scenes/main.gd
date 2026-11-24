@@ -121,6 +121,11 @@ var council_index := 0
 ## The player's own hall: founding, roster and the daily levy.
 var player_sect_open := false
 var player_sect_index := 0
+## The twelve houses' own stories: one three-chapter arc each, decided on a
+## dedicated reading screen. State lives here; the rules live in SectStorylines.
+var storylines: SectStorylines
+var storylines_open := false
+var storyline_index := 0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -185,6 +190,7 @@ func _ready() -> void:
 	_root_rng = Rng.stream("root_roll", 0)
 	_name_rng = Rng.stream("npc_names", 0)
 	quests = QuestLog.new()
+	storylines = SectStorylines.new()
 	_build_world()
 	_spawn_player()
 	_build_hud()
@@ -733,7 +739,7 @@ func _process(delta: float) -> void:
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
-			or sect_ledger_open or council_open or player_sect_open:
+			or sect_ledger_open or council_open or player_sect_open or storylines_open:
 		return
 
 	_tick_inheritance_trial(delta)
@@ -808,6 +814,8 @@ func _process(delta: float) -> void:
 		toggle_council()
 	if Input.is_action_just_pressed("open_player_sect"):
 		toggle_player_sect()
+	if Input.is_action_just_pressed("open_storylines"):
+		toggle_storylines()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1808,6 +1816,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.is_action_pressed("accept"):
 			_player_sect_activate(player_sect_index)
+			return
+		return
+
+	if storylines_open:
+		if event.is_action_pressed("open_storylines") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_storylines()
+			return
+		if event.is_action_pressed("ui_down"):
+			storyline_index = mini(storyline_index + 1, maxi(0, storyline_rows().size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			storyline_index = maxi(0, storyline_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			_storylines_activate(storyline_index)
 			return
 		return
 
@@ -3054,6 +3078,245 @@ func _sect_service_item(entry: Dictionary) -> Dictionary:
 	return Items.normalize_item(item)
 
 
+# ----------------------------------------------------------- sect stories ----
+
+
+func toggle_storylines() -> void:
+	if storylines_open:
+		_close_storylines()
+	else:
+		_open_storylines()
+
+
+func _open_storylines() -> void:
+	if player == null or String(phase) != "play":
+		return
+	storylines_open = true
+	storyline_index = clampi(storyline_index, 0, maxi(0, storyline_rows().size() - 1))
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_storylines() -> void:
+	if not storylines_open:
+		return
+	storylines_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## What a house's gates are judged against: the body and the run, never a copy
+## stored on the storyline.
+func _storyline_context() -> Dictionary:
+	return {
+		"realm": player.cultivation.realm if player != null else 0,
+		"contribution": Game.sect_contribution,
+	}
+
+
+## A house's letter begins in its own conversation: Elder Bai for the local gate,
+## the notice board for every correspondence from beyond the province.
+func _accept_giver_storylines(giver_id: String) -> void:
+	if player == null or storylines == null or giver_id == "":
+		return
+	var context := _storyline_context()
+	for value in storylines.available_ids(context):
+		var id := String(value)
+		var entry := storylines.storyline(id)
+		if String(entry.get("giver", "")) != giver_id:
+			continue
+		if storylines.accept(id, context):
+			Bus.toast.emit("A house writes — %s: %s" % [
+				String(entry.get("title", "Storyline")), String(entry.get("summary", ""))])
+
+
+## One toast per chapter whose test is paid. The decision itself is taken on the
+## storyline screen, so this never spends or grants anything.
+func _announce_storyline_advancements(advancements: Array) -> void:
+	for value in advancements:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		Bus.toast.emit("Story chapter — %s: %s is decided. Press F6." % [
+			String(entry.get("title", "")), String(entry.get("chapter_title", ""))])
+
+
+## One row per house, and two stance rows under a house whose chapter waits for
+## a decision. A distant letter still reads where it came from and why it is
+## closed, so the screen never hides a gate behind a blank line.
+func storyline_rows() -> Array:
+	var out: Array = []
+	if storylines == null:
+		return out
+	var context := _storyline_context()
+	for value in storylines.storylines():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		if id == "":
+			continue
+		var sect: Dictionary = storylines.sect_of(id)
+		var state := storylines.status(id, context)
+		var detail := storylines.progress_text(id)
+		var reason := ""
+		if state == "locked":
+			var unlock_value: Variant = entry.get("unlock", {})
+			var unlock: Dictionary = unlock_value if typeof(unlock_value) == TYPE_DICTIONARY else {}
+			reason = "Needs realm %d and %d contribution" % [int(unlock.get("min_realm", 0)),
+				int(unlock.get("min_contribution", 0))]
+			var foreign := storylines.foreign_active_id()
+			if foreign != "" and not storylines.is_local(id):
+				reason = "One correspondence at a time — finish %s first" % storylines.title_of(foreign)
+			var required_value: Variant = entry.get("requires_storylines", [])
+			if typeof(required_value) == TYPE_ARRAY:
+				for other in (required_value as Array):
+					if not storylines.is_completed(String(other)):
+						reason = "Word has not yet reached %s" % String(sect.get("name", "the house"))
+						break
+		elif state == "available":
+			reason = "Answer %s" % ("Elder Bai" if storylines.is_local(id) else "the notice board")
+		out.append({
+			"kind": "info",
+			"id": id,
+			"label": "%s — %s" % [String(sect.get("name", "?")), storylines.title_of(id)],
+			"detail": detail,
+			"reason": reason,
+			"status": state,
+			"regard": storylines.regard_of(id),
+			"local": storylines.is_local(id),
+			"enabled": false,
+		})
+		if state == "decision":
+			for choice_value in storylines.choices_of(id):
+				if typeof(choice_value) != TYPE_DICTIONARY:
+					continue
+				var choice: Dictionary = choice_value
+				out.append({
+					"kind": "choice",
+					"id": id,
+					"choice": String(choice.get("id", "")),
+					"label": String(choice.get("label", "Decide")),
+					"detail": String(choice.get("detail", "")),
+					"reason": _storyline_effect_line(choice.get("effects", {})),
+					"status": "choice",
+					"regard": storylines.regard_of(id),
+					"local": storylines.is_local(id),
+					"enabled": true,
+				})
+	return out
+
+
+func _signed(value: int) -> String:
+	if value > 0:
+		return "+%d" % value
+	return "%d" % value
+
+
+## The choice's authored price, in the screen's own words.
+func _storyline_effect_line(raw: Variant) -> String:
+	if typeof(raw) != TYPE_DICTIONARY:
+		return ""
+	var effects: Dictionary = raw
+	var parts: Array[String] = []
+	var regard := int(effects.get("regard", 0))
+	if regard != 0:
+		parts.append("%s regard" % _signed(regard))
+	var stones := int(effects.get("stones", 0))
+	if stones != 0:
+		parts.append("%d stones" % stones)
+	var contribution := int(effects.get("contribution", 0))
+	if contribution != 0:
+		parts.append("%d contribution" % contribution)
+	var notoriety := int(effects.get("notoriety", 0))
+	if notoriety != 0:
+		parts.append("%s notoriety" % _signed(notoriety))
+	var karma := int(effects.get("karma", 0))
+	if karma != 0:
+		parts.append("%s karma" % _signed(karma))
+	if String(effects.get("technique", "")) != "":
+		parts.append("a technique")
+	if String(effects.get("passive", "")) != "":
+		parts.append("a passive")
+	var standing_value: Variant = effects.get("standing", null)
+	if typeof(standing_value) == TYPE_DICTIONARY:
+		var standing: Dictionary = standing_value
+		var faction := DB.faction(String(standing.get("faction", "")))
+		parts.append("%s %s standing" % [_signed(int(standing.get("amount", 0))),
+			String(faction.get("name", "faction"))])
+	return " · ".join(parts)
+
+
+func _storylines_activate(index: int) -> void:
+	var rows := storyline_rows()
+	if index < 0 or index >= rows.size():
+		return
+	var row: Dictionary = rows[index]
+	if String(row.get("kind", "")) != "choice":
+		return
+	_choose_storyline(String(row.get("id", "")), String(row.get("choice", "")))
+
+
+## One stance, one payment. Regard is already applied by the log; every other
+## effect passes through the run's own purse and grant paths.
+func _choose_storyline(id: String, choice_id: String) -> void:
+	if storylines == null:
+		return
+	var result := storylines.choose(id, choice_id)
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The house refuses: %s." % String(result.get("reason", "")))
+		return
+	var effects_value: Variant = result.get("effects", {})
+	var effects: Dictionary = effects_value if typeof(effects_value) == TYPE_DICTIONARY else {}
+	_apply_storyline_effects(effects)
+	Bus.toast.emit("Story — %s: %s." % [storylines.title_of(id), _storyline_effect_line(effects)])
+	if bool(result.get("completed", false)):
+		var ending_value: Variant = result.get("ending", {})
+		var ending: Dictionary = ending_value if typeof(ending_value) == TYPE_DICTIONARY else {}
+		Bus.toast.emit("The story is told — %s. %s" % [String(ending.get("title", "Ending")),
+			String(ending.get("text", ""))])
+	else:
+		var next_value: Variant = result.get("next_chapter", {})
+		var next: Dictionary = next_value if typeof(next_value) == TYPE_DICTIONARY else {}
+		Bus.toast.emit("Next chapter — %s: %s" % [String(next.get("title", "")),
+			String(next.get("brief", ""))])
+	Bus.player_stats_changed.emit()
+
+
+func _apply_storyline_effects(effects: Dictionary) -> void:
+	var stones := int(effects.get("stones", 0))
+	if stones != 0:
+		Game.spirit_stones = maxi(0, Game.spirit_stones + stones)
+	var contribution := int(effects.get("contribution", 0))
+	if contribution != 0:
+		Game.sect_contribution = SectEconomy.award_contribution(Game.sect_contribution, contribution)
+	var notoriety := int(effects.get("notoriety", 0))
+	if notoriety != 0:
+		Game.notoriety = clampi(Game.notoriety + notoriety, 0, Captivity.notoriety_cap())
+	var karma := int(effects.get("karma", 0))
+	if karma != 0:
+		Game.karma += karma
+	var technique_id := String(effects.get("technique", ""))
+	if technique_id != "" and player != null and player.learn_technique(technique_id):
+		var tech: Dictionary = DB.technique(technique_id)
+		Bus.toast.emit("Technique learned: %s" % String(tech.get("name", technique_id)))
+	var passive_id := String(effects.get("passive", ""))
+	if passive_id != "" and player != null and player.add_passive(passive_id):
+		var passive: Dictionary = DB.passive(passive_id)
+		Bus.toast.emit("Passive awakened: %s" % String(passive.get("name", passive_id)))
+	var standing_value: Variant = effects.get("standing", null)
+	if typeof(standing_value) == TYPE_DICTIONARY:
+		var standing: Dictionary = standing_value
+		var faction_id := String(standing.get("faction", ""))
+		var amount := int(standing.get("amount", 0))
+		if faction_id != "" and amount != 0:
+			Game.faction_standing = Factions.award(Game.faction_standing, faction_id, amount)
+			var faction: Dictionary = DB.faction(faction_id)
+			Bus.toast.emit("%s standing %s." % [String(faction.get("name", "The faction")),
+				("rises" if amount > 0 else "falls")])
+
+
 # --------------------------------------------------------------- captivity ----
 
 
@@ -3479,6 +3742,7 @@ func _talk(npc: Npc) -> void:
 	# A giver's errand begins in conversation. Reports happen before the greeting
 	# can return early, so a step that asks for a conversation always sees it.
 	_accept_giver_quests(npc.npc_id)
+	_accept_giver_storylines(npc.npc_id)
 	_report_quests("talk", npc.npc_id)
 	_report_quests("return", npc.npc_id)
 
@@ -3609,7 +3873,9 @@ func _use_interactable(node: Interactable) -> void:
 			if node.id == "board.market":
 				_hear_realm_rumor("The notice board")
 				_accept_giver_quests("board.market")
+				_accept_giver_storylines("board.market")
 				_report_quests("talk", "board.market")
+				_report_quests("return", "board.market")
 			Bus.toast.emit(node.examine_text)
 		Interactable.Kind.HERALD:
 			_read_world_event()
@@ -3889,6 +4155,8 @@ func _report_quests(kind: String, target: String, amount: int = 1) -> Array:
 		return []
 	var advancements := quests.report(kind, target, amount)
 	_announce_quest_advancements(advancements)
+	if storylines != null:
+		_announce_storyline_advancements(storylines.report(kind, target, amount))
 	return advancements
 
 
@@ -4617,6 +4885,7 @@ func _save(slot: int) -> void:
 		"player": player.to_dict(),
 		"ground_items": ground_items,
 		"quests": quests.to_dict(),
+		"sect_storylines": storylines.to_dict(),
 		"used_interactables": used_interactables.duplicate(),
 		"chunk_deltas": world_delta.to_dict(),
 		"shop": merchant.to_dict(),
@@ -4675,6 +4944,7 @@ func _load_game(slot: int) -> void:
 	_close_sect_ledger()
 	_close_council()
 	_close_player_sect()
+	_close_storylines()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.
@@ -4688,6 +4958,7 @@ func _load_game(slot: int) -> void:
 	player.set_process(true)
 	ground_items = data.get("ground_items", []).duplicate(true)
 	quests.from_dict(data.get("quests", {}))
+	storylines.from_dict(data.get("sect_storylines", {}))
 	used_interactables = data.get("used_interactables", []).duplicate()
 	realm_seed = int(data.get("realm_seed", 0))
 	realm_cleared = bool(data.get("realm_cleared", false))

@@ -4419,6 +4419,114 @@ func _run() -> void:
 	player.cultivation.contamination = m67_contamination
 	player.hp = minf(m67_hp, player.hp_max)
 
+	# --- M68: the sect storylines --------------------------------------------
+	var m68_stones := Game.spirit_stones
+	var m68_contribution := Game.sect_contribution
+	var m68_standing: Dictionary = Game.faction_standing.duplicate(true)
+	var m68_realm: int = player.cultivation.realm
+	var m68_sublevel: int = player.cultivation.sublevel
+	var m68_local := "storyline.azure_cloud"
+	check(main.storylines != null, "the sect storyline ledger loads in the scene")
+	check(main.storylines.storylines().size() == 12, "every house owns a story")
+	check(main.storylines.local_id() == m68_local, "the Azure Cloud owns the local story")
+	player.cultivation.realm = 2
+	player.cultivation.sublevel = 1
+	player.rebuild_stats()
+	Game.sect_contribution = 20
+	main._talk(main.elder)
+	check(main.storylines.is_accepted(m68_local), "Elder Bai opens the local story")
+	check(not main.storylines.is_available("storyline.heavenly_sword", main._storyline_context()),
+		"a distant letter waits for the local story")
+
+	# The reading screen freezes play and restores it, like the other screens.
+	main._open_storylines()
+	check(main.storylines_open, "the storyline screen opens")
+	check(not player.is_physics_processing(), "the storyline screen freezes the player")
+	main._close_storylines()
+	check(player.is_physics_processing(), "closing the storyline screen restores the player")
+
+	main._report_quests("collect", "spirit_herb", 3)
+	check(main.storylines.is_awaiting_choice(m68_local), "the first chapter's test opens a decision")
+	var m68_rows: Array = main.storyline_rows()
+	var m68_choice := -1
+	for i in m68_rows.size():
+		var row: Dictionary = m68_rows[i]
+		if String(row.get("kind", "")) == "choice" and String(row.get("id", "")) == m68_local \
+				and String(row.get("choice", "")) == "report":
+			m68_choice = i
+			break
+	check(m68_choice >= 0, "the screen shows the authored stance")
+	var m68_house_standing := Factions.standing_of("faction.azure_cloud", Game.faction_standing)
+	if m68_choice >= 0:
+		main._storylines_activate(m68_choice)
+	check(main.storylines.progress_of(m68_local) == 1, "the first stance moves the story")
+	check(main.storylines.regard_of(m68_local) == 20, "the stance raises the house's regard")
+	check(Factions.standing_of("faction.azure_cloud", Game.faction_standing) > m68_house_standing,
+		"the stance moves the house's standing")
+
+	main._report_quests("channel", "shrine", 1)
+	var m68_seal := -1
+	m68_rows = main.storyline_rows()
+	for i in m68_rows.size():
+		var row: Dictionary = m68_rows[i]
+		if String(row.get("kind", "")) == "choice" and String(row.get("choice", "")) == "seal":
+			m68_seal = i
+			break
+	var m68_stones_before := Game.spirit_stones
+	if m68_seal >= 0:
+		main._storylines_activate(m68_seal)
+	check(Game.spirit_stones == m68_stones_before + 80, "the second stance pays its stones")
+	check(main.storylines.progress_of(m68_local) == 2, "the second stance moves the story")
+
+	main._report_quests("craft", "alchemy", 1)
+	var m68_bind := -1
+	m68_rows = main.storyline_rows()
+	for i in m68_rows.size():
+		var row: Dictionary = m68_rows[i]
+		if String(row.get("kind", "")) == "choice" and String(row.get("choice", "")) == "bind":
+			m68_bind = i
+			break
+	var m68_points_before := Game.sect_contribution
+	if m68_bind >= 0:
+		main._storylines_activate(m68_bind)
+	check(main.storylines.is_completed(m68_local), "the third stance completes the story")
+	check(String(main.storylines.ending_for(m68_local).get("title", "")) == "The Mountain Keeps Its Promise",
+		"the local story reaches its authored ending")
+	check(Game.sect_contribution >= m68_points_before + 30, "the final stance pays its contribution")
+	check(main.storylines.regard_of(m68_local) == 40, "the high path's regard adds up")
+	check(main.storylines.choices_made(m68_local).size() == 3, "all three choices are recorded")
+
+	# A foreign house writes to the board; only one correspondence may be open.
+	player.cultivation.realm = 4
+	player.cultivation.sublevel = 1
+	player.rebuild_stats()
+	Game.sect_contribution = 300
+	if m67_board != null:
+		main._use_interactable(m67_board)
+	check(main.storylines.accepted_ids().size() == 1, "the board opens exactly one correspondence")
+	check(main.storylines.foreign_active_id() == "storyline.heavenly_sword",
+		"the first authored letter is the one taken up")
+	check(not main.storylines.is_available("storyline.crimson_lotus", main._storyline_context()),
+		"a second correspondence stays closed")
+
+	Save.delete_slot(108)
+	main._save(108)
+	main.storylines = SectStorylines.new()
+	main._load_game(108)
+	check(main.storylines.is_completed(m68_local), "the local story survives a save")
+	check(main.storylines.choices_made(m68_local).size() == 3, "the local choices survive a save")
+	check(main.storylines.regard_of(m68_local) == 40, "regard survives a save")
+	check(main.storylines.is_accepted("storyline.heavenly_sword"), "a correspondence survives a save")
+	Save.delete_slot(108)
+
+	# Put the run back where the remaining suite expects it.
+	player.cultivation.realm = m68_realm
+	player.cultivation.sublevel = m68_sublevel
+	player.rebuild_stats()
+	Game.spirit_stones = m68_stones
+	Game.sect_contribution = m68_contribution
+	Game.faction_standing = m68_standing
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

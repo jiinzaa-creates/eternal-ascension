@@ -1,0 +1,1635 @@
+{
+  "start_regard": 10,
+  "stakes": [
+    {
+      "id": "stake.welcome",
+      "name": "The Welcome",
+      "blurb": "A house tests the stranger before it shows the fault."
+    },
+    {
+      "id": "stake.fault",
+      "name": "The Fault Line",
+      "blurb": "Every house carries a crack it has learned to call tradition."
+    },
+    {
+      "id": "stake.future",
+      "name": "The Reckoning",
+      "blurb": "The crack opens, and someone must decide what the house becomes."
+    }
+  ],
+  "storylines": [
+    {
+      "id": "storyline.azure_cloud",
+      "sect": "sect.azure_cloud",
+      "title": "The Hoarded Vein",
+      "summary": "A heaven-grade vein runs under the pill terraces, and the elders have been quietly drinking from it for a century.",
+      "giver": "elder_bai",
+      "unlock": {
+        "min_realm": 2,
+        "min_contribution": 20
+      },
+      "requires_storylines": [],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.azure_cloud.1",
+          "title": "The Seam in the Terraces",
+          "stake": "stake.welcome",
+          "brief": "Elder Bai wants the herb terraces walked before the council meets. The earth under the third terrace glows where no lamp was hung.",
+          "test": {
+            "kind": "collect",
+            "target": "spirit_herb",
+            "count": 3,
+            "text": "Gather three spirit herbs from the terraces"
+          },
+          "choices": [
+            {
+              "id": "report",
+              "label": "Report the seam to Elder Bai.",
+              "detail": "The old man listens without blinking and writes nothing down. That is how the mountain keeps its books.",
+              "effects": {
+                "regard": 10,
+                "standing": {
+                  "faction": "faction.azure_cloud",
+                  "amount": 4
+                }
+              }
+            },
+            {
+              "id": "share",
+              "label": "Show the outer disciples the seam first.",
+              "detail": "The outer yard has been watering thin soil for years. They deserve to see what the elders have been standing on.",
+              "effects": {
+                "regard": -2,
+                "contribution": 25,
+                "notoriety": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.azure_cloud.2",
+          "title": "The Council's Silence",
+          "stake": "stake.fault",
+          "brief": "The Traditionalists want the vein sealed and forgotten. The Reformists want it opened to the outer hall. Both blocs have stopped speaking to each other.",
+          "test": {
+            "kind": "channel",
+            "target": "shrine",
+            "count": 1,
+            "text": "Attune at the shrine to read the vein's qi"
+          },
+          "choices": [
+            {
+              "id": "seal",
+              "label": "Stand with the Traditionalists and seal the vault.",
+              "detail": "A mountain is not a warehouse. What is sealed today can be opened by a wiser hand tomorrow.",
+              "effects": {
+                "regard": 8,
+                "stones": 80,
+                "standing": {
+                  "faction": "faction.azure_cloud",
+                  "amount": 3
+                }
+              }
+            },
+            {
+              "id": "open",
+              "label": "Stand with the Reformists and open the vault.",
+              "detail": "The outer disciples will remember who opened the door, and so will the elders who wanted it shut.",
+              "effects": {
+                "regard": -2,
+                "contribution": 45
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.azure_cloud.3",
+          "title": "The Mountain's Answer",
+          "stake": "stake.future",
+          "brief": "The council has stalled long enough for the vein to reach the roots of the pill terraces. One furnace-load will decide whether the mountain feeds its children or its vaults.",
+          "test": {
+            "kind": "craft",
+            "target": "alchemy",
+            "count": 1,
+            "text": "Brew one pill from the vein-fed herbs"
+          },
+          "choices": [
+            {
+              "id": "bind",
+              "label": "Bind the vein to the sect's own furnaces.",
+              "detail": "The mountain keeps its promise: every disciple who climbs gets a share of what the mountain gives.",
+              "effects": {
+                "regard": 12,
+                "stones": 120,
+                "contribution": 30,
+                "standing": {
+                  "faction": "faction.azure_cloud",
+                  "amount": 6
+                }
+              }
+            },
+            {
+              "id": "break",
+              "label": "Break the seal and let the valley draw.",
+              "detail": "A vein belongs to the valley that grew over it. The sect will have to earn its pills like everyone else.",
+              "effects": {
+                "regard": -6,
+                "contribution": 80,
+                "notoriety": 3
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 28,
+          "title": "The Mountain Keeps Its Promise",
+          "text": "The vein runs into the common furnaces, and for the first time in a century the outer yard smells of its own pills."
+        },
+        {
+          "min_regard": 14,
+          "title": "A Vein Half-Opened",
+          "text": "The council keeps its vault and grants the outer hall a measured share. Nobody is satisfied, which the elders call balance."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Elders Remember",
+          "text": "The seam is sealed, the terraces are quiet, and the people who opened their mouths about it are posted to the far gate."
+        }
+      ]
+    },
+    {
+      "id": "storyline.heavenly_sword",
+      "sect": "sect.heavenly_sword",
+      "title": "The Honest Edge",
+      "summary": "Cliffspire's hardliners keep the gate shut to rootless talent, and a generation of outer disciples has never been given a real blade.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 3,
+        "min_contribution": 60
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.heavenly_sword.1",
+          "title": "A Duel at the Eastern Pass",
+          "stake": "stake.welcome",
+          "brief": "A letter stamped with a sword asks whether your edge is honest. The hardliners will read the answer in how you fight.",
+          "test": {
+            "kind": "kill",
+            "target": "beast",
+            "count": 6,
+            "text": "Clear six beasts from the eastern pass"
+          },
+          "choices": [
+            {
+              "id": "duel",
+              "label": "Take the hardliners' duel.",
+              "detail": "One clean cut, no politics. The hardliners respect a blade that speaks before its owner does.",
+              "effects": {
+                "regard": 9,
+                "stones": 60,
+                "notoriety": 2
+              }
+            },
+            {
+              "id": "yard",
+              "label": "Fight beside the outer disciples.",
+              "detail": "The outer yard has technique and no teacher. Standing in their line tells Cliffspire something the hardliners will not like.",
+              "effects": {
+                "regard": -2,
+                "contribution": 35
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.heavenly_sword.2",
+          "title": "The Blade That Was Promised",
+          "stake": "stake.fault",
+          "brief": "The hardliners commissioned a blade for the gate captain. The outer yard was promised the same steel a decade ago.",
+          "test": {
+            "kind": "craft",
+            "target": "forge",
+            "count": 2,
+            "text": "Forge two pieces of work at the anvil"
+          },
+          "choices": [
+            {
+              "id": "armoury",
+              "label": "Forge for the hardliners' armoury.",
+              "detail": "A sharp blade in a captain's hand keeps the pass. Whether the pass should be kept is a different question.",
+              "effects": {
+                "regard": 8,
+                "stones": 90
+              }
+            },
+            {
+              "id": "teach",
+              "label": "Teach the outer yard to forge its own.",
+              "detail": "Steel is not the lesson. The lesson is that they are allowed to hold it.",
+              "effects": {
+                "regard": -3,
+                "contribution": 50
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.heavenly_sword.3",
+          "title": "The Gate and the World",
+          "stake": "stake.future",
+          "brief": "The sect master is old, the hardliners are loud, and the outer yard has learned to make its own blades. Cliffspire will be one thing or the other by winter.",
+          "test": {
+            "kind": "return",
+            "target": "board.market",
+            "count": 1,
+            "text": "Send your answer to the market board"
+          },
+          "choices": [
+            {
+              "id": "closed",
+              "label": "Keep Cliffspire closed to outsiders.",
+              "detail": "The blade is honest because the hand is known. A gate that opens for everyone is a market, not a school.",
+              "effects": {
+                "regard": 10,
+                "stones": 100
+              }
+            },
+            {
+              "id": "open_gate",
+              "label": "Open the gate to any root.",
+              "detail": "A hundred years of careful bloodlines has produced one good swordsman and a great many clerks.",
+              "effects": {
+                "regard": -6,
+                "contribution": 90,
+                "notoriety": 2
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 27,
+          "title": "The Edge Belongs to the Hand",
+          "text": "Cliffspire opens its yard to rootless talent. The hardliners call it dilution; the outer disciples call it a school."
+        },
+        {
+          "min_regard": 15,
+          "title": "Two Blades in One Hall",
+          "text": "The gate stays half-shut. The hardliners keep the pass and the outer yard keeps its anvil, and neither disarms the other."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Pass Holds",
+          "text": "The gate is barred, the promise is forgotten, and the outer yard goes back to practising with wooden swords."
+        }
+      ]
+    },
+    {
+      "id": "storyline.crimson_lotus",
+      "sect": "sect.crimson_lotus",
+      "title": "The Poisoned Heir",
+      "summary": "Two heirs, one cup, and a house that considers poison a form of etiquette. The wrong answer makes you part of the inheritance.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 3,
+        "min_contribution": 80
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.crimson_lotus.1",
+          "title": "A Debt at Lotus Lake",
+          "stake": "stake.welcome",
+          "brief": "A painted letter asks for fresh herbs, no questions. Half the lake already knows which heir sent it.",
+          "test": {
+            "kind": "collect",
+            "target": "spirit_herb",
+            "count": 4,
+            "text": "Gather four spirit herbs for the lake house"
+          },
+          "choices": [
+            {
+              "id": "elder_heir",
+              "label": "Sell the herbs to the elder heir.",
+              "detail": "The elder heir pays in old silver and older smiles. The physician of the younger heir pays in nothing at all.",
+              "effects": {
+                "regard": 8,
+                "stones": 80
+              }
+            },
+            {
+              "id": "physician",
+              "label": "Give them to the poisoned heir's physician.",
+              "detail": "A physician with no silver and a patient with no time. The lake will hear about this by evening.",
+              "effects": {
+                "regard": -2,
+                "contribution": 40
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.crimson_lotus.2",
+          "title": "The Taste of the Tea",
+          "stake": "stake.fault",
+          "brief": "The house's tea is famous. The house's tea is also the reason no rival ever dines twice at Lotus Lake.",
+          "test": {
+            "kind": "trade",
+            "target": "market",
+            "count": 3,
+            "text": "Buy three lots at the market for the house's table"
+          },
+          "choices": [
+            {
+              "id": "carry",
+              "label": "Carry the poison to the market.",
+              "detail": "The lake trades in what it knows. A buyer who does not ask is a buyer who has already been chosen.",
+              "effects": {
+                "regard": 8,
+                "stones": 120,
+                "notoriety": 4
+              }
+            },
+            {
+              "id": "warn",
+              "label": "Test the tea and warn the buyers.",
+              "detail": "The market will remember a warning longer than it remembers a bargain.",
+              "effects": {
+                "regard": -3,
+                "contribution": 55,
+                "karma": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.crimson_lotus.3",
+          "title": "Two Heirs, One Cup",
+          "stake": "stake.future",
+          "brief": "The younger heir is failing. The elder heir has already ordered the funeral wine, and the cauldron is waiting.",
+          "test": {
+            "kind": "craft",
+            "target": "alchemy",
+            "count": 2,
+            "text": "Brew two doses at the cauldron"
+          },
+          "choices": [
+            {
+              "id": "antivenom",
+              "label": "Brew the antivenom for the poisoned heir.",
+              "detail": "A cure is a political act. The younger heir will live, and the elder heir will have to explain why that is a surprise.",
+              "effects": {
+                "regard": -6,
+                "contribution": 40,
+                "passive": "passive.regenerative_meridian"
+              }
+            },
+            {
+              "id": "ordered_poison",
+              "label": "Brew the poison the elders actually ordered.",
+              "detail": "The lake has one rule for succession and no rule for grief. You are paid either way.",
+              "effects": {
+                "regard": 10,
+                "stones": 160,
+                "notoriety": 6
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 28,
+          "title": "The Cup Is Emptied",
+          "text": "The younger heir lives. Lotus Lake learns that a cure can travel as far as a poison, and the elder heir learns to smile at the wrong time."
+        },
+        {
+          "min_regard": 16,
+          "title": "A House With Two Futures",
+          "text": "The poison is poured away and the succession is postponed. The lake calls this mercy and keeps the cup polished."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Funeral Wine",
+          "text": "The younger heir is buried with full ceremony. The elder heir sends you a very expensive thank-you."
+        }
+      ]
+    },
+    {
+      "id": "storyline.thousand_beast",
+      "sect": "sect.thousand_beast",
+      "title": "The Communion",
+      "summary": "Ten Thousand Hoof Plain cannot agree whether the herds are brothers or stock, and the pens are filling either way.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 3,
+        "min_contribution": 70
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.thousand_beast.1",
+          "title": "Tracks on the Plain",
+          "stake": "stake.welcome",
+          "brief": "The herders have lost three nights of sleep to a herd that will not stay off the road. The communion faction says it is asking for something.",
+          "test": {
+            "kind": "kill",
+            "target": "beast",
+            "count": 7,
+            "text": "Drive the plain's beasts away from the road"
+          },
+          "choices": [
+            {
+              "id": "cull",
+              "label": "Cull the herd the herders fear.",
+              "detail": "A dead beast cannot ask for anything. The herders sleep and the pens stay full.",
+              "effects": {
+                "regard": 6,
+                "stones": 70
+              }
+            },
+            {
+              "id": "drive",
+              "label": "Drive them without a kill.",
+              "detail": "It takes longer and pays less. The herd turns for the hills on its own, and the communion faction notices.",
+              "effects": {
+                "regard": -2,
+                "contribution": 50,
+                "karma": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.thousand_beast.2",
+          "title": "The Pens at Ten Thousand Hoof",
+          "stake": "stake.fault",
+          "brief": "The slave-beast faction has bought new chains. The communion faction has stopped buying anything at all.",
+          "test": {
+            "kind": "collect",
+            "target": "spirit_herb",
+            "count": 3,
+            "text": "Gather fodder and herbs for the pens"
+          },
+          "choices": [
+            {
+              "id": "feed_first",
+              "label": "Feed the penned beasts first.",
+              "detail": "A chain is still a chain, but a hungry beast is a dead one. The communion faction calls it a beginning.",
+              "effects": {
+                "regard": -3,
+                "contribution": 40
+              }
+            },
+            {
+              "id": "sell_fodder",
+              "label": "Sell the fodder to the slave-beast faction.",
+              "detail": "They pay for what they need and remember who supplied it. The pens get their chains and the plain gets its answer.",
+              "effects": {
+                "regard": 8,
+                "stones": 90,
+                "notoriety": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.thousand_beast.3",
+          "title": "Who Speaks for the Herd",
+          "stake": "stake.future",
+          "brief": "The plain's council will hear one voice from outside the house. The herds have no vote, so someone has to lend them one.",
+          "test": {
+            "kind": "channel",
+            "target": "shrine",
+            "count": 1,
+            "text": "Listen to the plain at the shrine"
+          },
+          "choices": [
+            {
+              "id": "communion",
+              "label": "Stand with the communion faction.",
+              "detail": "The beasts are people with clearer instincts. A house that forgets this is only a market with better fences.",
+              "effects": {
+                "regard": -6,
+                "contribution": 40,
+                "passive": "passive.beast_taming_instinct"
+              }
+            },
+            {
+              "id": "breeders",
+              "label": "Stand with the breeders.",
+              "detail": "The house eats because the pens are full. Sentiment does not fill a winter storehouse.",
+              "effects": {
+                "regard": 10,
+                "stones": 150
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 29,
+          "title": "The Plain Answers",
+          "text": "The chains come off the pens. Ten Thousand Hoof becomes the only house whose gate the herds cross by choice."
+        },
+        {
+          "min_regard": 15,
+          "title": "A Shorter Chain",
+          "text": "The pens stay, the chains are lightened, and the communion faction calls this a first step rather than a victory."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Pens Hold",
+          "text": "The herds are stock, the council is satisfied, and the plain is quieter than it was."
+        }
+      ]
+    },
+    {
+      "id": "storyline.celestial_formation",
+      "sect": "sect.celestial_formation",
+      "title": "The Failing Array",
+      "summary": "The grand array under Inkstone Plateau is failing, and the house that draws reality has been drawing over the crack for forty years.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 4,
+        "min_contribution": 120
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.celestial_formation.1",
+          "title": "The Line That Should Not Bend",
+          "stake": "stake.welcome",
+          "brief": "A ward-stone on the southern rim has gone warm. The house's letter calls it routine maintenance and pays too well for routine.",
+          "test": {
+            "kind": "craft",
+            "target": "forge",
+            "count": 2,
+            "text": "Cut two replacement ward-stones at the forge"
+          },
+          "choices": [
+            {
+              "id": "quiet",
+              "label": "Repair the stones quietly.",
+              "detail": "A crack in a ward is not a crisis if nobody is told. The house pays for silence and calls it professionalism.",
+              "effects": {
+                "regard": 8,
+                "contribution": 40
+              }
+            },
+            {
+              "id": "contract",
+              "label": "Take the contract and say nothing.",
+              "detail": "The letter asked for stones, not questions. The payment is generous enough to buy several answers elsewhere.",
+              "effects": {
+                "regard": -2,
+                "stones": 110
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.celestial_formation.2",
+          "title": "A Diagram of Broken Light",
+          "stake": "stake.fault",
+          "brief": "At the shrine the array's light bends the wrong way. Something under the plateau is drawing back.",
+          "test": {
+            "kind": "channel",
+            "target": "shrine",
+            "count": 2,
+            "text": "Trace the array's circuit at the shrine twice"
+          },
+          "choices": [
+            {
+              "id": "trace",
+              "label": "Trace the array to its broken corner.",
+              "detail": "The flaw has a shape, and the shape has an author. The house will want to know which of its elders drew it.",
+              "effects": {
+                "regard": -3,
+                "stones": 60
+              }
+            },
+            {
+              "id": "feed",
+              "label": "Feed the array your own qi and hide the crack.",
+              "detail": "A patch is not a repair, but it holds for another season. The house calls that a solution.",
+              "effects": {
+                "regard": 5,
+                "contribution": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.celestial_formation.3",
+          "title": "The Plateau Answers",
+          "stake": "stake.future",
+          "brief": "The grand array is one bad night from taking the plateau with it. The house's elders have called a closed session and invited you to the door.",
+          "test": {
+            "kind": "inheritance",
+            "target": "trial",
+            "count": 1,
+            "text": "Walk a hidden realm's altar trial"
+          },
+          "choices": [
+            {
+              "id": "reveal",
+              "label": "Reveal the failing grand array.",
+              "detail": "A diagram is a promise. The house can redraw it honestly, or it can keep pretending the line is straight.",
+              "effects": {
+                "regard": -6,
+                "contribution": 50,
+                "passive": "passive.natural_formation_affinity"
+              }
+            },
+            {
+              "id": "hide",
+              "label": "Keep the secret and take the commission.",
+              "detail": "The plateau holds for now. The elders pay for the extra season and the silence that comes with it.",
+              "effects": {
+                "regard": 10,
+                "stones": 200,
+                "notoriety": 4
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 28,
+          "title": "The Diagram Redrawn",
+          "text": "Inkstone Plateau admits the flaw and redraws the array in public. The elders lose face; the plateau keeps its mountain."
+        },
+        {
+          "min_regard": 14,
+          "title": "A Patch of Light",
+          "text": "The crack is patched and the elders keep their seats. The array holds, and everyone agrees not to ask for how long."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Line Holds",
+          "text": "The secret is kept, the commission is paid, and the plateau is left to the arithmetic of another season."
+        }
+      ]
+    },
+    {
+      "id": "storyline.blood_moon",
+      "sect": "sect.blood_moon",
+      "title": "Succession by Murder",
+      "summary": "Blood Moon's master is dead by doctrine and the new heir needs a witness with clean hands and a full purse.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 4,
+        "min_contribution": 140
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [
+        "storyline.frozen_heaven"
+      ],
+      "chapters": [
+        {
+          "id": "storyline.blood_moon.1",
+          "title": "The Blood-Swamp Court",
+          "stake": "stake.welcome",
+          "brief": "The letter is written on red paper and smells of iron. The new heir wants the marsh road cleared before the funeral.",
+          "test": {
+            "kind": "kill",
+            "target": "beast",
+            "count": 9,
+            "text": "Clear nine beasts from the blood-swamp road"
+          },
+          "choices": [
+            {
+              "id": "kneel",
+              "label": "Kneel to the new heir.",
+              "detail": "The court has already decided. A knee costs nothing and the purse is heavy.",
+              "effects": {
+                "regard": 9,
+                "stones": 120,
+                "notoriety": 4
+              }
+            },
+            {
+              "id": "refuse",
+              "label": "Refuse the knee and walk out.",
+              "detail": "The marsh hears everything. A house that cannot buy your knee may decide to take something else.",
+              "effects": {
+                "regard": -2,
+                "contribution": 40,
+                "karma": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.blood_moon.2",
+          "title": "A Cup for the Old Master",
+          "stake": "stake.fault",
+          "brief": "The funeral cup is being prepared. The heir wants it to taste of remembrance, and the old master's rivals want it to taste of nothing at all.",
+          "test": {
+            "kind": "craft",
+            "target": "alchemy",
+            "count": 2,
+            "text": "Brew two funeral doses at the cauldron"
+          },
+          "choices": [
+            {
+              "id": "heir_cup",
+              "label": "Brew what the heir asks.",
+              "detail": "The cup will be remembered. So will the hand that filled it.",
+              "effects": {
+                "regard": 8,
+                "stones": 160,
+                "notoriety": 6
+              }
+            },
+            {
+              "id": "harmless",
+              "label": "Brew something harmless.",
+              "detail": "The old master is dead already. The cup does not need to kill anyone else.",
+              "effects": {
+                "regard": -3,
+                "contribution": 60,
+                "karma": 4
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.blood_moon.3",
+          "title": "The Crimson Moon Rite",
+          "stake": "stake.future",
+          "brief": "The rite needs a body that has walked a hidden realm and come back with something the swamp can drink.",
+          "test": {
+            "kind": "inheritance",
+            "target": "trial",
+            "count": 1,
+            "text": "Stand an altar trial and bring back its legacy"
+          },
+          "choices": [
+            {
+              "id": "rite",
+              "label": "Take the blood rite.",
+              "detail": "Power is taken, never given. The rite will mark you as surely as it marks the heir.",
+              "effects": {
+                "regard": 10,
+                "technique": "tech.blood.crimson_moon",
+                "notoriety": 8
+              }
+            },
+            {
+              "id": "break_cup",
+              "label": "Break the cup and end the succession.",
+              "detail": "A doctrine built on murder has one flaw: it always needs another murderer. Break the cup and let the swamp choose something else.",
+              "effects": {
+                "regard": -6,
+                "contribution": 100,
+                "karma": 8
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 28,
+          "title": "The Moon Drinks",
+          "text": "The rite is taken and the heir rules with your mark on the court. Blood Moon remembers its friends, and its friends do not sleep well."
+        },
+        {
+          "min_regard": 15,
+          "title": "A Court With a Witness",
+          "text": "The succession stands and the cup is broken. The swamp calls it an accident and the heir calls it a debt."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Cup Breaks",
+          "text": "The rite is refused and the court closes its doors. Blood Moon has a long memory and a longer list of people who owe it."
+        }
+      ]
+    },
+    {
+      "id": "storyline.eternal_medicine",
+      "sect": "sect.eternal_medicine",
+      "title": "The Plague They Made",
+      "summary": "Green Hollow has a cure for the plague in the eastern villages. Green Hollow also has the plague's original recipe.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 3,
+        "min_contribution": 100
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.eternal_medicine.1",
+          "title": "A Village Without a Name",
+          "stake": "stake.welcome",
+          "brief": "A valley letter asks for herbs in quantities that suggest a clinic, not a garden. The villages east of the market have started burning their dead.",
+          "test": {
+            "kind": "collect",
+            "target": "spirit_herb",
+            "count": 6,
+            "text": "Gather six spirit herbs for the valley"
+          },
+          "choices": [
+            {
+              "id": "stores",
+              "label": "Gather for the valley's own stores.",
+              "detail": "The valley pays promptly and asks for a receipt. The villages are not mentioned in the letter.",
+              "effects": {
+                "regard": 7,
+                "stones": 80
+              }
+            },
+            {
+              "id": "villages",
+              "label": "Gather for the sick villages.",
+              "detail": "The valley will call it waste. The villages will call it something else.",
+              "effects": {
+                "regard": -2,
+                "contribution": 45,
+                "karma": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.eternal_medicine.2",
+          "title": "The Price of a Cure",
+          "stake": "stake.fault",
+          "brief": "The cure works. The valley has priced it by the patient's village, and the eastern villages have started paying in land.",
+          "test": {
+            "kind": "craft",
+            "target": "alchemy",
+            "count": 3,
+            "text": "Brew three doses of the valley's cure"
+          },
+          "choices": [
+            {
+              "id": "sell",
+              "label": "Sell the cure at the valley's price.",
+              "detail": "A monopoly is only a problem for the people outside it. The ledger balances.",
+              "effects": {
+                "regard": 8,
+                "stones": 140,
+                "notoriety": 2
+              }
+            },
+            {
+              "id": "give",
+              "label": "Give the cure away.",
+              "detail": "The valley will send someone to explain economics. The villages will send people who are still alive.",
+              "effects": {
+                "regard": -3,
+                "contribution": 60,
+                "karma": 5
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.eternal_medicine.3",
+          "title": "The Plague's Author",
+          "stake": "stake.future",
+          "brief": "The plague's strain matches a valley recipe book, and the page has an elder's seal. The valley wants the book back.",
+          "test": {
+            "kind": "return",
+            "target": "board.market",
+            "count": 1,
+            "text": "Send your finding to the market board"
+          },
+          "choices": [
+            {
+              "id": "name",
+              "label": "Name the valley's elder.",
+              "detail": "A cure is a gift. A plague is a business plan. The market deserves to know which one it has been buying.",
+              "effects": {
+                "regard": 10,
+                "contribution": 50,
+                "passive": "passive.regenerative_meridian"
+              }
+            },
+            {
+              "id": "bury",
+              "label": "Bury the proof and take the valley's thanks.",
+              "detail": "The plague is over. The valley will pay generously for a history that ends with the cure.",
+              "effects": {
+                "regard": -6,
+                "stones": 180
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 29,
+          "title": "The Cure Is Public",
+          "text": "The recipe is read aloud in every market east of the pass. Green Hollow loses its monopoly and keeps its name."
+        },
+        {
+          "min_regard": 16,
+          "title": "The Valley Pays",
+          "text": "The cure reaches the villages at a price they can survive. The valley calls it charity and keeps the recipe locked."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Book Closes",
+          "text": "The proof disappears, the valley thanks you, and the eastern villages remember a plague that nobody caused."
+        }
+      ]
+    },
+    {
+      "id": "storyline.shadow_veil",
+      "sect": "sect.shadow_veil",
+      "title": "The Seller of Secrets",
+      "summary": "Someone under the market is selling all twelve houses' business to each other, and Shadow Veil would like to know who before the houses do.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 3,
+        "min_contribution": 90
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.shadow_veil.1",
+          "title": "A Name in the Undermarket",
+          "stake": "stake.welcome",
+          "brief": "A note under the stall door offers a secret about the stall next door. The price is three ordinary purchases and one unusual question.",
+          "test": {
+            "kind": "trade",
+            "target": "market",
+            "count": 3,
+            "text": "Make three purchases to cover a trail"
+          },
+          "choices": [
+            {
+              "id": "buy",
+              "label": "Buy the first secret.",
+              "detail": "Information is the only real currency. The seller takes the silver and leaves a name that is probably true.",
+              "effects": {
+                "regard": 8,
+                "stones": 90
+              }
+            },
+            {
+              "id": "follow",
+              "label": "Follow the seller instead.",
+              "detail": "A bought secret is a leash. Following the seller is a chance to cut it.",
+              "effects": {
+                "regard": -2,
+                "contribution": 40
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.shadow_veil.2",
+          "title": "The Ledger of Faces",
+          "stake": "stake.fault",
+          "brief": "The seller's ledger names a market clerk, two gate guards, and someone who signs letters for the Azure Cloud.",
+          "test": {
+            "kind": "talk",
+            "target": "board.market",
+            "count": 1,
+            "text": "Read the notice board for the seller's next drop"
+          },
+          "choices": [
+            {
+              "id": "veil",
+              "label": "Trade the market's ledger to the Veil.",
+              "detail": "The Veil pays for what it cannot steal. The market will not notice until its prices move without it.",
+              "effects": {
+                "regard": 8,
+                "stones": 130,
+                "notoriety": 5
+              }
+            },
+            {
+              "id": "watch",
+              "label": "Warn the market watch.",
+              "detail": "The watch is not subtle, but a clerk who sells gate schedules is worse.",
+              "effects": {
+                "regard": -3,
+                "contribution": 55,
+                "karma": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.shadow_veil.3",
+          "title": "The Veil Lifts",
+          "stake": "stake.future",
+          "brief": "The seller is ready to leave the province with twelve houses' secrets. Shadow Veil wants the seller stopped, and the ledger.",
+          "test": {
+            "kind": "kill",
+            "target": "beast",
+            "count": 5,
+            "text": "Clear the seller's escort from the under-city road"
+          },
+          "choices": [
+            {
+              "id": "vanish",
+              "label": "Take the Veil's offer and vanish.",
+              "detail": "The Veil offers a new face and a share of the ledger. The province will forget you before the season turns.",
+              "effects": {
+                "regard": 10,
+                "stones": 100,
+                "passive": "passive.swift_steps"
+              }
+            },
+            {
+              "id": "expose",
+              "label": "Expose the seller to all twelve houses.",
+              "detail": "Every house will want the ledger. Every house will owe the person who put it on the board.",
+              "effects": {
+                "regard": -6,
+                "contribution": 90,
+                "notoriety": 3
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 28,
+          "title": "The Ledger Changes Hands",
+          "text": "The seller is gone and the ledger is with the Veil. The under-market has a new silence, and you know what it costs."
+        },
+        {
+          "min_regard": 15,
+          "title": "Twelve Houses Owe a Name",
+          "text": "The ledger is read on the board. Half the province is embarrassed and the other half is taking notes."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Seller Walks",
+          "text": "The seller leaves with the secrets and the Veil remembers that you were paid not to follow."
+        }
+      ]
+    },
+    {
+      "id": "storyline.thunder_sovereign",
+      "sect": "sect.thunder_sovereign",
+      "title": "The Rented Sky",
+      "summary": "Stormcrown can call a tribulation down on anyone with the silver, and the villages under the cloud have started paying not to be chosen.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 4,
+        "min_contribution": 130
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.thunder_sovereign.1",
+          "title": "A Storm With a Price",
+          "stake": "stake.welcome",
+          "brief": "The peak's letter quotes a fee for a guided tribulation and a discount for silence. The shrine has been crackling for three nights.",
+          "test": {
+            "kind": "channel",
+            "target": "shrine",
+            "count": 2,
+            "text": "Read the storm's charge at the shrine twice"
+          },
+          "choices": [
+            {
+              "id": "pay",
+              "label": "Pay for a guided tribulation.",
+              "detail": "The sky is a service. The peak delivers on time, and the receipt is written in scorch marks.",
+              "effects": {
+                "regard": 8,
+                "stones": 120
+              }
+            },
+            {
+              "id": "study",
+              "label": "Refuse and study the storm yourself.",
+              "detail": "Lightning is courted, not commanded. The peak respects a client who reads the terms.",
+              "effects": {
+                "regard": -2,
+                "contribution": 50
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.thunder_sovereign.2",
+          "title": "The Hour They Rent",
+          "stake": "stake.fault",
+          "brief": "A village has paid the peak to aim a tribulation at a rival village. The invoice is signed and the cloud is already forming.",
+          "test": {
+            "kind": "kill",
+            "target": "beast",
+            "count": 6,
+            "text": "Clear the storm road of beasts before the cloud gathers"
+          },
+          "choices": [
+            {
+              "id": "subject",
+              "label": "Bring the peak a worthy subject.",
+              "detail": "A tribulation needs a body. A beast is cheaper than a village and the peak does not ask questions.",
+              "effects": {
+                "regard": 8,
+                "stones": 100,
+                "notoriety": 3
+              }
+            },
+            {
+              "id": "warn_villages",
+              "label": "Warn the villages under the cloud.",
+              "detail": "The peak will call it breach of contract. The villages will call it something they can survive.",
+              "effects": {
+                "regard": -3,
+                "contribution": 60,
+                "karma": 4
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.thunder_sovereign.3",
+          "title": "Judgment, Personally",
+          "stake": "stake.future",
+          "brief": "The Sovereign will hear one petition before the storm season. Every village on the plain has sent someone, and the peak has sent a price list.",
+          "test": {
+            "kind": "inheritance",
+            "target": "trial",
+            "count": 1,
+            "text": "Stand an altar trial under the storm"
+          },
+          "choices": [
+            {
+              "id": "take_thunder",
+              "label": "Take the Sovereign's thunder.",
+              "detail": "Judgment must be delivered personally. The peak will teach you how to hold it.",
+              "effects": {
+                "regard": 10,
+                "contribution": 40,
+                "passive": "passive.spiritual_perception"
+              }
+            },
+            {
+              "id": "break_monopoly",
+              "label": "Break the monopoly of the sky.",
+              "detail": "A tribulation is a test, not a service. The peak has been selling the heavens' own weather.",
+              "effects": {
+                "regard": -6,
+                "contribution": 100,
+                "karma": 5
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 28,
+          "title": "The Sky Is Not for Rent",
+          "text": "The storm season opens to everyone. Stormcrown keeps its peaks and loses its price list."
+        },
+        {
+          "min_regard": 15,
+          "title": "A Fair Price for Thunder",
+          "text": "The peak still sells tribulations, but the villages set the terms. The Sovereign calls it a compromise and the plain calls it a start."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Invoice Stands",
+          "text": "The cloud gathers over the village that could not pay. The peak sends you a receipt and a discount for next season."
+        }
+      ]
+    },
+    {
+      "id": "storyline.frozen_heaven",
+      "sect": "sect.frozen_heaven",
+      "title": "The Thawing Elder",
+      "summary": "An elder is coming out of a century of ice, and Frozen Heaven would rather she stayed a perfectly preserved lesson.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 4,
+        "min_contribution": 110
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [
+        "storyline.blood_moon"
+      ],
+      "chapters": [
+        {
+          "id": "storyline.frozen_heaven.1",
+          "title": "A Vault That Breathes",
+          "stake": "stake.welcome",
+          "brief": "The glacier vaults have kept a hundred years of stores at perfect stillness. One vault has started to breathe.",
+          "test": {
+            "kind": "collect",
+            "target": "spirit_herb",
+            "count": 4,
+            "text": "Gather four herbs that will survive the cold"
+          },
+          "choices": [
+            {
+              "id": "preserve",
+              "label": "Preserve the vault's stores.",
+              "detail": "Emotion is impurity. A vault that stays cold keeps everything worth keeping.",
+              "effects": {
+                "regard": 8,
+                "stones": 90
+              }
+            },
+            {
+              "id": "elder_ask",
+              "label": "Take the thawing elder what she asks for.",
+              "detail": "She asked for warm tea and a name. The vault keepers have not decided which request is more dangerous.",
+              "effects": {
+                "regard": -2,
+                "contribution": 45
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.frozen_heaven.2",
+          "title": "The Sound of a Heart",
+          "stake": "stake.fault",
+          "brief": "The elder remembers a student, a season, and a name the sect has spent a century erasing. The ice is thinner every morning.",
+          "test": {
+            "kind": "channel",
+            "target": "shrine",
+            "count": 1,
+            "text": "Sit with the shrine's stillness"
+          },
+          "choices": [
+            {
+              "id": "remember",
+              "label": "Help the elder remember.",
+              "detail": "A memory is not a contagion, whatever the scripture says. The vault keepers are already sharpening their needles.",
+              "effects": {
+                "regard": 8,
+                "contribution": 50,
+                "karma": 3
+              }
+            },
+            {
+              "id": "refreeze",
+              "label": "Refreeze her and report it.",
+              "detail": "The sect's doctrine is clear: feeling is the impurity that slows the freeze. The report will be filed and the vault will be quiet.",
+              "effects": {
+                "regard": -3,
+                "stones": 100
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.frozen_heaven.3",
+          "title": "What Emotion Costs",
+          "stake": "stake.future",
+          "brief": "The elder will either wake or be ice by dawn. Frozen Heaven has sent no instruction, which is its own instruction.",
+          "test": {
+            "kind": "craft",
+            "target": "alchemy",
+            "count": 2,
+            "text": "Brew two warming draughts at the cauldron"
+          },
+          "choices": [
+            {
+              "id": "thaw",
+              "label": "Let her thaw.",
+              "detail": "A sect that preserves everything will eventually preserve nothing alive. The glacier can spare one warm body.",
+              "effects": {
+                "regard": 10,
+                "contribution": 50,
+                "passive": "passive.flowing_water"
+              }
+            },
+            {
+              "id": "ice",
+              "label": "Let the ice keep its silence.",
+              "detail": "The vault is cold, the doctrine holds, and the sect pays for the frost it understands.",
+              "effects": {
+                "regard": -6,
+                "stones": 150
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 29,
+          "title": "The Glacier Thaws",
+          "text": "The elder wakes, and Frozen Heaven discovers that a heart can survive a century if someone remembers to warm it."
+        },
+        {
+          "min_regard": 15,
+          "title": "One Vault Left Open",
+          "text": "The elder wakes for a season and chooses the ice again. The sect calls it discipline; she calls it a visit."
+        },
+        {
+          "min_regard": 0,
+          "title": "Perfect Stillness",
+          "text": "The vault is sealed and the elder is a lesson again. The glacier is very quiet, and very proud of it."
+        }
+      ]
+    },
+    {
+      "id": "storyline.golden_cauldron",
+      "sect": "sect.golden_cauldron",
+      "title": "The God-Killing Commission",
+      "summary": "Furnace City has accepted a commission for a weapon that can kill gods, and the client has paid in advance.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 4,
+        "min_contribution": 150
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.golden_cauldron.1",
+          "title": "A Commission With No Name",
+          "stake": "stake.welcome",
+          "brief": "The order is for a blade with no wielder named and no purpose written. The gold is real and the client is not.",
+          "test": {
+            "kind": "craft",
+            "target": "forge",
+            "count": 3,
+            "text": "Complete three pieces of forge work"
+          },
+          "choices": [
+            {
+              "id": "take",
+              "label": "Take the commission.",
+              "detail": "Creation outranks cultivation. A smith does not ask what the blade will cut.",
+              "effects": {
+                "regard": 8,
+                "stones": 150,
+                "notoriety": 2
+              }
+            },
+            {
+              "id": "ask",
+              "label": "Ask who the weapon is for.",
+              "detail": "A question is not a refusal. The Cauldron respects a smith who reads the order twice.",
+              "effects": {
+                "regard": -2,
+                "contribution": 50
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.golden_cauldron.2",
+          "title": "The Metal That Remembers",
+          "stake": "stake.fault",
+          "brief": "The ore came from a ruin older than the houses. It rings when no one strikes it, and the forge master has stopped sleeping.",
+          "test": {
+            "kind": "kill",
+            "target": "beast",
+            "count": 5,
+            "text": "Keep the forge road clear of beasts"
+          },
+          "choices": [
+            {
+              "id": "guard",
+              "label": "Guard the forge road for the Cauldron.",
+              "detail": "The work must continue. Whatever the metal remembers, it will remember after the blade is finished.",
+              "effects": {
+                "regard": 8,
+                "stones": 120
+              }
+            },
+            {
+              "id": "caravan",
+              "label": "Escort the ore caravan instead.",
+              "detail": "The road is safer with the ore on it than the ore in the forge. The client will have to wait.",
+              "effects": {
+                "regard": -3,
+                "contribution": 60
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.golden_cauldron.3",
+          "title": "Ten Thousand Refinements",
+          "stake": "stake.future",
+          "brief": "The blade is one fold from finished. The forge master has left the final strike to you, and the client has arrived without a face.",
+          "test": {
+            "kind": "inheritance",
+            "target": "trial",
+            "count": 1,
+            "text": "Walk an altar trial for the blade's final temper"
+          },
+          "choices": [
+            {
+              "id": "finish",
+              "label": "Finish the weapon.",
+              "detail": "A commission is a promise. What the client does with it is the client's business, and the Cauldron's name will be on the steel.",
+              "effects": {
+                "regard": 10,
+                "stones": 220,
+                "notoriety": 5
+              }
+            },
+            {
+              "id": "sabotage",
+              "label": "Sabotage the blade.",
+              "detail": "A weapon that can kill gods should not be sold to someone who will not give a name.",
+              "effects": {
+                "regard": -6,
+                "contribution": 100,
+                "karma": 6
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 29,
+          "title": "The Steel Remembers",
+          "text": "The blade is finished and the client takes it without a word. Furnace City is paid, and the forge master starts sleeping again."
+        },
+        {
+          "min_regard": 16,
+          "title": "A Flaw in the Fold",
+          "text": "The blade leaves the city with a flaw only a master would find. The Cauldron keeps its commission and its deniability."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Commission Closes",
+          "text": "The weapon is broken in the quench and the client is told to commission elsewhere. Furnace City keeps the gold and loses the name."
+        }
+      ]
+    },
+    {
+      "id": "storyline.void_scripture",
+      "sect": "sect.void_scripture",
+      "title": "The Book That Rewrites",
+      "summary": "The Floating Archive holds a book that edits its readers, and the Pavilion wants a copy made by someone who has not read it.",
+      "giver": "board.market",
+      "unlock": {
+        "min_realm": 5,
+        "min_contribution": 180
+      },
+      "requires_storylines": [
+        "storyline.azure_cloud"
+      ],
+      "excludes": [],
+      "chapters": [
+        {
+          "id": "storyline.void_scripture.1",
+          "title": "A Library That Drifts",
+          "stake": "stake.welcome",
+          "brief": "The archive's letter is a copying commission with a page count and no title. The Pavilion pays by the character and asks for a steady hand.",
+          "test": {
+            "kind": "talk",
+            "target": "board.market",
+            "count": 1,
+            "text": "Answer the archive at the market board"
+          },
+          "choices": [
+            {
+              "id": "copy",
+              "label": "Request a copying commission.",
+              "detail": "Knowledge must be catalogued, not owned. The Pavilion has a page for everyone, and a price for every page.",
+              "effects": {
+                "regard": 8,
+                "stones": 80
+              }
+            },
+            {
+              "id": "ask_hidden",
+              "label": "Ask what the archive is hiding.",
+              "detail": "A library that drifts between peaks is not hiding a book. It is hiding a reader.",
+              "effects": {
+                "regard": -2,
+                "contribution": 50
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.void_scripture.2",
+          "title": "The Page That Reads Back",
+          "stake": "stake.fault",
+          "brief": "The page has no author and no ink. It is warm to the touch, and the copy you have not made yet is already on it.",
+          "test": {
+            "kind": "channel",
+            "target": "shrine",
+            "count": 2,
+            "text": "Steady your mind at the shrine twice"
+          },
+          "choices": [
+            {
+              "id": "read",
+              "label": "Read the page aloud.",
+              "detail": "A sentence read aloud can edit a target out of the scene. The question is who is holding the pen.",
+              "effects": {
+                "regard": 8,
+                "contribution": 60,
+                "notoriety": 3
+              }
+            },
+            {
+              "id": "copy_blind",
+              "label": "Copy it without reading.",
+              "detail": "The Pavilion asked for a copy, not a reader. The hand can be steady and the eyes can be closed.",
+              "effects": {
+                "regard": -3,
+                "stones": 110
+              }
+            }
+          ]
+        },
+        {
+          "id": "storyline.void_scripture.3",
+          "title": "The Reader Rewritten",
+          "stake": "stake.future",
+          "brief": "The book has begun to write back. The Pavilion's archivist has not been seen for nine days, and the archive has drifted closer to the market.",
+          "test": {
+            "kind": "inheritance",
+            "target": "trial",
+            "count": 1,
+            "text": "Walk an altar trial and keep your name"
+          },
+          "choices": [
+            {
+              "id": "finish_reading",
+              "label": "Let the book finish you.",
+              "detail": "Whoever finishes the book decides what cultivation is. The Pavilion has been waiting a long time for a reader who volunteered.",
+              "effects": {
+                "regard": 10,
+                "contribution": 40,
+                "passive": "passive.void_affinity"
+              }
+            },
+            {
+              "id": "burn",
+              "label": "Burn the page.",
+              "detail": "Some knowledge should be catalogued and never opened. The archive will survive the loss; its readers may not.",
+              "effects": {
+                "regard": -6,
+                "contribution": 110,
+                "karma": 5
+              }
+            }
+          ]
+        }
+      ],
+      "endings": [
+        {
+          "min_regard": 29,
+          "title": "A Reader Finishes",
+          "text": "The book closes with your name in it. The archive drifts away, and the Pavilion begins to catalogue a reader instead of a page."
+        },
+        {
+          "min_regard": 15,
+          "title": "The Page Is Copied",
+          "text": "The copy is shelved and the original is sealed. The archive keeps its secret and you keep your name, for now."
+        },
+        {
+          "min_regard": 0,
+          "title": "The Page Burns",
+          "text": "The book is ash and the archivist is still missing. The Pavilion thanks you for the fire and does not open the door again."
+        }
+      ]
+    }
+  ]
+}

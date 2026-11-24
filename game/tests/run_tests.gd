@@ -89,6 +89,7 @@ func _ready() -> void:
 	_sect_autonomy_tests()
 	_quest_tests()
 	_quest_architecture_tests()
+	_sect_storyline_tests()
 	_hidden_realm_tests()
 	_hidden_realm_family_tests()
 	_inheritance_tests()
@@ -5155,6 +5156,316 @@ func _quest_architecture_tests() -> void:
 		if String((value as Dictionary).get("id", "")) != QuestLog.PRIMARY_ID:
 			retained.append(value)
 	check(not QuestLog.validate(retained).is_empty(), "a missing primary quest is rejected")
+
+
+func _complete_local_storyline(log: SectStorylines, high: bool = true) -> void:
+	var context := {"realm": 4, "contribution": 300}
+	log.accept("storyline.azure_cloud", context)
+	log.report("collect", "spirit_herb", 3)
+	log.choose("storyline.azure_cloud", "report" if high else "share")
+	log.report("channel", "shrine", 1)
+	log.choose("storyline.azure_cloud", "seal" if high else "open")
+	log.report("craft", "alchemy", 1)
+	log.choose("storyline.azure_cloud", "bind" if high else "break")
+
+
+func _storyline_entry(data: Dictionary, id: String) -> Dictionary:
+	var value: Variant = data.get("storylines", [])
+	if typeof(value) != TYPE_ARRAY:
+		return {}
+	for entry in (value as Array):
+		if typeof(entry) == TYPE_DICTIONARY and String((entry as Dictionary).get("id", "")) == id:
+			return entry
+	return {}
+
+
+func _sect_storyline_tests() -> void:
+	print("[storylines] twelve houses, three chapters, choices and regard")
+	check(not DB.sect_storylines_data.is_empty(), "sect storyline data loads")
+	check(SectStorylines.validate(DB.sect_storylines_data).is_empty(), "the authored sect storylines validate")
+	var log := SectStorylines.new()
+	check(log.storylines().size() == 12, "one storyline per house")
+	check(log.stakes().size() == 3, "three shared stakes")
+	check(log.local_id() == "storyline.azure_cloud", "the local house owns the local arc")
+	check(log.is_local("storyline.azure_cloud"), "the Azure Cloud arc is local")
+	check(not log.is_local("storyline.heavenly_sword"), "a distant arc is not local")
+	check(log.start_regard() == 10, "regard starts at the authored value")
+	check(log.chapters_of("storyline.azure_cloud").size() == 3, "the local arc has three chapters")
+	check(String(log.chapter_at("storyline.azure_cloud", 0).get("stake", "")) == "stake.welcome",
+		"the first chapter is the welcome")
+	check(log.accepted_ids().is_empty(), "no house writes before the run begins")
+	check(log.storyline("storyline.nope").is_empty(), "an unknown arc resolves to nothing")
+
+	# Gates: the local arc first, then one distant correspondence at a time.
+	check(not log.is_available("storyline.azure_cloud", {"realm": 1, "contribution": 40}),
+		"the local arc waits for its realm")
+	check(not log.is_available("storyline.azure_cloud", {"realm": 2, "contribution": 19}),
+		"the local arc waits for its contribution")
+	check(log.is_available("storyline.azure_cloud", {"realm": 2, "contribution": 20}),
+		"the local arc opens on its gates")
+	check(log.status("storyline.azure_cloud", {"realm": 2, "contribution": 20}) == "available",
+		"a reachable arc reads available")
+	check(log.status("storyline.azure_cloud", {}) == "locked", "an unreachable arc reads locked")
+	check(not log.is_available("storyline.heavenly_sword", {"realm": 9, "contribution": 999}),
+		"a distant arc waits for the local story")
+	check(log.available_ids({"realm": 2, "contribution": 20}) == ["storyline.azure_cloud"],
+		"only the local arc is open at the start")
+	check(not log.accept("storyline.azure_cloud", {"realm": 1, "contribution": 0}),
+		"an unreachable arc is refused")
+	check(log.accept("storyline.azure_cloud", {"realm": 2, "contribution": 20}), "the local arc is accepted")
+	check(not log.accept("storyline.azure_cloud", {"realm": 2, "contribution": 20}),
+		"an arc is accepted once")
+	check(log.status("storyline.azure_cloud", {}) == "active", "an accepted arc reads active")
+	check(log.accepted_ids().size() == 1, "the open arc is listed")
+
+	# A chapter advances only on its own event, then waits for a decision.
+	check(log.report("kill", "beast", 5).is_empty(), "an unrelated event does not move the arc")
+	check(log.progress_text("storyline.azure_cloud").contains("0/3"), "the first chapter shows its count")
+	check(log.report("collect", "spirit_herb", 2).is_empty(), "partial progress does not open the decision")
+	var advanced := log.report("collect", "spirit_herb", 1)
+	check(advanced.size() == 1, "the chapter completes on its last report")
+	check(log.is_awaiting_choice("storyline.azure_cloud"), "a paid test opens the decision")
+	check(log.choices_of("storyline.azure_cloud").size() == 2, "the chapter offers two stances")
+	check(log.report("collect", "spirit_herb", 9).is_empty(), "events stop at the decision")
+	check(log.status("storyline.azure_cloud", {}) == "decision", "the arc reads decision")
+	check(log.progress_text("storyline.azure_cloud").begins_with("Decision"),
+		"the chapter line names the decision")
+	check(not bool(log.choose("storyline.azure_cloud", "nope").get("ok", true)),
+		"an unknown stance is refused")
+	check(not bool(log.choose("storyline.nope", "report").get("ok", true)), "an unknown arc is refused")
+
+	# A stance pays its effects, moves regard, and advances the chapter once.
+	var chosen := log.choose("storyline.azure_cloud", "report")
+	check(bool(chosen.get("ok", false)), "a stance is taken")
+	check(int((chosen.get("effects", {}) as Dictionary).get("regard", 0)) == 10,
+		"the stance returns its effects")
+	check(log.regard_of("storyline.azure_cloud") == 20, "regard follows the stance")
+	check(log.progress_of("storyline.azure_cloud") == 1, "the arc moves to its second chapter")
+	check(not log.is_completed("storyline.azure_cloud"), "the arc is not complete after one choice")
+	check(log.choices_made("storyline.azure_cloud").size() == 1, "the choice is recorded")
+	check(not bool(log.choose("storyline.azure_cloud", "report").get("ok", true)),
+		"a chosen chapter cannot be chosen again")
+	check(log.progress_text("storyline.azure_cloud").contains("0/1"),
+		"the next chapter starts with a fresh counter")
+
+	log.report("channel", "shrine", 1)
+	check(log.choose("storyline.azure_cloud", "seal").get("ok", false), "the second stance is taken")
+	log.report("craft", "alchemy", 1)
+	var final_choice := log.choose("storyline.azure_cloud", "bind")
+	check(bool(final_choice.get("completed", false)), "the third choice completes the arc")
+	var ending: Dictionary = final_choice.get("ending", {})
+	check(String(ending.get("title", "")) == "The Mountain Keeps Its Promise",
+		"the high-regard ending resolves")
+	check(log.is_completed("storyline.azure_cloud"), "a completed arc reads complete")
+	check(log.completed_ids().has("storyline.azure_cloud"), "the completed arc is listed")
+	check(log.status("storyline.azure_cloud", {}) == "completed", "a completed arc's status")
+	check(log.progress_text("storyline.azure_cloud") == "The Mountain Keeps Its Promise",
+		"a completed arc reads its ending")
+	check(log.choices_made("storyline.azure_cloud").size() == 3, "every choice is recorded")
+	check(log.regard_of("storyline.azure_cloud") == 40, "the high path adds up")
+
+	# Defiance spends regard, so the low ending is reachable rather than dead data.
+	var low := SectStorylines.new()
+	_complete_local_storyline(low, false)
+	check(low.regard_of("storyline.azure_cloud") == 0, "defiance can spend all regard")
+	check(low.is_completed("storyline.azure_cloud"), "the low path completes")
+	check(String(low.ending_for("storyline.azure_cloud").get("title", "")) == "The Elders Remember",
+		"the low-regard ending resolves")
+
+	# One correspondence at a time, and two houses that refuse each other.
+	var foreign := SectStorylines.new()
+	_complete_local_storyline(foreign)
+	var open_context := {"realm": 4, "contribution": 300}
+	check(foreign.is_available("storyline.heavenly_sword", open_context),
+		"a distant arc opens after the local story")
+	check(foreign.accept("storyline.heavenly_sword", open_context), "the correspondence is accepted")
+	check(foreign.foreign_active_id() == "storyline.heavenly_sword", "the open correspondence is named")
+	check(not foreign.is_available("storyline.crimson_lotus", open_context),
+		"one correspondence at a time")
+	foreign.report("kill", "beast", 6)
+	foreign.choose("storyline.heavenly_sword", "duel")
+	foreign.report("craft", "forge", 2)
+	foreign.choose("storyline.heavenly_sword", "armoury")
+	foreign.report("return", "board.market", 1)
+	var foreign_end := foreign.choose("storyline.heavenly_sword", "closed")
+	check(bool(foreign_end.get("completed", false)), "the distant arc completes")
+	check(foreign.foreign_active_id() == "", "a completed correspondence frees the slot")
+	check(foreign.is_available("storyline.crimson_lotus", open_context),
+		"the next correspondence becomes available")
+
+	var exclusive := SectStorylines.new()
+	_complete_local_storyline(exclusive)
+	check(exclusive.accept("storyline.blood_moon", {"realm": 5, "contribution": 400}),
+		"Blood Moon is accepted")
+	check(not exclusive.is_available("storyline.frozen_heaven", {"realm": 5, "contribution": 400}),
+		"the rival house is refused")
+	var reverse := SectStorylines.new()
+	_complete_local_storyline(reverse)
+	check(reverse.accept("storyline.frozen_heaven", {"realm": 5, "contribution": 400}),
+		"Frozen Heaven is accepted")
+	check(not reverse.accept("storyline.blood_moon", {"realm": 5, "contribution": 400}),
+		"the refusal is mutual")
+
+	# The HUD reads two lines for the open arc.
+	var tracker := SectStorylines.new()
+	tracker.accept("storyline.azure_cloud", {"realm": 2, "contribution": 20})
+	var tracker_lines: Array = tracker.tracker_lines(1)
+	check(tracker_lines.size() == 2, "the tracker shows one arc as two lines")
+	check(String(tracker_lines[0]) == "STORY — The Hoarded Vein", "the tracker heads the arc")
+	check(String(tracker_lines[1]).contains("0/3"), "the tracker carries live progress")
+
+	# Persistence: decisions and regard survive, and a dirty save is cleaned.
+	var saved := log.to_dict()
+	check(int(saved.get("version", 0)) == SectStorylines.SAVE_VERSION, "the storyline ledger is versioned")
+	var restored := SectStorylines.new()
+	restored.from_dict(saved)
+	check(restored.is_completed("storyline.azure_cloud"), "a completed arc survives a round trip")
+	check(restored.regard_of("storyline.azure_cloud") == log.regard_of("storyline.azure_cloud"),
+		"regard survives a round trip")
+	check(restored.choices_made("storyline.azure_cloud").size() == 3, "choices survive a round trip")
+
+	var pending := SectStorylines.new()
+	pending.accept("storyline.azure_cloud", {"realm": 2, "contribution": 20})
+	pending.report("collect", "spirit_herb", 3)
+	var pending_saved := pending.to_dict()
+	var pending_restored := SectStorylines.new()
+	pending_restored.from_dict(pending_saved)
+	check(pending_restored.is_awaiting_choice("storyline.azure_cloud"),
+		"a pending decision survives a save")
+
+	var dirty: Dictionary = pending_saved.duplicate(true)
+	var dirty_state: Dictionary = (dirty.get("states", {}) as Dictionary).get("storyline.azure_cloud", {})
+	dirty_state["chapter"] = 99
+	dirty_state["regard"] = -5
+	dirty_state["choices"] = {"storyline.azure_cloud.1": "nope"}
+	(dirty.get("states", {}) as Dictionary)["storyline.unknown"] = {}
+	var cleaned := SectStorylines.new()
+	cleaned.from_dict(dirty)
+	check(cleaned.progress_of("storyline.azure_cloud") == 0, "an oversized chapter is clamped to the first undecided one")
+	check(cleaned.regard_of("storyline.azure_cloud") == 0, "negative regard is clamped")
+	check(cleaned.choices_made("storyline.azure_cloud").is_empty(), "an invalid stance is dropped")
+	check(not cleaned.states.has("storyline.unknown"), "unknown arcs are dropped")
+
+	var counter_dirty: Dictionary = pending_saved.duplicate(true)
+	var counter_state: Dictionary = (counter_dirty.get("states", {}) as Dictionary).get("storyline.azure_cloud", {})
+	counter_state["chapter"] = 0
+	counter_state["counters"] = {"collect:spirit_herb": 999, "junk": 4}
+	var counter_clean := SectStorylines.new()
+	counter_clean.from_dict(counter_dirty)
+	check(counter_clean.is_awaiting_choice("storyline.azure_cloud"), "a full counter reopens the decision")
+	check(int(counter_clean.state_of("storyline.azure_cloud").get("counters", {}).get("collect:spirit_herb", 0)) == 3,
+		"a saved counter is clamped to its count")
+	check(not counter_clean.state_of("storyline.azure_cloud").get("counters", {}).has("junk"),
+		"malformed counters are dropped")
+
+	# A save cannot point back at a chapter it already decided.
+	var rewind: Dictionary = pending_saved.duplicate(true)
+	var rewind_state: Dictionary = (rewind.get("states", {}) as Dictionary).get("storyline.azure_cloud", {})
+	rewind_state["chapter"] = 2
+	rewind_state["completed"] = false
+	rewind_state["choices"] = {"storyline.azure_cloud.1": "report"}
+	var rewound := SectStorylines.new()
+	rewound.from_dict(rewind)
+	check(rewound.progress_of("storyline.azure_cloud") == 1, "a decided chapter is not replayed")
+	check(not rewound.is_completed("storyline.azure_cloud"), "a rewound arc is not complete")
+
+	var all_chosen: Dictionary = pending_saved.duplicate(true)
+	var all_state: Dictionary = (all_chosen.get("states", {}) as Dictionary).get("storyline.azure_cloud", {})
+	all_state["chapter"] = 0
+	all_state["completed"] = false
+	all_state["choices"] = {
+		"storyline.azure_cloud.1": "report",
+		"storyline.azure_cloud.2": "seal",
+		"storyline.azure_cloud.3": "bind",
+	}
+	var derived := SectStorylines.new()
+	derived.from_dict(all_chosen)
+	check(derived.is_completed("storyline.azure_cloud"), "three recorded stances complete the arc")
+	check(derived.choices_made("storyline.azure_cloud").size() == 3, "the recorded stances are kept")
+
+	# Validation rejects broken content rather than booting it.
+	check(not SectStorylines.validate({}).is_empty(), "empty storyline data is rejected")
+	var broken: Dictionary = DB.sect_storylines_data.duplicate(true)
+	broken.erase("stakes")
+	check(not SectStorylines.validate(broken).is_empty(), "missing stakes are rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	var broken_list: Array = broken.get("storylines", [])
+	(broken_list as Array).append((broken_list as Array)[0])
+	check(not SectStorylines.validate(broken).is_empty(), "a duplicate storyline id is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["sect"] = "sect.nope"
+	check(not SectStorylines.validate(broken).is_empty(), "an unknown sect is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["giver"] = ""
+	check(not SectStorylines.validate(broken).is_empty(), "a storyline without giver is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["unlock"] = {"min_realm": 99}
+	check(not SectStorylines.validate(broken).is_empty(), "an impossible realm gate is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["requires_storylines"] = ["storyline.nope"]
+	check(not SectStorylines.validate(broken).is_empty(), "an unknown prerequisite is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["requires_storylines"] = ["storyline.heavenly_sword"]
+	check(not SectStorylines.validate(broken).is_empty(), "a self-prerequisite is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.azure_cloud")["requires_storylines"] = ["storyline.heavenly_sword"]
+	_storyline_entry(broken, "storyline.heavenly_sword")["requires_storylines"] = ["storyline.azure_cloud"]
+	check(not SectStorylines.validate(broken).is_empty(), "a prerequisite cycle is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["excludes"] = ["storyline.blood_moon"]
+	check(not SectStorylines.validate(broken).is_empty(), "a one-sided refusal is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["excludes"] = ["storyline.nope"]
+	check(not SectStorylines.validate(broken).is_empty(), "an unknown exclusion is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	(_storyline_entry(broken, "storyline.azure_cloud")["chapters"] as Array).pop_back()
+	check(not SectStorylines.validate(broken).is_empty(), "a two-chapter arc is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	var broken_chapters: Array = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	(broken_chapters[1] as Dictionary)["stake"] = "stake.nope"
+	check(not SectStorylines.validate(broken).is_empty(), "an unknown stake is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	(broken_chapters[2] as Dictionary)["stake"] = (broken_chapters[0] as Dictionary)["stake"]
+	check(not SectStorylines.validate(broken).is_empty(), "a reused stake is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	((broken_chapters[0] as Dictionary)["test"] as Dictionary)["kind"] = "dance"
+	check(not SectStorylines.validate(broken).is_empty(), "an unknown test kind is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	((broken_chapters[0] as Dictionary)["test"] as Dictionary)["count"] = 0
+	check(not SectStorylines.validate(broken).is_empty(), "an impossible test count is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	((broken_chapters[0] as Dictionary)["choices"] as Array).pop_back()
+	check(not SectStorylines.validate(broken).is_empty(), "a single-stance chapter is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	(((broken_chapters[0] as Dictionary)["choices"] as Array)[0] as Dictionary)["effects"] = {}
+	check(not SectStorylines.validate(broken).is_empty(), "a stance that changes nothing is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	((((broken_chapters[0] as Dictionary)["choices"] as Array)[0] as Dictionary)["effects"] as Dictionary)["gold"] = 1
+	check(not SectStorylines.validate(broken).is_empty(), "an unknown effect is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	((((broken_chapters[0] as Dictionary)["choices"] as Array)[0] as Dictionary)["effects"] as Dictionary)["technique"] = "tech.nope"
+	check(not SectStorylines.validate(broken).is_empty(), "an unknown technique grant is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	broken_chapters = _storyline_entry(broken, "storyline.azure_cloud")["chapters"]
+	((((broken_chapters[0] as Dictionary)["choices"] as Array)[0] as Dictionary)["effects"] as Dictionary)["standing"] = {"faction": "faction.nope", "amount": 4}
+	check(not SectStorylines.validate(broken).is_empty(), "unknown faction standing is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	((_storyline_entry(broken, "storyline.azure_cloud")["endings"] as Array)[1] as Dictionary)["min_regard"] = 40
+	check(not SectStorylines.validate(broken).is_empty(), "unordered endings are rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	var broken_endings: Array = _storyline_entry(broken, "storyline.azure_cloud")["endings"]
+	(broken_endings as Array).pop_back()
+	check(not SectStorylines.validate(broken).is_empty(), "a missing low-regard ending is rejected")
+	broken = DB.sect_storylines_data.duplicate(true)
+	_storyline_entry(broken, "storyline.heavenly_sword")["sect"] = "sect.azure_cloud"
+	check(not SectStorylines.validate(broken).is_empty(), "two arcs for one house are rejected")
 
 
 # ---------------------------------------------------------- hidden realms ----

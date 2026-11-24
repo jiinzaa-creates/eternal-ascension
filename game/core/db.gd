@@ -61,6 +61,8 @@ var politics_data: Dictionary = {}
 var player_sect_data: Dictionary = {}
 ## Sect autonomy: daily upkeep, steward bonus, doctrine guards and events.
 var sect_autonomy_data: Dictionary = {}
+## Sect storylines: one three-chapter arc per house, with stakes and choices.
+var sect_storylines_data: Dictionary = {}
 ## Hidden realm layouts: room grids, corners, populations and wardens.
 var hidden_realm_data: Dictionary = {}
 ## Hidden realm discovery sites and opening cycles.
@@ -133,6 +135,7 @@ func load_all() -> void:
 	politics_data = _read("politics.json")
 	player_sect_data = _read("player_sect.json")
 	sect_autonomy_data = _read("sect_autonomy.json")
+	sect_storylines_data = _read("sect_storylines.json")
 	hidden_realm_data = _read("hidden_realm_templates.json")
 	realm_access_data = _read("realm_access.json")
 	hidden_realm_family_data = _read("hidden_realm_families.json")
@@ -770,6 +773,9 @@ func validate() -> Array:
 	problems.append_array(PlayerSect.validate(player_sect_data))
 	# The hall's own day: upkeep, guarded raids and a reachable event table.
 	problems.append_array(SectAutonomy.validate(sect_autonomy_data))
+	# The houses' own stories: one arc per sect, three real chapters, two stances
+	# that change something, resolvable endings and mutual refusals.
+	problems.append_array(SectStorylines.validate(sect_storylines_data))
 	# Hidden realm layouts: a valid default, reachable corners and real enemies.
 	problems.append_array(HiddenRealms.validate(hidden_realm_data))
 	# Nine content families, each with its own layout, palette and population.

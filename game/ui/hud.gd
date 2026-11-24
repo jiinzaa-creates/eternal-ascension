@@ -118,6 +118,7 @@ func _draw() -> void:
 	draw_sect_ledger(player)
 	draw_council(player)
 	draw_player_sect(player)
+	draw_storylines(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -370,11 +371,14 @@ func draw_waypoint(player: Player) -> void:
 	_text(Vector2(x + 38.0, y + 19.0), "%s · %s" % [String(host.waypoint_name), Travel.distance_label(distance)], 12, INK)
 
 
-func draw_quest(player: Player) -> void:
+func draw_quest(_player: Player) -> void:
+	var lines: Array = []
 	var quests: QuestLog = host.quests as QuestLog
-	if quests == null or not quests.is_valid():
-		return
-	var lines: Array = quests.tracker_lines(2)
+	if quests != null and quests.is_valid():
+		lines = quests.tracker_lines(2)
+	var stories: SectStorylines = host.storylines as SectStorylines
+	if stories != null:
+		lines.append_array(stories.tracker_lines(1))
 	if lines.is_empty():
 		return
 	var w := size.x
@@ -383,7 +387,11 @@ func draw_quest(player: Player) -> void:
 	draw_rect(Rect2(w - 316.0 - 12.0, y - 22.0, width, 22.0 + float(lines.size()) * 18.0), PANEL_BG)
 	for i in lines.size():
 		var line := String(lines[i])
-		var color := Color("#d8c070") if line.begins_with("QUEST — ") else INK
+		var color := INK
+		if line.begins_with("QUEST — "):
+			color = Color("#d8c070")
+		elif line.begins_with("STORY — "):
+			color = Color("#a8d8c0")
 		_text(Vector2(w - 316.0, y + float(i) * 18.0), _fit(line, 12, 292.0), 12, color)
 
 
@@ -395,7 +403,9 @@ func draw_quest(player: Player) -> void:
 func _side_panel_y() -> float:
 	var extra := 0.0
 	if host.quests != null:
-		extra = maxf(0.0, float(host.quests.tracker_lines(2).size() - 2) * 18.0)
+		extra += maxf(0.0, float(host.quests.tracker_lines(2).size() - 2) * 18.0)
+	if host.storylines != null:
+		extra += float(host.storylines.tracker_lines(1).size()) * 18.0
 	return 296.0 + extra
 
 
@@ -901,6 +911,76 @@ func draw_player_sect(player: Player) -> void:
 			log_y += 15.0
 
 	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER found / recruit   ·   the hall levies and pays itself   ·   F4 / E / ESC — close",
+		10, Color("#7b8b94"))
+
+
+## The twelve houses' own stories: every arc, its live chapter, that house's
+## regard, and the two stances once a chapter's test is paid. A frozen reading
+## screen like the ledger, because a house's future should not be decided
+## mid-swing.
+func draw_storylines(_player: Player) -> void:
+	if not bool(host.storylines_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
+	var w := 1040.0
+	var h := 652.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "SECT STORYLINES", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "Twelve houses, one story each — the same stakes, never the same work.", 11, MUTED)
+	var active := 0
+	var finished := 0
+	if host.storylines != null:
+		active = host.storylines.accepted_ids().size()
+		finished = host.storylines.completed_ids().size()
+	_text(Vector2(x + 24.0, y + 78.0), "%d open · regard is the house's memory of you · %d complete" % [
+		active, finished], 11, Color("#d8c898"))
+	draw_line(Vector2(x + 20.0, y + 94.0), Vector2(x + w - 20.0, y + 94.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.storyline_rows()
+	var cursor := clampi(int(host.storyline_index), 0, maxi(0, rows.size() - 1))
+	var row_y := y + 112.0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var kind := String(row.get("kind", "info"))
+		var status := String(row.get("status", "locked"))
+		var selected := i == cursor
+		var indent := 34.0 if kind == "choice" else 0.0
+		if selected:
+			draw_rect(Rect2(x + 18.0, row_y - 13.0, w - 36.0, 34.0), Color("#1b2328", 0.92))
+		var colour := Color("#6f7f88")
+		if status == "completed":
+			colour = Color("#7f9098")
+		elif status == "decision" or status == "choice":
+			colour = Color("#e0c880")
+		elif status == "active":
+			colour = Color("#a8d8c0")
+		elif status == "available":
+			colour = Color("#7fd3e0")
+		if kind == "choice":
+			_text(Vector2(x + 32.0 + indent, row_y), _fit("› " + String(row.get("label", "")), 12, 640.0), 12,
+				Color("#e0c880") if selected else Color("#c8b8a0"))
+			_text(Vector2(x + 32.0 + indent, row_y + 14.0), _fit(String(row.get("reason", "")), 10, 640.0), 10,
+				Color("#a8d8c0"))
+		else:
+			_text(Vector2(x + 28.0, row_y), _fit(String(row.get("label", "?")), 12, 620.0), 12,
+				ACCENT if selected else colour)
+			var detail := String(row.get("detail", ""))
+			var reason := String(row.get("reason", ""))
+			if reason != "":
+				detail += "   — " + reason
+			_text(Vector2(x + 28.0, row_y + 14.0), _fit(detail, 10, 720.0), 10, MUTED)
+			var badge := "REGARD %d" % int(row.get("regard", 0))
+			if bool(row.get("local", false)):
+				badge = "YOUR GATE · " + badge
+			_text(Vector2(x + w - 24.0 - _text_width(badge, 10), row_y), badge, 10,
+				Color("#d8c898") if bool(row.get("local", false)) else Color("#7f9098"))
+		row_y += 36.0
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER take a stance   ·   F6 / E / ESC — close",
 		10, Color("#7b8b94"))
 
 
