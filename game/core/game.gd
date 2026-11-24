@@ -66,6 +66,12 @@ var sect_stipend_day := SectEconomy.DEFAULT_STIPEND_DAY
 ## How many quartermaster purchases this run, so every issued item gets a new
 ## stable id and two pills never share one.
 var sect_purchases := 0
+## Contribution invested in each council bloc, by bloc id. The support itself
+## is derived, so only the investment has to be saved.
+var sect_lobby: Dictionary = {}
+## Set once the council has opened the master's seat. It stays open for the rest
+## of the run; the top rung's own standing and realm gates still apply.
+var sect_seat_open := false
 
 
 func _process(delta: float) -> void:
@@ -101,6 +107,8 @@ func new_run(seed_value: int = 0) -> void:
 	sect_contribution = 0
 	sect_stipend_day = SectEconomy.DEFAULT_STIPEND_DAY
 	sect_purchases = 0
+	sect_lobby.clear()
+	sect_seat_open = false
 	hitstop.clear()
 
 
@@ -150,6 +158,8 @@ func to_dict() -> Dictionary:
 		"sect_contribution": sect_contribution,
 		"sect_stipend_day": sect_stipend_day,
 		"sect_purchases": sect_purchases,
+		"sect_lobby": sect_lobby.duplicate(true),
+		"sect_seat_open": sect_seat_open,
 	}
 
 
@@ -181,3 +191,5 @@ func from_dict(data: Dictionary) -> void:
 	sect_contribution = clampi(int(data.get("sect_contribution", 0)), 0, SectEconomy.cap())
 	sect_stipend_day = int(data.get("sect_stipend_day", SectEconomy.DEFAULT_STIPEND_DAY))
 	sect_purchases = maxi(0, int(data.get("sect_purchases", 0)))
+	sect_lobby = SectPolitics.sanitize_lobby(data.get("sect_lobby", {}))
+	sect_seat_open = bool(data.get("sect_seat_open", false))

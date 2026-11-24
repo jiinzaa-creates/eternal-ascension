@@ -53,6 +53,8 @@ var sects_data: Dictionary = {}
 var hierarchy_data: Dictionary = {}
 ## Sect economy: contribution awards, stipends by rank, donations and services.
 var sect_economy_data: Dictionary = {}
+## Sect politics: the council blocs and the vote that opens the master's seat.
+var politics_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -110,6 +112,7 @@ func load_all() -> void:
 	sects_data = _read("sects.json")
 	hierarchy_data = _read("hierarchy.json")
 	sect_economy_data = _read("sect_economy.json")
+	politics_data = _read("politics.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -739,6 +742,9 @@ func validate() -> Array:
 	# Sect economy content: awards, donations, one stipend per rung, and
 	# quartermaster services that sell real consumables at a real rank gate.
 	problems.append_array(SectEconomy.validate(sect_economy_data))
+	# The council: three blocs, a reachable support threshold, and a vote that
+	# only a rank on the actual ladder may call.
+	problems.append_array(SectPolitics.validate(politics_data))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())

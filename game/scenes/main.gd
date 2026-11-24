@@ -117,6 +117,9 @@ var hierarchy_open := false
 ## The sect ledger: stipend, donations and the quartermaster's shelf.
 var sect_ledger_open := false
 var sect_ledger_index := 0
+## The council: three blocs, their support, and the vote on the master's seat.
+var council_open := false
+var council_index := 0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -682,7 +685,7 @@ func _process(delta: float) -> void:
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
-			or sect_ledger_open:
+			or sect_ledger_open or council_open:
 		return
 
 	_simulate_npcs()
@@ -752,6 +755,8 @@ func _process(delta: float) -> void:
 		toggle_hierarchy()
 	if Input.is_action_just_pressed("open_ledger"):
 		toggle_sect_ledger()
+	if Input.is_action_just_pressed("open_council"):
+		toggle_council()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1705,6 +1710,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		return
 
+	if council_open:
+		if event.is_action_pressed("open_council") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_council()
+			return
+		if event.is_action_pressed("ui_down"):
+			council_index = mini(council_index + 1, maxi(0, council_rows().size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			council_index = maxi(0, council_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			_council_activate(council_index)
+			return
+		return
+
 	if chronicle_open:
 		if event.is_action_pressed("open_chronicle") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -2416,7 +2437,7 @@ func _close_hierarchy() -> void:
 ## who is spawned; the ladder and eligibility stay in `Hierarchy`.
 func hierarchy_rows() -> Array:
 	var current := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
-		Game.notoriety, Hierarchy.seat_available())
+		Game.notoriety, Hierarchy.seat_available(Game.sect_seat_open))
 	var current_id := String(current.get("id", ""))
 	var out: Array = []
 	for group in [Hierarchy.ladder(), Hierarchy.offices()]:
@@ -2480,7 +2501,7 @@ func _player_rank_id() -> String:
 	if player == null:
 		return "rank.servant"
 	return String(Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
-		Game.notoriety, Hierarchy.seat_available()).get("id", "rank.servant"))
+		Game.notoriety, Hierarchy.seat_available(Game.sect_seat_open)).get("id", "rank.servant"))
 
 
 ## The ledger is one list of real transactions: today's stipend, the two
@@ -2596,6 +2617,120 @@ func _sect_buy_service(row: Dictionary) -> void:
 	player.inventory = Items.add_to_inventory(player.inventory, item)
 	Bus.toast.emit("The quartermaster hands over %s. Contribution −%d." % [
 		String(item.get("name", "a pill")), int(result.get("cost", 0))])
+	Bus.player_stats_changed.emit()
+
+
+# ----------------------------------------------------------- sect council ----
+
+
+func toggle_council() -> void:
+	if council_open:
+		_close_council()
+	else:
+		_open_council()
+
+
+func _open_council() -> void:
+	if player == null or String(phase) != "play":
+		return
+	council_open = true
+	council_index = clampi(council_index, 0, maxi(0, council_rows().size() - 1))
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_council() -> void:
+	if not council_open:
+		return
+	council_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## Three blocs plus the vote. Support is derived from the saved investment map;
+## the row also states what one more lobby would cost and buy. The vote row is
+## present even when it cannot be called, with the rank or support still missing.
+func council_rows() -> Array:
+	var rank_id := _player_rank_id()
+	var out: Array = []
+	for value in SectPolitics.blocs():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var result := SectPolitics.lobby(id, Game.sect_contribution, Game.sect_lobby)
+		out.append({
+			"kind": "bloc",
+			"id": id,
+			"label": String(entry.get("name", id)),
+			"speaker": String(entry.get("speaker", "")),
+			"agenda": String(entry.get("agenda", "")),
+			"support": SectPolitics.support_for(id, Game.sect_lobby),
+			"max": SectPolitics.max_for(id),
+			"cost": int(entry.get("cost", 0)),
+			"gain": int(entry.get("gain", 0)),
+			"enabled": bool(result.get("ok", false)),
+			"reason": String(result.get("reason", "")),
+		})
+	var check := SectPolitics.can_vote(Game.sect_lobby, rank_id, Game.sect_seat_open)
+	out.append({
+		"kind": "vote",
+		"id": "vote",
+		"label": "Call the council vote",
+		"speaker": "The hall",
+		"agenda": "Open the master's seat to a challenge." if not Game.sect_seat_open else "The master's seat stands open.",
+		"support": SectPolitics.total_support(Game.sect_lobby),
+		"max": SectPolitics.threshold(),
+		"cost": 0,
+		"gain": 0,
+		"enabled": bool(check.get("ok", false)),
+		"reason": String(check.get("reason", "")),
+	})
+	return out
+
+
+func _council_activate(index: int) -> void:
+	var rows := council_rows()
+	if index < 0 or index >= rows.size():
+		return
+	var row: Dictionary = rows[index]
+	if not bool(row.get("enabled", false)):
+		var reason := String(row.get("reason", ""))
+		if reason == "":
+			Bus.toast.emit("The council refuses.")
+		else:
+			Bus.toast.emit("The council refuses: %s." % reason)
+		return
+	if String(row.get("kind", "")) == "bloc":
+		_council_lobby(row)
+	elif String(row.get("kind", "")) == "vote":
+		_council_vote()
+
+
+func _council_lobby(row: Dictionary) -> void:
+	var result := SectPolitics.lobby(String(row.get("id", "")), Game.sect_contribution, Game.sect_lobby)
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The council refuses: %s." % String(result.get("reason", "")))
+		return
+	Game.sect_contribution = int(result.get("contribution", Game.sect_contribution))
+	Game.sect_lobby = (result.get("invested", {}) as Dictionary).duplicate(true)
+	Bus.toast.emit("%s support +%d. %s" % [String(row.get("label", "The bloc")),
+		int(result.get("gain", 0)), SectPolitics.summary_line(Game.sect_lobby)])
+	Bus.player_stats_changed.emit()
+
+
+func _council_vote() -> void:
+	var result := SectPolitics.vote(Game.sect_lobby, _player_rank_id(), Game.sect_seat_open)
+	if not bool(result.get("ok", false)):
+		Bus.toast.emit("The council refuses: %s." % String(result.get("reason", "")))
+		return
+	Game.sect_seat_open = true
+	Bus.toast.emit("The council opens the master's seat. The ladder now ends at the chair.")
+	var station := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing, Game.notoriety,
+		Hierarchy.seat_available(Game.sect_seat_open))
+	if String(station.get("id", "")) == "rank.sect_master":
+		Bus.toast.emit("The hall rises: you are Sect Master.")
 	Bus.player_stats_changed.emit()
 
 
@@ -3744,6 +3879,7 @@ func _load_game(slot: int) -> void:
 	_close_sects()
 	_close_hierarchy()
 	_close_sect_ledger()
+	_close_council()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.

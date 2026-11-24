@@ -84,6 +84,7 @@ func _ready() -> void:
 	_sects_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
+	_sect_politics_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -4563,6 +4564,133 @@ func _sect_economy_tests() -> void:
 	broken = DB.sect_economy_data.duplicate(true)
 	(broken["services"] as Array).append((DB.sect_economy_data["services"] as Array)[0].duplicate(true))
 	check(not SectEconomy.validate(broken).is_empty(), "a duplicate service is rejected")
+
+
+## Sect politics: three blocs whose support is bought with contribution, and a
+## vote that only opens the top seat when the council is already with you.
+func _sect_politics_tests() -> void:
+	print("[sect politics] blocs, lobbying and the vote for the seat")
+	check(SectPolitics.blocs().size() == 3, "the council has three blocs")
+	check(SectPolitics.bloc("bloc.reformists").get("name", "") == "Reformists", "a bloc is found by id")
+	check(not String(SectPolitics.bloc("bloc.reformists").get("speaker", "")).is_empty(),
+		"a bloc names its speaker")
+	check(SectPolitics.bloc("bloc.nope").is_empty(), "an unknown bloc is empty")
+	check(SectPolitics.threshold() == 150, "the vote has its threshold")
+	check(SectPolitics.min_rank() == "rank.deputy", "only a deputy may call the vote")
+	check(SectPolitics.max_support() == 300, "three blocs can reach 300 support")
+
+	check(SectPolitics.support_for("bloc.traditionalists", {}) == 20, "a bloc starts at its base")
+	check(SectPolitics.support_for("bloc.traditionalists", {"bloc.traditionalists": 30}) == 50,
+		"investment raises support")
+	check(SectPolitics.support_for("bloc.traditionalists", {"bloc.traditionalists": 999}) == 100,
+		"support clamps at the bloc ceiling")
+	check(SectPolitics.support_for("bloc.nope", {"bloc.nope": 10}) == 0, "an unknown bloc has no support")
+	check(SectPolitics.total_support({}) == 60, "the untouched council stands at 60")
+	check(SectPolitics.total_support({"bloc.traditionalists": 40, "bloc.reformists": 30,
+		"bloc.militants": 30}) == 160, "support is summed over the blocs")
+
+	var lobby := SectPolitics.lobby("bloc.reformists", 20, {})
+	check(bool(lobby.get("ok", false)), "a lobby is accepted when contribution covers it")
+	check(int(lobby.get("contribution", 0)) == 12, "a lobby spends its cost")
+	check(int(lobby.get("gain", 0)) == 10, "a lobby buys its gain")
+	check(int((lobby.get("invested", {}) as Dictionary).get("bloc.reformists", 0)) == 10,
+		"the investment map records the gain")
+	check(int(lobby.get("support", 0)) == 30, "the bloc's new support is reported")
+	check(not bool(SectPolitics.lobby("bloc.reformists", 7, {}).get("ok", false)),
+		"a lobby cannot overdraw contribution")
+	check(not bool(SectPolitics.lobby("bloc.nope", 20, {}).get("ok", false)),
+		"an unknown bloc is refused")
+	var capped := SectPolitics.lobby("bloc.reformists", 20, {"bloc.reformists": 80})
+	check(not bool(capped.get("ok", false)), "a maxed bloc is refused")
+	var partial := SectPolitics.lobby("bloc.reformists", 20, {"bloc.reformists": 75})
+	check(bool(partial.get("ok", false)) and int(partial.get("gain", 0)) == 5,
+		"the last lobby buys only the room left")
+
+	var poor := SectPolitics.can_vote({}, "rank.deputy", false)
+	check(not bool(poor.get("ok", false)) and String(poor.get("reason", "")).contains("60 of 150"),
+		"a council at 60 cannot vote")
+	var low_rank := SectPolitics.can_vote({"bloc.traditionalists": 80, "bloc.reformists": 80,
+		"bloc.militants": 80}, "rank.outer_disciple", false)
+	check(not bool(low_rank.get("ok", false)) and String(low_rank.get("reason", "")).contains("Deputy"),
+		"an outer disciple cannot call the vote even with the council")
+	var open_seat := SectPolitics.can_vote({"bloc.traditionalists": 80, "bloc.reformists": 80,
+		"bloc.militants": 80}, "rank.deputy", true)
+	check(not bool(open_seat.get("ok", false)), "the vote cannot be called twice")
+	var ready := {"bloc.traditionalists": 40, "bloc.reformists": 30, "bloc.militants": 30}
+	check(bool(SectPolitics.can_vote(ready, "rank.deputy", false).get("ok", false)),
+		"a deputy with 160 support can call the vote")
+	var result := SectPolitics.vote(ready, "rank.deputy", false)
+	check(bool(result.get("ok", false)) and bool(result.get("seat_open", false)),
+		"a successful vote opens the seat")
+	check(SectPolitics.summary_line(ready).contains("160"), "the council summary counts support")
+
+	var cleaned := SectPolitics.sanitize_lobby({"bloc.reformists": 999, "bloc.nope": 50,
+		"bloc.traditionalists": -4})
+	check(int(cleaned.get("bloc.reformists", 0)) == 80, "a loaded lobby clamps to the room left")
+	check(not cleaned.has("bloc.nope"), "an unknown loaded bloc is dropped")
+	check(not cleaned.has("bloc.traditionalists"), "a zero loaded lobby is dropped")
+	check(SectPolitics.sanitize_lobby([]).is_empty(), "junk lobby data is emptied")
+
+	check(Game.to_dict().has("sect_lobby") and Game.to_dict().has("sect_seat_open"),
+		"the political record is saved")
+	check(Game.sect_lobby.is_empty() and not Game.sect_seat_open,
+		"a run starts with a closed council and a held seat")
+	check(not Hierarchy.seat_available(), "the content seat is held")
+	check(Hierarchy.seat_available(true), "the political result opens the seat")
+	var held_station := Hierarchy.player_rank(6, {"faction.azure_cloud": 100}, 0, Hierarchy.seat_available())
+	var open_station := Hierarchy.player_rank(6, {"faction.azure_cloud": 100}, 0, Hierarchy.seat_available(true))
+	check(String(held_station.get("id", "")) == "rank.deputy", "a qualified player stops at Deputy while the seat is held")
+	check(String(open_station.get("id", "")) == "rank.sect_master", "the same player takes the open seat")
+
+	check(SectPolitics.validate(DB.politics_data).is_empty(), "the shipped council validates")
+	var broken: Dictionary = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array).clear()
+	check(not SectPolitics.validate(broken).is_empty(), "an empty council is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array).pop_back()
+	check(not SectPolitics.validate(broken).is_empty(), "a council missing a bloc is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array).append((DB.politics_data["blocs"] as Array)[0].duplicate(true))
+	check(not SectPolitics.validate(broken).is_empty(), "a duplicate bloc is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["name"] = " "
+	check(not SectPolitics.validate(broken).is_empty(), "a nameless bloc is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["speaker"] = " "
+	check(not SectPolitics.validate(broken).is_empty(), "a bloc without a speaker is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["agenda"] = " "
+	check(not SectPolitics.validate(broken).is_empty(), "a bloc without an agenda is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["base"] = -1
+	check(not SectPolitics.validate(broken).is_empty(), "negative base support is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["max"] = 20
+	check(not SectPolitics.validate(broken).is_empty(), "a bloc that cannot gain is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["max"] = 101
+	check(not SectPolitics.validate(broken).is_empty(), "support above 100 is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["gain"] = 0
+	check(not SectPolitics.validate(broken).is_empty(), "a lobby that buys nothing is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["blocs"] as Array)[0]["cost"] = 0
+	check(not SectPolitics.validate(broken).is_empty(), "a free lobby is rejected")
+	broken = DB.politics_data.duplicate(true)
+	broken.erase("vote")
+	check(not SectPolitics.validate(broken).is_empty(), "missing vote rules are rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["vote"] as Dictionary)["threshold"] = 0
+	check(not SectPolitics.validate(broken).is_empty(), "a zero threshold is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["vote"] as Dictionary)["threshold"] = 301
+	check(not SectPolitics.validate(broken).is_empty(), "an unwinnable vote is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["vote"] as Dictionary)["threshold"] = 60
+	check(not SectPolitics.validate(broken).is_empty(), "a vote that passes without lobbying is rejected")
+	broken = DB.politics_data.duplicate(true)
+	(broken["vote"] as Dictionary)["min_rank"] = "rank.nope"
+	check(not SectPolitics.validate(broken).is_empty(), "a vote gated on an unknown rank is rejected")
 
 
 func _quest_tests() -> void:

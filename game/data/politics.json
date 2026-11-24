@@ -1,0 +1,38 @@
+{
+  "vote": {
+    "threshold": 150,
+    "min_rank": "rank.deputy"
+  },
+  "blocs": [
+    {
+      "id": "bloc.traditionalists",
+      "name": "Traditionalists",
+      "speaker": "Elder Bai",
+      "agenda": "Keep the old rites, the vaults closed and the ladder slow.",
+      "base": 20,
+      "max": 100,
+      "cost": 8,
+      "gain": 10
+    },
+    {
+      "id": "bloc.reformists",
+      "name": "Reformists",
+      "speaker": "Instructor Rui",
+      "agenda": "Open the outer hall to talent from anywhere, not only the old families.",
+      "base": 20,
+      "max": 100,
+      "cost": 8,
+      "gain": 10
+    },
+    {
+      "id": "bloc.militants",
+      "name": "Militants",
+      "speaker": "The gate captain",
+      "agenda": "Spend the sect's strength abroad before it rusts in the courtyards.",
+      "base": 20,
+      "max": 100,
+      "cost": 8,
+      "gain": 10
+    }
+  ]
+}

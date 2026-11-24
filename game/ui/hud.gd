@@ -115,6 +115,7 @@ func _draw() -> void:
 	draw_sects(player)
 	draw_hierarchy(player)
 	draw_sect_ledger(player)
+	draw_council(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -196,7 +197,7 @@ func draw_vitals(player: Player) -> void:
 	], 11, Color("#8fd8e8"))
 	y += 18.0
 	_text(Vector2(x, y), _fit(Hierarchy.hud_line(player.cultivation.realm, Game.faction_standing,
-		Game.notoriety, Hierarchy.seat_available()), 11, 408.0), 11, Color("#d8c898"))
+		Game.notoriety, Hierarchy.seat_available(Game.sect_seat_open)), 11, 408.0), 11, Color("#d8c898"))
 	y += 18.0
 	_text(Vector2(x, y), "Realm art: %s   Unlocks: %d" % [
 		String(player.cultivation.realm_ability().get("name", "—")), player.cultivation.unlock_ids().size()
@@ -639,7 +640,7 @@ func draw_hierarchy(player: Player) -> void:
 	_text(Vector2(x + 24.0, y + 58.0), "The Azure Cloud's ladder — a station is earned by standing and realm, not granted by a key.", 11, MUTED)
 	var realm := player.cultivation.realm
 	var current := Hierarchy.player_rank(realm, Game.faction_standing, Game.notoriety,
-		Hierarchy.seat_available())
+		Hierarchy.seat_available(Game.sect_seat_open))
 	_text(Vector2(x + 24.0, y + 78.0), _fit("Your station: %s · authority %d" % [
 		String(current.get("name", "")), Hierarchy.authority(String(current.get("id", "")))],
 		12, w - 48.0), 12, Color("#d8c898"))
@@ -675,7 +676,7 @@ func draw_hierarchy(player: Player) -> void:
 	var next_line := "No rung above this one."
 	if not next.is_empty():
 		var missing := Hierarchy.missing_for(String(next.get("id", "")), realm, Game.faction_standing,
-			Game.notoriety, Hierarchy.seat_available())
+			Game.notoriety, Hierarchy.seat_available(Game.sect_seat_open))
 		if missing.is_empty():
 			next_line = "Next: %s — ready." % String(next.get("name", ""))
 		else:
@@ -712,7 +713,7 @@ func draw_sect_ledger(player: Player) -> void:
 	_text(Vector2(x + 24.0, y + 34.0), "SECT LEDGER", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Contribution is earned in service and spent at the quartermaster's counter.", 11, MUTED)
 	var rank := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
-		Game.notoriety, Hierarchy.seat_available())
+		Game.notoriety, Hierarchy.seat_available(Game.sect_seat_open))
 	var rank_id := String(rank.get("id", "rank.servant"))
 	_text(Vector2(x + 24.0, y + 78.0), _fit(SectEconomy.summary_line(rank_id, Game.sect_contribution,
 		Game.sect_stipend_day, Clock.day), 11, w - 48.0), 11, Color("#d8c898"))
@@ -738,6 +739,62 @@ func draw_sect_ledger(player: Player) -> void:
 		row_y += 50.0
 
 	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER transact   ·   O / E / ESC — close",
+		10, Color("#7b8b94"))
+
+
+## The council: three blocs with their support bars and one vote. Lobbying is a
+## contribution purchase; the vote row states the rank and support it still wants.
+func draw_council(player: Player) -> void:
+	if not bool(host.council_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
+	var w := 860.0
+	var h := 520.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "SECT COUNCIL", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "The master's seat is held. The blocs decide whether it opens to a challenge.",
+		11, MUTED)
+	_text(Vector2(x + 24.0, y + 78.0), "%d contribution   ·   %s" % [Game.sect_contribution,
+		SectPolitics.summary_line(Game.sect_lobby)], 11, Color("#d8c898"))
+	draw_line(Vector2(x + 20.0, y + 94.0), Vector2(x + w - 20.0, y + 94.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.council_rows()
+	var cursor := clampi(int(host.council_index), 0, maxi(0, rows.size() - 1))
+	var row_y := y + 112.0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var enabled := bool(row.get("enabled", false))
+		if i == cursor:
+			draw_rect(Rect2(x + 18.0, row_y - 14.0, w - 36.0, 60.0), Color("#1b2328", 0.92))
+		_text(Vector2(x + 28.0, row_y), _fit(String(row.get("label", "?")), 13, 240.0), 13,
+			ACCENT if i == cursor else (INK if enabled else Color("#6f7f88")))
+		_text(Vector2(x + 28.0, row_y + 16.0), _fit(String(row.get("speaker", "")), 10, 240.0), 10, MUTED)
+		_text(Vector2(x + 280.0, row_y + 2.0), _fit(String(row.get("agenda", "")), 10, 340.0), 10, MUTED)
+		var support := int(row.get("support", 0))
+		var ceiling := maxi(1, int(row.get("max", 1)))
+		var bar_x := x + 640.0
+		var bar_w := 180.0
+		draw_rect(Rect2(bar_x, row_y + 4.0, bar_w, 8.0), Color("#242c31"))
+		draw_rect(Rect2(bar_x, row_y + 4.0, bar_w * clampf(float(support) / float(ceiling), 0.0, 1.0), 8.0),
+			Color("#7fd3e0" if String(row.get("kind", "")) == "bloc" else "#c8b070"))
+		_text(Vector2(bar_x, row_y + 22.0), "%d / %d" % [support, ceiling], 10, Color("#d8c898"))
+		var action := ""
+		if String(row.get("kind", "")) == "bloc":
+			action = "%d contribution → +%d support" % [int(row.get("cost", 0)), int(row.get("gain", 0))]
+		else:
+			action = "Needs %d support and the station of %s" % [SectPolitics.threshold(),
+				Hierarchy.title(SectPolitics.min_rank())]
+		if not enabled and String(row.get("reason", "")) != "":
+			action += "   — " + String(row.get("reason", ""))
+		_text(Vector2(x + 280.0, row_y + 20.0), _fit(action, 10, 340.0), 10,
+			MUTED if enabled else Color("#8a7070"))
+		row_y += 68.0
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER lobby / call the vote   ·   F3 / E / ESC — close",
 		10, Color("#7b8b94"))
 
 
@@ -1261,7 +1318,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

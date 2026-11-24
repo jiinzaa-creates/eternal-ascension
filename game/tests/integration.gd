@@ -3493,7 +3493,9 @@ func _run() -> void:
 	var m53_elder: Npc = main.elder
 	check(m53_elder != null, "the elder exists")
 	var m53_base: int = m53_elder.realm
-	Clock.day = 600
+	# Three years, not one and a half: every seed has time to clear the peak and
+	# a failed breakthrough, so the assertion stays about the sim, not the seed.
+	Clock.day = 1100
 	main._check_npc_progress()
 	check(m53_elder.realm >= m53_base, "an elder never loses a realm to time")
 	check(m53_elder.realm > m53_base, "the elder climbs over a year and a half")
@@ -3530,6 +3532,7 @@ func _run() -> void:
 	Clock.day = m53_day
 	Clock.hour = m53_hour
 	player.global_position = m53_home
+	main._refresh_npc_progress_all()
 	main._progress_day = m53_day
 	main._captive_day = m53_day
 	main._refresh_npc_progress_all()
@@ -3727,7 +3730,7 @@ func _run() -> void:
 	check(Hierarchy.for_archetype("guard") == "office.guardian", "a guard holds the guardian office")
 	check(Hierarchy.for_archetype("merchant") == "", "a merchant holds no sect seat")
 	var m57_station := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
-		Game.notoriety, Hierarchy.seat_available())
+		Game.notoriety, Hierarchy.seat_available(Game.sect_seat_open))
 	check(not m57_station.is_empty(), "the player has a station in the Azure Cloud")
 	main.toggle_hierarchy()
 	check(main.hierarchy_open, "the hierarchy screen opens")
@@ -3747,6 +3750,10 @@ func _run() -> void:
 	var m58_stipend_day := Game.sect_stipend_day
 	var m58_purchases := Game.sect_purchases
 	var m58_inventory: Array = player.inventory.duplicate(true)
+	var m58_standing: Dictionary = Game.faction_standing.duplicate(true)
+	var m58_notoriety := Game.notoriety
+	Game.faction_standing["faction.azure_cloud"] = 100
+	Game.notoriety = 0
 	Game.spirit_stones = 100
 	Game.sect_contribution = 20
 	Game.sect_stipend_day = SectEconomy.DEFAULT_STIPEND_DAY
@@ -3786,13 +3793,15 @@ func _run() -> void:
 	Game.sect_contribution = 50
 	var m58_pills := 0
 	for m58_item in player.inventory:
-		if String((m58_item as Dictionary).get("base", "")) == "base.pill.qi_gathering":
-			m58_pills += 1
+		var m58_entry: Dictionary = m58_item
+		if String(m58_entry.get("base", "")) == "base.pill.qi_gathering":
+			m58_pills += maxi(1, int(m58_entry.get("count", 1)))
 	main._sect_ledger_activate(m58_service_index)
 	var m58_pills_after := 0
 	for m58_item in player.inventory:
-		if String((m58_item as Dictionary).get("base", "")) == "base.pill.qi_gathering":
-			m58_pills_after += 1
+		var m58_entry_after: Dictionary = m58_item
+		if String(m58_entry_after.get("base", "")) == "base.pill.qi_gathering":
+			m58_pills_after += maxi(1, int(m58_entry_after.get("count", 1)))
 	check(Game.sect_contribution == 44, "the quartermaster takes exactly the service cost")
 	check(m58_pills_after == m58_pills + 1, "the quartermaster hands over a real pill")
 	check(Game.sect_purchases == m58_purchases + 1, "each purchase advances the counter")
@@ -3817,7 +3826,79 @@ func _run() -> void:
 	Game.sect_contribution = m58_contribution
 	Game.sect_stipend_day = m58_stipend_day
 	Game.sect_purchases = m58_purchases
+	Game.faction_standing = m58_standing
+	Game.notoriety = m58_notoriety
 	player.inventory = m58_inventory
+
+	# --- M59: the council and the vote -----------------------------------------
+	var m59_contribution := Game.sect_contribution
+	var m59_lobby: Dictionary = Game.sect_lobby.duplicate(true)
+	var m59_seat := Game.sect_seat_open
+	var m59_standing: Dictionary = Game.faction_standing.duplicate(true)
+	var m59_notoriety := Game.notoriety
+	var m59_realm: int = player.cultivation.realm
+	var m59_sublevel: int = player.cultivation.sublevel
+	var m59_qi: float = player.cultivation.qi
+	var m59_hp: float = player.hp
+	Game.faction_standing["faction.azure_cloud"] = 100
+	Game.notoriety = 0
+	Game.sect_contribution = 200
+	Game.sect_lobby = {}
+	Game.sect_seat_open = false
+	player.cultivation.realm = 6
+	player.cultivation.sublevel = 1
+	player.rebuild_stats()
+	player.cultivation.qi = player.cultivation.qi_max(player.stats)
+	check(main._player_rank_id() == "rank.deputy", "a qualified player stands at Deputy while the seat is held")
+
+	var m59_rows: Array = main.council_rows()
+	check(m59_rows.size() == 4, "the council lists three blocs and the vote")
+	check(String((m59_rows[0] as Dictionary).get("kind", "")) == "bloc", "the first row is a bloc")
+	var m59_vote_index := -1
+	for m59_i in m59_rows.size():
+		if String((m59_rows[m59_i] as Dictionary).get("kind", "")) == "vote":
+			m59_vote_index = m59_i
+	check(m59_vote_index == 3, "the vote closes the council list")
+	main.toggle_council()
+	check(main.council_open, "the council screen opens")
+	check(not player.is_physics_processing(), "the council freezes play")
+	main.toggle_council()
+	check(not main.council_open and player.is_physics_processing(), "closing the council resumes play")
+
+	main._council_activate(0)
+	check(Game.sect_contribution == 192, "lobbying spends contribution")
+	check(int(Game.sect_lobby.get("bloc.traditionalists", 0)) == 10, "lobbying records the investment")
+	check(not bool((main.council_rows()[m59_vote_index] as Dictionary).get("enabled", false)),
+		"the vote is refused while the council is split")
+	main._council_activate(m59_vote_index)
+	check(not Game.sect_seat_open, "a refused vote leaves the seat held")
+
+	Game.sect_lobby = {"bloc.traditionalists": 40, "bloc.reformists": 30, "bloc.militants": 30}
+	check(bool((main.council_rows()[m59_vote_index] as Dictionary).get("enabled", false)),
+		"a deputy with enough support can call the vote")
+	main._council_activate(m59_vote_index)
+	check(Game.sect_seat_open, "the vote opens the master's seat")
+	check(main._player_rank_id() == "rank.sect_master", "the open seat makes the qualified player Sect Master")
+
+	Save.delete_slot(101)
+	main._save(101)
+	Game.sect_lobby.clear()
+	Game.sect_seat_open = false
+	main._load_game(101)
+	check(Game.sect_seat_open, "the opened seat survives a save")
+	check(int(Game.sect_lobby.get("bloc.traditionalists", 0)) == 40, "the lobbies survive a save")
+	Save.delete_slot(101)
+
+	Game.sect_contribution = m59_contribution
+	Game.sect_lobby = m59_lobby
+	Game.sect_seat_open = m59_seat
+	Game.faction_standing = m59_standing
+	Game.notoriety = m59_notoriety
+	player.cultivation.realm = m59_realm
+	player.cultivation.sublevel = m59_sublevel
+	player.rebuild_stats()
+	player.cultivation.qi = m59_qi
+	player.hp = minf(m59_hp, player.hp_max)
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

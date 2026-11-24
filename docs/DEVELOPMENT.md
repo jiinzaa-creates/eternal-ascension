@@ -768,6 +768,49 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   refused twice, a small donation, a quartermaster purchase that grants a real pill and advances
   the counter, the story award, and contribution/day surviving a save and load.
 
+## Sect politics
+
+- **Support is bought with contribution, not a second currency.** `data/politics.json` holds
+  three blocs — Traditionalists (Elder Bai), Reformists (Instructor Rui) and Militants (the gate
+  captain). Each starts at 20 support, caps at 100, and sells 10 support for 8 contribution.
+  `SectPolitics` (`game/systems/sect_politics.gd`) never mutates the run: `lobby()` takes the
+  current contribution and investment map and returns the result plus `ok`/`reason`, and
+  `support_for()` derives support as `base + invested`, clamped to the ceiling. The same
+  contribution that buys pills at the quartermaster is therefore a political resource with a real
+  opportunity cost.
+- **Only the last lobby can be partial.** A lobby adds the bloc's `gain`, but never past its
+  ceiling; if only 5 points of room remain, the action buys 5 and cannot be repeated. A maxed bloc
+  is refused, so a saved map never carries wasted contribution.
+- **The vote is the gate to the seat.** `can_vote()` refuses a seat that is already open, a player
+  below `rank.deputy`, and any council below the 150-support threshold; the screen shows the
+  current total, so the vote is never a blind gamble. `vote()` opens the seat on success. Calling
+  the vote requires the Deputy station, which already means effective Azure Cloud standing 80 and
+  realm 5 — politics is a late-game act, not an early shortcut.
+- **The top rung still applies its own gates.** `Hierarchy.seat_available(open_override)` returns
+  true when the data declares the seat vacant or the run has opened it. The player's station is
+  still `Hierarchy.player_rank(...)`, so opening the seat only matters to a cultivator who also
+  has 95 effective standing and realm 6; then the same derived-station path yields Sect Master.
+  No rank counter is written.
+- **The council screen.** **F3** opens a frozen four-row screen: three blocs with speaker, agenda,
+  a support bar, ceiling and the price of one more lobby, then the vote with its requirement and
+  refusal reason. Arrows select, ENTER lobbies or calls the vote, and **F3**, **E** or **ESC**
+  closes. Lobbying updates contribution and the saved map immediately; the screen recomputes every
+  row from that state rather than caching a stale number.
+- **Saved keys and validation.** `Game.sect_lobby` (bloc id → invested support) and
+  `Game.sect_seat_open` are optional keys under schema 2, reset in `new_run()` and read through
+  `SectPolitics.sanitize_lobby()` and a boolean cast. `SectPolitics.validate()` runs at boot and
+  rejects a missing council, the wrong bloc count, duplicate ids, empty names,
+  speakers or agendas, negative base support, ceilings that cannot rise or exceed 100, zero gain
+  or cost, missing or non-positive vote thresholds, a vote that passes without lobbying or cannot
+  be won at all, and a minimum rank that is not on the ladder.
+- **Tests.** Unit `_sect_politics_tests` covers the three blocs, base/invested/clamped support,
+  totals, lobby costs and gains, the partial last lobby, overdraw and unknown blocks, every vote
+  refusal (support, rank, already open), successful vote, lobby sanitation, saved keys, the held
+  versus open seat, and sixteen validation negatives. Integration covers the four-row screen,
+  freeze, a lobby spending contribution and recording investment, a refused early vote, a
+  successful vote at 160 support, the qualified player becoming Sect Master, and the seat and
+  lobbies surviving a save and load.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

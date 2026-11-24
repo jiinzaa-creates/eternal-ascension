@@ -7,8 +7,8 @@ extends RefCounted
 ## same effective Azure Cloud standing M55 already tracks and from their realm.
 ## That keeps one source of truth — acting for the sect raises its standing, and
 ## the ladder reads the result — with no rank key in the save. The master's seat
-## is held by an NPC until M59 politics opens it; the model already accepts a
-## vacant seat, so leadership is a data change, not a rewrite.
+## is held by an NPC until the council vote opens it; the model accepts the
+## saved political result, and the top rung still applies its own gates.
 
 const EXPECTED_LADDER := 7
 const EXPECTED_OFFICES := 2
@@ -34,8 +34,10 @@ static func assignments() -> Dictionary:
 	return DB.hierarchy_assignments()
 
 
-static func seat_available() -> bool:
-	return not bool(DB.hierarchy_data.get("seat_held", true))
+## The seat is held by content unless the run has opened it through the council.
+## `open_override` is the saved political result; data can also declare it vacant.
+static func seat_available(open_override: bool = false) -> bool:
+	return open_override or not bool(DB.hierarchy_data.get("seat_held", true))
 
 
 static func title(id: String) -> String:
