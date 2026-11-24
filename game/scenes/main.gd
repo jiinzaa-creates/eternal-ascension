@@ -14,8 +14,6 @@ const BEAST_SHARE := 0.45
 ## Share of wild humanoids that turn up as elites. Drawn from its own stream, so
 ## tuning the share cannot reshuffle the spawns themselves.
 const ELITE_SHARE := 0.12
-## The tomb's warden. A save remembers this id once it has fallen.
-const WARDEN_ID := "boss.tomb_warden"
 
 var phase := "creation"  # creation | play | realm
 ## Character creation is two screens: formation points, then identity.
@@ -3845,9 +3843,12 @@ func _enter_realm() -> void:
 	realm_instance.name = "HiddenRealm"
 	realm_instance.entity_parent = world
 	world.add_child(realm_instance)
-	# A warden already killed in this save stays dead: the tomb remembers.
-	realm_instance.spawn_warden = not bosses_slain.has(WARDEN_ID)
 	realm_instance.generate(realm_seed)
+	# A warden already killed in this save stays dead: the tomb remembers.
+	var warden_dead := realm_instance.warden_id != "" and bosses_slain.has(realm_instance.warden_id)
+	if warden_dead:
+		realm_instance.clear_warden()
+	realm_instance.spawn_warden = not warden_dead
 	if realm_cleared:
 		realm_instance.mark_cleared()
 	player.global_position = realm_instance.entry_position() + Vector2(0, 60)
@@ -3858,7 +3859,7 @@ func _enter_realm() -> void:
 	lighting.add_light(realm_instance, realm_instance.altar_position(), Color("#c9b6ff"), 320.0, 1.0)
 	Bus.toast.emit("The rift closes behind you. The tomb does not want you here.")
 	if realm_instance.has_warden():
-		var ward: Dictionary = Boss.profile(DB.boss(WARDEN_ID))
+		var ward: Dictionary = Boss.profile(DB.boss(realm_instance.warden_id))
 		Bus.toast.emit(String(ward.get("intro", "Something old rises in the dark.")))
 
 

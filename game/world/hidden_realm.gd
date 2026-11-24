@@ -2,20 +2,32 @@ class_name HiddenRealm
 extends Node2D
 ## Tomb of the Hollow Moon — the first hidden realm.
 ##
-## A handcrafted template (5x4 room grid, entry at one corner, inheritance at
-## the far corner) filled from a seed: room roles, a spanning-tree of corridors
-## plus a few loops, hazards, enemies, chests. Connectivity is guaranteed by
-## construction, and the unit suite flood-fills it to prove that.
+## A data-driven room grid filled from a seed: room roles, a spanning-tree of
+## corridors plus a few loops, hazards, enemies, chests and an altar. The layout
+## comes from `hidden_realm_templates.json`; connectivity is guaranteed by
+## construction, and the unit suite flood-fills every template to prove that.
 
 const ROOM_W := 420.0
 const ROOM_H := 340.0
 const GAP := 110.0
+## The historic tomb size, kept as the fallback if content is missing.
 const COLS := 5
 const ROWS := 4
 const HAZARD_DPS := 7.0
 
 var realm_seed: int = 0
 var realm_name: String = "Tomb of the Hollow Moon"
+var template_id: String = "template.tomb"
+var profile: Dictionary = {}
+var cols: int = COLS
+var rows: int = ROWS
+var treasure_count: int = 2
+var loop_count: int = 4
+var hazard_chance: float = 1.0
+var enemy_ilvl: int = 2
+var enemies_per_room: int = 2
+var enemy_roster: Array = []
+var warden_id: String = "boss.tomb_warden"
 var cells: Array[Vector2i] = []
 var links: Array = []
 var kinds: Dictionary = {}
@@ -37,9 +49,25 @@ var entity_parent: Node = null
 var detached: Array = []
 
 
-func generate(seed_value: int) -> void:
+func generate(seed_value: int, wanted_template: String = "") -> void:
 	realm_seed = seed_value
-	var r: RandomNumberGenerator = Rng.stream("hidden_realm", seed_value, 0)
+	var id := wanted_template if wanted_template != "" else HiddenRealms.default_id()
+	profile = HiddenRealms.template(id)
+	if profile.is_empty():
+		profile = HiddenRealms.default_template()
+	template_id = String(profile.get("id", "template.tomb"))
+	cols = clampi(int(profile.get("cols", COLS)), 3, 8)
+	rows = clampi(int(profile.get("rows", ROWS)), 3, 8)
+	realm_name = String(profile.get("name", realm_name))
+	treasure_count = maxi(1, int(profile.get("treasures", 2)))
+	loop_count = maxi(0, int(profile.get("loops", 4)))
+	hazard_chance = clampf(float(profile.get("hazard_chance", 1.0)), 0.0, 1.0)
+	enemy_ilvl = clampi(int(profile.get("enemy_ilvl", 2)), 1, 12)
+	enemies_per_room = clampi(int(profile.get("enemies_per_room", 2)), 1, 6)
+	enemy_roster = (profile.get("enemy_roster", []) as Array).duplicate()
+	warden_id = String(profile.get("warden", ""))
+	var stream_index := maxi(0, HiddenRealms.index_of(template_id))
+	var r: RandomNumberGenerator = Rng.stream("hidden_realm", seed_value, stream_index)
 	cells.clear()
 	links.clear()
 	kinds.clear()
@@ -47,11 +75,13 @@ func generate(seed_value: int) -> void:
 	interactables.clear()
 	spawn_points.clear()
 
-	for y in ROWS:
-		for x in COLS:
+	for y in rows:
+		for x in cols:
 			cells.append(Vector2i(x, y))
-	entry_cell = Vector2i(0, ROWS - 1)
-	altar_cell = Vector2i(COLS - 1, 0)
+	entry_cell = HiddenRealms.corner(String(profile.get("entry", "southwest")), cols, rows)
+	altar_cell = HiddenRealms.corner(String(profile.get("altar", "northeast")), cols, rows)
+	if entry_cell == altar_cell:
+		altar_cell = Vector2i(cols - 1, 0)
 
 	_assign_kinds(r)
 	_build_links(r)
@@ -73,7 +103,7 @@ func _assign_kinds(r: RandomNumberGenerator) -> void:
 			treasure_candidates.append(cell)
 	# Determinism: pick from the seeded stream. Array.shuffle() would consume the
 	# engine-global RNG, so two realms generated from the same seed would differ.
-	for _i in mini(2, treasure_candidates.size()):
+	for _i in mini(treasure_count, treasure_candidates.size()):
 		var pick := r.randi_range(0, treasure_candidates.size() - 1)
 		kinds[treasure_candidates[pick]] = "treasure"
 		treasure_candidates.remove_at(pick)
@@ -87,7 +117,7 @@ func _build_links(r: RandomNumberGenerator) -> void:
 		var options: Array[Vector2i] = []
 		for offset in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var neighbor: Vector2i = current + offset
-			if neighbor.x < 0 or neighbor.y < 0 or neighbor.x >= COLS or neighbor.y >= ROWS:
+			if neighbor.x < 0 or neighbor.y < 0 or neighbor.x >= cols or neighbor.y >= rows:
 				continue
 			if visited.has(neighbor):
 				continue
@@ -101,7 +131,7 @@ func _build_links(r: RandomNumberGenerator) -> void:
 		stack.append(pick)
 
 	# A few extra edges turn the maze into a looping tomb rather than a tree.
-	for i in 4:
+	for i in loop_count:
 		var a: Vector2i = cells[r.randi_range(0, cells.size() - 1)]
 		var b: Vector2i = cells[r.randi_range(0, cells.size() - 1)]
 		if a != b and not are_linked(a, b):
@@ -117,8 +147,8 @@ func are_linked(a: Vector2i, b: Vector2i) -> bool:
 
 ## The world rectangle the room grid occupies, used for camera bounds.
 func world_bounds() -> Rect2:
-	var width := float(COLS - 1) * (ROOM_W + GAP) + ROOM_W
-	var height := float(ROWS - 1) * (ROOM_H + GAP) + ROOM_H
+	var width := float(cols - 1) * (ROOM_W + GAP) + ROOM_W
+	var height := float(rows - 1) * (ROOM_H + GAP) + ROOM_H
 	return Rect2(Vector2(-ROOM_W * 0.5, -ROOM_H * 0.5), Vector2(width, height))
 
 
@@ -175,6 +205,8 @@ func _build_hazards(r: RandomNumberGenerator) -> void:
 	for cell in cells:
 		if String(kinds[cell]) != "combat":
 			continue
+		if hazard_chance < 1.0 and r.randf() > hazard_chance:
+			continue
 		var center := cell_center(cell)
 		var offset := Vector2(r.randf_range(-90.0, 90.0), r.randf_range(-70.0, 70.0))
 		hazards.append({
@@ -211,30 +243,32 @@ const ENEMY_ROSTER: Array[String] = ["sentinel", "skirmisher", "archer", "brawle
 
 
 func _spawn_enemies(r: RandomNumberGenerator) -> void:
-	var ilvl := 2
+	var roster: Array = enemy_roster
+	if roster.is_empty():
+		roster = ENEMY_ROSTER
 	for cell in cells:
 		var kind := String(kinds[cell])
 		if kind != "combat" and kind != "treasure":
 			continue
-		var count := 2 if kind == "combat" else 1
+		var count := enemies_per_room if kind == "combat" else 1
 		for i in count:
 			var offset := Vector2(r.randf_range(-120.0, 120.0), r.randf_range(-90.0, 90.0))
 			var pos: Vector2 = cell_center(cell) + offset
 			spawn_points.append(pos)
 			var dummy := Dummy.new()
-			dummy.ilvl = ilvl
+			dummy.ilvl = enemy_ilvl
 			dummy.position = pos
-			var slot := (absi(cell.x) * 3 + absi(cell.y) * 5 + i) % ENEMY_ROSTER.size()
-			dummy.archetype = String(ENEMY_ROSTER[slot])
+			var slot := (absi(cell.x) * 3 + absi(cell.y) * 5 + i) % roster.size()
+			dummy.archetype = String(roster[slot])
 			_attach(dummy)
 
 
 ## The warden stands between the entry hall and the altar. It is placed before
 ## the realm's other guards so its silhouette is never lost among them.
 func _spawn_warden() -> void:
-	if not spawn_warden:
+	if not spawn_warden or warden_id == "":
 		return
-	var entry: Dictionary = DB.boss("boss.tomb_warden")
+	var entry: Dictionary = DB.boss(warden_id)
 	if entry.is_empty():
 		return
 	var body := Dummy.new()
@@ -251,6 +285,16 @@ func has_warden() -> bool:
 	if warden == null or not is_instance_valid(warden):
 		return false
 	return float(warden.hp) > 0.0
+
+
+## Remove a warden that a save has already killed. Generation runs before the
+## scene checks `bosses_slain`, so a cleared tomb takes this path rather than a
+## second gate rule.
+func clear_warden() -> void:
+	spawn_warden = false
+	if is_instance_valid(warden):
+		warden.queue_free()
+	warden = null
 
 
 ## Spawns one spirit beast of a species at a position, parented like the rest of

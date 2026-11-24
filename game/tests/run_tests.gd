@@ -4989,6 +4989,16 @@ func _hidden_realm_tests() -> void:
 	add_child(realm)
 	realm.generate(4242)
 
+	check(HiddenRealms.templates().size() == 3, "the registry holds three layouts")
+	check(HiddenRealms.default_id() == "template.tomb", "the tomb remains the default")
+	check(String(HiddenRealms.default_template().get("name", "")) == "Tomb of the Hollow Moon",
+		"the default template resolves")
+	check(HiddenRealms.index_of("template.tomb") == 0 and HiddenRealms.index_of("template.nope") == -1,
+		"templates are addressed by order")
+	check(HiddenRealms.corner("northwest", 5, 4) == Vector2i(0, 0), "a northwest corner is the origin")
+	check(HiddenRealms.corner("southeast", 5, 4) == Vector2i(4, 3), "a southeast corner is the far cell")
+	check(HiddenRealms.corner("north", 5, 4) == Vector2i(0, 0), "an unknown corner falls back safely")
+
 	check(realm.cells.size() == 20, "template lays out a 5x4 room grid")
 	check(realm.links.size() >= 19, "corridors form a spanning tree plus loops")
 	check(realm.all_rooms_reachable(), "every room is reachable from the entry")
@@ -5026,6 +5036,103 @@ func _hidden_realm_tests() -> void:
 			same_kinds = false
 			break
 	check(same_kinds, "same seed rebuilds the same room roles")
+
+	# Every authored layout must generate, connect, and fill on its own terms.
+	for value in HiddenRealms.templates():
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var other := HiddenRealm.new()
+		add_child(other)
+		other.generate(777, id)
+		check(other.cells.size() == int(entry.get("cols", 0)) * int(entry.get("rows", 0)),
+			"%s lays out its own grid" % id)
+		check(other.all_rooms_reachable(), "%s is fully connected" % id)
+		check(String(other.profile.get("id", "")) == id, "%s reports its profile" % id)
+		var other_bounds: Rect2 = other.world_bounds()
+		check(other_bounds.size.x >= HiddenRealm.ROOM_W * other.cols, "%s bounds cover the grid" % id)
+		var other_chests := 0
+		var other_has_exit := false
+		var other_has_altar := false
+		for item in other.interactables:
+			if String(item.id).begins_with("realm.chest"):
+				other_chests += 1
+			elif String(item.id) == "realm.exit":
+				other_has_exit = true
+			elif String(item.id) == "realm.altar":
+				other_has_altar = true
+		check(other_has_exit and other_has_altar, "%s has an exit and an altar" % id)
+		check(other_chests == int(entry.get("treasures", 0)), "%s places one chest per treasure room" % id)
+		check(other.hazards.size() <= other.cells.size(), "%s hazards stay inside the rooms" % id)
+		check(other.spawn_points.size() >= other.cells.size() - 2, "%s fills its rooms with guards" % id)
+		check(other.has_warden() == (String(entry.get("warden", "")) != ""),
+			"%s posts a warden only when it names one" % id)
+		var repeat_same := HiddenRealm.new()
+		add_child(repeat_same)
+		repeat_same.generate(777, id)
+		check(JSON.stringify(other.links) == JSON.stringify(repeat_same.links),
+			"%s rebuilds the same corridors" % id)
+		other.queue_free()
+		repeat_same.queue_free()
+
+	check(realm.has_warden(), "the default tomb posts its warden")
+	realm.clear_warden()
+	check(not realm.has_warden(), "a cleared tomb removes its warden")
+
+	check(HiddenRealms.validate(DB.hidden_realm_data).is_empty(), "the shipped realm templates validate")
+	var broken: Dictionary = DB.hidden_realm_data.duplicate(true)
+	broken.erase("templates")
+	check(not HiddenRealms.validate(broken).is_empty(), "missing templates are rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array).append((DB.hidden_realm_data["templates"] as Array)[0].duplicate(true))
+	check(not HiddenRealms.validate(broken).is_empty(), "duplicate templates are rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["name"] = " "
+	check(not HiddenRealms.validate(broken).is_empty(), "a nameless template is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["cols"] = 2
+	check(not HiddenRealms.validate(broken).is_empty(), "a too-narrow grid is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["rows"] = 9
+	check(not HiddenRealms.validate(broken).is_empty(), "a too-tall grid is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["entry"] = "middle"
+	check(not HiddenRealms.validate(broken).is_empty(), "an unknown entry corner is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["altar"] = "middle"
+	check(not HiddenRealms.validate(broken).is_empty(), "an unknown altar corner is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["altar"] = String((DB.hidden_realm_data["templates"] as Array)[0].get("entry", ""))
+	check(not HiddenRealms.validate(broken).is_empty(), "an entry equal to the altar is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["treasures"] = 0
+	check(not HiddenRealms.validate(broken).is_empty(), "a treeless template is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["treasures"] = 99
+	check(not HiddenRealms.validate(broken).is_empty(), "too many treasure rooms are rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["loops"] = -1
+	check(not HiddenRealms.validate(broken).is_empty(), "negative loops are rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["hazard_chance"] = 1.5
+	check(not HiddenRealms.validate(broken).is_empty(), "an impossible hazard chance is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["enemy_ilvl"] = 0
+	check(not HiddenRealms.validate(broken).is_empty(), "an invalid enemy tier is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["enemies_per_room"] = 0
+	check(not HiddenRealms.validate(broken).is_empty(), "an empty room population is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["enemy_roster"] = []
+	check(not HiddenRealms.validate(broken).is_empty(), "an empty enemy roster is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["enemy_roster"] = ["nope"]
+	check(not HiddenRealms.validate(broken).is_empty(), "an unknown enemy is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	(broken["templates"] as Array)[0]["warden"] = "boss.nope"
+	check(not HiddenRealms.validate(broken).is_empty(), "an unknown warden is rejected")
+	broken = DB.hidden_realm_data.duplicate(true)
+	broken["default"] = "template.nope"
+	check(not HiddenRealms.validate(broken).is_empty(), "an unknown default template is rejected")
 
 	realm.queue_free()
 	twin.queue_free()

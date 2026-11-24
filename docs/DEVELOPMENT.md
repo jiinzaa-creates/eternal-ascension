@@ -1234,6 +1234,31 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - Any new archetype rule belongs in `EnemyAI` with checks in `run_tests`, plus a scene-level check in
   `integration.gd` before it is called working.
 
+## Hidden realm framework
+
+- **Layouts are data.** `data/hidden_realm_templates.json` holds the templates, and `HiddenRealms`
+  (`game/systems/hidden_realms.gd`) is the only reader. A template declares its grid (`cols`, `rows`),
+  entry and altar corners, loop count, treasure-room count, hazard chance, enemy tier, population and
+  roster, and an optional warden. The default is `template.tomb`, the historic 5×4 Tomb of the Hollow
+  Moon; `template.ossuary` and `template.shrine` are the other authored layouts that prove the shape.
+- **`HiddenRealm.generate(seed, template_id = "")`** resolves the template, lays out the grid and fills
+  it: entry/altar roles, treasure rooms, a spanning tree plus `loops` extra corridors, seeded hazards,
+  one chest per treasure room, room guards and the profile's warden. Connectivity is guaranteed by
+  construction and flood-filled in the unit suite for every template.
+- **The default is unchanged.** Calling `generate(seed)` selects `template.tomb` at stream index 0, the
+  same `Rng.stream("hidden_realm", seed, 0)` the old generator used, so existing realm seeds keep their
+  corridor layout. Other templates use their registry index as the stream counter, so a template and a
+  seed always rebuild the same realm.
+- **`DB.validate` owns boot safety.** It rejects an unknown default, duplicate ids, a missing name, a
+  grid outside 3–8 cells per side, an unknown or identical entry/altar corner, zero or excessive
+  treasure rooms, invalid loops/hazard chance/tier/population, an empty or unknown enemy roster and an
+  unknown warden. The scene reads the spawned warden's id from the realm rather than a hardcoded
+  constant, so a bossless layout needs no special case.
+- **Scope.** This milestone is the framework; the rift still opens the default tomb, and choosing or
+  discovering another template belongs to the next milestone. A future selector must save the template
+  id beside `realm_seed`; today only the seed is stored and the default is implied. M64 adds the
+  remaining content families as data entries, not new generators.
+
 ## Spirit beasts and bosses
 
 - **A beast is a species, not a new body.** `Beasts` reads `data/spirit_beasts.json` and normalises each
@@ -1271,8 +1296,8 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - The HUD draws one wide boss bar with the phase name and a mark at every threshold, scanning the
   `boss` group. A boss also scales its body by 1.7× in `_draw` and marks its bar, so it reads as one at
   a glance without touching collision or reach.
-- Add a species or a boss in data and validate it; the only code that may need touching is the boss id
-  the tomb looks for (`main.WARDEN_ID`) and, for a new gate, the guard function beside the altar.
+- Add a species or a boss in data and validate it; the only code that may need touching is the
+  `warden` field of a hidden-realm template and, for a new gate, the guard function beside the altar.
 
 ## Combat polish
 

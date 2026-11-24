@@ -76,7 +76,7 @@ On the creation screen: **1–6** allocate a point to STR / DEX / AGI / INT / WI
 4. **Cultivate** — meditate to gather Qi, advance through 10 sublevels, then face a
    breakthrough at the peak. Failure causes Qi deviation, meridian damage, or regression.
 5. **The Rift** — east of the market, a portal opens the *Tomb of the Hollow Moon*, a seeded
-   5×4 hidden realm with corridors, hazards, chests, and an inheritance altar. Saves are
+   data-driven hidden realm with corridors, hazards, chests, and an inheritance altar. Saves are
    blocked inside; exit to save.
 6. **Save/load** — F5/F9. Saves are atomic, checksummed, backed up three deep, and recover
    automatically from a corrupted newest file.
@@ -194,6 +194,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Day/night lighting: `CanvasModulate` ambient tint plus shrine, rift and altar point lights.
 - Resolution scaling: 1280×720 canvas, integer stretch on exact multiples, EXPAND otherwise.
 - One settlement, 19 scheduled NPCs with generated records, one sect questline with event-driven steps and rewards.
+- Hidden-realm framework: layouts are content in `data/hidden_realm_templates.json` (grid, corners, loops, treasures, hazard chance, enemy tier/roster and optional warden), with three authored layouts and boot validation. The rift still opens the default 5×4 Tomb of the Hollow Moon; selecting a discovered layout is the next milestone. Every template is deterministic and flood-fill tested.
 - One procedural hidden realm with hazards, chests and a one-time inheritance.
 - Save/load with atomic writes, sha256 verification, 3 backups, corruption fallback, schema migration.
 - Structured logging with an in-memory ring buffer (`Log.dump()`).

@@ -59,6 +59,8 @@ var politics_data: Dictionary = {}
 var player_sect_data: Dictionary = {}
 ## Sect autonomy: daily upkeep, steward bonus, doctrine guards and events.
 var sect_autonomy_data: Dictionary = {}
+## Hidden realm layouts: room grids, corners, populations and wardens.
+var hidden_realm_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -119,6 +121,7 @@ func load_all() -> void:
 	politics_data = _read("politics.json")
 	player_sect_data = _read("player_sect.json")
 	sect_autonomy_data = _read("sect_autonomy.json")
+	hidden_realm_data = _read("hidden_realm_templates.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -756,6 +759,8 @@ func validate() -> Array:
 	problems.append_array(PlayerSect.validate(player_sect_data))
 	# The hall's own day: upkeep, guarded raids and a reachable event table.
 	problems.append_array(SectAutonomy.validate(sect_autonomy_data))
+	# Hidden realm layouts: a valid default, reachable corners and real enemies.
+	problems.append_array(HiddenRealms.validate(hidden_realm_data))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())

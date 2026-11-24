@@ -415,6 +415,8 @@ func _run() -> void:
 	await frames(3)
 	check(String(main.phase) == "realm", "the rift enters the hidden realm")
 	check(main.realm_instance != null, "a hidden realm instance exists")
+	check(main.realm_instance.template_id == "template.tomb", "the rift opens the default layout")
+	check(main.realm_instance.cols == 5 and main.realm_instance.rows == 4, "the default tomb keeps its 5x4 grid")
 	check(not main.chunks.visible, "the overworld is hidden inside the realm")
 	check(not main.chunks.props[0].visible, "streamed props hide with the overworld")
 	check(not main.settlement.buildings[0].visible, "buildings hide inside the realm")
@@ -459,6 +461,16 @@ func _run() -> void:
 	await frames(3)
 	check(String(main.phase) == "play", "the exit returns to the overworld")
 	check(main.realm_instance == null, "the realm instance is released")
+	main._enter_realm()
+	await frames(3)
+	check(not main.realm_instance.has_warden(), "a cleared tomb stays clear on the next visit")
+	for node in main.realm_instance.interactables:
+		if node.id == "realm.exit":
+			exit_node = node
+	player.global_position = exit_node.global_position
+	main._try_interact()
+	await frames(3)
+	check(main.realm_instance == null, "the second visit exits cleanly")
 	check(main.chunks.visible, "the overworld is visible again")
 	check(main.chunks.props[0].visible, "streamed props return with the overworld")
 	check(main.camera_rig.limit_right == int(ChunkManager.world_bounds().end.x), "camera bounds return to the province")

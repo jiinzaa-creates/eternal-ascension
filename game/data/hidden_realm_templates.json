@@ -1,0 +1,50 @@
+{
+  "default": "template.tomb",
+  "templates": [
+    {
+      "id": "template.tomb",
+      "name": "Tomb of the Hollow Moon",
+      "cols": 5,
+      "rows": 4,
+      "entry": "southwest",
+      "altar": "northeast",
+      "loops": 4,
+      "treasures": 2,
+      "hazard_chance": 1.0,
+      "enemy_ilvl": 2,
+      "enemies_per_room": 2,
+      "enemy_roster": ["sentinel", "skirmisher", "archer", "brawler"],
+      "warden": "boss.tomb_warden"
+    },
+    {
+      "id": "template.ossuary",
+      "name": "Moonlit Ossuary",
+      "cols": 6,
+      "rows": 4,
+      "entry": "northwest",
+      "altar": "southeast",
+      "loops": 6,
+      "treasures": 3,
+      "hazard_chance": 0.5,
+      "enemy_ilvl": 3,
+      "enemies_per_room": 2,
+      "enemy_roster": ["sentinel", "brawler", "archer"],
+      "warden": ""
+    },
+    {
+      "id": "template.shrine",
+      "name": "Starfall Shrine",
+      "cols": 4,
+      "rows": 3,
+      "entry": "southwest",
+      "altar": "northeast",
+      "loops": 2,
+      "treasures": 1,
+      "hazard_chance": 0.75,
+      "enemy_ilvl": 4,
+      "enemies_per_room": 1,
+      "enemy_roster": ["skirmisher", "archer"],
+      "warden": ""
+    }
+  ]
+}
