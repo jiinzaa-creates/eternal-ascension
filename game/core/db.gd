@@ -47,6 +47,8 @@ var captivity: Dictionary = {}
 var stories: Dictionary = {}
 ## Factions: standing bands with effects, members and the award tuning.
 var factions_data: Dictionary = {}
+## The twelve sects: identity, seat, economy, fault line and signature arts.
+var sects_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -101,6 +103,7 @@ func load_all() -> void:
 	captivity = _read("captivity.json")
 	stories = _read("stories.json")
 	factions_data = _read("factions.json")
+	sects_data = _read("sects.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -134,6 +137,7 @@ func load_all() -> void:
 	_index("story", story_templates())
 	_index("faction", factions())
 	_index("faction_band", faction_bands())
+	_index("sect", sects())
 
 
 func _read(file: String) -> Dictionary:
@@ -330,6 +334,15 @@ func faction_band(id: String) -> Dictionary:
 func faction_awards() -> Dictionary:
 	var value: Variant = factions_data.get("awards", {})
 	return value if typeof(value) == TYPE_DICTIONARY else {}
+
+
+func sects() -> Array:
+	var value: Variant = sects_data.get("sects", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func sect(id: String) -> Dictionary:
+	return by_id("sect", id)
 
 
 func bond(id: String) -> Dictionary:
@@ -690,6 +703,9 @@ func validate() -> Array:
 	# Faction content: bands must tile the ladder, each archetype and boss may
 	# belong to one faction, and allies and rivals must name each other back.
 	problems.append_array(Factions.validate(factions_data))
+	# Sect content: exactly twelve houses, unique names and signatures, real
+	# links to playable arts, and one local gate tied to a real faction.
+	problems.append_array(Sects.validate(sects_data))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())

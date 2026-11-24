@@ -81,6 +81,7 @@ func _ready() -> void:
 	_npc_progress_tests()
 	_stories_tests()
 	_factions_tests()
+	_sects_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -4209,6 +4210,114 @@ func _factions_tests() -> void:
 	broken = DB.factions_data.duplicate(true)
 	(broken["factions"] as Array)[3]["bosses"] = ["boss.nope"]
 	check(not Factions.validate(broken).is_empty(), "an unknown boss is rejected")
+
+
+## Sects: the twelve houses are content with a codex and a validator, not a
+## simulation yet. Their identities must be complete and never repeat.
+func _sects_tests() -> void:
+	print("[sects] twelve houses, twelve answers")
+	check(DB.sects().size() == Sects.EXPECTED, "the twelve sects are loaded (%d)" % DB.sects().size())
+	check(Sects.count() == Sects.EXPECTED, "the roster reads twelve")
+	check(String(Sects.sect("sect.heavenly_sword").get("name", "")) == "Heavenly Sword",
+		"a sect is found by id")
+	check(Sects.sect("sect.nope").is_empty(), "an unknown sect is empty")
+	check(Sects.row("sect.nope").is_empty(), "an unknown sect has no codex row")
+
+	var local := Sects.local_sect()
+	check(String(local.get("id", "")) == "sect.azure_cloud", "the market's gate is the Azure Cloud")
+	check(String(local.get("faction", "")) == "faction.azure_cloud", "the local sect is the Azure Cloud faction")
+	check(not Factions.faction(String(local.get("faction", ""))).is_empty(),
+		"the local sect names a real faction")
+	var locals := 0
+	for value in Sects.sects():
+		if bool((value as Dictionary).get("local", false)):
+			locals += 1
+	check(locals == 1, "exactly one sect is the player's gate")
+
+	var names := {}
+	var methods := {}
+	var techniques := {}
+	for value in Sects.sects():
+		var entry: Dictionary = value
+		names[String(entry.get("name", ""))] = true
+		var method: Dictionary = entry.get("method", {})
+		var technique: Dictionary = entry.get("technique", {})
+		methods[String(method.get("name", ""))] = true
+		techniques[String(technique.get("name", ""))] = true
+		check(String(entry.get("philosophy", "")) != "" and String(entry.get("fault_line", "")) != "",
+			"%s has a philosophy and a fault line" % String(entry.get("name", "?")))
+		check(String(entry.get("seat", "")) != "" and String(entry.get("economy", "")) != "",
+			"%s has a seat and an economy" % String(entry.get("name", "?")))
+		check(String(technique.get("path", "")) != "" and String(method.get("path", "")) != "",
+			"%s signatures explain themselves" % String(entry.get("name", "?")))
+		check(Sects.TECHNIQUE_KINDS.has(String(technique.get("kind", ""))),
+			"%s signature technique has a playable kind" % String(entry.get("name", "?")))
+	check(names.size() == Sects.EXPECTED, "every sect has its own name")
+	check(methods.size() == Sects.EXPECTED, "every sect has its own method")
+	check(techniques.size() == Sects.EXPECTED, "every sect has its own technique")
+
+	var signature := Sects.signature_line("sect.heavenly_sword")
+	check(signature.contains("Sword Heart Method") and signature.contains("Heaven Splitting Slash"),
+		"a signature line names both arts")
+	var seat := Sects.seat_line("sect.crimson_lotus")
+	check(seat.contains("Lotus Lake") and seat.contains("poison"), "a seat line names place and trade")
+	check(Sects.describe("sect.void_scripture").contains("catalogued"), "describe carries the philosophy")
+	check(Sects.describe("sect.nope") == "", "an unknown sect describes as nothing")
+	check(Sects.signature_line("sect.nope") == "" and Sects.seat_line("sect.nope") == "",
+		"an unknown sect has no signature or seat line")
+
+	var row := Sects.row("sect.azure_cloud")
+	check(bool(row.get("local", false)), "the local row is marked for the codex")
+	check(String(row.get("method", "")) == "Five Elements Cycle" and
+		String(row.get("technique", "")) == "Azure Cloud Palm", "a row flattens its signatures")
+	check(String(row.get("technique_kind", "")) == "projectile", "a row carries the technique kind")
+	check(Factions.faction(String(row.get("faction", ""))).get("name", "") == "Azure Cloud Sect",
+		"the local row points at the standing house")
+	check(not Game.to_dict().has("sects"), "the sect roster is content, not save state")
+
+	check(Sects.validate(DB.sects_data).is_empty(), "the shipped sect roster validates")
+	var broken: Dictionary = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array).pop_back()
+	check(not Sects.validate(broken).is_empty(), "eleven sects are rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array).append((DB.sects_data["sects"] as Array)[0].duplicate(true))
+	check(not Sects.validate(broken).is_empty(), "a duplicate sect id is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["name"] = (DB.sects_data["sects"] as Array)[0]["name"]
+	check(not Sects.validate(broken).is_empty(), "a duplicate sect name is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["method"] = {"name": "Sword Heart Method", "path": "Borrowed."}
+	check(not Sects.validate(broken).is_empty(), "a shared signature method is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["philosophy"] = "  "
+	check(not Sects.validate(broken).is_empty(), "a sect without a philosophy is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["colour"] = "not-a-colour"
+	check(not Sects.validate(broken).is_empty(), "an invalid sect colour is rejected")
+	broken = DB.sects_data.duplicate(true)
+	var two_locals: Array = broken["sects"]
+	var second_sect: Dictionary = two_locals[2]
+	second_sect["local"] = true
+	second_sect["faction"] = "faction.watch"
+	check(not Sects.validate(broken).is_empty(), "two local gates are rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["faction"] = ""
+	check(not Sects.validate(broken).is_empty(), "a local sect without a faction is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["faction"] = "faction.nope"
+	check(not Sects.validate(broken).is_empty(), "a local sect naming an unknown faction is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[0]["method"]["id"] = "method.nope"
+	check(not Sects.validate(broken).is_empty(), "an unknown signature method is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[0]["technique"]["id"] = "tech.nope"
+	check(not Sects.validate(broken).is_empty(), "an unknown signature technique is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["technique"]["kind"] = "melee"
+	check(not Sects.validate(broken).is_empty(), "a signature kind that disagrees with its art is rejected")
+	broken = DB.sects_data.duplicate(true)
+	(broken["sects"] as Array)[1]["technique"]["kind"] = "dance"
+	check(not Sects.validate(broken).is_empty(), "an unknown signature kind is rejected")
 
 
 func _quest_tests() -> void:

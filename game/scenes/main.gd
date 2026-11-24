@@ -110,6 +110,8 @@ var _story_day := 0
 var chronicle_open := false
 ## The faction screen: who stands where with whom, and what that buys.
 var factions_open := false
+## The sect codex: twelve houses, their seats, economies, fault lines and arts.
+var sects_open := false
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -674,7 +676,7 @@ func _process(delta: float) -> void:
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
-			or alchemy_open or captives_open or chronicle_open or factions_open:
+			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open:
 		return
 
 	_simulate_npcs()
@@ -738,6 +740,8 @@ func _process(delta: float) -> void:
 		toggle_chronicle()
 	if Input.is_action_just_pressed("open_factions"):
 		toggle_factions()
+	if Input.is_action_just_pressed("open_sects"):
+		toggle_sects()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1663,6 +1667,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close_factions()
 		return
 
+	if sects_open:
+		if event.is_action_pressed("open_sects") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_sects()
+		return
+
 	if chronicle_open:
 		if event.is_action_pressed("open_chronicle") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -2295,6 +2305,46 @@ func faction_rows() -> Array:
 			"relations": Factions.relation_text(id),
 			"lawful": bool(entry.get("lawful", false)),
 		})
+	return out
+
+
+# ------------------------------------------------------------------ sects ----
+
+
+func toggle_sects() -> void:
+	if sects_open:
+		_close_sects()
+	else:
+		_open_sects()
+
+
+func _open_sects() -> void:
+	if player == null or String(phase) != "play":
+		return
+	sects_open = true
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_sects() -> void:
+	if not sects_open:
+		return
+	sects_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## The codex is content, not state: one row per authored sect, with the local
+## house marked so the screen can point at the gate the player actually uses.
+func sect_rows() -> Array:
+	var out: Array = []
+	for value in Sects.sects():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var row := Sects.row(String((value as Dictionary).get("id", "")))
+		if not row.is_empty():
+			out.append(row)
 	return out
 
 
@@ -3419,6 +3469,7 @@ func _load_game(slot: int) -> void:
 	_close_captives()
 	_close_chronicle()
 	_close_factions()
+	_close_sects()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.

@@ -112,6 +112,7 @@ func _draw() -> void:
 	draw_captive_ledger(player)
 	draw_chronicle(player)
 	draw_factions(player)
+	draw_sects(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -565,6 +566,55 @@ func draw_factions(player: Player) -> void:
 
 	_text(Vector2(x + 24.0, y + h - 26.0), "K / E / ESC — close   ·   helping one house warms its allies and cools its rivals",
 		11, Color("#7b8b94"))
+
+
+## The sect codex: twelve houses, their seats and economies, their fault lines,
+## and the method and technique that make each of them a distinct answer.
+func draw_sects(player: Player) -> void:
+	if not bool(host.sects_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
+	var w := 1000.0
+	var h := 600.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "THE TWELVE SECTS", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "Twelve houses, twelve answers to the same mountain.", 11, MUTED)
+	var local := Sects.local_sect()
+	if not local.is_empty():
+		var faction_id := String(local.get("faction", ""))
+		var standing := Factions.describe(faction_id, Game.faction_standing, Game.notoriety)
+		var line := "Your gate: %s" % String(local.get("name", ""))
+		if standing != "":
+			line += "   ·   " + standing
+		_text(Vector2(x + 24.0, y + 76.0), _fit(line, 11, w - 48.0), 11, Color("#c8b8e8"))
+	draw_line(Vector2(x + 20.0, y + 92.0), Vector2(x + w - 20.0, y + 92.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.sect_rows()
+	for i in mini(rows.size(), 12):
+		var row: Dictionary = rows[i]
+		var column := floori(float(i) / 6.0)
+		var line_index := i % 6
+		var cx := x + 24.0 + float(column) * 488.0
+		var cy := y + 108.0 + float(line_index) * 76.0
+		var colour := Color(String(row.get("colour", "#9aa0a6")))
+		var name := "%s  ·  %s" % [String(row.get("name", "?")), String(row.get("seat", ""))]
+		if bool(row.get("local", false)):
+			name += "  (your gate)"
+		_text(Vector2(cx, cy), _fit(name, 14, 448.0), 14, colour)
+		_text(Vector2(cx, cy + 17.0), _fit(String(row.get("philosophy", "")), 10, 448.0), 10, INK)
+		_text(Vector2(cx, cy + 32.0), _fit("%s · %s" % [String(row.get("method", "")),
+			String(row.get("technique", ""))], 10, 448.0), 10, Color("#c8b070"))
+		var trade := "%s · %s" % [String(row.get("territory", "")), String(row.get("economy", ""))]
+		_text(Vector2(cx, cy + 46.0), _fit(trade, 9, 448.0), 9, MUTED)
+		_text(Vector2(cx, cy + 59.0), _fit("Fault: " + String(row.get("fault_line", "")), 9, 448.0), 9,
+			Color("#a08a8a"))
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "Y / E / ESC — close   ·   the twelve are content, not yet a simulation: hierarchy, economy and politics come later",
+		10, Color("#7b8b94"))
 
 
 ## The active bar only: six slots, each with its art's own cooldown sweep.
@@ -1082,7 +1132,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

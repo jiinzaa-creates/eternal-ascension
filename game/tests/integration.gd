@@ -3700,6 +3700,24 @@ func _run() -> void:
 	Game.spirit_stones = m55_stones
 	Game.notoriety = m55_notoriety
 
+	# --- sects: twelve houses, one gate ---------------------------------------
+	check(Sects.count() == 12, "the province holds twelve sects")
+	check(String(Sects.local_sect().get("id", "")) == "sect.azure_cloud",
+		"the market's gate belongs to the Azure Cloud")
+	check(String(Sects.sect("sect.void_scripture").get("technique", {}).get("name", "")) == "Page of Unmaking",
+		"a distant house answers with its own art")
+	main.toggle_sects()
+	check(main.sects_open, "the sect codex opens")
+	check(main.sect_rows().size() == 12, "the codex lists all twelve")
+	check(not player.is_physics_processing(), "the codex freezes play")
+	var m56_names: Dictionary = {}
+	for m56_row in main.sect_rows():
+		m56_names[String(m56_row.get("name", ""))] = true
+	check(m56_names.size() == 12 and m56_names.has("Heavenly Sword"), "each house is named once")
+	main.toggle_sects()
+	check(not main.sects_open, "the sect codex closes")
+	check(player.is_physics_processing(), "closing the codex resumes play")
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

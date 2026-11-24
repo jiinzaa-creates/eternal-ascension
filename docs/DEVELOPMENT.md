@@ -652,6 +652,39 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   Integration awards Azure Cloud standing and checks member regard, the dossier line, the league's
   buy discount, notoriety's asymmetry, a story award for the watch, the screen, and save/load.
 
+## The twelve sects
+
+- **Identity is data.** `data/sects.json` holds exactly twelve entries. Each names a seat, a
+  philosophy, a territory, an economy, an internal fault line, a colour, and one signature method
+  and one signature technique. They are the province's organizations, not a second standing
+  system: the market's standing remains M55's four factions, and the Azure Cloud is the only sect
+  whose gate the player currently stands at (`"local": true`, tied to `faction.azure_cloud`).
+- **Read-only model.** `Sects` (`game/systems/sects.gd`) exposes `sects()`, `sect(id)`,
+  `local_sect()`, `describe()`, `signature_line()`, `seat_line()`, `row()` and `validate()`.
+  `row()` flattens the nested method/technique objects so the HUD never reads raw content, and
+  includes `local` and `faction` so the codex can mark the player's own house.
+- **Signature arts are identities first.** A sect's method and technique must be named and unique
+  across all twelve, and each carries a one-line `path` explaining what makes it different. When
+  the art already exists in the playable tables the entry links it (`method.sword`,
+  `method.blood`, `tech.palm.azure_cloud`, `tech.palm.thousand_petals`,
+  `tech.formation.sealing_array`, `tech.beast.nine_stampede`, `tech.blood.crimson_moon`); the
+  validator requires the link to resolve and the declared technique `kind` to agree with the real
+  art. Unlinked signatures are distant arts: content and flavour now, playable mechanics later.
+- **The codex.** **Y** opens a frozen two-column screen listing all twelve houses with seat,
+  philosophy, method and technique, territory and economy, fault line, and a marker on the local
+  gate. The local line reads the player's real faction band through `Factions.describe()`, so it
+  cannot claim a welcome the sect does not give. It is a reading screen and closes on **Y**, **E**
+  or **ESC**. No state is toggled besides the freeze.
+- **Validated at boot.** `DB.validate()` runs `Sects.validate()`, which rejects a roster that is not
+  exactly twelve, duplicate ids or names, duplicate or missing signatures, unknown method or
+  technique links, a declared kind that disagrees with the linked art, unknown kinds, invalid
+  colours, empty identity fields, more or fewer than one local sect, and a local sect with a
+  missing or unknown faction.
+- **Tests.** Unit `_sects_tests` covers the roster count, lookup, the local gate and its faction,
+  unique names/methods/techniques, complete fields, signature and seat lines, codex rows, the
+  absence of a save key, and twelve validation negatives. Integration opens and closes the codex,
+  checks all twelve rows, the freeze, and that play resumes.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

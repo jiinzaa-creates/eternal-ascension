@@ -21,6 +21,7 @@ const KEY_BINDINGS := {
 	"open_captives": [KEY_L],
 	"open_chronicle": [KEY_J],
 	"open_factions": [KEY_K],
+	"open_sects": [KEY_Y],
 	"breakthrough": [KEY_G],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],
