@@ -2790,9 +2790,60 @@ func _run() -> void:
 	check(is_equal_approx(player.cultivation.contamination, 60.0 - 35.0 * M45_CLEANSE_POTENCY), "a cleansing pill purges contamination")
 	main.close_gear()
 
+	# --- professions: practice earns ranks, ranks open recipes ------------------
+	Game.professions.clear()
+	check(Professions.level_of(Game.professions, "profession.smith") == 0, "a run begins as an apprentice")
+	Game.spirit_stones = maxi(Game.spirit_stones, 1000)
+	player.cultivation.realm = 3
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m46.ore", "slot": "material", "name": "Spirit Ore", "material": "ore", "count": 8}))
+	player.inventory = Items.add_to_inventory(player.inventory, Items.normalize_item({
+		"id": "item.m46.core", "slot": "material", "name": "Spirit Core", "material": "core", "count": 4}))
+
+	main._open_forge()
+	main.forge_mode = 0
+	var m46_ring_index := -1
+	for i in main.forge_rows().size():
+		if String((main.forge_rows()[i] as Dictionary).get("id", "")) == "recipe.forge.spirit_iron_ring":
+			m46_ring_index = i
+	check(m46_ring_index >= 0, "the masterwork is listed even when locked")
+	main.forge_index = m46_ring_index
+	var m46_stones := Game.spirit_stones
+	var m46_attempts := Game.crafts_made
+	main.forge_act()
+	check(Game.spirit_stones == m46_stones, "a locked recipe costs nothing")
+	check(Game.crafts_made == m46_attempts, "a locked recipe is not even an attempt")
+
+	var m46_award := Professions.award(Game.professions, "profession.smith", 10)
+	check(int(m46_award["level"]) == 2 and bool(m46_award["leveled"]), "practice earns the adept rank")
+	check(bool(Professions.gate(DB.recipe("recipe.forge.spirit_iron_ring"), Game.professions, DB).get("ok", false)),
+		"the adept may take the masterwork")
+	main.forge_act()
+	check(Game.crafts_made == m46_attempts + 1, "an unlocked recipe is a real attempt")
+	check(Game.spirit_stones == m46_stones - 160, "an unlocked recipe charges its stones")
+	main.close_forge()
+
+	# Alchemy gates on its own profession, not the smith's.
+	Game.professions["profession.alchemist"] = {"xp": 0}
+	main._open_alchemy()
+	var m46_potion_index := -1
+	for i in main.alchemy_rows().size():
+		if String((main.alchemy_rows()[i] as Dictionary).get("id", "")) == "potion.cleansing":
+			m46_potion_index = i
+	check(m46_potion_index >= 0, "the cleansing pill is listed even when locked")
+	main.alchemy_index = m46_potion_index
+	var m46_herbs: int = int(Crafting.material_counts(player.inventory).get("herb", 0))
+	main.alchemy_act()
+	check(int(Crafting.material_counts(player.inventory).get("herb", 0)) == m46_herbs, "a locked pill spends no herbs")
+	Professions.award(Game.professions, "profession.alchemist", 4)
+	check(bool(Professions.gate(DB.potion("potion.mending"), Game.professions, DB).get("ok", false)),
+		"practice opens the mending pill")
+	main.close_alchemy()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
+	Game.professions = {"profession.smith": {"xp": 12}}
 	main._save(96)
 	check(Save.has_save(96), "quick save writes through the scene")
 
@@ -2805,6 +2856,7 @@ func _run() -> void:
 	main.quests.completed = false
 	main.inheritance_taken = false
 	Game.spirit_stones = 0
+	Game.professions.clear()
 	main._load_game(96)
 	check(absf(player.cultivation.qi - 12.0) < 0.01, "quick load restores Qi")
 	check(player.passives.size() == saved_passives, "quick load restores passives")
@@ -2812,6 +2864,7 @@ func _run() -> void:
 	check(main.inheritance_taken, "quick load restores the inheritance")
 	check(player.physique_id == saved_physique, "quick load restores the physique")
 	check(Game.spirit_stones == saved_stones, "quick load restores spirit stones")
+	check(Professions.level_of(Game.professions, "profession.smith") == 2, "practice survives a save")
 	check(container.used, "a searched container stays spent after loading")
 	check(player.technique_ids.has("tech.blood.crimson_moon"), "a manual's technique survives a reload")
 	Save.delete_slot(96)

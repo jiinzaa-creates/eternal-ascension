@@ -29,6 +29,9 @@ var age_warning_stage: int = 0
 ## Crafting attempts this run. Every attempt advances it, failures included, so
 ## a retry rolls a new item instead of repeating the failed stream.
 var crafts_made: int = 0
+## Practice earned in each profession, by id: `{profession.smith: {xp: n}}`.
+## The rank itself is derived, so only practice is ever stored.
+var professions: Dictionary = {}
 
 
 func _process(delta: float) -> void:
@@ -51,6 +54,7 @@ func new_run(seed_value: int = 0) -> void:
 	dead = false
 	age_warning_stage = 0
 	crafts_made = 0
+	professions.clear()
 	hitstop.clear()
 
 
@@ -87,6 +91,7 @@ func to_dict() -> Dictionary:
 		"dead": dead,
 		"age_warning_stage": age_warning_stage,
 		"crafts_made": crafts_made,
+		"professions": professions.duplicate(true),
 	}
 
 
@@ -105,3 +110,4 @@ func from_dict(data: Dictionary) -> void:
 	dead = bool(data.get("dead", false))
 	age_warning_stage = int(data.get("age_warning_stage", 0))
 	crafts_made = int(data.get("crafts_made", 0))
+	professions = Professions.sanitize(data.get("professions", {}))

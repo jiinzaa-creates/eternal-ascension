@@ -8,6 +8,8 @@
 		{
 			"id": "potion.qi_gathering",
 			"name": "Qi Gathering Pill",
+			"profession": "profession.alchemist",
+			"level": 0,
 			"base": "base.pill.qi_gathering",
 			"materials": [{"material": "herb", "count": 2}],
 			"stones": 30,
@@ -19,6 +21,8 @@
 		{
 			"id": "potion.mending",
 			"name": "Mending Pill",
+			"profession": "profession.alchemist",
+			"level": 1,
 			"base": "base.pill.mending",
 			"materials": [{"material": "herb", "count": 2}, {"material": "core", "count": 1}],
 			"stones": 40,
@@ -30,6 +34,8 @@
 		{
 			"id": "potion.cleansing",
 			"name": "Cleansing Pill",
+			"profession": "profession.alchemist",
+			"level": 2,
 			"base": "base.pill.cleansing",
 			"materials": [{"material": "herb", "count": 3}, {"material": "marrow", "count": 1}],
 			"stones": 80,

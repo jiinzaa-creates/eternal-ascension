@@ -91,13 +91,14 @@ static func potency_for(quality_mult: float, exceptional: bool) -> float:
 
 ## Brews one recipe. Pure in `(recipe, ilvl, key, counter, quality_mult)`; the
 ## caller advances its attempt counter on every try, failures included.
-func brew(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: float = 1.0) -> Dictionary:
+func brew(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: float = 1.0,
+		failure_mult: float = 1.0) -> Dictionary:
 	var out := {"ok": false, "failed": false, "quality": false, "item": {}, "reason": ""}
 	if recipe.is_empty():
 		out["reason"] = "unknown potion"
 		return out
 	var r: RandomNumberGenerator = Rng.stream("brew." + String(recipe.get("id", "")), key, counter)
-	if r.randf() < clampf(float(recipe.get("failure_chance", 0.0)), 0.0, 1.0):
+	if r.randf() < clampf(float(recipe.get("failure_chance", 0.0)) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0):
 		out["failed"] = true
 		out["reason"] = "the brew spoils"
 		return out

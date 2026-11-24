@@ -35,6 +35,7 @@ var recipes: Array = []
 var crafting_actions: Array = []
 var potions: Array = []
 var alchemy_station: Dictionary = {}
+var professions: Array = []
 
 var _by_id: Dictionary = {}
 
@@ -79,6 +80,8 @@ func load_all() -> void:
 	potions = alchemy.get("potions", [])
 	var station_value: Variant = alchemy.get("station", {})
 	alchemy_station = station_value if typeof(station_value) == TYPE_DICTIONARY else {}
+	var profession_data := _read("professions.json")
+	professions = profession_data.get("professions", [])
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -105,6 +108,7 @@ func load_all() -> void:
 	_index("recipe", recipes)
 	_index("action", crafting_actions)
 	_index("potion", potions)
+	_index("profession", professions)
 
 
 func _read(file: String) -> Dictionary:
@@ -159,6 +163,10 @@ func potion(id: String) -> Dictionary:
 
 func alchemy_brewery() -> Dictionary:
 	return alchemy_station
+
+
+func profession(id: String) -> Dictionary:
+	return by_id("profession", id)
 
 
 func has(kind: String, id: String) -> bool:
@@ -747,6 +755,7 @@ func validate() -> Array:
 
 	# Loot tables are the whole drop economy: a bad weight would skew every kill.
 	_validate_loot(problems)
+	_validate_professions(problems)
 	_validate_crafting(problems)
 	_validate_alchemy(problems)
 
@@ -766,6 +775,55 @@ func validate() -> Array:
 
 ## A potion that names a missing base, an unknown effect or a negative cost would
 ## only fail when a player had already spent herbs on it.
+## A profession is only meaningful if it lives at a real station, and a recipe
+## gate is only honest if the profession it names exists.
+func _validate_professions(problems: Array) -> void:
+	if professions.is_empty():
+		problems.append("no professions are authored")
+	var station_ids: Dictionary = {}
+	for entry in crafting_stations:
+		if typeof(entry) == TYPE_DICTIONARY:
+			station_ids[String((entry as Dictionary).get("id", ""))] = true
+	if not alchemy_station.is_empty():
+		station_ids[String(alchemy_station.get("id", ""))] = true
+	var seen: Dictionary = {}
+	for entry in professions:
+		if typeof(entry) != TYPE_DICTIONARY:
+			problems.append("profession is not an object")
+			continue
+		var profession: Dictionary = entry
+		var id := String(profession.get("id", ""))
+		if id == "":
+			problems.append("profession without id")
+			continue
+		if seen.has(id):
+			problems.append("duplicate profession " + id)
+		seen[id] = true
+		if String(profession.get("name", "")) == "":
+			problems.append("profession %s has no name" % id)
+		var station := String(profession.get("station", ""))
+		if not station_ids.has(station):
+			problems.append("profession %s names unknown station %s" % [id, station])
+		if float(profession.get("quality_bonus", 0.0)) < 0.0:
+			problems.append("profession %s has a negative quality bonus" % id)
+		var reduction := float(profession.get("failure_reduction", 0.0))
+		if reduction < 0.0 or reduction > 1.0:
+			problems.append("profession %s has an invalid failure reduction" % id)
+
+
+## Every gate must name a real profession and a reachable rank.
+func _validate_recipe_gate(data: Dictionary, label: String, problems: Array) -> void:
+	var id := String(data.get("profession", ""))
+	if id == "":
+		problems.append("%s has no profession" % label)
+		return
+	if not has("profession", id):
+		problems.append("%s names unknown profession %s" % [label, id])
+	var level := int(data.get("level", 0))
+	if level < 0 or level > Professions.MAX_LEVEL:
+		problems.append("%s has an out-of-range profession level" % label)
+
+
 func _validate_alchemy(problems: Array) -> void:
 	if alchemy_station.is_empty():
 		problems.append("alchemy has no station")
@@ -812,6 +870,7 @@ func _validate_alchemy(problems: Array) -> void:
 			if float((effect as Dictionary).get("amount", 0.0)) <= 0.0:
 				problems.append("potion %s has a non-positive effect" % potion_id)
 		_validate_craft_cost(potion, "potion " + potion_id, problems, true)
+		_validate_recipe_gate(potion, "potion " + potion_id, problems)
 
 
 func _base_exists_for_slot(slot: String) -> bool:
@@ -873,6 +932,7 @@ func _validate_crafting(problems: Array) -> void:
 			if rarity < 0 or rarity >= ItemGen.RARITY_NAMES.size():
 				problems.append("recipe %s has an out-of-range rarity" % recipe_id)
 		_validate_craft_cost(recipe, "recipe " + recipe_id, problems, true)
+		_validate_recipe_gate(recipe, "recipe " + recipe_id, problems)
 	for station_id in station_ids.keys():
 		if int(per_station.get(station_id, 0)) == 0:
 			problems.append("crafting station %s has no recipes" % station_id)

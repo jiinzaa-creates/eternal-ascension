@@ -48,6 +48,7 @@ func _ready() -> void:
 	_inventory_tests()
 	_crafting_tests()
 	_alchemy_tests()
+	_professions_tests()
 	_loot_tests()
 	_cultivation_tests()
 	_combat_tests()
@@ -4212,3 +4213,75 @@ func _alchemy_tests() -> void:
 	check(bool(failed.get("failed", false)) and (failed["item"] as Dictionary).is_empty(), "a spoiled brew makes nothing")
 	check(not bool(rules.brew({}, 1, 0, 0).get("ok", true)), "an unknown potion is refused")
 	check(DB.has("potion", "potion.cleansing"), "potions are indexed")
+
+
+## Professions: ranks derived from practice, bonuses that grow with rank, and
+## recipe gates that mean what they say.
+func _professions_tests() -> void:
+	check(DB.professions.size() == 2, "two professions are authored")
+	var smith: Dictionary = DB.profession("profession.smith")
+	check(String(smith.get("station", "")) == "station.forge", "the smith works the forge")
+	check(String(DB.profession("profession.alchemist").get("station", "")) == "station.alchemy",
+		"the alchemist works the cauldron")
+
+	check(Professions.level_for(0) == 0, "a fresh apprentice starts at nothing")
+	check(Professions.level_for(3) == 0, "practice below the gate earns no rank")
+	check(Professions.level_for(4) == 1, "four finished works make a journeyman")
+	check(Professions.level_for(10) == 2, "ten works make an adept")
+	check(Professions.level_for(34) == Professions.MAX_LEVEL, "practice tops out at grandmaster")
+	check(Professions.level_for(9999) == Professions.MAX_LEVEL, "rank never overflows")
+	check(Professions.rank_name(0) == "Apprentice" and Professions.rank_name(4) == "Grandmaster", "ranks are named")
+	check(Professions.xp_for_level(2) == 10, "the level curve is data")
+
+	var data: Dictionary = {}
+	var awarded := Professions.award(data, "profession.smith", 3)
+	check(int(awarded["xp"]) == 3 and int(awarded["level"]) == 0 and not bool(awarded["leveled"]),
+		"practice accumulates without a rank")
+	var ranked := Professions.award(data, "profession.smith", 1)
+	check(int(ranked["level"]) == 1 and bool(ranked["leveled"]), "the fourth work earns a rank")
+	check(Professions.level_of(data, "profession.smith") == 1, "the rank is derived from practice")
+	check(not bool(Professions.award(data, "profession.smith", 0)["leveled"]), "empty practice changes nothing")
+	check(Professions.xp_of(Professions.sanitize({"profession.smith": {"xp": -5}}), "profession.smith") == 0,
+		"negative practice is discarded")
+	check(Professions.sanitize({"junk": 4}).is_empty(), "only professions are read back")
+	check(Professions.xp_of(Professions.sanitize({"profession.smith": {"xp": 7}}), "profession.smith") == 7,
+		"practice survives a sanitize")
+
+	check(Professions.quality_bonus(smith, 0) == 0.0, "an apprentice has no bonus")
+	check(Professions.quality_bonus(smith, 2) > 0.0, "rank raises quality")
+	check(is_equal_approx(Professions.failure_mult(smith, 0), 1.0), "rank zero changes no odds")
+	check(Professions.failure_mult(smith, 4) < 1.0, "rank lowers failure")
+	check(Professions.failure_mult(smith, 100) >= 0.35, "even a grandmaster keeps a risk floor")
+
+	# Gates: the apprentice may forge a jian, not a spirit iron ring.
+	var jian: Dictionary = DB.recipe("recipe.forge.iron_jian")
+	var ring: Dictionary = DB.recipe("recipe.forge.spirit_iron_ring")
+	check(bool(Professions.gate(jian, {}, DB).get("ok", false)), "the first sword is open to an apprentice")
+	check(not bool(Professions.gate(ring, {}, DB).get("ok", true)), "a masterwork is locked to an apprentice")
+	check(String(Professions.gate(ring, {}, DB).get("reason", "")) == "Smith 2 required",
+		"a lock names the rank it needs")
+	check(not bool(Professions.gate(ring, data, DB).get("ok", true)), "a journeyman still cannot take a masterwork")
+	var practiced: Dictionary = {"profession.smith": {"xp": 10}}
+	check(bool(Professions.gate(ring, practiced, DB).get("ok", false)), "an adept may take the masterwork")
+	check(bool(Professions.gate({"profession": "", "level": 0}, {}, DB).get("ok", false)),
+		"an ungated recipe is open to anyone")
+
+	# Alchemy speaks the same rank language.
+	var mending: Dictionary = DB.potion("potion.mending")
+	check(not bool(Professions.gate(mending, {}, DB).get("ok", true)), "the mending pill needs practice")
+	check(bool(Professions.gate(mending, {"profession.alchemist": {"xp": 4}}, DB).get("ok", false)),
+		"a journeyman alchemist may brew it")
+
+	# Progress text is what the panels show.
+	var text := Professions.progress_text({"profession.smith": {"xp": 6}}, "profession.smith", DB)
+	check(text.begins_with("Smith — Journeyman") and text.contains("6/10"), "progress shows rank and practice")
+	check(String(Professions.progress_text({}, "profession.alchemist", DB)).begins_with("Alchemist — Apprentice"),
+		"an untrained profession reads as apprentice")
+
+	# Crafting honours the failure multiplier it is given.
+	var certain: Dictionary = DB.recipe("recipe.forge.iron_jian").duplicate(true)
+	certain["failure_chance"] = 1.0
+	check(bool(Crafting.new(DB).craft(certain, 1, 50000, 0, 1.0, 1.0).get("failed", false)),
+		"a certain failure still fails at full odds")
+	var protected: Dictionary = Crafting.new(DB).craft(certain, 1, 50000, 0, 1.0, 0.0)
+	check(bool(protected.get("ok", false)), "a zero chance cannot spoil the work")

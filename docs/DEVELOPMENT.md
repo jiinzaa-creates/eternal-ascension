@@ -943,6 +943,35 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **Save.** No new run state: potency is ordinary item data and the attempt counter is the one
   the forge already uses. Schema stays 2.
 
+## Professions
+
+- **Two trades, one curve.** `data/professions.json` names **Smith** (station `station.forge`) and
+  **Alchemist** (`station.alchemy`), each with a `quality_bonus` and a `failure_reduction` per
+  rank. The rank curve is shared code, not data per profession: `[0, 4, 10, 20, 34]` points for
+  Apprentice → Journeyman → Adept → Master → Grandmaster.
+- **Practice, not payment.** `Professions.award()` is the only way practice is earned, and the
+  scene calls it only after a *completed* forge, refine or brew. A failure earns nothing, and
+  disassembly earns nothing because it is free. `Game.professions` stores only
+  `{profession.id: {xp}}`; `Professions.level_for()` derives the rank, exactly the way age is
+  derived from the calendar.
+- **What rank buys.** `quality_bonus` is added to INT's quality multiplier before the roll, so a
+  master smith can reach results an apprentice cannot; `failure_mult` scales the recipe's failure
+  chance and is clamped at `0.35`, so even a grandmaster keeps a real risk.
+- **Gates are data.** Every recipe and potion names a `profession` and a `level`.
+  `Professions.gate()` answers whether the run may take it, and the scene checks the gate
+  *before* the cost or the attempt counter, so locked work spends nothing and does not advance
+  the stream. `Crafting.check()` deliberately stays gate-agnostic: it answers cost questions, not
+  character ones.
+- **The panels say so.** Forge and alchemy headers show `Smith — Journeyman (6/10 xp)`, locked
+  rows are marked `(locked)`, and the detail pane gives the required rank instead of a generic
+  refusal.
+- **Save.** One optional key, `professions`, read through `Professions.sanitize()`: unknown ids,
+  malformed entries and negative practice are dropped, so an edited save cannot buy a rank.
+  Schema stays 2.
+- **Validation.** `DB.validate()` rejects a missing or empty profession list, unknown or duplicate
+  ids, a station that does not exist, a negative quality bonus, an out-of-range failure reduction,
+  and a recipe or potion whose profession is unknown or whose level is outside `0…4`.
+
 ## Loot tables
 
 - **One table per source, all in data.** `data/loot_tables.json` holds `kill.wild`,

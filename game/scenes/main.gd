@@ -991,6 +991,10 @@ func _spend_craft(cost: Dictionary) -> void:
 
 
 func _forge_make(recipe: Dictionary) -> void:
+	var gate := Professions.gate(recipe, Game.professions, DB)
+	if not bool(gate.get("ok", false)):
+		Bus.toast.emit("The forge refuses: %s." % String(gate.get("reason", "your rank is too low")))
+		return
 	var check := Crafting.check(recipe, player.inventory, Game.spirit_stones, player.cultivation.realm)
 	if not bool(check.get("ok", false)):
 		Bus.toast.emit("The forge refuses: %s." % String(check.get("reason", "not enough")))
@@ -1002,7 +1006,11 @@ func _forge_make(recipe: Dictionary) -> void:
 	# new stream or a failed recipe would fail forever.
 	var attempt := Game.crafts_made
 	Game.crafts_made += 1
-	var result := crafting.craft(recipe, ilvl, 50000 + attempt, 0, player.stats.crafting_quality_mult())
+	var smith: Dictionary = DB.profession("profession.smith")
+	var rank := Professions.level_of(Game.professions, "profession.smith")
+	var quality := player.stats.crafting_quality_mult() + Professions.quality_bonus(smith, rank)
+	var result := crafting.craft(
+		recipe, ilvl, 50000 + attempt, 0, quality, Professions.failure_mult(smith, rank))
 	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
 		Bus.toast.emit(String(result.get("reason", "the forge cannot make that")).capitalize() + ".")
 		return
@@ -1014,6 +1022,9 @@ func _forge_make(recipe: Dictionary) -> void:
 	player.pick_up(item)
 	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Forged %s%s." % [String(item.get("name", "a piece")), flourish])
+	var practice := Professions.award(Game.professions, "profession.smith")
+	if bool(practice.get("leveled", false)):
+		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
 
 
 func _forge_refine(item: Dictionary) -> void:
@@ -1024,7 +1035,11 @@ func _forge_refine(item: Dictionary) -> void:
 		return
 	var attempt := Game.crafts_made
 	Game.crafts_made += 1
-	var result := crafting.refine(item, 60000 + attempt, 0, player.stats.crafting_quality_mult())
+	var smith: Dictionary = DB.profession("profession.smith")
+	var rank := Professions.level_of(Game.professions, "profession.smith")
+	var quality := player.stats.crafting_quality_mult() + Professions.quality_bonus(smith, rank)
+	var result := crafting.refine(
+		item, 60000 + attempt, 0, quality, Professions.failure_mult(smith, rank))
 	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
 		Bus.toast.emit(String(result.get("reason", "the piece refuses the hammer")).capitalize() + ".")
 		return
@@ -1039,6 +1054,9 @@ func _forge_refine(item: Dictionary) -> void:
 			break
 	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Refined %s%s." % [String(refined.get("name", "a piece")), flourish])
+	var practice := Professions.award(Game.professions, "profession.smith")
+	if bool(practice.get("leveled", false)):
+		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
 
 
 func _forge_disassemble(item: Dictionary) -> void:
@@ -1097,6 +1115,10 @@ func alchemy_act() -> void:
 func _brew(recipe: Dictionary) -> void:
 	if player == null or alchemy == null or recipe.is_empty():
 		return
+	var gate := Professions.gate(recipe, Game.professions, DB)
+	if not bool(gate.get("ok", false)):
+		Bus.toast.emit("The cauldron refuses: %s." % String(gate.get("reason", "your rank is too low")))
+		return
 	var check := Crafting.check(recipe, player.inventory, Game.spirit_stones, player.cultivation.realm)
 	if not bool(check.get("ok", false)):
 		Bus.toast.emit("The cauldron refuses: %s." % String(check.get("reason", "not enough")))
@@ -1105,7 +1127,11 @@ func _brew(recipe: Dictionary) -> void:
 	var ilvl := maxi(int(base.get("ilvl", 1)), player.cultivation.realm)
 	var attempt := Game.crafts_made
 	Game.crafts_made += 1
-	var result := alchemy.brew(recipe, ilvl, 70000 + attempt, 0, player.stats.crafting_quality_mult())
+	var alchemist: Dictionary = DB.profession("profession.alchemist")
+	var rank := Professions.level_of(Game.professions, "profession.alchemist")
+	var quality := player.stats.crafting_quality_mult() + Professions.quality_bonus(alchemist, rank)
+	var result := alchemy.brew(
+		recipe, ilvl, 70000 + attempt, 0, quality, Professions.failure_mult(alchemist, rank))
 	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
 		Bus.toast.emit(String(result.get("reason", "the cauldron cannot make that")).capitalize() + ".")
 		return
@@ -1117,6 +1143,9 @@ func _brew(recipe: Dictionary) -> void:
 	player.pick_up(pill)
 	var flourish := " (exceptional brew)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Brewed %s at potency x%.2f%s." % [String(pill.get("name", "a pill")), Alchemy.potency_of(pill), flourish])
+	var practice := Professions.award(Game.professions, "profession.alchemist")
+	if bool(practice.get("leveled", false)):
+		Bus.toast.emit("Alchemist rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
 
 
 func _open_alchemy() -> void:

@@ -155,13 +155,14 @@ static func quality_chance(quality_mult: float) -> float:
 ## Forges one recipe. `key`/`counter` are the item's stream coordinates, so the
 ## same attempt always produces the same piece; every attempt should advance the
 ## caller's attempt counter, failures included, or a failed roll would repeat.
-func craft(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: float = 1.0) -> Dictionary:
+func craft(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: float = 1.0,
+		failure_mult: float = 1.0) -> Dictionary:
 	var out := {"ok": false, "failed": false, "quality": false, "item": {}, "reason": ""}
 	if recipe.is_empty():
 		out["reason"] = "unknown recipe"
 		return out
 	var r: RandomNumberGenerator = Rng.stream("craft." + String(recipe.get("id", "")), key, counter)
-	if r.randf() < clampf(float(recipe.get("failure_chance", 0.0)), 0.0, 1.0):
+	if r.randf() < clampf(float(recipe.get("failure_chance", 0.0)) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0):
 		out["failed"] = true
 		out["reason"] = "the work fails"
 		return out
@@ -183,7 +184,8 @@ func craft(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: 
 
 ## Rerolls a piece's affixes. The base, level, rarity and wear are kept — a
 ## refiner improves a sword, it does not smith a different one.
-func refine(item: Dictionary, key: int, counter: int, quality_mult: float = 1.0) -> Dictionary:
+func refine(item: Dictionary, key: int, counter: int, quality_mult: float = 1.0,
+		failure_mult: float = 1.0) -> Dictionary:
 	var out := {"ok": false, "failed": false, "quality": false, "item": item, "reason": ""}
 	if not Items.is_equipment(String(item.get("slot", ""))):
 		out["reason"] = "only gear can be refined"
@@ -196,7 +198,7 @@ func refine(item: Dictionary, key: int, counter: int, quality_mult: float = 1.0)
 		out["reason"] = "refining is not offered"
 		return out
 	var r: RandomNumberGenerator = Rng.stream("craft.refine", key, counter)
-	if r.randf() < clampf(float(rules.get("failure_chance", 0.0)), 0.0, 1.0):
+	if r.randf() < clampf(float(rules.get("failure_chance", 0.0)) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0):
 		out["failed"] = true
 		out["reason"] = "the work fails; the piece survives unchanged"
 		return out

@@ -556,6 +556,7 @@ func draw_forge(player: Player) -> void:
 		tabs += ("[%s] " % modes[i]) if i == mode else (" %s  " % modes[i])
 	_text(origin + Vector2(160.0, 32.0), tabs + "   TAB switches", 11, MUTED)
 	_text(origin + Vector2(22.0, 52.0), "↑/↓ choose    ENTER work    E — close", 11, Color("#6b7b84"))
+	_text(origin + Vector2(430.0, 52.0), Professions.progress_text(Game.professions, "profession.smith", DB), 11, Color("#d8c070"))
 
 	var rows: Array = host.forge_rows()
 	var selected := clampi(int(host.forge_index), 0, maxi(0, rows.size() - 1))
@@ -566,6 +567,8 @@ func draw_forge(player: Player) -> void:
 	for i in range(first, mini(rows.size(), first + 12)):
 		var entry: Dictionary = rows[i]
 		var label := String(entry.get("name", "?")) if mode == 0 else Items.label(entry)
+		if mode == 0 and not bool(Professions.gate(entry, Game.professions, DB).get("ok", false)):
+			label += "  (locked)"
 		var line := "%s %s" % [">" if i == selected else " ", _fit(label, 12, 330.0)]
 		_text(Vector2(origin.x + 22.0, list_y), line, 12, ACCENT if i == selected else _item_color(entry))
 		list_y += 20.0
@@ -586,7 +589,10 @@ func draw_forge(player: Player) -> void:
 		cy += 20.0
 		_text(Vector2(cx, cy), _fit(String(chosen.get("desc", "")), 11, 360.0), 11, Color("#7f9098"))
 		cy += 32.0
-		if bool(check.get("ok", false)):
+		var gate: Dictionary = Professions.gate(chosen, Game.professions, DB)
+		if not bool(gate.get("ok", false)):
+			_text(Vector2(cx, cy), "Locked — %s." % String(gate.get("reason", "rank too low")), 12, Color("#e08f8f"))
+		elif bool(check.get("ok", false)):
 			_text(Vector2(cx, cy), "Ready.  ENTER forges it.", 12, ACCENT)
 		else:
 			_text(Vector2(cx, cy), _fit("Refused — %s" % String(check.get("reason", "not enough")), 11, 360.0), 11, Color("#e08f8f"))
@@ -634,19 +640,22 @@ func draw_alchemy(player: Player) -> void:
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "HERB-GARDEN CAULDRON", 18, Color("#9fe0a8"))
 	_text(origin + Vector2(272.0, 32.0), "↑/↓ choose    ENTER brew    E — close", 11, MUTED)
+	_text(origin + Vector2(22.0, 52.0), Professions.progress_text(Game.professions, "profession.alchemist", DB), 11, Color("#d8c070"))
 
 	var rows: Array = host.alchemy_rows()
 	var selected := clampi(int(host.alchemy_index), 0, maxi(0, rows.size() - 1))
-	var list_y := origin.y + 66.0
+	var list_y := origin.y + 72.0
 	if rows.is_empty():
 		_text(Vector2(origin.x + 22.0, list_y), "Nothing can be brewed here.", 12, MUTED)
 		return
 	for i in rows.size():
 		var entry: Dictionary = rows[i]
 		var check: Dictionary = Crafting.check(entry, player.inventory, Game.spirit_stones, player.cultivation.realm)
-		var line := "%s %s" % [">" if i == selected else " ", _fit(String(entry.get("name", "?")), 12, 290.0)]
+		var locked := not bool(Professions.gate(entry, Game.professions, DB).get("ok", false))
+		var label := String(entry.get("name", "?")) + ("  (locked)" if locked else "")
+		var line := "%s %s" % [">" if i == selected else " ", _fit(label, 12, 290.0)]
 		var color := ACCENT if i == selected else Color("#9fc8a8")
-		if not bool(check.get("ok", false)) and i != selected:
+		if (not bool(check.get("ok", false)) or locked) and i != selected:
 			color = Color("#6b7b84")
 		_text(Vector2(origin.x + 22.0, list_y), line, 12, color)
 		list_y += 22.0
@@ -669,7 +678,10 @@ func draw_alchemy(player: Player) -> void:
 	cy += 20.0
 	_text(Vector2(cx, cy), _fit(String(chosen.get("desc", "")), 11, 350.0), 11, Color("#7f9098"))
 	cy += 34.0
-	if bool(rules_check.get("ok", false)):
+	var gate: Dictionary = Professions.gate(chosen, Game.professions, DB)
+	if not bool(gate.get("ok", false)):
+		_text(Vector2(cx, cy), "Locked — %s." % String(gate.get("reason", "rank too low")), 12, Color("#e08f8f"))
+	elif bool(rules_check.get("ok", false)):
 		_text(Vector2(cx, cy), "Ready.  ENTER brews one.", 12, ACCENT)
 	else:
 		_text(Vector2(cx, cy), _fit("Refused — %s" % String(rules_check.get("reason", "not enough")), 11, 350.0), 11, Color("#e08f8f"))

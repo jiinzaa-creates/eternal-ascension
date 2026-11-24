@@ -1,0 +1,20 @@
+{
+	"professions": [
+		{
+			"id": "profession.smith",
+			"name": "Smith",
+			"station": "station.forge",
+			"quality_bonus": 0.08,
+			"failure_reduction": 0.06,
+			"desc": "The anvil teaches patience: every piece finished makes the next cleaner and less likely to spoil."
+		},
+		{
+			"id": "profession.alchemist",
+			"name": "Alchemist",
+			"station": "station.alchemy",
+			"quality_bonus": 0.1,
+			"failure_reduction": 0.05,
+			"desc": "A steady hand at the cauldron wastes fewer herbs and draws more out of every root."
+		}
+	]
+}
