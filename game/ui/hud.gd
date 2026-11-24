@@ -809,8 +809,8 @@ func draw_npc_dossier(_player: Player) -> void:
 	var x := 24.0
 	var y := 334.0
 	var width := 432.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 252.0), PANEL_BG)
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 252.0), Color("#5f7f8c", 0.45), false, 1.0)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 269.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 269.0), Color("#5f7f8c", 0.45), false, 1.0)
 	_text(Vector2(x, y), _fit("%s — %s" % [npc.display_name, npc.role], 15, 408.0), 15, ACCENT)
 	y += 20.0
 	var sect_part := ""
@@ -820,6 +820,12 @@ func draw_npc_dossier(_player: Player) -> void:
 	_text(Vector2(x, y), _fit("Realm %d — %s%s · nerve %s" % [
 		npc.realm, realm_name, sect_part, npc.nerve_label()], 11, 408.0), 11, MUTED)
 	y += 17.0
+	# Where the person stands on the ladder and how close the next rung is. This
+	# is derived from the seed and the day, not saved.
+	var cultivation := npc.progress_line()
+	if cultivation != "":
+		_text(Vector2(x, y), _fit(cultivation, 11, 408.0), 11, Color("#a8d8c0"))
+		y += 17.0
 	# An alarm replaces the routine line: what the body is doing about the threat
 	# matters more than what the hour had planned for it.
 	var routine := npc.activity_line()

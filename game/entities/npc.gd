@@ -51,6 +51,9 @@ var animator := Animator.new()
 ## The archetype's brain, from `NpcAi.profile`. A reaction is live state and is
 ## never saved: a threat does not survive a load, so neither does the alarm.
 var ai: Dictionary = {}
+## The cultivation record `NpcProgress` derives for this person on the current
+## day. Derived, never saved: a day and a seed already decide it.
+var progress: Dictionary = {}
 ## `routine`, `confront`, `flee` or `shelter`.
 var reaction := "routine"
 ## Seconds of alarm left. The reaction lasts exactly as long as this does.
@@ -146,6 +149,47 @@ func bond_line() -> String:
 	return Relationships.describe(int(bond_to_player().get("score", 0)))
 
 
+## Re-derives this person's cultivation for the current day. A realm gained is
+## not a label: the sheet is regenerated at the new realm, so attributes, arts
+## and worn gear all rise with it, and a companion's build follows immediately.
+func refresh_progress() -> Dictionary:
+	if npc_id == "" or archetype_id == "":
+		return progress
+	var state := NpcProgress.state_for(archetype_id, npc_id, Clock.day, Game.world_seed)
+	if state.is_empty():
+		return progress
+	progress = state
+	var earned := clampi(int(state.get("realm", realm)), 1, maxi(1, Realms.count()))
+	if earned != realm:
+		realm = earned
+		speed = 48.0 + float(realm) * 4.0
+		var entry := NpcProgress.archetype(archetype_id)
+		if not entry.is_empty():
+			apply_sheet(NpcDb.sheet(entry, npc_id, realm))
+			realm = earned
+		if in_party:
+			var ratio := hp / maxf(1.0, hp_max)
+			build_party_stats()
+			hp = clampf(hp_max * ratio, 1.0, hp_max)
+	queue_redraw()
+	return state
+
+
+## "Cultivation: Foundation Establishment 3 · 62% to the next step" — the
+## dossier's one line on where this person stands and how close the next rung is.
+func progress_line() -> String:
+	if progress.is_empty():
+		return ""
+	var stage := NpcProgress.stage_label(progress)
+	if NpcProgress.at_peak(archetype_id, progress):
+		return "Cultivation: %s · the peak of their path." % stage
+	var line := "Cultivation: %s · %d%% to the next step" % [
+		stage, NpcProgress.insight_percent(progress)]
+	if int(progress.get("injured_until", 0)) >= Clock.day:
+		line += " · recovering from a failed breakthrough"
+	return line
+
+
 func root_name() -> String:
 	return String(DB.by_id("root", root_id).get("name", "Unknown Root"))
 
@@ -175,6 +219,7 @@ func _ready() -> void:
 		ai = NpcAi.profile({})
 	if settlement != null:
 		_set_destination("plaza")
+	refresh_progress()
 
 
 func _physics_process(delta: float) -> void:

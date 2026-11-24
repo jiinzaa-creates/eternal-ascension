@@ -1402,3 +1402,7 @@ func _validate_npc_data(problems: Array) -> void:
 			for goal_id in goal_pool:
 				if not goal_ids.has(String(goal_id)):
 					problems.append("npc archetype %s names unknown goal %s" % [id, String(goal_id)])
+
+	# Progression is content too: a person must be able to grow, and a cap below
+	# their own realm would make the simulation start above its ceiling.
+	problems.append_array(NpcProgress.validate(npc_data))

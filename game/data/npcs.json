@@ -12,6 +12,20 @@
     {"id": "goal.teach", "label": "Pass on the art", "blurb": "What was learned should outlive the one who learned it."},
     {"id": "goal.survive", "label": "Live another winter", "blurb": "The next season is enough to hope for."}
   ],
+  "progression": {
+    "sublevel_cost": 36.0,
+    "max_sim_days": 1200,
+    "injury_days": 14,
+    "regression_chance": 0.15,
+    "base_chance": 0.62,
+    "realm_penalty": 0.055,
+    "min_chance": 0.06,
+    "max_chance": 0.92,
+    "jitter_min": 0.7,
+    "jitter_max": 1.3,
+    "realm_drag": 0.05,
+    "drag_floor": 0.5
+  },
   "archetypes": [
     {
       "id": "sect_master", "role": "Sect Master", "realm": 5, "weight": 1, "schedule": "elder", "rest_schedule": "elder_rest", "sect": "sect.azure_cloud",
@@ -21,6 +35,7 @@
       "techniques": ["tech.formation.sealing_array", "tech.palm.azure_cloud", "tech.body.golden_bell"],
       "gear": ["base.staff.azure_rod", "base.robe.cloud_silk", "base.ring.spirit_iron", "base.talisman.wind_charm"],
       "goals": ["goal.protect_sect", "goal.status", "goal.pursue_dao"],
+      "progression": {"rate": 0.95, "cap": 8, "talent": 0.10},
       "ai": {"nerve": 0.95, "alert_range": 400.0, "response": "confront", "refuge": "sect_hall", "shout": true}
     },
     {
@@ -31,6 +46,7 @@
       "techniques": ["tech.palm.azure_cloud", "tech.sword.azure_cleave", "tech.step.cloud_step"],
       "gear": ["base.staff.azure_rod", "base.robe.cloud_silk", "base.ring.jade"],
       "goals": ["goal.teach", "goal.pursue_dao", "goal.protect_sect"],
+      "progression": {"rate": 1.05, "cap": 7, "talent": 0.08},
       "ai": {"nerve": 0.9, "alert_range": 380.0, "response": "confront", "refuge": "sect_hall", "shout": true}
     },
     {
@@ -41,6 +57,7 @@
       "techniques": ["tech.sword.azure_cleave", "tech.sword.piercing_thrust", "tech.step.cloud_step"],
       "gear": ["base.sword.iron_jian", "base.robe.cloud_silk", "base.ring.jade"],
       "goals": ["goal.pursue_dao", "goal.status", "goal.wander"],
+      "progression": {"rate": 1.60, "cap": 6, "talent": 0.04},
       "ai": {"nerve": 0.6, "alert_range": 280.0, "response": "confront", "refuge": "training", "shout": true}
     },
     {
@@ -51,6 +68,7 @@
       "techniques": ["tech.sword.azure_cleave", "tech.step.cloud_step"],
       "gear": ["base.sword.iron_jian", "base.robe.cloud_silk"],
       "goals": ["goal.pursue_dao", "goal.status", "goal.survive"],
+      "progression": {"rate": 1.80, "cap": 4, "talent": 0.0},
       "ai": {"nerve": 0.4, "alert_range": 240.0, "response": "shelter", "refuge": "dorms", "shout": true}
     },
     {
@@ -61,6 +79,7 @@
       "techniques": ["tech.step.cloud_step"],
       "gear": ["base.robe.cloud_silk", "base.ring.jade", "base.talisman.wind_charm"],
       "goals": ["goal.wealth", "goal.family", "goal.wander"],
+      "progression": {"rate": 0.70, "cap": 2, "talent": 0.0},
       "ai": {"nerve": 0.25, "alert_range": 220.0, "response": "shelter", "refuge": "tavern", "shout": true}
     },
     {
@@ -71,6 +90,7 @@
       "techniques": ["tech.fist.iron_bone", "tech.sword.azure_cleave"],
       "gear": ["base.sword.heavy_saber", "base.robe.iron_plate", "base.ring.jade"],
       "goals": ["goal.protect_sect", "goal.survive", "goal.family"],
+      "progression": {"rate": 1.20, "cap": 5, "talent": 0.02},
       "ai": {"nerve": 0.85, "alert_range": 360.0, "response": "confront", "refuge": "gate", "shout": true}
     },
     {
@@ -81,6 +101,7 @@
       "techniques": ["tech.step.cloud_step"],
       "gear": ["base.robe.cloud_silk"],
       "goals": ["goal.family", "goal.survive", "goal.wealth"],
+      "progression": {"rate": 0.60, "cap": 2, "talent": 0.0},
       "ai": {"nerve": 0.2, "alert_range": 200.0, "response": "flee", "refuge": "fields", "shout": true}
     }
   ],

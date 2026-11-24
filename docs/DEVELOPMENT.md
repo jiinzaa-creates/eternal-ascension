@@ -526,6 +526,47 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   subdues and binds it, executes a different subdued body to prove the kill path is intact, cycles
   the terms, settles a day, hands one over, releases another and saves/loads the yard.
 
+## NPC progression
+
+- **One pure simulation, no saved state.** `NpcProgress` (`game/systems/npc_progress.gd`) derives
+  every resident's cultivation from `(world_seed, archetype, npc_id, day)`. Each day adds insight
+  from the archetype's `rate`, dragged down by realm (`realm_drag`, floor `drag_floor`) and
+  jittered per person per day (`jitter_min..jitter_max`); `sublevel_cost` (36) buys one sublevel,
+  and at sublevel 10 an insight-full peak rolls a breakthrough.
+- **Breakthroughs have consequences.** `breakthrough_chance = base_chance −
+  realm_penalty·(realm−1) + talent`, clamped to `min_chance..max_chance` (0.06..0.92). Success
+  raises the realm and resets the peak. Failure resets insight, sets
+  `injured_until = day + injury_days` (14) during which no insight accrues, and may roll a
+  sublevel regression (`regression_chance`). The streams are `npc_insight`,
+  `npc_breakthrough` and `npc_regression`, drawn with `Rng.stream_from(world_seed, ...)`, so
+  tests and future worker code never depend on whichever seed the autoload holds.
+- **Bounded and cached.** `max_sim_days` (1200) caps the horizon. The cache holds each person's
+  state at the last requested day and steps forward one day at a time; asking for an earlier day
+  (a load rewound the clock) rebuilds from day 1. The cache is an optimisation, never authority;
+  `NpcProgress.reset_cache()` exists for tests.
+- **A realm is not a label.** `Npc.refresh_progress()` re-derives the state and, when the realm
+  changed, regenerates the person's sheet at the new realm through `NpcDb.sheet()`: attributes,
+  arts and worn gear rise with it, speed follows the realm, and a companion in the party rebuilds
+  its `StatBlock` while keeping its health ratio. The dossier gains a cultivation line with the
+  stage and progress to the next step.
+- **Only real milestones are announced.** `main._check_npc_progress()` runs on a day change
+  (including jumps from rest and travel), and after a load `_refresh_npc_progress_all()`
+  reconciles every body with the saved day. At most three breakthroughs or failed attempts are
+  reported as toasts; sublevels are not.
+- **Nothing is saved.** Progression is a function of the seed and the day, so it adds no save key
+  and schema stays 2. `_progress_day` is a live cursor that only avoids repeating the refresh and
+  is reset on load.
+- **Content.** The shared knobs live in the top-level `progression` block of `data/npcs.json`;
+  each archetype carries `{rate, cap, talent}`. `NpcProgress.validate()` rejects a missing block, a
+  rate of zero, a cap below the archetype's own realm or outside the ladder, and a talent outside
+  −0.5..0.5.
+- **Tests.** Unit `_npc_progress_tests` covers determinism across a rebuilt cache, divergence
+  between people and worlds, rewinding, realm monotonicity, caps, insight percentages, breakthrough
+  odds, a real failure path (a temporary hopeless archetype, removed afterwards), the body/dossier
+  reads, the absence of save keys and validation. Integration advances the clock 600 days and
+  checks the elder's realm, grown sheet, dossier line, companion build and the same ladder after a
+  save/load.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

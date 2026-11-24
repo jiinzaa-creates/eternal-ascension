@@ -78,6 +78,7 @@ func _ready() -> void:
 	_relationships_tests()
 	_party_tests()
 	_captivity_tests()
+	_npc_progress_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3815,6 +3816,122 @@ func _captivity_tests() -> void:
 	var ladder_data: Dictionary = DB.captivity.duplicate(true)
 	(ladder_data["loyalty"] as Dictionary)["restless"] = 5
 	check(not Captivity.validate(ladder_data).is_empty(), "an out-of-order loyalty ladder is rejected")
+
+
+## The town climbs without the player. Progression is a pure day-by-day
+## simulation from the world seed and the person's stable id, so the checks are
+## about determinism, monotonicity, caps and consequences — not about saved data.
+func _npc_progress_tests() -> void:
+	print("[npc progression] the town climbs without the player")
+	NpcProgress.reset_cache()
+	check(not NpcProgress.archetype("outer_disciple").is_empty(), "an archetype is found by id")
+	check(NpcProgress.archetype("nobody").is_empty(), "an unknown archetype is empty")
+	check(not NpcProgress.profile("outer_disciple").is_empty(), "an archetype carries a discipline profile")
+	check(NpcProgress.realm_cap("outer_disciple") >= NpcProgress.base_realm("outer_disciple"),
+		"a cap is never below the starting realm")
+	check(NpcProgress.realm_cap("farmer") < NpcProgress.realm_cap("sect_master"),
+		"a sect master's ceiling outranks a farmer's")
+	check(float(NpcProgress.profile("inner_disciple").get("rate", 0.0)) >
+		float(NpcProgress.profile("farmer").get("rate", 0.0)), "disciples train harder than farmers")
+
+	var seed_a := 424242
+	var person := "npc.progress.unit"
+	var day_one := NpcProgress.state_for("outer_disciple", person, 1, seed_a)
+	check(int(day_one.get("realm", 0)) == NpcProgress.base_realm("outer_disciple"),
+		"a person starts at the archetype's realm")
+	check(int(day_one.get("sublevel", 0)) == 1, "a person starts at the first sublevel")
+	check(float(day_one.get("insight", 0.0)) >= 0.0, "nobody starts in insight debt")
+
+	var day_300 := NpcProgress.state_for("outer_disciple", person, 300, seed_a)
+	check(int(day_300.get("realm", 0)) > int(day_one.get("realm", 0))
+		or int(day_300.get("sublevel", 0)) > 1, "three hundred days of practice move a person")
+	check(int(day_300.get("realm", 0)) <= NpcProgress.realm_cap("outer_disciple"),
+		"growth respects the realm cap")
+	check(float(day_300.get("insight", 0.0)) >= 0.0, "insight never goes negative")
+
+	# Determinism: seed, id and day decide the person; nothing else does.
+	NpcProgress.reset_cache()
+	var rebuilt := NpcProgress.state_for("outer_disciple", person, 300, seed_a)
+	check(str(rebuilt) == str(day_300), "the same seed and day rebuild the same person")
+	var neighbour := NpcProgress.state_for("outer_disciple", "npc.progress.other", 300, seed_a)
+	check(str(neighbour) != str(day_300), "two disciples do not advance in lockstep")
+	var other_world := NpcProgress.state_for("outer_disciple", person, 300, seed_a + 1)
+	check(str(other_world) != str(day_300), "a different world advances differently")
+
+	# A load rewinds the clock, so it must rewind the record too.
+	var rewound := NpcProgress.state_for("outer_disciple", person, 60, seed_a)
+	check(int(rewound.get("realm", 1)) <= int(day_300.get("realm", 1)),
+		"rewinding the clock rewinds the record")
+
+	# A failed breakthrough may cost a sublevel (that is the intended failure),
+	# but a realm is never lost to time.
+	var previous_realm := 0
+	var realms_hold := true
+	for cursor in [30, 90, 180, 360, 540, 720]:
+		var state := NpcProgress.state_for("outer_disciple", person, int(cursor), seed_a)
+		var realm := int(state.get("realm", 1))
+		if realm < previous_realm:
+			realms_hold = false
+		previous_realm = realm
+	check(realms_hold, "time never takes a realm away")
+
+	check(NpcProgress.insight_percent(day_300) >= 0 and NpcProgress.insight_percent(day_300) <= 100,
+		"progress towards the next step is a percentage")
+	check(NpcProgress.stage_label(day_300).contains(" "), "a stage reads as realm and sublevel")
+	check(NpcProgress.describe("outer_disciple", day_300) != "", "a record can be described")
+	check(not NpcProgress.at_peak("outer_disciple", day_one), "day one is not the peak")
+
+	var generous := NpcProgress.breakthrough_chance(1, 0.0)
+	var harsh := NpcProgress.breakthrough_chance(8, 0.0)
+	check(generous > harsh, "higher realms break through harder")
+	check(NpcProgress.breakthrough_chance(1, 5.0) <=
+		float(NpcProgress.rules().get("max_chance", 0.92)), "talent cannot guarantee a breakthrough")
+	check(NpcProgress.breakthrough_chance(12, -5.0) >=
+		float(NpcProgress.rules().get("min_chance", 0.06)), "no realm is impossible")
+
+	# A temporary hopeless prodigy proves failure is real: insight resets, the
+	# body is injured, and attempts keep coming. The archetype is removed after.
+	var archetypes_list: Array = DB.npc_data.get("archetypes", [])
+	archetypes_list.append({"id": "test_progress", "realm": 1,
+		"progression": {"rate": 600.0, "cap": 12, "talent": -0.5}})
+	NpcProgress.reset_cache()
+	var doomed := NpcProgress.state_for("test_progress", "npc.progress.doomed", 200, seed_a)
+	check(int(doomed.get("attempts", 0)) > 0, "a peak cultivator attempts a breakthrough")
+	check(int(doomed.get("failures", 0)) > 0, "a hopeless attempt can fail")
+	check(int(doomed.get("injured_until", 0)) >= 0, "failure leaves a recovery date")
+	archetypes_list.pop_back()
+	NpcProgress.reset_cache()
+
+	# The body and the dossier read the same derived state.
+	var saved_day: int = Clock.day
+	var npc := Npc.new()
+	npc.npc_id = "npc.progress.body"
+	npc.archetype_id = "outer_disciple"
+	npc.realm = 1
+	Clock.day = 400
+	var body_state := npc.refresh_progress()
+	check(npc.realm == int(body_state.get("realm", 0)), "the body wears the realm it earned")
+	check(npc.realm > 1 or int(body_state.get("sublevel", 1)) > 1,
+		"a resident met on day 400 has grown")
+	check(npc.progress_line().contains("Cultivation"), "the dossier states the climb")
+	check(npc.attrs.get_attr("str") >= 11, "progress raises the generated attributes")
+	Clock.day = saved_day
+	npc.free()
+
+	# Derived, not saved: no progression key enters the run dictionary.
+	check(not Game.to_dict().has("progress"), "progression is not a save key")
+	check(not Game.to_dict().has("npc_progress"), "progression is not an extra save key")
+
+	check(NpcProgress.validate(DB.npc_data).is_empty(), "the shipped progression data validates")
+	var free_steps: Dictionary = DB.npc_data.duplicate(true)
+	(free_steps["progression"] as Dictionary)["sublevel_cost"] = 0.0
+	check(not NpcProgress.validate(free_steps).is_empty(), "a free sublevel is rejected")
+	var low_cap: Dictionary = DB.npc_data.duplicate(true)
+	(low_cap["archetypes"] as Array)[0]["progression"]["cap"] = 1
+	check(not NpcProgress.validate(low_cap).is_empty(), "a cap below the archetype's realm is rejected")
+	var no_discipline: Dictionary = DB.npc_data.duplicate(true)
+	(no_discipline["archetypes"] as Array)[0].erase("progression")
+	check(not NpcProgress.validate(no_discipline).is_empty(), "an archetype without a discipline is rejected")
 
 
 func _quest_tests() -> void:

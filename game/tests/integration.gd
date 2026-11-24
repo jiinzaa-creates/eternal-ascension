@@ -3480,6 +3480,57 @@ func _run() -> void:
 	Clock.hour = m52_hour
 	player.global_position = m52_home
 
+	# --- npc progression: the town climbs from the seed and the day ----------
+	var m53_day: int = Clock.day
+	var m53_hour: float = Clock.hour
+	var m53_home: Vector2 = player.global_position
+	Clock.day = 4
+	main._progress_day = Clock.day
+	main._refresh_npc_progress_all()
+	var m53_elder: Npc = main.elder
+	check(m53_elder != null, "the elder exists")
+	var m53_base: int = m53_elder.realm
+	Clock.day = 600
+	main._check_npc_progress()
+	check(m53_elder.realm >= m53_base, "an elder never loses a realm to time")
+	check(m53_elder.realm > m53_base, "the elder climbs over a year and a half")
+	check(String(m53_elder.progress_line()).contains("Cultivation"), "the dossier reports the climb")
+	check(String(m53_elder.progress_line()).contains(NpcProgress.stage_label(m53_elder.progress)),
+		"the dossier names the stage the person stands on")
+	check(m53_elder.attrs.get_attr("wis") >= 24, "the grown elder carries a grown sheet")
+	check(int(m53_elder.progress.get("realm", 0)) == m53_elder.realm,
+		"the body and its record agree")
+
+	# A companion's build reads the realm it has reached.
+	var m53_guard: Npc = null
+	for m53_row in main.npcs:
+		var m53_person: Npc = m53_row
+		if m53_guard == null and m53_person.archetype_id == "guard":
+			m53_guard = m53_person
+	check(m53_guard != null, "a guard can be found")
+	m53_guard.join_party()
+	check(m53_guard.party_stats != null and m53_guard.hp_max > 0.0,
+		"a grown companion brings a grown build")
+	m53_guard.leave_party()
+
+	# Progression is derived: a save carries the day, not the ladder.
+	check(not Game.to_dict().has("progress"), "progression adds no save key")
+	Save.delete_slot(100)
+	main._save(100)
+	main._load_game(100)
+	var m53_loaded := NpcProgress.state_for(m53_elder.archetype_id, m53_elder.npc_id,
+		Clock.day, Game.world_seed)
+	check(m53_elder.realm == int(m53_loaded.get("realm", 0)),
+		"a loaded town derives the same ladder")
+	Save.delete_slot(100)
+
+	Clock.day = m53_day
+	Clock.hour = m53_hour
+	player.global_position = m53_home
+	main._progress_day = m53_day
+	main._captive_day = m53_day
+	main._refresh_npc_progress_all()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0

@@ -100,6 +100,9 @@ var captive_index := 0
 ## Last world day settled for the holding yard. A jump in days (inn, travel, a
 ## loaded clock) is paid a day at a time instead of skipped.
 var _captive_day := 0
+## Last world day the town's cultivation was re-derived for. Progression is a
+## pure function of the day, so this only avoids repeating the refresh.
+var _progress_day := 0
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -555,6 +558,7 @@ func _begin_run() -> void:
 	_apply_origin()
 	Game.born_day = Clock.day
 	_captive_day = Clock.day
+	_progress_day = Clock.day
 	Game.dead = false
 	Game.age_warning_stage = 0
 	_run_ended = false
@@ -651,6 +655,7 @@ func _process(delta: float) -> void:
 	if String(phase) == "ended":
 		return
 	_check_captivity()
+	_check_npc_progress()
 	# Regional Qi density is derived from where the body stands, never saved.
 	if realm_instance != null:
 		Game.biome_density = 1.0
@@ -1915,6 +1920,61 @@ func party_members() -> Array:
 	return out
 
 
+# ---------------------------------------------------------- npc progression ----
+
+
+## Re-derives every resident's cultivation for the current day. Bodies whose
+## realm changed rebuild their sheet, which is why a disciple met on day 1 is
+## visibly not the cultivator met on day 300.
+func _refresh_npc_progress_all() -> void:
+	for node in npcs:
+		if not is_instance_valid(node):
+			continue
+		var npc := node as Npc
+		if npc != null:
+			_npc_progress_for(npc)
+
+
+func _npc_progress_for(npc: Npc) -> Dictionary:
+	if npc == null:
+		return {}
+	return npc.refresh_progress()
+
+
+## The town climbs while the player is elsewhere. Only a realm breakthrough and
+## a failed attempt are worth a line: sublevels happen too often to announce.
+func _check_npc_progress() -> void:
+	if String(phase) != "play":
+		return
+	if _progress_day == 0:
+		_progress_day = Clock.day
+		return
+	if Clock.day == _progress_day:
+		return
+	_progress_day = Clock.day
+	var lines: Array[String] = []
+	for node in npcs:
+		if not is_instance_valid(node):
+			continue
+		var npc := node as Npc
+		if npc == null:
+			continue
+		var state := _npc_progress_for(npc)
+		if int(state.get("last_event_day", 0)) != Clock.day:
+			continue
+		match String(state.get("last_event", "")):
+			"breakthrough":
+				lines.append("%s breaks through to %s." % [npc.display_name, Realms.name_of(npc.realm)])
+			"deviation":
+				lines.append("%s fails a breakthrough and withdraws to recover." % npc.display_name)
+	for i in mini(lines.size(), 3):
+		Bus.toast.emit(lines[i])
+	if lines.size() > 3:
+		Bus.toast.emit("%d more of the market advanced today." % (lines.size() - 3))
+	if not lines.is_empty():
+		Bus.player_stats_changed.emit()
+
+
 # --------------------------------------------------------------- captivity ----
 
 
@@ -3046,6 +3106,10 @@ func _load_game(slot: int) -> void:
 	chunks.today = Clock.day
 	chunks.resync(player.global_position)
 	_sync_party()
+	# Progression is derived from the saved day, so a loaded town is exactly as
+	# strong as the seed says it should be on that day.
+	_progress_day = Clock.day
+	_refresh_npc_progress_all()
 	phase = "play"
 	if Game.dead:
 		_end_run()
