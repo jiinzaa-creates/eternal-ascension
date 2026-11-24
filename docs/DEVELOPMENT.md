@@ -1636,7 +1636,7 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   the remembered chunk so the overworld is recomputed on return. `density_updates` counts the real
   work; the integration check proves two frames in one chunk cost one lookup and a chunk crossing
   costs the next.
-- **Release is versioned in one place.** `application/config/version` is `1.0.0`; the save header and
+- **Release is versioned in one place.** `application/config/version` is `1.0.1`; the save header and
   the title read it through `ProjectSettings`, so a release bump is one edit. `export_presets.cfg`
   carries Linux/X11 (`embed_pck`, one executable) and Web (non-threaded) presets. A tag-triggered CI
   job installs the matching export templates, exports both, and uploads them; ordinary pushes still

@@ -57,7 +57,7 @@ static func menu_items() -> Array[String]:
 
 
 static func version_string() -> String:
-	return String(ProjectSettings.get_setting("application/config/version", "1.0.0"))
+	return String(ProjectSettings.get_setting("application/config/version", "1.0.1"))
 
 
 func _can_activate(item: int) -> bool:
@@ -179,7 +179,7 @@ func _draw() -> void:
 			label = "Continue  ·  no save yet"
 		_text(Vector2(rect.position.x + 18.0, y + 29.0), label, 17, colour)
 
-	_text(Vector2(84.0, height - 42.0), "↑ ↓ choose   ·   ENTER confirm   ·   ESC quit", 11, muted)
+	_text(Vector2(84.0, height - 42.0), "UP / DOWN choose   ·   ENTER confirm   ·   ESC quit", 11, muted)
 	var version := "v%s   ·   Godot %s" % [version_string(), String(Engine.get_version_info().get("string", ""))]
 	_text(Vector2(84.0, height - 20.0), version, 10, muted)
 	_text(Vector2(width - 330.0, height - 20.0), "F10 opens settings in game", 10, muted)

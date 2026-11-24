@@ -6093,7 +6093,7 @@ func _title_tests() -> void:
 	check(String(items[2]) == "Quit", "the last item quits")
 	check(title.newest_slot_of([3, 7, 1]) == 7, "continue takes the highest populated slot")
 	check(title.newest_slot_of([]) == 0, "no saves means no continue slot")
-	check(String(title.version_string()) == "1.0.0", "the title names the release")
+	check(String(title.version_string()) == "1.0.1", "the title names the release")
 	check(ResourceLoader.exists("res://assets/title_key_art.jpg"), "the title key art ships")
 	check(String(ProjectSettings.get_setting("application/run/main_scene", "")) == "res://scenes/title.tscn",
 		"the game boots to the title")

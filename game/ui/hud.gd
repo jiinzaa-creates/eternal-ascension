@@ -53,6 +53,11 @@ var _redraw_accum := 0.0
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sync_view_size()
+	# A Control created after the first scene has no resize event to inherit.
+	# Without this the title-to-run change left the HUD at size zero: left panels
+	# still drew, but centered text and right/bottom panels went off-screen.
+	get_viewport().size_changed.connect(_sync_view_size)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_font = ThemeDB.fallback_font
 	Bus.toast.connect(_on_toast)
@@ -66,7 +71,16 @@ func _on_toast(text: String) -> void:
 		_toasts.pop_front()
 
 
+func _sync_view_size() -> void:
+	var view := get_viewport_rect().size
+	if size != view:
+		size = view
+		position = Vector2.ZERO
+		queue_redraw()
+
+
 func _process(delta: float) -> void:
+	_sync_view_size()
 	# Only rebuild the toast list when something actually expired, instead of
 	# allocating a filtered array every frame.
 	var expired := false
@@ -1948,7 +1962,8 @@ func draw_tribulation() -> void:
 
 
 func draw_toasts() -> void:
-	var y := size.y - 84.0
+	# Clear of the skill bar and the help block, which own the bottom band.
+	var y := size.y - 248.0
 	var x := size.x * 0.5
 	for toast in _toasts:
 		var alpha := clampf(float(toast["ttl"]), 0.0, 1.0)
@@ -1961,10 +1976,20 @@ func draw_toasts() -> void:
 func draw_help() -> void:
 	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · F4 sect · F6 stories · F7 archive · F8 blank page · C sheet · F10 settings · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
-	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
-	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))
 	var pad := "Gamepad: left stick move · right stick aim · X attack · LS click guard · A dodge · B interact · Y meditate · RB sprint · LB shop · DPAD travel/waypoint"
-	_text(Vector2(24.0, size.y - 60.0), pad, 11, Color("#6b7b84"))
+	# The skill bar owns the bottom 120 px. Help lives above it, wrapped to the
+	# window, instead of being drawn through the bar and each other.
+	var rows: Array[String] = []
+	for text in [lines, pad, trade]:
+		for row in _wrapped(String(text), 10, size.x - 48.0):
+			rows.append(String(row))
+	var row_height := 14.0
+	var top := size.y - 152.0 - row_height * float(rows.size())
+	draw_rect(Rect2(12.0, top - 12.0, size.x - 24.0, row_height * float(rows.size()) + 18.0),
+		Color("#070b0d", 0.55))
+	for i in rows.size():
+		var colour := Color("#7b8b94") if i < rows.size() - 2 else Color("#6b7b84")
+		_text(Vector2(24.0, top + row_height * float(i) + 10.0), rows[i], 10, colour)
 
 
 func draw_creation(player: Player) -> void:

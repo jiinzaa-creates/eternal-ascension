@@ -5566,7 +5566,7 @@ func _save(slot: int) -> void:
 		Bus.toast.emit("The heavens do not pause for a save.")
 		return
 	var data := {
-		"version": String(ProjectSettings.get_setting("application/config/version", "1.0.0")),
+		"version": String(ProjectSettings.get_setting("application/config/version", "1.0.1")),
 		"clock": Clock.to_dict(),
 		"game": Game.to_dict(),
 		"player": player.to_dict(),

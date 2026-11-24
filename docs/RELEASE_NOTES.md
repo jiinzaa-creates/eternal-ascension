@@ -1,7 +1,23 @@
-# Eternal Ascension 1.0.0
+# Eternal Ascension 1.0.1
 
 Released 24 November 2026. This is the first release build of the 2D top-down xianxia
 cultivation sandbox.
+
+## Patch 1.0.1 — browser pass
+
+The 1.0.0 build was opened in a browser and three defects surfaced:
+
+- The HUD was built at zero size when the main scene replaced the title, so centered creation text
+  and the right and bottom panels were clipped off-screen. It now syncs its size on ready and on
+  every viewport resize, and an integration check pins the HUD to the live viewport.
+- The title footer used arrow glyphs the fallback font lacks, which rendered as tofu boxes; it now
+  reads `UP / DOWN choose · ENTER confirm · ESC quit`.
+- The control help was drawn through the combat skill bar and the toasts. It now wraps in a block
+  above the skill bar, and toasts clear both.
+
+At 1280×720 the title, key art and menu are legible; **Begin a new life** walks creation, identity
+and into play; **Continue** reloads populated slot 1 and reports `Loaded slot 1.`. Audio is still
+unheard (see Known limits).
 
 ## What ships
 
@@ -43,18 +59,20 @@ Web preset is exported without thread support).
 ## Verification at release
 
 - Unit suite: **4330 / 0**.
-- Integration suite: **1198 / 0** in two consecutive final runs.
+- Integration suite: **1199 / 0** in the final run after the 1.0.1 fixes.
 - Headless import and a 240-frame boot: exit 0 with no script or data errors.
 - Linux export boots headlessly from the exported binary.
-- Web export produces its HTML, wasm and pack files.
+- Web export produces its HTML, wasm and pack files and was opened at 1280×720: title, key art and
+  menu legible; New Life reached creation, identity and play; Continue loaded slot 1.
 
 ## Known limits
 
 - The game is code-drawn except the title key art; there are no character portraits, painted
   backgrounds or imported animation frames.
-- No GPU, display or audio device is available in the build environment. The title screen, HUD,
-  effects and score have **not** been seen or heard; their logic is tested, their look and sound
-  are not. The exports were not opened in a browser here.
+- No audio device is available in the build environment. The synthesized score has **not** been
+  heard; its logic, settings and F2 mute path are tested, its sound is not.
+- The browser pass covered the title, both menu paths, creation and a resumed run at 1280×720;
+  a full playthrough, small-window layout below 1280 and every screen were not re-checked.
 - GitHub Actions has not been observed running; the tag job is configuration, not a verified run.
 - Travel between provinces, flight/domain projection, profession masters and deeper economy,
-  NPC feuds and the player being taken captive remain out of scope for 1.0.0.
+  NPC feuds and the player being taken captive remain out of scope for 1.0.1.

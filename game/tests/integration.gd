@@ -4889,7 +4889,7 @@ func _run() -> void:
 	check(m72_title.is_inside_tree(), "the title screen loads")
 	check(m72_title.menu_items().size() == 3, "the title offers new life, continue and quit")
 	check(m72_title.newest_slot_of([4, 9, 2]) == 9, "continue takes the newest populated slot")
-	check(String(m72_title.version_string()) == "1.0.0", "the title names the release")
+	check(String(m72_title.version_string()) == "1.0.1", "the title names the release")
 	m72_title.queue_free()
 	await frames(1)
 
@@ -4902,6 +4902,11 @@ func _run() -> void:
 	main._apply_options()
 	check(Music.is_enabled(), "the music switch restores the score")
 	check(Options.get_int("volume") == Music.volume, "the score shares the interface volume")
+
+	# A HUD built after the title scene must still learn the viewport's size;
+	# without this centered creation text and right/bottom panels stay off-screen.
+	check(main.hud.size == get_viewport().get_visible_rect().size,
+		"the HUD fills the viewport after the scene is built (%s)" % str(main.hud.size))
 
 	# The HUD redraws at its authored cap, not once per frame.
 	main.hud.redraw_requests = 0
@@ -4929,7 +4934,7 @@ func _run() -> void:
 	main._update_biome_density()
 
 	# The release identifies itself and ships its art.
-	check(String(ProjectSettings.get_setting("application/config/version", "")) == "1.0.0",
+	check(String(ProjectSettings.get_setting("application/config/version", "")) == "1.0.1",
 		"the project carries the release version")
 	check(ResourceLoader.exists("res://assets/title_key_art.jpg"), "the title key art is importable")
 	check(FileAccess.file_exists("res://export_presets.cfg"), "the export presets ship with the project")

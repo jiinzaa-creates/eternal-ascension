@@ -2,7 +2,7 @@
 
 A 2D top-down open-world xianxia cultivation action RPG, built with **Godot 4.4** (GDScript).
 
-Current build: **1.0.0**, the release build. It is a complete playable sandbox: a streamed
+Current build: **1.0.1**, the release build. It is a complete playable sandbox: a streamed
 province, a populated settlement with scheduled NPCs, real-time frame-data combat, cultivation
 with breakthroughs, deterministic procedural items, nine hidden-realm families with their own
 wardens and inheritances, four quest chains, twelve sect storylines, a four-thread narrative
@@ -272,7 +272,7 @@ docs/         DEVELOPMENT.md — engine pin, determinism rule, save compatibilit
 - Performance: the HUD now redraws at 30 Hz instead of once per frame and only rebuilds its toast
   list when a toast expires; the standing biome's Qi density is resolved on a chunk crossing rather
   than every frame. Both paths are covered by integration checks that count the work performed.
-- Release: version 1.0.0 is carried by the project and the save header, Linux and Web presets ship
+- Release: version 1.0.1 is carried by the project and the save header, Linux and Web presets ship
   in `game/export_presets.cfg`, and a tag-triggered CI job builds both artifacts.
 - One procedural hidden realm with hazards, chests and a one-time inheritance.
 - Save/load with atomic writes, sha256 verification, 3 backups, corruption fallback, schema migration.
@@ -284,7 +284,7 @@ Character appearance art and painted backgrounds (characters and the province ar
 code-drawn, with the title key art as the one painted asset); travel between provinces; flight,
 domain projection, space folding and the other declared realm capabilities; profession tools,
 masters and the deeper economy; NPC deaths and feuds; the player being taken captive rather than
-being the captor; additional hidden-realm templates. The 1.0.0 interface, audio and release
+being the captor; additional hidden-realm templates. The 1.0.1 interface, audio and release
 packaging are complete; this list is deliberate scope, not missing UI.
 
 Each system is described in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md); the release notes are
