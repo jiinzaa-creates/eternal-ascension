@@ -838,9 +838,10 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   time the screen is read.
 - **The screen.** **F4** opens a frozen screen. Before founding it lists the three doctrines with
   their names, capacities and levies, and why founding is not yet possible. After founding it
-  lists the daily levy (with its amount and the treasury), every eligible friend as a recruit row
-  with realm, derived rank, bond and gift, and a roster panel with each member's name, rank and
-  realm. Arrows select, ENTER founds/levies/recruits, and **F4**, **E** or **ESC** closes.
+  lists every eligible friend as a recruit row with realm, derived rank, bond and gift, and a
+  panel with the steward, each member's name, rank and realm, the treasury and the latest hall
+  report. Arrows select, ENTER founds or recruits, and **F4**, **E** or **ESC** closes; the day
+  itself is settled by M61, not by a button.
 - **Saved key and validation.** `Game.player_sect` is an optional schema-2 key: `{name, doctrine,
   founded_day, treasury, members, tribute_day}`. `PlayerSect.sanitize()` discards an unknown
   doctrine, falls back to the doctrine's name, drops duplicate/empty members, caps the roster at
@@ -851,8 +852,44 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
 - **Tests.** Unit `_player_sect_tests` covers the three doctrines, costs, ranks, founding, tribute
   totals, once-a-day collection, every recruitment refusal, roster cleaning, the saved key and
   fifteen validation negatives. Integration covers the three-row founding screen, freeze, founding
-  fee and treasury, recruiting Elder Bai after raising his regard, a levy that pays by realm and
-  cannot repeat, and the hall, roster and treasury surviving a save and load.
+  fee and treasury, recruiting Elder Bai after raising his regard, a day's settlement, skipped
+  days, and the hall, roster, treasury, autonomy day and report surviving a save and load.
+
+## Sect autonomy
+
+- **The hall keeps its own days.** `data/sect_autonomy.json` sets one stone of upkeep per present
+  member, a two-stone steward bonus, five weighted events and a per-doctrine guard for raids.
+  `SectAutonomy.settle_day()` is pure: it gathers `PlayerSect.tribute_for()` plus the steward
+  bonus, pays upkeep, applies the day's event, clamps the treasury at zero and reports a
+  shortfall. It never mutates the sheet it is given.
+- **The event is seed-pure.** `event_for(day, world_seed, sect)` draws from
+  `Rng.stream_from(world_seed, "sect_autonomy", hash(hall name), day)`, so the same hall, seed and
+  day always produce the same news and a reload cannot reroll a bad day. Only the raid is marked
+  `guarded`: the Sword Creed halves its cost, the Formation Creed quarters it, Alchemy takes it in
+  full. A dispute is not a raid and is never discounted.
+- **Skipped days are settled one at a time.** `settle_days()` walks every day from the saved
+  autonomy day to the current one, at most `DEFAULT_MAX_DAYS` (60) per call; the next frame picks
+  up any remainder. An empty hall advances the date without income, upkeep or events. Each
+  settled day appends a bounded report line to the sheet's `log` (last eight kept).
+- **The steward is derived.** `main.player_sect_steward()` returns the highest-realm member
+  currently present; the model's two-stone bonus needs only a non-empty roster. No appointment or
+  roster rank is saved beyond M60's member ids.
+- **Wiring.** `_check_sect_autonomy()` runs from `_process` after captivity and before NPC
+  progression. It reads `autonomy_day` from the sheet (falling back to the current day for an old
+  M60 save, so a migration does not dump months of backlog), settles, stores the returned sheet
+  and emits a one-line or multi-day toast. Founding sets `autonomy_day` to the founding day and an
+  empty log.
+- **Saved key and validation.** The three new fields live inside the existing optional
+  `Game.player_sect` schema-2 key: `autonomy_day` and an eight-line `log`. `PlayerSect.sanitize()`
+  clamps the day and drops empty/overlong/overflowing report lines. `SectAutonomy.validate()`
+  rejects negative upkeep or steward bonus, missing/empty events, duplicate ids, unlabelled or
+  impossible events, a missing guard table, guards on unknown doctrines, guards outside 0..1 and a
+  doctrine with no guard.
+- **Tests.** Unit `_sect_autonomy_tests` covers income/upkeep/steward math, all three doctrine
+  guards, a shortfall clamped at zero, empty-hall days, deterministic event draws, multi-day
+  settlement, the 60-day bound, report cleaning and twelve validation negatives. Integration
+  checks a new day, five skipped days, the bounded report, and the autonomy day and treasury
+  surviving a save and load.
 
 ## Off-screen simulation
 

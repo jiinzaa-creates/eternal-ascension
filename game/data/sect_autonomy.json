@@ -1,0 +1,42 @@
+{
+  "upkeep_per_member": 1,
+  "steward_bonus": 2,
+  "events": [
+    {
+      "id": "event.quiet",
+      "weight": 40,
+      "stones": 0,
+      "label": "A quiet day in the hall."
+    },
+    {
+      "id": "event.vein",
+      "weight": 20,
+      "stones": 12,
+      "label": "A seam of spirit stone opens in the cellar."
+    },
+    {
+      "id": "event.petition",
+      "weight": 15,
+      "stones": 6,
+      "label": "A nearby village sends a voluntary gift."
+    },
+    {
+      "id": "event.dispute",
+      "weight": 15,
+      "stones": -5,
+      "label": "A dispute costs the hall silver to settle."
+    },
+    {
+      "id": "event.raid",
+      "weight": 10,
+      "stones": -12,
+      "guarded": true,
+      "label": "Beasts test the gate; repairs cost the hall."
+    }
+  ],
+  "guard": {
+    "doctrine.sword": 0.5,
+    "doctrine.alchemy": 1.0,
+    "doctrine.formation": 0.25
+  }
+}

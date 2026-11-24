@@ -86,6 +86,7 @@ func _ready() -> void:
 	_sect_economy_tests()
 	_sect_politics_tests()
 	_player_sect_tests()
+	_sect_autonomy_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -4832,6 +4833,118 @@ func _player_sect_tests() -> void:
 	broken_data = DB.player_sect_data.duplicate(true)
 	(broken_data["member_ranks"] as Array)[0]["name"] = " "
 	check(not PlayerSect.validate(broken_data).is_empty(), "a nameless member rank is rejected")
+
+
+## Sect autonomy: the hall gathers its levy, pays upkeep and lives one seeded
+## event per day while the player is elsewhere.
+func _sect_autonomy_tests() -> void:
+	print("[sect autonomy] daily levy, upkeep and seeded events")
+	check(SectAutonomy.upkeep_per_member() == 1, "a member costs one stone a day")
+	check(SectAutonomy.steward_bonus() == 2, "the steward adds two stones")
+	check(SectAutonomy.events().size() == 5, "the event table is loaded")
+	check(approx(SectAutonomy.guard_for("doctrine.sword"), 0.5), "a sword hall halves a raid")
+	check(approx(SectAutonomy.guard_for("doctrine.formation"), 0.25), "a formation hall quarters it")
+	check(approx(SectAutonomy.guard_for("doctrine.nope"), 1.0), "an unknown doctrine takes the full loss")
+
+	var sect: Dictionary = PlayerSect.found("doctrine.sword", 500, 1).get("sect", {})
+	var quiet := SectAutonomy.settle_day(sect, [4], 2, 424242, "event.quiet")
+	check(bool(quiet.get("ok", false)), "a staffed hall settles")
+	check(int(quiet.get("income", 0)) == 5, "levy plus steward bonus comes in")
+	check(int(quiet.get("upkeep", 0)) == 1, "the member's upkeep is paid")
+	check(int((quiet.get("sect", {}) as Dictionary).get("treasury", 0)) == 504,
+		"a quiet day leaves the hall richer")
+	check(int((quiet.get("sect", {}) as Dictionary).get("autonomy_day", 0)) == 2,
+		"the day is recorded")
+	var raid := SectAutonomy.settle_day(sect, [4], 2, 424242, "event.raid")
+	check(int(raid.get("event_stones", 0)) == -6, "a sword hall pays half a raid")
+	check(int((raid.get("sect", {}) as Dictionary).get("treasury", 0)) == 498,
+		"income, upkeep and the raid all land")
+	var alchemy: Dictionary = PlayerSect.found("doctrine.alchemy", 500, 1).get("sect", {})
+	var burned := SectAutonomy.settle_day(alchemy, [1, 1], 2, 424242, "event.raid")
+	check(int(burned.get("event_stones", 0)) == -12, "an alchemy hall takes the full raid")
+	check(int((burned.get("sect", {}) as Dictionary).get("treasury", 0)) == 494,
+		"the alchemy levy offsets some of it")
+	var formation: Dictionary = PlayerSect.found("doctrine.formation", 500, 1).get("sect", {})
+	var held := SectAutonomy.settle_day(formation, [4], 2, 424242, "event.raid")
+	check(int(held.get("event_stones", 0)) == -3, "a formation hall quarters a raid")
+	check(int((held.get("sect", {}) as Dictionary).get("treasury", 0)) == 502,
+		"the hall still gains on a guarded day")
+	var poor := sect.duplicate(true)
+	poor["treasury"] = 0
+	var short := SectAutonomy.settle_day(poor, [1], 2, 424242, "event.dispute")
+	check(bool(short.get("shortfall", false)), "an unpayable day is marked short")
+	check(int((short.get("sect", {}) as Dictionary).get("treasury", -1)) == 0,
+		"a short treasury stops at zero")
+	var empty := SectAutonomy.settle_day(sect, [], 3, 424242)
+	check(bool(empty.get("ok", false)) and int(empty.get("income", 0)) == 0,
+		"an empty hall earns and pays nothing")
+
+	var seeded := SectAutonomy.event_for(5, 424242, sect)
+	check(seeded == SectAutonomy.event_for(5, 424242, sect), "the same day brings the same event")
+	check(not String(seeded.get("id", "")).is_empty(), "the event has an id")
+	var multi := SectAutonomy.settle_days(sect, [4], 2, 10, 424242)
+	check(int(multi.get("days", 0)) == 9, "skipped days are counted")
+	check(int((multi.get("sect", {}) as Dictionary).get("autonomy_day", 0)) == 10,
+		"the hall advances to the current day")
+	check((multi.get("lines", []) as Array).size() == 9, "every day leaves a report line")
+	check((multi.get("sect", {}) as Dictionary).get("log", []).size() == 8,
+		"the saved report stays bounded")
+	var capped := SectAutonomy.settle_days(sect, [4], 1, 100, 424242)
+	check(int(capped.get("days", 0)) == SectAutonomy.DEFAULT_MAX_DAYS, "a long absence is bounded")
+	check(int((capped.get("sect", {}) as Dictionary).get("autonomy_day", 0)) == SectAutonomy.DEFAULT_MAX_DAYS,
+		"the next call can pick up the rest")
+	var no_people := SectAutonomy.settle_days(sect, [], 2, 10, 424242)
+	check((no_people.get("lines", []) as Array).is_empty(), "an empty hall has no events to report")
+	check(int((no_people.get("sect", {}) as Dictionary).get("autonomy_day", 0)) == 10,
+		"an empty hall still records the passage of days")
+
+	var clean := PlayerSect.sanitize({"doctrine": "doctrine.sword", "log": ["a", "", "b"],
+		"autonomy_day": 7})
+	check((clean.get("log", []) as Array).size() == 2, "empty report lines are dropped")
+	check(int(clean.get("autonomy_day", 0)) == 7, "the autonomy day survives cleaning")
+	var long_log: Array = []
+	for i in 12:
+		long_log.append("line %d" % i)
+	check((PlayerSect.sanitize({"doctrine": "doctrine.sword", "log": long_log}).get("log", []) as Array).size() == 8,
+		"a loaded report caps at eight lines")
+
+	check(SectAutonomy.validate(DB.sect_autonomy_data).is_empty(), "the shipped autonomy validates")
+	var broken: Dictionary = DB.sect_autonomy_data.duplicate(true)
+	broken.erase("events")
+	check(not SectAutonomy.validate(broken).is_empty(), "missing events are rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["events"] as Array).clear()
+	check(not SectAutonomy.validate(broken).is_empty(), "an empty event table is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["events"] as Array).append((DB.sect_autonomy_data["events"] as Array)[0].duplicate(true))
+	check(not SectAutonomy.validate(broken).is_empty(), "a duplicate event is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["events"] as Array)[0]["label"] = " "
+	check(not SectAutonomy.validate(broken).is_empty(), "an unlabelled event is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["events"] as Array)[0]["weight"] = 0
+	check(not SectAutonomy.validate(broken).is_empty(), "an event that cannot happen is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["events"] as Array)[0]["weight"] = -1
+	check(not SectAutonomy.validate(broken).is_empty(), "a negative weight is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	broken["upkeep_per_member"] = -1
+	check(not SectAutonomy.validate(broken).is_empty(), "negative upkeep is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	broken["steward_bonus"] = -1
+	check(not SectAutonomy.validate(broken).is_empty(), "a negative steward bonus is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	broken.erase("guard")
+	check(not SectAutonomy.validate(broken).is_empty(), "missing doctrine guards are rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["guard"] as Dictionary)["doctrine.nope"] = 0.5
+	check(not SectAutonomy.validate(broken).is_empty(), "a guard for an unknown doctrine is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["guard"] as Dictionary)["doctrine.sword"] = 1.5
+	check(not SectAutonomy.validate(broken).is_empty(), "a guard above one is rejected")
+	broken = DB.sect_autonomy_data.duplicate(true)
+	(broken["guard"] as Dictionary).erase("doctrine.formation")
+	check(not SectAutonomy.validate(broken).is_empty(), "a doctrine without a guard is rejected")
 
 
 func _quest_tests() -> void:

@@ -676,6 +676,7 @@ func _process(delta: float) -> void:
 	if String(phase) == "ended":
 		return
 	_check_captivity()
+	_check_sect_autonomy()
 	_check_npc_progress()
 	_check_stories()
 	# Regional Qi density is derived from where the body stands, never saved.
@@ -2805,6 +2806,43 @@ func player_sect_members() -> Array:
 	return out
 
 
+## The strongest present member keeps the hall while the player is away. This is
+## derived, not appointed: the same roster always produces the same steward.
+func player_sect_steward() -> Dictionary:
+	var best: Dictionary = {}
+	for value in player_sect_members():
+		var member: Dictionary = value
+		if best.is_empty() or int(member.get("realm", 1)) > int(best.get("realm", 1)):
+			best = member
+	return best
+
+
+## The hall runs itself one day at a time, including days skipped by rest or
+## travel. A reload starts from the saved autonomy day, so it can never reroll a
+## bad event; the same seed, hall and day always produce the same day.
+func _check_sect_autonomy() -> void:
+	if String(phase) != "play" or Game.player_sect.is_empty():
+		return
+	var last := int(Game.player_sect.get("autonomy_day", Clock.day))
+	if Clock.day <= last:
+		return
+	var result := SectAutonomy.settle_days(Game.player_sect, _player_sect_realms(), last + 1,
+		Clock.day, Game.world_seed)
+	Game.player_sect = (result.get("sect", Game.player_sect) as Dictionary).duplicate(true)
+	var days := int(result.get("days", 0))
+	if days <= 0:
+		return
+	var lines: Array = result.get("lines", [])
+	if lines.is_empty():
+		return
+	if days == 1:
+		Bus.toast.emit(String(lines[0]))
+	else:
+		Bus.toast.emit("The hall ran %d days: +%d levy, −%d upkeep." % [days,
+			int(result.get("income", 0)), int(result.get("upkeep", 0))])
+	Bus.player_stats_changed.emit()
+
+
 func _player_sect_realms() -> Array:
 	var realms: Array = []
 	for value in player_sect_members():
@@ -2836,17 +2874,6 @@ func player_sect_rows() -> Array:
 			})
 		return out
 
-	var check := PlayerSect.can_collect(Game.player_sect, Clock.day)
-	var levy := PlayerSect.tribute_for(String(Game.player_sect.get("doctrine", "")), _player_sect_realms())
-	out.append({
-		"kind": "levy",
-		"id": "levy",
-		"label": "Gather the daily levy",
-		"detail": "+%d stones · treasury %d" % [levy, int(Game.player_sect.get("treasury", 0))],
-		"blurb": "The hall's share, gathered once a day.",
-		"enabled": bool(check.get("ok", false)),
-		"reason": String(check.get("reason", "")),
-	})
 	var candidates := 0
 	for node in npcs:
 		if not is_instance_valid(node):
@@ -2907,11 +2934,8 @@ func _player_sect_activate(index: int) -> void:
 		else:
 			Bus.toast.emit("The hall refuses: %s." % reason)
 		return
-	match kind:
-		"levy":
-			_collect_player_sect_levy()
-		"recruit":
-			_recruit_player_sect_member(String(row.get("id", "")))
+	if kind == "recruit":
+		_recruit_player_sect_member(String(row.get("id", "")))
 
 
 func _is_captive_id(npc_id: String) -> bool:
@@ -2933,16 +2957,6 @@ func _found_player_sect(doctrine_id: String) -> void:
 	Game.player_sect = (result.get("sect", {}) as Dictionary).duplicate(true)
 	player_sect_index = 0
 	Bus.toast.emit("%s is founded. The hall is yours." % String(Game.player_sect.get("name", "Your sect")))
-	Bus.player_stats_changed.emit()
-
-
-func _collect_player_sect_levy() -> void:
-	var result := PlayerSect.collect(Game.player_sect, Clock.day, _player_sect_realms())
-	if not bool(result.get("ok", false)):
-		Bus.toast.emit("The hall refuses: %s." % String(result.get("reason", "")))
-		return
-	Game.player_sect = (result.get("sect", {}) as Dictionary).duplicate(true)
-	Bus.toast.emit("Levy gathered: +%d stones." % int(result.get("amount", 0)))
 	Bus.player_stats_changed.emit()
 
 

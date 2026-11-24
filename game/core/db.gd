@@ -57,6 +57,8 @@ var sect_economy_data: Dictionary = {}
 var politics_data: Dictionary = {}
 ## Player-founded sect: founding rules, doctrines and member ranks.
 var player_sect_data: Dictionary = {}
+## Sect autonomy: daily upkeep, steward bonus, doctrine guards and events.
+var sect_autonomy_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -116,6 +118,7 @@ func load_all() -> void:
 	sect_economy_data = _read("sect_economy.json")
 	politics_data = _read("politics.json")
 	player_sect_data = _read("player_sect.json")
+	sect_autonomy_data = _read("sect_autonomy.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -751,6 +754,8 @@ func validate() -> Array:
 	# A player-founded hall: expensive enough to be a late choice, with three
 	# distinct doctrines and a roster that cannot outgrow the data's cap.
 	problems.append_array(PlayerSect.validate(player_sect_data))
+	# The hall's own day: upkeep, guarded raids and a reachable event table.
+	problems.append_array(SectAutonomy.validate(sect_autonomy_data))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())

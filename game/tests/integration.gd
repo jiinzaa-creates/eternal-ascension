@@ -3902,6 +3902,7 @@ func _run() -> void:
 
 	# --- M60: founding the player's own hall -----------------------------------
 	var m60_stones := Game.spirit_stones
+	var m60_day := Clock.day
 	var m60_sect: Dictionary = Game.player_sect.duplicate(true)
 	var m60_standing: Dictionary = Game.faction_standing.duplicate(true)
 	var m60_notoriety := Game.notoriety
@@ -3944,13 +3945,17 @@ func _run() -> void:
 	main._player_sect_activate(m60_recruit_index)
 	check(PlayerSect.is_member(Game.player_sect, m60_elder.npc_id), "the friend joins the hall")
 	check(int(Game.player_sect.get("treasury", 0)) == 475, "the gift leaves the treasury")
-	var m60_levy := 1 + floori(float(m60_elder.realm) / 2.0)
-	main._player_sect_activate(0)
-	check(int(Game.player_sect.get("treasury", 0)) == 475 + m60_levy, "the levy pays the hall")
-	check(int(Game.player_sect.get("tribute_day", -1)) == Clock.day, "the levy records the day")
-	var m60_after_levy := int(Game.player_sect.get("treasury", 0))
-	main._player_sect_activate(0)
-	check(int(Game.player_sect.get("treasury", 0)) == m60_after_levy, "the levy cannot be gathered twice")
+	var m60_autonomy_day := int(Game.player_sect.get("autonomy_day", -1))
+	Clock.day = m60_day + 1
+	main._check_sect_autonomy()
+	check(int(Game.player_sect.get("autonomy_day", -1)) == Clock.day, "the hall settles a new day")
+	check((Game.player_sect.get("log", []) as Array).size() == 1, "the hall keeps a report")
+	check(int(Game.player_sect.get("treasury", -1)) >= 0, "the treasury never goes negative")
+	Clock.day = m60_day + 5
+	main._check_sect_autonomy()
+	check(int(Game.player_sect.get("autonomy_day", -1)) == Clock.day, "skipped days are settled in order")
+	check((Game.player_sect.get("log", []) as Array).size() >= 5, "each settled day is reported")
+	var m60_after_autonomy := int(Game.player_sect.get("treasury", 0))
 
 	Save.delete_slot(102)
 	main._save(102)
@@ -3958,7 +3963,9 @@ func _run() -> void:
 	main._load_game(102)
 	check(not Game.player_sect.is_empty(), "the hall survives a save")
 	check(PlayerSect.is_member(Game.player_sect, m60_elder.npc_id), "the roster survives a save")
-	check(int(Game.player_sect.get("treasury", 0)) == m60_after_levy, "the treasury survives a save")
+	check(int(Game.player_sect.get("treasury", 0)) == m60_after_autonomy, "the treasury survives a save")
+	check(int(Game.player_sect.get("autonomy_day", -1)) == m60_day + 5, "the autonomy day survives a save")
+	check(int(Game.player_sect.get("founded_day", 0)) <= m60_autonomy_day, "the hall remembers its founding")
 	Save.delete_slot(102)
 
 	Game.spirit_stones = m60_stones
@@ -3967,6 +3974,7 @@ func _run() -> void:
 	Game.notoriety = m60_notoriety
 	Game.party_ids = m60_party
 	Game.npc_memory = m60_memory
+	Clock.day = m60_day
 	player.cultivation.realm = m60_realm
 	player.cultivation.sublevel = m60_sublevel
 	player.rebuild_stats()

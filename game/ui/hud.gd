@@ -851,18 +851,37 @@ func draw_player_sect(player: Player) -> void:
 		_text(Vector2(x + 576.0, y + 148.0), "%d / %d members · %d stones" % [
 			PlayerSect.member_count(Game.player_sect), PlayerSect.capacity(Game.player_sect),
 			int(Game.player_sect.get("treasury", 0))], 10, Color("#d8c898"))
+		var steward: Dictionary = host.player_sect_steward()
+		var steward_line := "Steward: the hall waits."
+		if not steward.is_empty():
+			steward_line = "Steward: %s (%s)" % [String(steward.get("name", "?")), String(steward.get("rank", ""))]
+		_text(Vector2(x + 576.0, y + 166.0), _fit(steward_line, 10, 260.0), 10, Color("#a8d8c0"))
+		_text(Vector2(x + 576.0, y + 188.0), "MEMBERS", 11, ACCENT)
 		var members: Array = host.player_sect_members()
-		var member_y := y + 176.0
+		var member_y := y + 206.0
 		if members.is_empty():
 			_text(Vector2(x + 576.0, member_y), "No one has joined yet.", 10, MUTED)
-		for value in members:
-			var member: Dictionary = value
+		for i in mini(members.size(), 5):
+			var member: Dictionary = members[i]
 			_text(Vector2(x + 576.0, member_y), _fit("%s — %s" % [String(member.get("name", "?")),
 				String(member.get("rank", ""))], 10, 260.0), 10, INK)
-			_text(Vector2(x + 576.0, member_y + 14.0), Realms.name_of(int(member.get("realm", 1))), 9, MUTED)
-			member_y += 38.0
+			_text(Vector2(x + 576.0, member_y + 13.0), Realms.name_of(int(member.get("realm", 1))), 9, MUTED)
+			member_y += 32.0
+		if members.size() > 5:
+			_text(Vector2(x + 576.0, member_y), "and %d more" % (members.size() - 5), 9, MUTED)
+		_text(Vector2(x + 576.0, y + 390.0), "HALL REPORT", 11, ACCENT)
+		var log_value: Variant = Game.player_sect.get("log", [])
+		var log_lines: Array = []
+		if typeof(log_value) == TYPE_ARRAY:
+			log_lines = log_value
+		var log_y := y + 408.0
+		if log_lines.is_empty():
+			_text(Vector2(x + 576.0, log_y), "No days have passed yet.", 9, MUTED)
+		for i in mini(log_lines.size(), 6):
+			_text(Vector2(x + 576.0, log_y), _fit(String(log_lines[log_lines.size() - 1 - i]), 9, 270.0), 9, MUTED)
+			log_y += 15.0
 
-	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER found / levy / recruit   ·   F4 / E / ESC — close",
+	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER found / recruit   ·   the hall levies and pays itself   ·   F4 / E / ESC — close",
 		10, Color("#7b8b94"))
 
 

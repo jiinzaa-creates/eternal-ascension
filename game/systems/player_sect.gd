@@ -101,6 +101,8 @@ static func found(doctrine_id: String, stones: int, day: int) -> Dictionary:
 			"treasury": founding_cost(),
 			"members": [],
 			"tribute_day": -1,
+			"autonomy_day": maxi(1, day),
+			"log": [],
 		},
 	}
 
@@ -239,6 +241,16 @@ static func sanitize(value: Variant) -> Dictionary:
 				continue
 			seen[id] = true
 			roster.append(id)
+	var log: Array = []
+	var raw_log: Variant = source.get("log", [])
+	if typeof(raw_log) == TYPE_ARRAY:
+		for line_value in (raw_log as Array):
+			var line := String(line_value).strip_edges()
+			if line == "":
+				continue
+			log.append(line.left(180))
+	while log.size() > 8:
+		log.pop_front()
 	return {
 		"name": name,
 		"doctrine": doctrine_id,
@@ -246,6 +258,8 @@ static func sanitize(value: Variant) -> Dictionary:
 		"treasury": maxi(0, int(source.get("treasury", 0))),
 		"members": roster,
 		"tribute_day": int(source.get("tribute_day", -1)),
+		"autonomy_day": maxi(1, int(source.get("autonomy_day", source.get("founded_day", 1)))),
+		"log": log,
 	}
 
 
