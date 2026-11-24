@@ -263,7 +263,7 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 
-	var target := Game.player as Node2D
+	var target := _combat_target()
 	if target == null:
 		velocity = _knock
 		move_and_slide()
@@ -406,6 +406,27 @@ func _arrive_home() -> void:
 	if hp < hp_max:
 		hp = hp_max
 	queue_redraw()
+
+
+## The body nearest to this enemy, player or companion. With an empty party this
+## is the player, unchanged; with companions the closest one draws the fight,
+## which is what makes a follower a target rather than a decoration.
+func _combat_target() -> Node2D:
+	var best: Node2D = Game.player as Node2D
+	var best_dist := INF
+	if best != null and is_instance_valid(best):
+		best_dist = best.global_position.distance_to(global_position)
+	for value in get_tree().get_nodes_in_group("party_member"):
+		var ally := value as Node2D
+		if ally == null or not is_instance_valid(ally):
+			continue
+		if not bool(ally.get("in_party")):
+			continue
+		var dist := ally.global_position.distance_to(global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best = ally
+	return best
 
 
 func _allies_committed(at: Vector2) -> int:

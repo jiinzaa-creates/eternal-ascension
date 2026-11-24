@@ -272,6 +272,7 @@ func _spawn_npcs() -> void:
 				offset,
 				String(entry[0])
 			)
+	_sync_party()
 
 
 func _archetype(id: String) -> Dictionary:
@@ -705,6 +706,8 @@ func _process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("interact"):
 		_try_interact()
+	if Input.is_action_just_pressed("party_toggle"):
+		_toggle_party()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -1270,6 +1273,12 @@ func _simulate_npcs() -> void:
 		if not is_instance_valid(npc):
 			continue
 		var node := npc as Npc
+		# A companion is always simulated and never goes to bed: it is with you.
+		if node.in_party:
+			if not node.simulated:
+				node.simulated = true
+				node.set_physics_process(true)
+			continue
 		var near := not in_realm and node.global_position.distance_to(player.global_position) <= NPC_SIM_RADIUS
 		if near:
 			if not node.simulated:
@@ -1314,7 +1323,8 @@ func _direct_npcs(delta: float) -> void:
 			continue
 		var npc := value as Npc
 		# A sleeping body is behind a door: it neither sees nor answers an alarm.
-		if npc == null or not npc.simulated or not npc.is_awake():
+		# A companion is following the player, not the town's duty roster.
+		if npc == null or not npc.simulated or not npc.is_awake() or npc.in_party:
 			continue
 		var radius := float(npc.ai.get("alert_range", 260.0))
 		var threat: Dictionary = NpcAi.nearest_threat(npc.global_position, threats, radius)
@@ -1337,7 +1347,7 @@ func _direct_npcs(delta: float) -> void:
 			if not is_instance_valid(other) or other == crier:
 				continue
 			var listener := other as Npc
-			if listener == null or not listener.simulated or not listener.is_awake():
+			if listener == null or not listener.simulated or not listener.is_awake() or listener.in_party:
 				continue
 			if not NpcAi.hears(crier.global_position, listener.global_position):
 				continue
@@ -1796,6 +1806,78 @@ func nearest_npc() -> Npc:
 	return best
 
 
+## P: ask the nearest person to travel with you, or send a companion home. The
+## rules live in `Party`; this only turns the answer into a line of speech.
+func _toggle_party() -> void:
+	if player == null or String(phase) != "play" or realm_instance != null:
+		return
+	var npc := nearest_npc()
+	if npc == null:
+		Bus.toast.emit("There is nobody close enough to ask.")
+		return
+	if npc.in_party:
+		_dismiss_party_member(npc)
+		return
+	var bond: Dictionary = npc.bond_to_player()
+	var verdict := Party.can_recruit(Game.party_ids, npc.npc_id,
+		int(bond.get("score", 0)), player.stats.party_slots())
+	if not bool(verdict.get("ok", false)):
+		Bus.toast.emit("%s %s" % [npc.display_name, String(verdict.get("reason", ""))])
+		return
+	Party.add(Game.party_ids, npc.npc_id)
+	npc.join_party()
+	Bus.toast.emit("%s joins you. (%s)" % [npc.display_name,
+		Party.slots_label(Game.party_ids.size(), player.stats.party_slots())])
+
+
+func _dismiss_party_member(npc: Npc) -> void:
+	if npc == null or not npc.in_party:
+		return
+	Party.remove(Game.party_ids, npc.npc_id)
+	npc.leave_party()
+	Bus.toast.emit("%s returns to the %s." % [
+		npc.display_name, npc.current_location.replace("_", " ")])
+
+
+## Aligns the spawned bodies with the saved roster. Membership is the only party
+## state a save carries, so this is the whole load path.
+func _sync_party() -> void:
+	for index in Game.party_ids.size():
+		var npc := _npc_by_id(String(Game.party_ids[index]))
+		if npc == null:
+			continue
+		if not npc.in_party:
+			npc.join_party()
+		if player != null and npc.global_position.distance_to(player.global_position) > 900.0:
+			npc.global_position = player.global_position + Party.follow_offset(index, Vector2.DOWN)
+	for node in npcs:
+		if not is_instance_valid(node):
+			continue
+		var resident := node as Npc
+		if resident != null and resident.in_party and not Game.party_ids.has(resident.npc_id):
+			resident.leave_party()
+
+
+func _npc_by_id(id: String) -> Npc:
+	for node in npcs:
+		if not is_instance_valid(node):
+			continue
+		var npc := node as Npc
+		if npc != null and npc.npc_id == id:
+			return npc
+	return null
+
+
+## The travelling party in roster order, for the HUD.
+func party_members() -> Array:
+	var out: Array = []
+	for id in Game.party_ids:
+		var npc := _npc_by_id(String(id))
+		if npc != null and npc.in_party:
+			out.append(npc)
+	return out
+
+
 func _nearest_interactable() -> Node:
 	var best: Node = null
 	var best_dist := 96.0
@@ -1827,7 +1909,12 @@ func interaction_prompt() -> String:
 	if best is Npc:
 		var npc := best as Npc
 		var drowsy := "" if npc.is_awake() else "  — asleep"
-		return "E  Talk to %s (%s)%s" % [npc.display_name, npc.role, drowsy]
+		var hint := ""
+		if npc.in_party:
+			hint = "  ·  P dismiss"
+		elif Party.willing(int(npc.bond_to_player().get("score", 0))):
+			hint = "  ·  P recruit"
+		return "E  Talk to %s (%s)%s%s" % [npc.display_name, npc.role, drowsy, hint]
 	var interactable := best as Interactable
 	if interactable.kind == Interactable.Kind.STORAGE:
 		return "E  %s  (%d/%d kinds stored)" % [interactable.display_label(), storage.slots_used(), Storage.CAPACITY]
@@ -2701,6 +2788,7 @@ func _load_game(slot: int) -> void:
 	# Rebuild the province so loaded deltas decide which resources exist.
 	chunks.today = Clock.day
 	chunks.resync(player.global_position)
+	_sync_party()
 	phase = "play"
 	if Game.dead:
 		_end_run()

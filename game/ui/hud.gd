@@ -103,6 +103,7 @@ func _draw() -> void:
 	draw_forge(player)
 	draw_alchemy(player)
 	draw_quest(player)
+	draw_party(player)
 	draw_prompt()
 	draw_realm_banner()
 	draw_tribulation()
@@ -362,6 +363,33 @@ func draw_quest(player: Player) -> void:
 	for i in lines.size():
 		var color := Color("#d8c070") if i == 0 else INK
 		_text(Vector2(w - 316.0, y + float(i) * 18.0), lines[i], 12, color)
+
+
+## The travelling party, under the quest line: each member's name, trade, realm,
+## bond and health. Every number comes from the body itself, so the panel cannot
+## disagree with the fight happening behind it.
+func draw_party(player: Player) -> void:
+	var members: Array = host.party_members()
+	if members.is_empty():
+		return
+	var x := size.x - 316.0
+	var y := 296.0
+	var height := 34.0 + float(members.size()) * 34.0
+	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, height), PANEL_BG)
+	_text(Vector2(x, y), "PARTY  %s" % Party.slots_label(members.size(), player.stats.party_slots()), 12, ACCENT)
+	y += 20.0
+	for value in members:
+		var npc := value as Npc
+		if npc == null:
+			continue
+		_text(Vector2(x, y), _fit("%s · %s" % [npc.display_name, npc.role], 11, 206.0), 11, INK)
+		var ratio := clampf(npc.hp / maxf(1.0, npc.hp_max), 0.0, 1.0)
+		_bar(Vector2(x + 214.0, y - 9.0), Vector2(64.0, 8.0), ratio, Color("#79d0a0"), "")
+		y += 17.0
+		_text(Vector2(x, y), "%s · %s · %d/%d HP" % [
+			String(DB.realm(npc.realm).get("name", "Realm %d" % npc.realm)),
+			npc.bond_label(), roundi(npc.hp), roundi(npc.hp_max)], 10, MUTED)
+		y += 17.0
 
 
 ## The active bar only: six slots, each with its art's own cooldown sweep.
@@ -867,7 +895,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

@@ -76,6 +76,7 @@ func _ready() -> void:
 	_schedules_tests()
 	_npcai_tests()
 	_relationships_tests()
+	_party_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -3551,6 +3552,102 @@ func _relationships_tests() -> void:
 	var wild_score := [{"from": "a", "to": "b", "tie": "tie.kin", "score": 400}]
 	check(not Relationships.validate(DB.bonds, DB.bond_ties, wild_score).is_empty(),
 		"a pair beyond the range is a problem")
+
+
+func _party_tests() -> void:
+	print("[party] trust, slots, formation and a companion's own fight")
+	# Trust is M50's friend band, not a second threshold.
+	check(Party.willing(25), "a friend will travel with you")
+	check(Party.willing(60), "a sworn friend will travel with you")
+	check(not Party.willing(24), "an acquaintance will not")
+	check(not Party.willing(-20), "a rival will not")
+
+	var roster: Array = []
+	check(not bool(Party.can_recruit(roster, "", 50, 3).get("ok", true)), "there is nobody to ask")
+	check(not bool(Party.can_recruit(roster, "npc.a", 10, 3).get("ok", true)),
+		"an unwilling body is refused")
+	check(String(Party.can_recruit(roster, "npc.a", 10, 3).get("reason", "")).contains("trust"),
+		"the refusal says why")
+	check(bool(Party.can_recruit(roster, "npc.a", 40, 3).get("ok", false)), "a friend may join")
+	check(not bool(Party.can_recruit(roster, "npc.a", 40, 0).get("ok", true)),
+		"no slots means no party")
+	check(not bool(Party.can_recruit(roster, "npc.a", 40, -2).get("ok", true)),
+		"a negative capacity refuses")
+	check(Party.add(roster, "npc.a"), "a member is added")
+	check(not Party.add(roster, "npc.a"), "the same member is not added twice")
+	check(not Party.add(roster, ""), "an empty id is not a member")
+	check(Party.has(roster, "npc.a"), "membership is readable")
+	check(Party.index_of(roster, "npc.a") == 0, "formation order is roster order")
+	check(Party.add(roster, "npc.b") and Party.index_of(roster, "npc.b") == 1,
+		"the second slot follows the first")
+	check(not bool(Party.can_recruit(roster, "npc.c", 40, 2).get("ok", true)),
+		"a full party refuses a third")
+	check(not bool(Party.can_recruit(roster, "npc.a", 40, 2).get("ok", true)),
+		"an existing member is not re-recruited")
+	check(String(Party.can_recruit(roster, "npc.a", 40, 2).get("reason", "")).contains("already"),
+		"the duplicate refusal says why")
+	check(Party.remove(roster, "npc.a"), "a member is dismissed")
+	check(not Party.remove(roster, "npc.a"), "a dismissal happens once")
+	check(not Party.has(roster, "npc.a") and Party.index_of(roster, "npc.b") == 0,
+		"the roster closes the gap")
+	check(Party.slots_label(1, 4) == "1/4", "the party reads as a count")
+	check(Party.MAX_SIZE >= 3, "the ceiling leaves room for a real party")
+
+	# A stored roster is cleaned, not trusted.
+	check(Party.sanitize("junk").is_empty(), "a non-list roster loads empty")
+	check(Party.sanitize(["npc.a", "", "npc.a", "npc.b"]).size() == 2,
+		"empty and duplicate ids are dropped")
+	var many: Array = []
+	for i in 20:
+		many.append("npc.%d" % i)
+	check(Party.sanitize(many).size() == Party.MAX_SIZE, "the ceiling applies on load")
+	check(Party.sanitize([3]).size() == 1, "an id may be numeric in the file")
+
+	# Formation is deterministic and behind the player.
+	var facing := Vector2.RIGHT
+	var back := Party.follow_offset(0, facing)
+	check(approx(back.x, -Party.FOLLOW_GAP), "slot zero walks directly behind the player")
+	check(approx(back.y, 0.0), "the back slot does not drift sideways")
+	var left := Party.follow_offset(1, facing)
+	var right := Party.follow_offset(2, facing)
+	check(left != right, "the two flanks are different places")
+	check(approx(left.y, -right.y), "the flanks mirror each other")
+	check(approx(left.x, right.x), "both flanks sit the same distance back")
+	check(Party.follow_offset(0, Vector2.ZERO) == Party.follow_offset(0, Vector2.DOWN),
+		"a body with no facing falls back to down")
+	check(Party.follow_offset(0, facing) == Party.follow_offset(0, facing), "the formation repeats")
+	check(Party.follow_offset(4, facing).length() > Party.follow_offset(1, facing).length(),
+		"later members stand wider")
+
+	# A companion fights with its own sheet.
+	Game.party_ids.clear()
+	var npc := Npc.new()
+	npc.npc_id = "npc.test.party"
+	npc.realm = 2
+	npc.attrs.from_dict({"str": 16, "dex": 13, "agi": 12, "int": 10, "wis": 11, "char": 10})
+	npc.gear = {"weapon": {"id": "item.test.saber", "slot": "weapon", "name": "Test Saber",
+		"base_damage": 12.0, "armor": 0.0, "mods": []}}
+	check(not npc.in_party and npc.hp_max <= 0.0, "an idle resident has no party health")
+	check(npc.take_hit(10.0) <= 0.0, "a resident who is not in the party cannot be hit")
+	npc.join_party()
+	check(npc.in_party, "joining makes a companion")
+	check(npc.hp_max > 40.0 and npc.hp == npc.hp_max,
+		"a companion gets health from its realm and body")
+	check(npc.party_stats != null and npc.party_stats.weapon_damage() >= 12.0,
+		"a companion wears its real weapon")
+	check(npc.party_damage() > 3.0, "a companion's blow is real")
+	check(npc.party_poise() > 0.0 and npc.party_penetration() >= 0.0,
+		"a companion's blow carries poise and steel")
+	check(npc.party_interval() > 0.0 and npc.party_interval() <= 1.6, "a companion's cadence is bounded")
+	var before := npc.hp
+	var dealt := npc.take_hit(20.0, Vector2.ZERO, false)
+	check(dealt > 0.0 and npc.hp < before, "a companion can be hurt")
+	check(npc.hp_max > npc.hp, "one blow does not end a companion")
+	npc.take_hit(npc.hp_max * 2.0, Vector2.ZERO, false)
+	check(not npc.in_party, "a downed companion leaves the party")
+	check(npc.hp > 0.0, "a downed companion is not dead")
+	check(Game.party_ids.is_empty(), "a downed companion leaves the saved roster")
+	npc.free()
 
 
 func _quest_tests() -> void:

@@ -72,8 +72,18 @@ func _physics_process(delta: float) -> void:
 
 func _scan() -> void:
 	var box := {"shape": "circle", "radius": radius, "angle": 360.0}
-	var group := "enemy" if faction == "player" else "player"
-	for body in get_tree().get_nodes_in_group(group):
+	# An enemy bolt meets the player and everyone travelling with them. A player's
+	# art still meets only enemies.
+	var groups: Array[String] = []
+	if faction == "player":
+		groups.append("enemy")
+	else:
+		groups.append("player")
+		groups.append("party_member")
+	var bodies: Array = []
+	for group in groups:
+		bodies.append_array(get_tree().get_nodes_in_group(group))
+	for body in bodies:
 		var target := body as Node2D
 		if target == null or not is_instance_valid(target):
 			continue

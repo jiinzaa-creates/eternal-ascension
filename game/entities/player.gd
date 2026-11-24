@@ -907,6 +907,12 @@ func _slide_step(attack: Dictionary) -> void:
 	_step_flash = 0.28
 
 
+## The direction the body is facing, for anything that stands behind it. Party
+## formation is the caller: a follower lines up behind the player's aim.
+func facing_direction() -> Vector2:
+	return _facing.normalized() if _facing.length_squared() > 0.0001 else Vector2.DOWN
+
+
 func weapon_damage() -> float:
 	return stats.weapon_damage()
 

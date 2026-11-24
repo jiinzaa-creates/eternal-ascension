@@ -451,6 +451,39 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   ties come from data, and the player's standing is memory. Schema stays 2 and old saves load
   unchanged.
 
+## Party
+
+- **Membership is a roster of stable ids.** `Party` (`game/systems/party.gd`) owns the rules:
+  `can_recruit()` answers yes/no with a player-readable reason, `add()`/`remove()` keep the roster
+  unique, and `sanitize()` cleans a loaded list. Order is formation order and is never sorted.
+- **Trust reuses the relationship graph.** `Party.willing()` is `Relationships.warns()`: only the
+  friend and sworn bands follow. There is no second friendship number to drift.
+- **Capacity comes from the stat pipeline.** The caller passes `player.stats.party_slots()` (CHAR
+  grows it), so the limit is derived in the one place stats are derived. `MAX_SIZE` is a storage
+  ceiling for corrupt files, not the gameplay limit.
+- **Formation is pure.** `follow_offset(index, facing)` puts slot zero behind the player and the
+  next two on the flanks, widening for larger parties. It takes a facing and returns a vector, so
+  the shape of a party is testable without spawning anyone.
+- **A companion fights with its own record.** `Npc.join_party()` builds a `StatBlock` from the body's
+  generated attributes and worn gear at its realm; `party_damage()` uses that weapon, that
+  `physical_mult` and that realm, with poise and penetration from the same stats. There is no escort
+  damage constant: a well-geared guard and a bare farmer hit differently because their sheets differ.
+- **Hit and fall, not immortality.** `Npc.take_hit()` takes the player's signature, rolls evasion per
+  blow (a counter keyed into the Rng stream, so one unlucky seed cannot make a body permanently
+  unhittable), mitigates through `Damage.mitigate_armor`, and at zero health calls `_fall_out()`:
+  the companion leaves `Game.party_ids`, walks back to the routine and comes to at 40% health. Going
+  down is a consequence, not a death.
+- **Enemies choose the nearest body.** `Dummy._combat_target()` compares the player with every
+  `party_member`, and enemy `Projectile` scans `player` and `party_member`; with an empty party both
+  paths reduce to the player, so no earlier fight changes.
+- **Companions are outside the town sim.** `_simulate_npcs` never puts a member to sleep, `_direct_npcs`
+  never orders one into an alarm and `Npc._physics_process` branches to `_party_process` before the
+  routine, so membership outranks the schedule rather than fighting it.
+- **Only membership is saved.** `Game.party_ids` is written under the optional `party` key and read
+  through `Party.sanitize()`; health, builds and positions are derived. `_sync_party()` reconciles
+  spawned bodies with the roster at spawn and after a load, putting a restored companion beside the
+  player. Schema stays 2 and older saves simply have no party.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

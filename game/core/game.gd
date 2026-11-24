@@ -35,6 +35,10 @@ var professions: Dictionary = {}
 ## What people remember of the player, by stable NPC id. The sheet regenerates
 ## from the seed; this is the only part of a person a save has to carry.
 var npc_memory: Dictionary = {}
+## The travelling party, as stable NPC ids in formation order. Membership is
+## the only party state a save carries: builds, health and positions regenerate
+## with the people.
+var party_ids: Array = []
 
 
 func _process(delta: float) -> void:
@@ -59,6 +63,7 @@ func new_run(seed_value: int = 0) -> void:
 	crafts_made = 0
 	professions.clear()
 	npc_memory.clear()
+	party_ids.clear()
 	hitstop.clear()
 
 
@@ -97,6 +102,7 @@ func to_dict() -> Dictionary:
 		"crafts_made": crafts_made,
 		"professions": professions.duplicate(true),
 		"npc_memory": npc_memory.duplicate(true),
+		"party": party_ids.duplicate(),
 	}
 
 
@@ -117,3 +123,4 @@ func from_dict(data: Dictionary) -> void:
 	crafts_made = int(data.get("crafts_made", 0))
 	professions = Professions.sanitize(data.get("professions", {}))
 	npc_memory = NpcDb.sanitize_memory(data.get("npc_memory", {}))
+	party_ids = Party.sanitize(data.get("party", []))

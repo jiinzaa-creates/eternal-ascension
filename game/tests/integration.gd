@@ -3212,6 +3212,137 @@ func _run() -> void:
 	Clock.hour = m50_hour
 	player.global_position = m50_home
 
+	# --- party: a friend joins, fights with its own build and can fall --------
+	var m51_day: int = Clock.day
+	var m51_hour: float = Clock.hour
+	var m51_home: Vector2 = player.global_position
+	Clock.day = 3
+	Clock.hour = 10.0
+	player.global_position = main.settlement.position_for("plaza")
+	Game.party_ids.clear()
+	Game.npc_memory.clear()
+	for m51_node in main.npcs:
+		var m51_person: Npc = m51_node
+		m51_person.leave_party()
+		m51_person.snap_to_schedule()
+	await frames(2)
+
+	var m51_guard: Npc = null
+	for m51_pick in main.npcs:
+		var m51_resident: Npc = m51_pick
+		if m51_guard == null and m51_resident.archetype_id == "guard":
+			m51_guard = m51_resident
+	check(m51_guard != null, "a guard can be asked")
+	m51_guard.global_position = player.global_position + Vector2(20, 0)
+	main._toggle_party()
+	check(Game.party_ids.is_empty() and not m51_guard.in_party, "a stranger is not recruited")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("trust"),
+		"the refusal explains itself")
+
+	Game.npc_memory[m51_guard.npc_id] = {"met": true, "talks": 4, "last_day": Clock.day, "regard": 30}
+	check(String(m51_guard.bond_to_player().get("band", "")) == "bond.friend",
+		"the guard is a friend at the cap")
+	check(String(main.interaction_prompt()).contains("P recruit"), "a friend offers to join")
+	main._toggle_party()
+	check(Game.party_ids.has(m51_guard.npc_id) and m51_guard.in_party, "a friend joins the party")
+	check(m51_guard.hp_max > 0.0 and m51_guard.hp == m51_guard.hp_max,
+		"a companion is ready to fight")
+	check(m51_guard.party_damage() > 0.0, "a companion brings its own blow")
+	check(String(main.interaction_prompt()).contains("P dismiss"), "a companion can be sent home")
+	check(not _toasts.is_empty() and String(_toasts[_toasts.size() - 1]).contains("joins you"),
+		"joining is announced")
+
+	# The follower keeps station behind the player.
+	player.global_position = main.settlement.position_for("plaza") + Vector2(0, 260)
+	var m51_far := m51_guard.global_position.distance_to(player.global_position)
+	await frames(40)
+	var m51_near := m51_guard.global_position.distance_to(player.global_position)
+	check(m51_near < m51_far, "a companion follows the player")
+	await frames(80)
+	check(m51_guard.global_position.distance_to(player.global_position) < 180.0,
+		"a companion closes to formation")
+
+	# It fights with its real build, and the enemy answers in kind.
+	var m51_target := Dummy.new()
+	m51_target.ilvl = 2
+	m51_target.display_name = "Sparring Beast"
+	main.world.add_child(m51_target)
+	m51_target.global_position = m51_guard.global_position + Vector2(0, 26)
+	m51_target.hp_max = 5000.0
+	m51_target.hp = 5000.0
+	m51_target.profile["aggro_range"] = 300.0
+	# Put the player well out of the way, so "nearest body" has one answer.
+	player.global_position = m51_guard.global_position + Vector2(700, 0)
+	await frames(2)
+	check(m51_target._combat_target() == m51_guard, "the enemy turns on the nearest body, not the player")
+	var m51_enemy_hp := m51_target.hp
+	await frames(90)
+	check(m51_target.hp < m51_enemy_hp, "a companion strikes with its own build")
+
+	m51_target.set_physics_process(false)
+	var m51_before_hit := m51_guard.hp
+	var m51_landed := false
+	# A companion may slip a blow, like anyone else; six committed swings make a
+	# clean miss on every one of them vanishingly unlikely.
+	for _m51_swing in 6:
+		if m51_guard.hp < m51_before_hit:
+			m51_landed = true
+			break
+		m51_target.global_position = m51_guard.global_position + Vector2(0, 24)
+		m51_target._facing = m51_target.global_position.direction_to(m51_guard.global_position)
+		m51_target._release_attack(m51_guard)
+	check(m51_landed, "an enemy blow lands on a companion")
+
+	m51_guard.take_hit(m51_guard.hp_max * 2.0, Vector2.ZERO, false)
+	check(not m51_guard.in_party, "a downed companion leaves the party")
+	check(not Game.party_ids.has(m51_guard.npc_id), "the roster drops a downed companion")
+	check(m51_guard.hp > 0.0, "a downed companion is not dead")
+
+	# Membership is the only party state a save carries.
+	var m51_other: Npc = null
+	for m51_scan in main.npcs:
+		var m51_candidate: Npc = m51_scan
+		if m51_other == null and m51_candidate.npc_id != "elder_bai" \
+				and m51_candidate.npc_id != "instructor_rui" and m51_candidate != m51_guard:
+			m51_other = m51_candidate
+	check(m51_other != null, "another resident can be asked")
+	m51_guard.global_position = main.settlement.position_for("gate")
+	m51_other.global_position = player.global_position + Vector2(20, 0)
+	Game.npc_memory[m51_other.npc_id] = {"met": true, "talks": 4, "last_day": Clock.day, "regard": 30}
+	main._toggle_party()
+	check(Game.party_ids.has(m51_other.npc_id) and m51_other.in_party, "a second friend can join")
+
+	Save.delete_slot(84)
+	main._save(84)
+	Game.party_ids.clear()
+	m51_other.leave_party()
+	check(not m51_other.in_party, "the roster can be emptied by hand")
+	main._load_game(84)
+	check(Game.party_ids.has(m51_other.npc_id), "the party survives a save")
+	check(m51_other.in_party, "a loaded companion is back at the player's side")
+	main._dismiss_party_member(m51_other)
+	check(not m51_other.in_party and not Game.party_ids.has(m51_other.npc_id),
+		"a companion can be sent home")
+	Save.delete_slot(84)
+
+	m51_target.queue_free()
+	await frames(2)
+	Game.party_ids.clear()
+	Game.npc_memory.clear()
+	m51_guard.leave_party()
+	m51_other.leave_party()
+	main._warn_timer = 0.0
+	main._alert_timer = 0.0
+	Clock.day = m51_day
+	Clock.hour = m51_hour
+	player.global_position = m51_home
+	for m51_restore_row in main.npcs:
+		var m51_restored: Npc = m51_restore_row
+		m51_restored.leave_party()
+		m51_restored.alarm_left = 0.0
+		m51_restored.reaction = "routine"
+		m51_restored.snap_to_schedule()
+
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)
 	player.cultivation.qi = 12.0
