@@ -12,6 +12,7 @@ const MUTED := Color("#8fa2ab")
 const ACCENT := Color("#9fe0c0")
 const SEA := Color("#0f1e26")
 const EDGE := Color("#2b343a")
+const REALM := Color("#d0b0ff")
 
 const TERRAIN_COLORS := {
 	"plains": Color("#4f6b3a"),
@@ -24,6 +25,9 @@ const TERRAIN_COLORS := {
 
 var continent: Dictionary = {}
 var current_index := -1
+## Discovered hidden realms in this province. Owned by the host, drawn here so
+## the map is the one place a known rift has a mark.
+var realm_marks: Array = []
 var _font: Font
 
 
@@ -34,9 +38,10 @@ func _ready() -> void:
 	visible = false
 
 
-func setup(data: Dictionary, current: int) -> void:
+func setup(data: Dictionary, current: int, marks: Array = []) -> void:
 	continent = data
 	current_index = current
+	realm_marks = marks.duplicate(true)
 	queue_redraw()
 
 
@@ -63,7 +68,7 @@ func _draw() -> void:
 
 	_text(Vector2(area.position.x, area.position.y - 52.0), String(continent.get("name", "A continent")), 26)
 	_text(Vector2(area.position.x, area.position.y - 28.0),
-		"%d regions · you stand in %s · M closes the map" % [region_count(), String(capital.get("name", "?")), ],
+		"%d regions · you stand in %s · M closes the map" % [region_count(), String(capital.get("name", "?"))],
 		12, MUTED)
 
 	var cells: Array = continent.get("cells", [])
@@ -96,6 +101,17 @@ func _draw() -> void:
 		draw_rect(rect, ACCENT, false, 2.0)
 		_text(Vector2(rect.position.x + 8.0, rect.end.y - 10.0), "you are here", 10, ACCENT)
 
+	# A known rift is marked in the region the player walks, never elsewhere.
+	var current: Dictionary = Continent.region_by_index(continent, current_index)
+	if not current.is_empty() and not realm_marks.is_empty():
+		var rect := Continent.map_rect(current["coord"], area)
+		var center := rect.position + Vector2(rect.size.x - 18.0, 18.0)
+		var color := REALM if bool((realm_marks[0] as Dictionary).get("open", false)) else Color("#8f7aa8")
+		draw_colored_polygon(PackedVector2Array([
+			center + Vector2(0, -6), center + Vector2(6, 0),
+			center + Vector2(0, 6), center + Vector2(-6, 0),
+		]), color)
+
 	# Legend.
 	var legend_y := size.y - 58.0
 	var x := area.position.x
@@ -105,6 +121,12 @@ func _draw() -> void:
 		x += 96.0
 	draw_rect(Rect2(Vector2(x, legend_y), Vector2(12, 12)), SEA)
 	_text(Vector2(x + 17.0, legend_y + 11.0), "Sea", 10, MUTED)
+
+	if not realm_marks.is_empty():
+		var mark: Dictionary = realm_marks[0]
+		_text(Vector2(area.position.x, size.y - 40.0),
+			"Hidden realm — %s: %s" % [String(mark.get("name", "?")), String(mark.get("status", ""))],
+			11, REALM)
 	_text(Vector2(area.position.x, size.y - 26.0),
 		"The province you walk is one region of this continent. Distant regions are geography, not yet reachable.",
 		11, Color("#6b7b84"))

@@ -1,0 +1,18 @@
+{
+  "default": "realm.hollow_moon",
+  "sites": [
+    {
+      "id": "realm.hollow_moon",
+      "name": "Tomb of the Hollow Moon",
+      "template": "template.tomb",
+      "offset_x": 820,
+      "offset_y": -520,
+      "radius": 420,
+      "cycle_days": 12,
+      "open_days": 4,
+      "offset_days": 0,
+      "rumor": "They say the eastern rift opens for four days in every twelve.",
+      "discovery": "A cold seam in the air widens where the rift breathes."
+    }
+  ]
+}

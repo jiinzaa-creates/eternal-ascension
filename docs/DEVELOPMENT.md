@@ -1259,6 +1259,29 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   id beside `realm_seed`; today only the seed is stored and the default is implied. M64 adds the
   remaining content families as data entries, not new generators.
 
+## Discovering and entering a hidden realm
+
+- **The site is data.** `data/realm_access.json` names the world site, the layout it opens, its
+  offset from the market spawn, reveal radius, opening cycle and the rumor/discovery lines. `RealmAccess`
+  (`game/systems/realm_access.gd`) owns the pure rules; `HiddenRealms` still owns the layout.
+- **Discovery writes one existing save key.** `Game.discovered` records the stable site id
+  (`realm.hollow_moon`), which already travels through the optional game dictionary and needs no schema
+  change. A pre-M63 save with a nonzero `realm_seed` or any realm progress is marked discovered on load,
+  so an old save keeps the tomb it had already entered.
+- **Three ways to hear of it.** Walking within `radius` discovers the site; the first conversation of a
+  day can carry a rumor (one per day, with the site's own line); and the market notice board repeats the
+  rumor. Discovery reveals the portal and adds it to the route list.
+- **Opening windows are derived, not stored.** A site declares `cycle_days`, `open_days` and an
+  `offset_days` phase. `window_for()` reports open days remaining and the closing day, or the next
+  opening day; the portal label, map footer and travel row all read the same result. A reload cannot
+  extend an opening, and a closed rift refuses entry at the portal with its opening day.
+- **The map and routes show the same truth.** A known site draws a purple mark in the player's current
+  continent region and a footer line with open/sealed status; the route list leads with landmarks and
+  then the realm, so the capped site rows cannot crowd it out.
+- **Scope.** One site (the tomb) is authored; M64 adds realm content and its own sites through the same
+  data and gate. The direct `_enter_realm()` transition remains gate-free for tests and future
+  transitions; every player entrance goes through `RealmAccess.access()` at the portal.
+
 ## Spirit beasts and bosses
 
 - **A beast is a species, not a new body.** `Beasts` reads `data/spirit_beasts.json` and normalises each

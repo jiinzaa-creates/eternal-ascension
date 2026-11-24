@@ -411,6 +411,27 @@ func _run() -> void:
 	check(Game.spirit_stones >= 120, "the quest grants spirit stones")
 
 	# --- hidden realm --------------------------------------------------------
+	if not main.realm_known():
+		main._discover_realm("test", true)
+	check(main.realm_known(), "the rift site is discovered")
+	check(main.realm_portal.visible, "a discovered rift is visible")
+	var realm_routes := 0
+	for route in main.travel_destinations():
+		if String(route.get("id", "")) == "realm.hollow_moon":
+			realm_routes += 1
+	check(realm_routes == 1, "a discovered rift is a travel destination once")
+	check(bool(main.realm_window().get("open", false)), "the realm is open on the test day")
+	check(main._realm_map_marks().size() == 1, "a discovered rift marks the map")
+	main.world_map.setup(main.continent, 0, main._realm_map_marks())
+	check(main.world_map.realm_marks.size() == 1, "the map receives the mark")
+	var access_day: int = Clock.day
+	Clock.day = 5
+	main._sync_realm_portal()
+	check(String(main.realm_portal.label).begins_with("Sealed Rift"), "the portal reads sealed between openings")
+	main._try_enter_realm()
+	check(main.realm_instance == null, "a sealed rift refuses entry")
+	Clock.day = access_day
+	main._sync_realm_portal()
 	main._enter_realm()
 	await frames(3)
 	check(String(main.phase) == "realm", "the rift enters the hidden realm")
@@ -544,11 +565,13 @@ func _run() -> void:
 	var hour_before: float = Clock.hour
 	Clock.day = 91
 	Clock.hour = 3.0
+	Weather.refresh(true)
 	await frames(2)
 	check(Weather.season_name() == "Winter", "reaching day ninety-one brings winter")
 	check(int(Weather.current["day"]) == 91, "the weather follows the clock")
 	Clock.day = day_before
 	Clock.hour = hour_before
+	Weather.refresh(true)
 	await frames(2)
 	check(Weather.season_name() == Climate.season_name(Climate.season_for_day(day_before)), "restoring the clock restores the season")
 
@@ -3585,10 +3608,15 @@ func _run() -> void:
 			continue
 		if m54_candidate.role == "Guard":
 			continue
+		var m54_bond: Dictionary = m54_candidate.bond_to_player()
+		if Relationships.refuses(int(m54_bond.get("score", 0))):
+			continue
 		m54_person = m54_candidate
 		break
 	check(m54_person != null, "a resident is available to ask for help")
 	Clock.hour = 12.0
+	if m54_person.reacting():
+		m54_person.stand_down()
 	m54_person.current_activity = "socialize"
 	m54_person.current_location = "market"
 	m54_person.global_position = player.global_position + Vector2(40, 0)

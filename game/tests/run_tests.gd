@@ -89,6 +89,7 @@ func _ready() -> void:
 	_sect_autonomy_tests()
 	_quest_tests()
 	_hidden_realm_tests()
+	_realm_access_tests()
 	_save_tests()
 	print("-----------------------------------------------")
 	print("RESULT: PASS %d / FAIL %d" % [_pass, _fail])
@@ -5139,6 +5140,82 @@ func _hidden_realm_tests() -> void:
 
 
 # ------------------------------------------------------------------- save ----
+
+func _realm_access_tests() -> void:
+	print("[access] discovery sites, opening windows and the shared gate")
+	check(RealmAccess.sites().size() >= 1, "at least one realm site is charted")
+	check(RealmAccess.default_id() == "realm.hollow_moon", "the Hollow Moon is the default site")
+	var site: Dictionary = RealmAccess.default_site()
+	check(String(site.get("name", "")) == "Tomb of the Hollow Moon", "the default site resolves")
+	check(not HiddenRealms.template(String(site.get("template", ""))).is_empty(), "the site names a real layout")
+	check(RealmAccess.world_position(site, Vector2(10, 20)) == Vector2(830, -500), "the site position is relative to spawn")
+	check(RealmAccess.reveal_radius(site) > 0.0, "the site has a reveal radius")
+
+	var first := RealmAccess.window_for(site, 1)
+	check(bool(first["open"]), "day one is inside the opening")
+	check(int(first["days"]) == 4 and int(first["closes_day"]) == 4, "the opening lasts four days")
+	var last := RealmAccess.window_for(site, 4)
+	check(bool(last["open"]) and int(last["days"]) == 1 and int(last["closes_day"]) == 4, "day four is the last open day")
+	var sealed := RealmAccess.window_for(site, 5)
+	check(not bool(sealed["open"]), "day five is sealed")
+	check(int(sealed["days"]) == 8 and int(sealed["opens_day"]) == 13, "the next opening is stated exactly")
+	check(not bool(RealmAccess.window_for(site, 12)["open"]), "the last day of the cycle is sealed")
+	check(bool(RealmAccess.window_for(site, 13)["open"]), "the cycle reopens on time")
+	check(bool(RealmAccess.window_for(site, 25)["open"]), "the window repeats every cycle")
+
+	check(bool(RealmAccess.access(site, 1, true)["ok"]), "a known open realm admits the player")
+	check(not bool(RealmAccess.access(site, 1, false)["ok"]), "an unknown realm refuses entry")
+	var shut := RealmAccess.access(site, 5, true)
+	check(not bool(shut["ok"]) and String(shut["reason"]).contains("13"), "a sealed realm states its opening day")
+	check(String(RealmAccess.portal_label(site, 1)).begins_with("Rift — "), "an open portal keeps its rift label")
+	check(String(RealmAccess.portal_label(site, 5)).begins_with("Sealed Rift"), "a sealed portal says so")
+	check(String(RealmAccess.travel_label(site, 1)).contains("open"), "travel marks an open realm")
+	check(String(RealmAccess.travel_label(site, 5)).contains("sealed"), "travel marks a sealed realm")
+	check(String(RealmAccess.status_line(site, 1)).contains("closes after day 4"), "the map status gives the closing day")
+	check(String(RealmAccess.rumor_line(site)).length() > 0, "the site carries a rumor")
+	check(String(RealmAccess.discovery_line(site)).length() > 0, "the site carries a discovery line")
+
+	check(RealmAccess.validate(DB.realm_access_data).is_empty(), "the shipped access sites validate")
+	var broken: Dictionary = DB.realm_access_data.duplicate(true)
+	broken.erase("sites")
+	check(not RealmAccess.validate(broken).is_empty(), "missing sites are rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array).append((DB.realm_access_data["sites"] as Array)[0].duplicate(true))
+	check(not RealmAccess.validate(broken).is_empty(), "duplicate sites are rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["id"] = "portal.nope"
+	check(not RealmAccess.validate(broken).is_empty(), "a site without a realm id is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["name"] = " "
+	check(not RealmAccess.validate(broken).is_empty(), "a nameless site is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["rumor"] = " "
+	check(not RealmAccess.validate(broken).is_empty(), "a silent rumor is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["discovery"] = " "
+	check(not RealmAccess.validate(broken).is_empty(), "a site with no discovery line is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["template"] = "template.nope"
+	check(not RealmAccess.validate(broken).is_empty(), "an unknown layout is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["radius"] = 10
+	check(not RealmAccess.validate(broken).is_empty(), "a reveal radius that is too small is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["cycle_days"] = 1
+	check(not RealmAccess.validate(broken).is_empty(), "a one-day cycle is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["open_days"] = 99
+	check(not RealmAccess.validate(broken).is_empty(), "an opening longer than the cycle is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["open_days"] = 0
+	check(not RealmAccess.validate(broken).is_empty(), "a site that never opens is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	(broken["sites"] as Array)[0]["offset_days"] = -1
+	check(not RealmAccess.validate(broken).is_empty(), "a negative cycle offset is rejected")
+	broken = DB.realm_access_data.duplicate(true)
+	broken["default"] = "realm.nope"
+	check(not RealmAccess.validate(broken).is_empty(), "an unknown default site is rejected")
+
 
 func _save_tests() -> void:
 	print("[save] atomic writes, checksums, backup recovery")
