@@ -2901,8 +2901,9 @@ func _run() -> void:
 	check(int(m47_after.get("talks", 0)) == int(m47_before.get("talks", 0)) + 1, "talking is counted")
 	check(int(m47_after.get("last_day", -1)) == Clock.day, "talking records the day")
 	check(int(m47_after.get("regard", 0)) > int(m47_before.get("regard", 0)), "talking warms regard")
-	check(m47_common.standing() == m47_common.base_disposition + int(m47_after.get("regard", 0)),
-		"standing reads base disposition plus memory")
+	check(m47_common.standing() == m47_common.base_disposition + int(m47_after.get("regard", 0))
+		+ Factions.disposition_bonus(m47_common.faction_id(), Game.faction_standing, Game.notoriety),
+		"standing reads base disposition, memory and faction")
 	var m47_expected: Dictionary = NpcDb.sheet(
 		main._archetype(m47_common.archetype_id), m47_common.npc_id, m47_common.realm)
 	check(String(m47_expected.get("root_id", "")) == m47_common.root_id, "the carried root is the generated one")
@@ -2919,8 +2920,10 @@ func _run() -> void:
 	var m47_loaded := NpcDb.memory_entry(Game.npc_memory, m47_common.npc_id)
 	check(int(m47_loaded.get("talks", 0)) == m47_talks, "NPC memory survives a save")
 	check(int(m47_loaded.get("regard", 0)) == m47_regard, "regard survives a save")
-	check(m47_common.standing() == m47_common.base_disposition + m47_regard,
-		"a loaded NPC reads the restored memory")
+	check(m47_common.standing() == m47_common.base_disposition + m47_regard
+		+ Factions.disposition_bonus(m47_common.faction_id(), Game.faction_standing, Game.notoriety),
+		"a loaded NPC reads the restored memory and standing")
+
 	Save.delete_slot(85)
 
 	# --- schedules: the week changes the routine, and the routine has teeth ----
@@ -3633,6 +3636,69 @@ func _run() -> void:
 	main._progress_day = m54_day
 	main._captive_day = m54_day
 	main._refresh_npc_progress_all()
+
+	# --- factions: standing is earned, remembered and spent -------------------
+	var m55_standing: Dictionary = Game.faction_standing.duplicate(true)
+	var m55_memory: Dictionary = Game.npc_memory.duplicate(true)
+	var m55_stones: int = Game.spirit_stones
+	var m55_notoriety: int = Game.notoriety
+	Game.faction_standing = Factions.sanitize({})
+	Game.notoriety = 0
+	var m55_elder: Npc = main.elder
+	var m55_base_standing: int = m55_elder.standing()
+	Game.faction_standing = Factions.award(Game.faction_standing, "faction.azure_cloud", 60)
+	check(m55_elder.faction_id() == "faction.azure_cloud", "the elder belongs to the Azure Cloud")
+	check(String(m55_elder.faction_line()).contains("Honoured"), "honoured standing reads on the dossier")
+	check(m55_elder.standing() >= m55_base_standing + 8, "faction standing warms its members")
+	var m55_farmer: Npc = null
+	for m55_node in main.npcs:
+		var m55_person: Npc = m55_node
+		if m55_person.archetype_id == "farmer":
+			m55_farmer = m55_person
+			break
+	check(m55_farmer != null and m55_farmer.faction_id() == "faction.market_league",
+		"farmers answer to the league, not the sect")
+	check(int(Game.faction_standing.get("faction.market_league", -1)) == 15,
+		"an ally's ripple warms the league a little")
+	Game.faction_standing = Factions.award(Game.faction_standing, "faction.market_league", 60)
+	var m55_quote: int = main._shop_price({"value": 100})
+	check(m55_quote == 90, "an honoured name buys at the honoured price")
+	check(m55_quote < Economy.buy_price({"value": 100}), "standing actually cuts the price")
+	# Lawful houses read the holding yard; a guild does not.
+	Game.notoriety = 80
+	check(Factions.effective_standing("faction.azure_cloud", Game.faction_standing, Game.notoriety) <
+		Factions.effective_standing("faction.market_league", Game.faction_standing, Game.notoriety),
+		"notoriety costs standing with the law")
+	Game.notoriety = 0
+	# A request answered for the watch is a small act of standing.
+	var m55_guard: Npc = null
+	for m55_node in main.npcs:
+		var m55_person: Npc = m55_node
+		if m55_person.archetype_id == "guard":
+			m55_guard = m55_person
+			break
+	check(m55_guard != null, "a guard is available to help")
+	var m55_watch_before := int(Game.faction_standing.get("faction.watch", 0))
+	main._story_reward({"actor": m55_guard.npc_id, "stones": 0, "regard": 0})
+	check(int(Game.faction_standing.get("faction.watch", 0)) == m55_watch_before + Factions.story_award(),
+		"helping a resident raises their faction")
+	# The standings screen freezes play and closes.
+	main.toggle_factions()
+	check(main.factions_open, "the standings screen opens")
+	check(main.faction_rows().size() == Factions.factions().size(), "the screen lists every faction")
+	main.toggle_factions()
+	check(not main.factions_open, "the standings screen closes")
+	# Standing is saved with the run, not re-derived from the day.
+	var m55_saved := Factions.sanitize(Game.faction_standing)
+	Save.delete_slot(100)
+	main._save(100)
+	main._load_game(100)
+	check(str(Game.faction_standing) == str(m55_saved), "standing survives a save and load")
+	Save.delete_slot(100)
+	Game.faction_standing = m55_standing
+	Game.npc_memory = m55_memory
+	Game.spirit_stones = m55_stones
+	Game.notoriety = m55_notoriety
 
 	# --- save / load ---------------------------------------------------------
 	Save.delete_slot(96)

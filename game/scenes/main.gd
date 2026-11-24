@@ -108,6 +108,8 @@ var _progress_day := 0
 var _story_day := 0
 ## The chronicle screen: the market's recent news and the requests it carries.
 var chronicle_open := false
+## The faction screen: who stands where with whom, and what that buys.
+var factions_open := false
 var _away_notes: Array = []
 var _wilds_recovered := 0
 var interactables: Array = []
@@ -672,7 +674,7 @@ func _process(delta: float) -> void:
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
-			or alchemy_open or captives_open or chronicle_open:
+			or alchemy_open or captives_open or chronicle_open or factions_open:
 		return
 
 	_simulate_npcs()
@@ -734,6 +736,8 @@ func _process(delta: float) -> void:
 		toggle_captives()
 	if Input.is_action_just_pressed("open_chronicle"):
 		toggle_chronicle()
+	if Input.is_action_just_pressed("open_factions"):
+		toggle_factions()
 
 	_spawn_timer += delta
 	if _spawn_timer >= RESPAWN_INTERVAL:
@@ -817,7 +821,7 @@ func _show_shop(mode: String) -> void:
 		for item in merchant.stock:
 			rows.append({
 				"name": String(item.get("name", "?")),
-				"price": Economy.buy_price(item),
+				"price": _shop_price(item),
 				"color": ItemGen.RARITY_COLORS[int(item.get("rarity", 0))],
 			})
 		_sell_base = 0
@@ -833,11 +837,18 @@ func _show_shop(mode: String) -> void:
 	shop_panel.setup(mode, "Azure Cloud Market — Merchant", rows, Game.spirit_stones)
 
 
+## A trusted name buys cheaper at the stall. Selling stays on the one value
+## curve, so standing can never be turned into a money loop.
+func _shop_price(item: Dictionary) -> int:
+	var mult := Factions.price_multiplier("faction.market_league", Game.faction_standing, Game.notoriety)
+	return maxi(1, int(ceil(float(Economy.buy_price(item)) * mult)))
+
+
 func _buy_index(index: int) -> void:
 	if index < 0 or index >= merchant.stock.size():
 		return
 	var item: Dictionary = merchant.stock[index]
-	var price := Economy.buy_price(item)
+	var price := _shop_price(item)
 	if not Economy.can_afford(Game.spirit_stones, price):
 		Bus.toast.emit("Not enough spirit stones: %d needed." % price)
 		return
@@ -1646,6 +1657,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 		return
 
+	if factions_open:
+		if event.is_action_pressed("open_factions") or event.is_action_pressed("interact") \
+				or event.is_action_pressed("ui_cancel"):
+			_close_factions()
+		return
+
 	if chronicle_open:
 		if event.is_action_pressed("open_chronicle") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -2172,6 +2189,15 @@ func _story_reward(offer: Dictionary) -> void:
 	record["regard"] = clampi(int(record.get("regard", 0)) + int(offer.get("regard", 0)),
 		NpcDb.REGARD_MIN, NpcDb.REGARD_MAX)
 	Game.npc_memory[id] = record
+	# The person's faction notices the help, and its allies and rivals move a
+	# little with it. A request answered is a small but real act of standing.
+	var npc := _story_npc(id)
+	var faction_id: String = npc.faction_id() if npc != null else ""
+	if faction_id != "":
+		Game.faction_standing = Factions.award(Game.faction_standing, faction_id, Factions.story_award())
+		Bus.toast.emit("%s standing rises: %s" % [
+			String(Factions.faction(faction_id).get("name", faction_id)),
+			Factions.describe(faction_id, Game.faction_standing, Game.notoriety)])
 	Bus.player_stats_changed.emit()
 
 
@@ -2214,6 +2240,62 @@ func chronicle_rows() -> Array:
 
 func story_offer_rows() -> Array:
 	return Game.story_offers.duplicate(true)
+
+
+# --------------------------------------------------------------- factions ----
+
+
+func toggle_factions() -> void:
+	if factions_open:
+		_close_factions()
+	else:
+		_open_factions()
+
+
+func _open_factions() -> void:
+	if player == null or String(phase) != "play":
+		return
+	factions_open = true
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_factions() -> void:
+	if not factions_open:
+		return
+	factions_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+## One row per faction, read through the same effective-standing rule the people
+## use, so the screen cannot promise a welcome the guard will not give.
+func faction_rows() -> Array:
+	var out: Array = []
+	for value in Factions.factions():
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var standing := Factions.effective_standing(id, Game.faction_standing, Game.notoriety)
+		var band := Factions.band_for(standing)
+		out.append({
+			"id": id,
+			"name": String(entry.get("name", id)),
+			"kind": String(entry.get("kind", "")),
+			"colour": String(entry.get("colour", "#9aa0a6")),
+			"motto": String(entry.get("motto", "")),
+			"value": standing,
+			"band": String(band.get("id", "")),
+			"label": String(band.get("label", "")),
+			"blurb": String(band.get("blurb", "")),
+			"disposition": int(band.get("disposition", 0)),
+			"price_mult": float(band.get("price_mult", 1.0)),
+			"relations": Factions.relation_text(id),
+			"lawful": bool(entry.get("lawful", false)),
+		})
+	return out
 
 
 # --------------------------------------------------------------- captivity ----
@@ -2989,6 +3071,11 @@ func _grant_reward() -> void:
 		var passive: Dictionary = DB.passive(passive_id)
 		Bus.toast.emit("Passive awakened: %s" % String(passive.get("name", passive_id)))
 	Game.spirit_stones += int(reward.get("spirit_stones", 0))
+	# The sect keeps a record of who carried its invitation: a completed quest is
+	# the largest single act of standing in the game.
+	Game.faction_standing = Factions.award(Game.faction_standing, "faction.azure_cloud", Factions.quest_award())
+	Bus.toast.emit("Azure Cloud Sect remembers: %s" % Factions.describe(
+		"faction.azure_cloud", Game.faction_standing, Game.notoriety))
 	Bus.player_stats_changed.emit()
 
 
@@ -3186,6 +3273,13 @@ func _grant_unique(source: String) -> void:
 ## loot roll: stones and one guaranteed piece at the declared rarity.
 func _on_boss_defeated(id: String, _at: Vector2) -> void:
 	bosses_slain[id] = true
+	# A boss can belong to a faction. Killing its warden costs that faction face
+	# and, through the rival ripple, warms the houses that oppose it.
+	var owner := Factions.for_boss(id)
+	if owner != "":
+		Game.faction_standing = Factions.award(Game.faction_standing, owner, -Factions.boss_penalty())
+		Bus.toast.emit("Word of the fall reaches the sects: %s" % Factions.describe(
+			owner, Game.faction_standing, Game.notoriety))
 	var entry: Dictionary = Boss.profile(DB.boss(id))
 	if entry.is_empty() or player == null:
 		return
@@ -3324,6 +3418,7 @@ func _load_game(slot: int) -> void:
 	_close_bars()
 	_close_captives()
 	_close_chronicle()
+	_close_factions()
 	Game.from_dict(data.get("game", {}))
 	Clock.from_dict(data.get("clock", {}))
 	# Offers expire against the saved day, not the day the load happened to run.

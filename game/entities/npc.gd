@@ -126,8 +126,27 @@ func regard() -> int:
 	return int(NpcDb.memory_entry(Game.npc_memory, npc_id).get("regard", 0))
 
 
+## The faction this body's archetype belongs to, or "" for an unaligned trade.
+func faction_id() -> String:
+	return Factions.for_archetype(archetype_id)
+
+
+## What the faction thinks of the player right now, notoriety included.
+func faction_standing() -> int:
+	return Factions.effective_standing(faction_id(), Game.faction_standing, Game.notoriety)
+
+
+## "Azure Cloud Sect — Trusted (+27)" — the dossier's faction line.
+func faction_line() -> String:
+	return Factions.describe(faction_id(), Game.faction_standing, Game.notoriety)
+
+
+## Base temperament, what the player earned in person, and what the body's
+## faction thinks of the player: one reading, so a guard cannot be warm to a
+## wanted name without the faction line saying so.
 func standing() -> int:
-	return base_disposition + regard()
+	return base_disposition + regard() + Factions.disposition_bonus(
+		faction_id(), Game.faction_standing, Game.notoriety)
 
 
 func standing_label() -> String:

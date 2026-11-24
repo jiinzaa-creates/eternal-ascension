@@ -1,0 +1,105 @@
+{
+  "awards": {
+    "default_standing": 0,
+    "quest_award": 40,
+    "story_award": 5,
+    "boss_penalty": 15,
+    "rival_shift": 0.5,
+    "ally_shift": 0.25,
+    "notoriety_divisor": 4
+  },
+  "bands": [
+    {
+      "id": "standing.hostile",
+      "min": -100,
+      "max": -40,
+      "label": "Hostile",
+      "blurb": "They know your name and have decided against it.",
+      "disposition": -10,
+      "price_mult": 1.25
+    },
+    {
+      "id": "standing.wary",
+      "min": -39,
+      "max": -1,
+      "label": "Wary",
+      "blurb": "You are tolerated, not welcomed.",
+      "disposition": -4,
+      "price_mult": 1.1
+    },
+    {
+      "id": "standing.neutral",
+      "min": 0,
+      "max": 24,
+      "label": "Neutral",
+      "blurb": "You are a face like any other.",
+      "disposition": 0,
+      "price_mult": 1.0
+    },
+    {
+      "id": "standing.trusted",
+      "min": 25,
+      "max": 59,
+      "label": "Trusted",
+      "blurb": "The gates open before you finish knocking.",
+      "disposition": 4,
+      "price_mult": 0.95
+    },
+    {
+      "id": "standing.honoured",
+      "min": 60,
+      "max": 100,
+      "label": "Honoured",
+      "blurb": "Your name is spoken with respect in their halls.",
+      "disposition": 8,
+      "price_mult": 0.9
+    }
+  ],
+  "factions": [
+    {
+      "id": "faction.azure_cloud",
+      "name": "Azure Cloud Sect",
+      "kind": "Sect",
+      "colour": "#7fd3e0",
+      "motto": "Climb, and do not look down.",
+      "archetypes": ["sect_master", "elder", "inner_disciple", "outer_disciple"],
+      "allies": ["faction.market_league", "faction.watch"],
+      "rivals": ["faction.hollow_moon"],
+      "lawful": true
+    },
+    {
+      "id": "faction.market_league",
+      "name": "Verdant Market League",
+      "kind": "Guild",
+      "colour": "#d8c070",
+      "motto": "Every road ends at a stall.",
+      "archetypes": ["merchant", "farmer"],
+      "allies": ["faction.azure_cloud"],
+      "rivals": [],
+      "lawful": false
+    },
+    {
+      "id": "faction.watch",
+      "name": "Market Watch",
+      "kind": "Order",
+      "colour": "#c08f8f",
+      "motto": "The gate holds while we stand.",
+      "archetypes": ["guard"],
+      "allies": ["faction.azure_cloud"],
+      "rivals": [],
+      "lawful": true
+    },
+    {
+      "id": "faction.hollow_moon",
+      "name": "Hollow Moon Cult",
+      "kind": "Cult",
+      "colour": "#a890d8",
+      "motto": "What the moon takes, it keeps.",
+      "archetypes": [],
+      "allies": [],
+      "rivals": ["faction.azure_cloud"],
+      "bosses": ["boss.tomb_warden"],
+      "lawful": true
+    }
+  ]
+}

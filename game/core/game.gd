@@ -55,6 +55,9 @@ var chronicle: Array = []
 ## Requests the player has been told about and can still answer, with progress
 ## for the hunt work. Expired offers are dropped on the day they lapse.
 var story_offers: Array = []
+## Standing with each faction, −100..100. Raw actions are kept here; lawful
+## factions subtract their memory of the player's notoriety when they read it.
+var faction_standing: Dictionary = {}
 
 
 func _process(delta: float) -> void:
@@ -86,6 +89,7 @@ func new_run(seed_value: int = 0) -> void:
 	notoriety = 0
 	chronicle.clear()
 	story_offers.clear()
+	faction_standing = Factions.sanitize({})
 	hitstop.clear()
 
 
@@ -131,6 +135,7 @@ func to_dict() -> Dictionary:
 		"notoriety": notoriety,
 		"chronicle": chronicle.duplicate(true),
 		"story_offers": story_offers.duplicate(true),
+		"faction_standing": faction_standing.duplicate(true),
 	}
 
 
@@ -158,3 +163,4 @@ func from_dict(data: Dictionary) -> void:
 	notoriety = clampi(int(data.get("notoriety", 0)), 0, Captivity.notoriety_cap())
 	chronicle = Stories.sanitize_chronicle(data.get("chronicle", []))
 	story_offers = Stories.sanitize_offers(data.get("story_offers", []), Clock.day)
+	faction_standing = Factions.sanitize(data.get("faction_standing", {}))

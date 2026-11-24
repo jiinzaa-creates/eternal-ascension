@@ -111,6 +111,7 @@ func _draw() -> void:
 	draw_boss()
 	draw_captive_ledger(player)
 	draw_chronicle(player)
+	draw_factions(player)
 	draw_toasts()
 	if _help_visible:
 		draw_help()
@@ -514,6 +515,58 @@ func draw_chronicle(player: Player) -> void:
 	_text(Vector2(x + 24.0, y + h - 26.0), "J / E / ESC — close", 11, Color("#7b8b94"))
 
 
+## The standings screen: who the player stands with, what the band does and who
+## it moves when an action is taken. A reading screen like the chronicle.
+func draw_factions(player: Player) -> void:
+	if not bool(host.factions_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.84))
+	var w := 760.0
+	var h := 470.0
+	var x := view.x * 0.5 - w * 0.5
+	var y := view.y * 0.5 - h * 0.5
+	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.97))
+	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	_text(Vector2(x + 24.0, y + 34.0), "STANDINGS", 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), "What each house thinks of you, and what the band buys.", 11, MUTED)
+	if Game.notoriety > 0:
+		_text(Vector2(x + 24.0, y + 76.0), "Lawful factions remember the holding yard: notoriety %d." % Game.notoriety,
+			11, Color("#d09090"))
+	draw_line(Vector2(x + 20.0, y + 92.0), Vector2(x + w - 20.0, y + 92.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.faction_rows()
+	var cursor := y + 116.0
+	for i in mini(rows.size(), 5):
+		var row: Dictionary = rows[i]
+		var band_color := Color("#9fb0b8")
+		match String(row.get("band", "")):
+			"standing.hostile":
+				band_color = Color("#e07070")
+			"standing.wary":
+				band_color = Color("#e0a070")
+			"standing.trusted":
+				band_color = Color("#8fd8a0")
+			"standing.honoured":
+				band_color = Color("#e8d090")
+		_text(Vector2(x + 24.0, cursor), _fit("%s  ·  %s" % [String(row.get("name", "?")),
+			String(row.get("kind", ""))], 14, w - 48.0), 14, Color(String(row.get("colour", "#9aa0a6"))))
+		cursor += 20.0
+		_text(Vector2(x + 24.0, cursor), "%s (%+d)  ·  members' regard %+d  ·  stall prices ×%.2f" % [
+			String(row.get("label", "")), int(row.get("value", 0)), int(row.get("disposition", 0)),
+			float(row.get("price_mult", 1.0))], 11, band_color)
+		cursor += 18.0
+		var relation := String(row.get("relations", ""))
+		var line := String(row.get("blurb", ""))
+		if relation != "":
+			line += "   " + relation
+		_text(Vector2(x + 24.0, cursor), _fit(line, 10, w - 48.0), 10, MUTED)
+		cursor += 30.0
+
+	_text(Vector2(x + 24.0, y + h - 26.0), "K / E / ESC — close   ·   helping one house warms its allies and cools its rivals",
+		11, Color("#7b8b94"))
+
+
 ## The active bar only: six slots, each with its art's own cooldown sweep.
 ## Occupancy of the other two bars and any art off the bars are named on the
 ## line beneath, so the readout never hides a known technique.
@@ -854,8 +907,8 @@ func draw_npc_dossier(_player: Player) -> void:
 	var x := 24.0
 	var y := 334.0
 	var width := 432.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 269.0), PANEL_BG)
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 269.0), Color("#5f7f8c", 0.45), false, 1.0)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 286.0), PANEL_BG)
+	draw_rect(Rect2(x - 12.0, y - 22.0, width, 286.0), Color("#5f7f8c", 0.45), false, 1.0)
 	_text(Vector2(x, y), _fit("%s — %s" % [npc.display_name, npc.role], 15, 408.0), 15, ACCENT)
 	y += 20.0
 	var sect_part := ""
@@ -912,6 +965,12 @@ func draw_npc_dossier(_player: Player) -> void:
 			npc.standing(), npc.standing_label()]
 	_text(Vector2(x, y), _fit(relation, 11, 408.0), 11, MUTED)
 	y += 16.0
+	# Which house this body answers to, and how that house currently reads the
+	# player: a guard's welcome is not only personal.
+	var faction := npc.faction_line()
+	if faction != "":
+		_text(Vector2(x, y), _fit(faction, 11, 408.0), 11, Color("#c8b8e8"))
+		y += 16.0
 	# Authored ties take the footnote when a person has any: they are facts about
 	# two people, not numbers the run can warm up or grind down.
 	var footnote := "The sheet regenerates from the seed; memory is saved."
@@ -1023,7 +1082,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	_text(Vector2(24.0, size.y - 44.0), trade, 11, Color("#6b7b84"))
 	_text(Vector2(24.0, size.y - 12.0), lines, 11, Color("#7b8b94"))

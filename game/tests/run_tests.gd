@@ -80,6 +80,7 @@ func _ready() -> void:
 	_captivity_tests()
 	_npc_progress_tests()
 	_stories_tests()
+	_factions_tests()
 	_quest_tests()
 	_hidden_realm_tests()
 	_save_tests()
@@ -4092,6 +4093,122 @@ func _stories_tests() -> void:
 	broken = DB.stories.duplicate(true)
 	(broken["rules"] as Dictionary)["deliver_base"] = "base.nope"
 	check(not Stories.validate(broken).is_empty(), "a delivery of an unknown item is rejected")
+
+
+## Factions: a stored record of what the player did, read through bands that
+## change real numbers, with rivals and allies moving when one house is helped.
+func _factions_tests() -> void:
+	print("[factions] standing is earned, remembered and spent")
+	check(Factions.factions().size() == 4, "the four factions are loaded")
+	check(not Factions.faction("faction.azure_cloud").is_empty(), "a faction is found by id")
+	check(Factions.faction("faction.nope").is_empty(), "an unknown faction is empty")
+	check(Factions.bands().size() == 5, "five standing bands are loaded")
+	check(Factions.validate(DB.factions_data).is_empty(), "the shipped faction data validates")
+	check(Factions.default_standing() == 0, "a new name starts neutral")
+
+	check(Factions.band_id(-100) == "standing.hostile", "the bottom of the ladder is hostile")
+	check(Factions.band_id(-40) == "standing.hostile", "hostile takes its upper edge")
+	check(Factions.band_id(-39) == "standing.wary", "wary begins where hostile ends")
+	check(Factions.band_id(0) == "standing.neutral", "zero is neutral")
+	check(Factions.band_id(24) == "standing.neutral", "neutral takes its upper edge")
+	check(Factions.band_id(25) == "standing.trusted", "trusted begins at its lower edge")
+	check(Factions.band_id(59) == "standing.trusted", "trusted takes its upper edge")
+	check(Factions.band_id(60) == "standing.honoured", "honoured begins at its lower edge")
+	check(Factions.band_id(999) == "standing.honoured", "the ladder clamps above the top")
+	check(Factions.label(60) == "Honoured", "a band has a readable label")
+	check(Factions.blurb(-50) != "", "a band explains itself")
+
+	check(Factions.for_archetype("elder") == "faction.azure_cloud", "elders belong to the Azure Cloud")
+	check(Factions.for_archetype("guard") == "faction.watch", "guards belong to the watch")
+	check(Factions.for_archetype("merchant") == "faction.market_league", "merchants belong to the league")
+	check(Factions.for_archetype("farmer") == "faction.market_league", "farmers belong to the league")
+	check(Factions.for_archetype("") == "", "an empty archetype belongs to no faction")
+	check(Factions.for_archetype("nobody") == "", "an unknown archetype belongs to no faction")
+	check(Factions.for_boss("boss.tomb_warden") == "faction.hollow_moon", "the warden answers to the Hollow Moon")
+	check(Factions.for_boss("boss.nobody") == "", "an unknown boss answers to no faction")
+	check(Factions.relation_text("faction.azure_cloud").contains("Rival"), "the sect names its rival")
+	check(Factions.relation_text("faction.market_league").contains("Ally"), "the league names its ally")
+
+	var empty := Factions.sanitize({})
+	check(empty.size() == Factions.factions().size(), "a fresh record covers every faction")
+	check(int(empty.get("faction.azure_cloud", 99)) == 0, "a fresh record is neutral")
+	var raw: Dictionary = {"faction.azure_cloud": 40}
+	check(Factions.effective_standing("faction.azure_cloud", raw) == 40, "raw standing reads as itself")
+	check(Factions.effective_standing("faction.azure_cloud", raw, 20) == 35,
+		"notoriety costs a lawful faction a quarter of its value")
+	check(Factions.effective_standing("faction.market_league", {"faction.market_league": 40}, 20) == 40,
+		"a guild is not the law and ignores notoriety")
+	check(Factions.effective_standing("faction.hollow_moon", {"faction.hollow_moon": 40}, 20) == 35,
+		"a lawful cult keeps its own law")
+	check(Factions.effective_standing("faction.azure_cloud", raw, 1000) == -100,
+		"notoriety can floor a lawful standing")
+
+	var after := Factions.award(empty, "faction.azure_cloud", 10)
+	check(int(after.get("faction.azure_cloud", 0)) == 10, "an act raises its faction")
+	check(int(after.get("faction.hollow_moon", 0)) == -5, "the rival loses half")
+	check(int(after.get("faction.market_league", 0)) == 2, "an ally gains a quarter")
+	check(int(after.get("faction.watch", 0)) == 2, "every ally moves")
+	check(int(empty.get("faction.azure_cloud", 0)) == 0, "award never mutates its input")
+	var damned := Factions.award(empty, "faction.hollow_moon", 10)
+	check(int(damned.get("faction.azure_cloud", 0)) == -5, "helping a cult cools its rival")
+	check(int(Factions.award(empty, "faction.azure_cloud", 500).get("faction.azure_cloud", 0)) == 100,
+		"awards clamp at the top")
+	check(int(Factions.award(empty, "faction.azure_cloud", -500).get("faction.azure_cloud", 0)) == -100,
+		"awards clamp at the bottom")
+	check(str(Factions.award(empty, "faction.nope", 50)) == str(empty), "an unknown faction changes nothing")
+	check(str(Factions.award(empty, "faction.azure_cloud", 0)) == str(empty), "a zero award changes nothing")
+
+	check(Factions.disposition_bonus("faction.azure_cloud", empty) == 0, "neutral members are unaffected")
+	check(Factions.disposition_bonus("faction.azure_cloud", {"faction.azure_cloud": 60}) == 8,
+		"honoured standing warms members")
+	check(Factions.price_multiplier("faction.market_league", {"faction.market_league": 60}) == 0.9,
+		"honoured standing cuts stall prices")
+	check(Factions.price_multiplier("faction.azure_cloud", {"faction.azure_cloud": -50}) == 1.25,
+		"hostile standing raises them")
+	var described := Factions.describe("faction.azure_cloud", {"faction.azure_cloud": 30})
+	check(described.contains("Azure Cloud Sect") and described.contains("Trusted"), "describe names the house and band")
+	check(Factions.describe("faction.nope", empty) == "", "an unknown house describes as nothing")
+
+	var dirty := Factions.sanitize({"faction.azure_cloud": 500, "faction.nope": 10, "junk": "x"})
+	check(int(dirty.get("faction.azure_cloud", 0)) == 100, "sanitise clamps wild values")
+	check(not dirty.has("faction.nope"), "sanitise drops unknown factions")
+	check(dirty.size() == Factions.factions().size(), "sanitise keeps the whole known map")
+	check(Factions.sanitize("nonsense").size() == Factions.factions().size(), "sanitise survives a bad shape")
+
+	check(Game.to_dict().has("faction_standing"), "faction standing is a save key")
+	check(Factions.sanitize(Game.faction_standing).size() == Factions.factions().size(),
+		"the live standing map covers every faction")
+
+	var broken: Dictionary = DB.factions_data.duplicate(true)
+	(broken["bands"] as Array)[0]["max"] = -41
+	check(not Factions.validate(broken).is_empty(), "a gap in the standing ladder is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["factions"] as Array).append((DB.factions_data["factions"] as Array)[0].duplicate(true))
+	check(not Factions.validate(broken).is_empty(), "a duplicate faction is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["factions"] as Array)[0]["archetypes"].append("nope")
+	check(not Factions.validate(broken).is_empty(), "an unknown archetype is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["factions"] as Array)[0]["archetypes"].append("guard")
+	check(not Factions.validate(broken).is_empty(), "an archetype in two factions is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["factions"] as Array)[3]["rivals"] = []
+	check(not Factions.validate(broken).is_empty(), "a one-sided rivalry is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["factions"] as Array)[0]["allies"].append("faction.azure_cloud")
+	check(not Factions.validate(broken).is_empty(), "a faction allied to itself is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["bands"] as Array)[0]["price_mult"] = 0.1
+	check(not Factions.validate(broken).is_empty(), "an unfair price multiplier is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["awards"] as Dictionary).erase("quest_award")
+	check(not Factions.validate(broken).is_empty(), "missing award tuning is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["awards"] as Dictionary)["default_standing"] = 200
+	check(not Factions.validate(broken).is_empty(), "a default outside the ladder is rejected")
+	broken = DB.factions_data.duplicate(true)
+	(broken["factions"] as Array)[3]["bosses"] = ["boss.nope"]
+	check(not Factions.validate(broken).is_empty(), "an unknown boss is rejected")
 
 
 func _quest_tests() -> void:

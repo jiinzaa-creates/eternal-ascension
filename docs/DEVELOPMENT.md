@@ -612,6 +612,46 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   hands a mending pill to an injured resident, advances and completes a two-kill hunt, and saves and
   loads the record.
 
+## Factions
+
+- **One stored record, read through bands.** `Factions` (`game/systems/factions.gd`) keeps the
+  player's raw standing with every house in `Game.faction_standing`, −100..100. Five bands tile
+  that range in `data/factions.json` (hostile, wary, neutral, trusted, honoured); each carries a
+  label, blurb, disposition shift and stall price multiplier. The raw number is what the player
+  did; the band is what a house currently does about it.
+- **Notoriety is read, not copied.** `effective_standing()` subtracts `notoriety / 4` from every
+  **lawful** faction before reading the band. A holding yard therefore costs face with the sect
+  and watch without rewriting their saved standing, and releasing captives restores it. Guilds
+  ignore the law's memory.
+- **Membership is content.** A faction owns archetype ids (`sect_master`, `elder`, … for Azure
+  Cloud; `merchant`/`farmer` for the league; `guard` for the watch) and boss ids (the Hollow Moon
+  owns `boss.tomb_warden`). `Factions.for_archetype()` gives an NPC its house; `Npc.faction_id()`,
+  `faction_standing()` and `faction_line()` expose it to the dossier, and `Npc.standing()` now
+  adds the band's disposition to base temperament and personal regard, so a trusted name is met
+  more warmly by every member.
+- **Actions ripple.** `award()` is pure and returns a new map: the target faction moves, each rival
+  loses `amount × rival_shift` (half), each ally gains `amount × ally_shift` (a quarter), all
+  truncated toward zero and clamped. The same function is called for the Azure Cloud quest
+  (`quest_award` 40), a story request answered for a resident (`story_award` 5), and a boss whose
+  faction loses `boss_penalty` 15. There is no second action log to drift out of step.
+- **Real consequences.** The market league's band multiplies the **buy** price at the stall
+  (`main._shop_price()`); selling stays on `Economy.sell_value()`, so standing cannot create a
+  money loop. The band's disposition flows into every member's standing, which dialogues, quests
+  and the dossier already read.
+- **The screen.** **K** opens a frozen standings screen listing each house, kind, band and value,
+  member regard and stall multiplier, blurb and ally/rival line. It is a reading screen like the
+  chronicle and the holding ledger; closing resumes the player.
+- **Saved, clamped, validated.** `Game.faction_standing` is an optional save key under schema 2,
+  rebuilt with `Factions.sanitize()`, which fills known factions with the default, drops unknown
+  ids and clamps every value. `Factions.validate()` runs at boot and rejects a gap or overlap in
+  the bands, a duplicate faction, an unknown archetype or boss, an archetype in two houses, a
+  self- or one-sided ally/rival relation, an unfair price multiplier, missing or non-positive
+  award tuning, and a default outside the ladder.
+- **Tests.** Unit `_factions_tests` covers band boundaries, membership, effective standing under
+  notoriety, ripple awards (including purity and clamps), effects, sanitising and validation.
+  Integration awards Azure Cloud standing and checks member regard, the dossier line, the league's
+  buy discount, notoriety's asymmetry, a story award for the watch, the screen, and save/load.
+
 ## Off-screen simulation
 
 - An `Npc` is either `simulated` or asleep. `sleep()` stops `_physics_process` entirely, so an

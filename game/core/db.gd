@@ -45,6 +45,8 @@ var bond_pairs: Array = []
 var captivity: Dictionary = {}
 ## The market's story content: daily beat rules and goal-gated templates.
 var stories: Dictionary = {}
+## Factions: standing bands with effects, members and the award tuning.
+var factions_data: Dictionary = {}
 
 var _by_id: Dictionary = {}
 
@@ -98,6 +100,7 @@ func load_all() -> void:
 	bond_pairs = bond_data.get("pairs", [])
 	captivity = _read("captivity.json")
 	stories = _read("stories.json")
+	factions_data = _read("factions.json")
 
 	_index("realm", realms)
 	_index("root", roots)
@@ -129,6 +132,8 @@ func load_all() -> void:
 	_index("bond", bonds)
 	_index("bond_tie", bond_ties)
 	_index("story", story_templates())
+	_index("faction", factions())
+	_index("faction_band", faction_bands())
 
 
 func _read(file: String) -> Dictionary:
@@ -302,6 +307,29 @@ func story_templates() -> Array:
 
 func story_template(id: String) -> Dictionary:
 	return by_id("story", id)
+
+
+func factions() -> Array:
+	var value: Variant = factions_data.get("factions", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func faction_bands() -> Array:
+	var value: Variant = factions_data.get("bands", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func faction(id: String) -> Dictionary:
+	return by_id("faction", id)
+
+
+func faction_band(id: String) -> Dictionary:
+	return by_id("faction_band", id)
+
+
+func faction_awards() -> Dictionary:
+	var value: Variant = factions_data.get("awards", {})
+	return value if typeof(value) == TYPE_DICTIONARY else {}
 
 
 func bond(id: String) -> Dictionary:
@@ -659,6 +687,9 @@ func validate() -> Array:
 	# Story content: the daily beat rules, template weights, goal and venue
 	# references, actor counts and request kinds must all be usable.
 	problems.append_array(Stories.validate(stories))
+	# Faction content: bands must tile the ladder, each archetype and boss may
+	# belong to one faction, and allies and rivals must name each other back.
+	problems.append_array(Factions.validate(factions_data))
 
 	if enemy_archetypes.size() < 4:
 		problems.append("expected at least 4 enemy archetypes, found %d" % enemy_archetypes.size())
