@@ -333,3 +333,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 47. GAIT CYCLES — IRON-TUSK BOAR (2026-11-25)
 16 frames filed (enemy_iron_tusk_boar_walk_{dir}_{a,b}.png + sheet). Colour discipline (§32): raw gait frames measured blue-grey drift (sat 0.059–0.106 vs idle 0.026 neutral charcoal) — a ×0.45 desaturation pass pulled the set into the idle's iron range before filing. QC: PASS (tests/boar_walk_test.png). Remaining gaits: corpse, ember spirit, crane, carp, mantis, serpent, corrupted wolf, guardian; then attack sets.
+
+## 48. GAIT CYCLES — HUNGRY CORPSE (2026-11-25)
+16 shamble frames filed (enemy_hungry_corpse_walk_{dir}_{left,right}.png + sheet) — biped stride format with dragging legs and limp swaying arms per the concept. Identity and facings verified (tests/corpse_walk_test.png). QC: PASS. Remaining gaits: ember spirit, crane, carp, mantis, serpent, corrupted wolf, guardian; then attack sets.
