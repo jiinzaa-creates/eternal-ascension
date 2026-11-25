@@ -245,3 +245,10 @@ DOCUMENTED LIMITS: water shows column striping when one tile repeats (needs a 2n
 ## 29. PARTY DIRECTIONAL SETS (2026-11-25, standing directive: "Keep building until everything has its asset")
 EA-CHR-0003 EXTENDED: Sword Cultivator 8-direction idle set (assets/characters/npcs/npc_sword_cultivator_idle_8dir_sheet.png + singles), same pipeline/specs as the Founder pilot. QC: PASS (tests/sword_cultivator_8dir_compass_test.png) — vermilion robe + white inner + black sash + red ribbons consistent; a few ribbon-tip specks survive the speck filter (kept deliberately over eating the ribbons).
 EA-CHR-0004 EXTENDED: Elder 8-direction idle set (assets/characters/npcs/npc_elder_idle_8dir_sheet.png + singles). QC: PASS (tests/elder_8dir_compass_test.png) — broad build, grey beard, bronze-disc belt and staff consistent across all facings.
+
+## 30. CANON SECT KITS — THE FOUR DATA FACTIONS (2026-11-25)
+Built for the houses fixed in game/data/factions.json (name + colour + motto are canon; kits follow them). Mottos are recorded here, never baked into art.
+EA-SEC-0005 sect_kit_azure_cloud.png — AZURE CLOUD SECT (#7fd3e0; "Climb, and do not look down."). Motif: sword rising through clouds. Pale cyan/white, silver trim. QC: PASS.
+EA-SEC-0006 sect_kit_verdant_market.png — VERDANT MARKET LEAGUE (#d8c070; "Every road ends at a stall."). Motif: stall awning over a square-hole coin (coin face carries cloud scroll, no characters). Gold-tan/leaf green. QC: PASS.
+EA-SEC-0007 sect_kit_market_watch.png — MARKET WATCH (#c08f8f; "The gate holds while we stand."). Motif: gate tower over shield. Dusty rose/slate. QC: PASS with note — the most western-leaning kit (laurel, castle stonework); the four-surface system holds, restyle toward Xianxia rooflines if the developer wants stricter cohesion.
+EA-SEC-0008 sect_kit_hollow_moon.png — HOLLOW MOON CULT (#a890d8; "What the moon takes, it keeps."). Motif: crescent cradling a kept pearl — the motto made visual. Violet/silver. QC: PASS — distinct from the Shadow archetype (no needle) and from corruption violet (no cracks/crystals), per the §20 distinction rule.
