@@ -348,3 +348,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 52. GAIT CYCLES — SPIRIT MANTIS (2026-11-25)
 16 gait frames filed (enemy_spirit_mantis_walk_{dir}_{a,b}.png + enemy_spirit_mantis_walk_sheet.png), alternating tripod leg phases. QC PASS (tests/mantis_walk_test.png): facings verified in all 8 directions, bladed forearms and pale green match the idle set. Remaining gaits: serpent, corrupted wolf, guardian; then attack sets.
+
+## 53. SWIM CYCLES — GLOOM SERPENT (2026-11-25)
+16 swim frames filed (enemy_gloom_serpent_walk_{dir}_{a,b}.png + enemy_gloom_serpent_walk_sheet.png), centre-anchored. QC PASS (tests/serpent_walk_test.png): S-curve slither alternates bend direction between phases, crested heads point in travel direction in all 8; note — the pale belly reads very bright at the first bend in two frames (S-A, NW-B), consistent with the design's pale underside. Remaining gaits: corrupted wolf, guardian; then attack sets.
