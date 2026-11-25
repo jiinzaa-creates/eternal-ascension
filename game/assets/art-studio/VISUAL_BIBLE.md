@@ -314,3 +314,7 @@ REMAINING ATTENTION: walk/attack cycles for the non-Founder cast (the last large
 
 ## 41. WALK CYCLES — SWORD CULTIVATOR (2026-11-25)
 First non-Founder walk set, same format as §26: 16 stride frames (L/R per direction, idle = passing pose) filed as npc_sword_cultivator_walk_{dir}_{left,right}.png + npc_sword_cultivator_walk_sheet.png (rows S…SW, cols stride-L / idle / stride-R / idle). Identity held across all 16 (red robe, ponytail, sword); facings verified on the QC strip (tests/sword_cultivator_walk_test.png). QC: PASS. Remaining walk sets: Elder, Merchant, Farmer, all creatures; then attack sets for the non-Founder cast.
+
+## 42. MERIDIAN CHART + TEXTURE-WIRING PROMPT (2026-11-25)
+MERIDIAN CHART: approved by Jawanza in a fresh message and generated — front silhouette, twelve glowing meridian rivers on ink-brown, no text. Filed ui/panels/meridian_chart.png. QC: PASS. The character-sheet extras list is now fully closed.
+FREEBUFF PROMPT: at Jawanza's request, a complete self-contained brief for his Freebuff agent to wire texture rendering into the engine (asset facts, locations, Animator layering, appearance colourways, TileSet build, fallback toggle, browser-screenshot verification). Filed as art-studio/FREEBUFF_TEXTURE_WIRING_PROMPT.md.
