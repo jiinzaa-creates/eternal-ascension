@@ -244,3 +244,4 @@ DOCUMENTED LIMITS: water shows column striping when one tile repeats (needs a 2n
 
 ## 29. PARTY DIRECTIONAL SETS (2026-11-25, standing directive: "Keep building until everything has its asset")
 EA-CHR-0003 EXTENDED: Sword Cultivator 8-direction idle set (assets/characters/npcs/npc_sword_cultivator_idle_8dir_sheet.png + singles), same pipeline/specs as the Founder pilot. QC: PASS (tests/sword_cultivator_8dir_compass_test.png) — vermilion robe + white inner + black sash + red ribbons consistent; a few ribbon-tip specks survive the speck filter (kept deliberately over eating the ribbons).
+EA-CHR-0004 EXTENDED: Elder 8-direction idle set (assets/characters/npcs/npc_elder_idle_8dir_sheet.png + singles). QC: PASS (tests/elder_8dir_compass_test.png) — broad build, grey beard, bronze-disc belt and staff consistent across all facings.
