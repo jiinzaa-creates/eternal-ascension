@@ -20,7 +20,8 @@ The game currently has NO sprite or tile pipeline. All actors are code-drawn pri
 ## NOT IN CODE (searched: *.gd, *.tscn, *.tres, project.godot, docs)
 Tile size · sprite frame size · direction count · animation FPS · atlas size · pivot convention for sprites · particle budget. None exist because no textured-actor system exists yet.
 
-## DERIVED — STUDIO RECOMMENDATIONS IF TEXTURED ART IS ADOPTED
+## ADOPTED — TEXTURED ART STANDARDS (Jawanza's decision, 2026-11-25: "Adopt textured art on those numbers")
+The derived recommendations below are now the project's adopted production standards. Any change needs Jawanza's explicit ruling.
 1. TILE SIZE: 32×32 px. 1024-unit chunks divide exactly (32 tiles/chunk per side); at default zoom a tile reads clearly, and 64 px source tiles drawn at 32 give headroom for the 2.0 zoom level. (Alternative: 64×64, 16/chunk — chunkier read, fewer tiles to author.)
 2. SPRITE FRAMES: standard actors 64×64 (body diameter 22–28 units, ~3-head figure ≈ 56–64 units tall standing on the shadow point); bosses 128×128 (diameter ≈44, figure ≈110). Pivot at ground contact (feet), centred X, bottom Y — matching the code's shadow offset (0, +6) and Y-sort origin.
 3. DIRECTIONS: 8. Facing is a continuous vector; 4-way would visibly snap against it, and the studio's asymmetric designs must not be mirrored (bible §17.2).
@@ -29,4 +30,4 @@ Tile size · sprite frame size · direction count · animation FPS · atlas size
 6. SECT KITS: build the first canon kits for the four data factions above — their colours/mottos are fixed canon. Azure Cloud ≈ the studio's Azure Sword archetype; Hollow Moon ≈ the Violet Shadow archetype. The remaining sects still need developer names/doctrines.
 
 ## WHAT THIS CHANGES FOR THE STUDIO
-Bible §17.5's blocker list is retired: the answers were "not yet built," not "unknown." Production stays gated, but now on ONE decision — adopt textured actors/tiles (with the derived numbers above) or keep code-drawn actors and redirect the studio to UI, key art, and palette work. Either way the concept registry stands as the design source.
+Bible §17.5's blocker list is retired: the answers were "not yet built," not "unknown." On 2026-11-25 Jawanza adopted textured art on the derived numbers above. Production is unblocked: first job = the Founder pilot set (bible §17.3), validated at the adopted 64×64 frame on 32×32 tiles (tests/founder_64px_scale_test.png). The concept registry stands as the design source for all frame work.
