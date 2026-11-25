@@ -363,3 +363,6 @@ Attack format (Founder standard): one mid-action pose per direction, max-dim 62 
 
 ## 57. ATTACK SET — ELDER (2026-11-25)
 Elder set filed (npc_elder_attack_{dir}.png + 8dir sheet): qi palm-strike poses, palm thrust toward facing in all 8; several frames carry attached qi wisps/orbs at the striking palm — accepted as design, same precedent as the wolf's paw mist. QC PASS (tests/elder_attack_test.png). Remaining attack sets: Brawler, Skirmisher, Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 58. ATTACK SET — BRAWLER (2026-11-25)
+Brawler set filed (enemy_brawler_attack_{dir}.png + 8dir sheet): heavy straight-punch lunges toward facing in all 8, wrapped fists + rust sash match the idle set. QC PASS (tests/brawler_attack_test.png). Remaining attack sets: Skirmisher, Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
