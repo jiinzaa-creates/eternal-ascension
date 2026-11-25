@@ -372,3 +372,6 @@ Skirmisher set filed (enemy_skirmisher_attack_{dir}.png + 8dir sheet): low dual-
 
 ## 60. ATTACK SET — SENTINEL (2026-11-25)
 Sentinel set filed (enemy_sentinel_attack_{dir}.png + 8dir sheet): spear thrusts past the shield toward facing in all 8, lamellar + tall shield match the idle set. QC PASS (tests/sentinel_attack_test.png). Remaining attack sets: Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 61. ATTACK SET — QI ARCHER (2026-11-25)
+Qi Archer set filed (enemy_qi_archer_attack_{dir}.png + 8dir sheet): full-draw bow poses aimed toward facing in all 8, glowing qi arrow + attached qi wisps at the bow. QC PASS (tests/qi_archer_attack_test.png). HUMAN ENEMY ATTACK SETS COMPLETE (Brawler, Skirmisher, Sentinel, Qi Archer). Remaining attack sets: Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
