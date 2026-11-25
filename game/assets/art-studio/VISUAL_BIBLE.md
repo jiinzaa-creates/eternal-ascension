@@ -360,3 +360,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 56. ATTACK SETS BEGIN — SWORD CULTIVATOR (2026-11-25)
 Attack format (Founder standard): one mid-action pose per direction, max-dim 62 fit in 64x64, {stem}_attack_{dir}.png + {stem}_attack_8dir_sheet.png (512x64 single row, ORDER). Sword Cultivator set filed (npc_sword_cultivator_attack_*): mid-slash jian poses, sword extended toward facing in all 8. QC PASS (tests/cultivator_attack_test.png). Remaining attack sets: Elder, Brawler, Skirmisher, Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 57. ATTACK SET — ELDER (2026-11-25)
+Elder set filed (npc_elder_attack_{dir}.png + 8dir sheet): qi palm-strike poses, palm thrust toward facing in all 8; several frames carry attached qi wisps/orbs at the striking palm — accepted as design, same precedent as the wolf's paw mist. QC PASS (tests/elder_attack_test.png). Remaining attack sets: Brawler, Skirmisher, Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
