@@ -345,3 +345,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 51. SWIM CYCLES — ABYSS JADE CARP (2026-11-25)
 16 swim frames filed (enemy_abyss_jade_carp_walk_{dir}_{a,b}.png + enemy_abyss_jade_carp_walk_sheet.png), centre-anchored (a swimming fish has no ground contact). QC PASS (tests/carp_walk_test.png): S-curve body, heads point in travel direction in all 8, tail sweep alternates between phases; pale jade matches the filed idle set. Remaining gaits: mantis, serpent, corrupted wolf, guardian; then attack sets.
+
+## 52. GAIT CYCLES — SPIRIT MANTIS (2026-11-25)
+16 gait frames filed (enemy_spirit_mantis_walk_{dir}_{a,b}.png + enemy_spirit_mantis_walk_sheet.png), alternating tripod leg phases. QC PASS (tests/mantis_walk_test.png): facings verified in all 8 directions, bladed forearms and pale green match the idle set. Remaining gaits: serpent, corrupted wolf, guardian; then attack sets.
