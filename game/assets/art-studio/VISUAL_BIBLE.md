@@ -351,3 +351,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 53. SWIM CYCLES — GLOOM SERPENT (2026-11-25)
 16 swim frames filed (enemy_gloom_serpent_walk_{dir}_{a,b}.png + enemy_gloom_serpent_walk_sheet.png), centre-anchored. QC PASS (tests/serpent_walk_test.png): S-curve slither alternates bend direction between phases, crested heads point in travel direction in all 8; note — the pale belly reads very bright at the first bend in two frames (S-A, NW-B), consistent with the design's pale underside. Remaining gaits: corrupted wolf, guardian; then attack sets.
+
+## 54. GAIT CYCLES — CORRUPTED SPIRIT WOLF (2026-11-25)
+16 gait frames filed (enemy_corrupted_spirit_wolf_walk_{dir}_{a,b}.png + sheet). FIRST PASS FAILED QC: 9 of 16 frames drifted dark violet (measured luminance 0.27–0.44 vs idle set 0.50–0.58) — the same identity failure as the original idle pass. Those 9 frames were regenerated under an explicit pale lock ("body fur PALE WHITE-GREY, corruption = thin violet cracks/crystals/aura only, NOT dark overall"); re-measured 0.46–0.69 across the set. QC PASS (tests/corrupted_wolf_walk_test.png). Remaining gait: guardian; then attack sets.
