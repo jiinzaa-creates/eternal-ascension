@@ -369,3 +369,6 @@ Brawler set filed (enemy_brawler_attack_{dir}.png + 8dir sheet): heavy straight-
 
 ## 59. ATTACK SET — SKIRMISHER (2026-11-25)
 Skirmisher set filed (enemy_skirmisher_attack_{dir}.png + 8dir sheet): low dual-dagger slash lunges toward facing in all 8, hooded crouch matches the idle set. QC PASS (tests/skirmisher_attack_test.png). Remaining attack sets: Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 60. ATTACK SET — SENTINEL (2026-11-25)
+Sentinel set filed (enemy_sentinel_attack_{dir}.png + 8dir sheet): spear thrusts past the shield toward facing in all 8, lamellar + tall shield match the idle set. QC PASS (tests/sentinel_attack_test.png). Remaining attack sets: Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
