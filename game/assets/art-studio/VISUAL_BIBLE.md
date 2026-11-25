@@ -324,3 +324,6 @@ FREEBUFF PROMPT: at Jawanza's request, a complete self-contained brief for his F
 
 ## 44. WALK CYCLES — MERCHANT (2026-11-25)
 16 stride frames filed (npc_merchant_walk_{dir}_{left,right}.png + npc_merchant_walk_sheet.png). Identity held (portly frame, trade pack, ledger in hand); facings verified (tests/merchant_walk_test.png). QC: PASS. Walk sets remaining: Farmer, creatures; then attack sets for the non-Founder cast.
+
+## 45. WALK CYCLES — FARMER (2026-11-25)
+16 stride frames filed (npc_farmer_walk_{dir}_{left,right}.png + npc_farmer_walk_sheet.png). Identity held (straw hat, hemp, hoe over shoulder in all frames); facings verified (tests/farmer_walk_test.png). QC: PASS. ALL humanoid walk sets are now complete (Founder, Sword Cultivator, Elder, Merchant, Farmer). Remaining: creature gait cycles, then attack sets for the non-Founder cast.
