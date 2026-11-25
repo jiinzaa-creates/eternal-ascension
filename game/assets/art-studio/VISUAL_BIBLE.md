@@ -330,3 +330,6 @@ FREEBUFF PROMPT: at Jawanza's request, a complete self-contained brief for his F
 
 ## 46. GAIT CYCLES — SPIRIT WOLF (2026-11-25)
 First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png — diagonal leg pairs) + walk sheet. Colour verified NUMERICALLY against the idle set before filing: idle S mean sat 0.437 / val 0.626 vs gait S sat 0.426 / val 0.687 — the palette matches (an initial visual impression of over-saturation was the QC strip's olive background, not the art). QC: PASS (tests/wolf_walk_test.png). Remaining gaits: boar, corpse, ember spirit, crane, carp, mantis, serpent, corrupted wolf, guardian; then attack sets.
+
+## 47. GAIT CYCLES — IRON-TUSK BOAR (2026-11-25)
+16 frames filed (enemy_iron_tusk_boar_walk_{dir}_{a,b}.png + sheet). Colour discipline (§32): raw gait frames measured blue-grey drift (sat 0.059–0.106 vs idle 0.026 neutral charcoal) — a ×0.45 desaturation pass pulled the set into the idle's iron range before filing. QC: PASS (tests/boar_walk_test.png). Remaining gaits: corpse, ember spirit, crane, carp, mantis, serpent, corrupted wolf, guardian; then attack sets.
