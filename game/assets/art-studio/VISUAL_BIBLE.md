@@ -366,3 +366,6 @@ Elder set filed (npc_elder_attack_{dir}.png + 8dir sheet): qi palm-strike poses,
 
 ## 58. ATTACK SET — BRAWLER (2026-11-25)
 Brawler set filed (enemy_brawler_attack_{dir}.png + 8dir sheet): heavy straight-punch lunges toward facing in all 8, wrapped fists + rust sash match the idle set. QC PASS (tests/brawler_attack_test.png). Remaining attack sets: Skirmisher, Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 59. ATTACK SET — SKIRMISHER (2026-11-25)
+Skirmisher set filed (enemy_skirmisher_attack_{dir}.png + 8dir sheet): low dual-dagger slash lunges toward facing in all 8, hooded crouch matches the idle set. QC PASS (tests/skirmisher_attack_test.png). Remaining attack sets: Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
