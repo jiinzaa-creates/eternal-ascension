@@ -327,3 +327,6 @@ FREEBUFF PROMPT: at Jawanza's request, a complete self-contained brief for his F
 
 ## 45. WALK CYCLES — FARMER (2026-11-25)
 16 stride frames filed (npc_farmer_walk_{dir}_{left,right}.png + npc_farmer_walk_sheet.png). Identity held (straw hat, hemp, hoe over shoulder in all frames); facings verified (tests/farmer_walk_test.png). QC: PASS. ALL humanoid walk sets are now complete (Founder, Sword Cultivator, Elder, Merchant, Farmer). Remaining: creature gait cycles, then attack sets for the non-Founder cast.
+
+## 46. GAIT CYCLES — SPIRIT WOLF (2026-11-25)
+First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png — diagonal leg pairs) + walk sheet. Colour verified NUMERICALLY against the idle set before filing: idle S mean sat 0.437 / val 0.626 vs gait S sat 0.426 / val 0.687 — the palette matches (an initial visual impression of over-saturation was the QC strip's olive background, not the art). QC: PASS (tests/wolf_walk_test.png). Remaining gaits: boar, corpse, ember spirit, crane, carp, mantis, serpent, corrupted wolf, guardian; then attack sets.
