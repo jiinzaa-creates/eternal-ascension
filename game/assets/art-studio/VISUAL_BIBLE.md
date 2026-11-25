@@ -161,3 +161,28 @@ EA-UI-0002 ui_hud_mockup.png — HUD over bamboo grove. Layout locked: portrait 
 EA-UI-0003 ui_inventory_panel_mockup.png — Inventory/character panel. Character pane left (ink silhouette placeholder), 4x4 grid right, rarity frames on filled slots (crystal/scroll/peach/sword icons consistent with Phase 5 items). QC: PASS. Production rules from this mockup: frame color = the ITEM's rarity; EMPTY slots always use the plain gray frame (the mockup shows colored empty frames for language display only). The scroll icon here carries tiny marks — production uses the Phase 5 blank-tag scroll.
 EA-UI-0004 ui_component_sheet.png — Component reference: 3 button/panel states (normal / highlighted-glow / muted), HP + Qi bars with end caps, 5 rarity frames, minimap ring. QC: PASS — this sheet is the production reference for all UI drawing.
 UI backlog: dialogue box, quest tracker, shop panel, sect management panel, map screen, settings, damage numbers, boss health bar (uses the guardian's bell motif), controller prompts, accessibility variants (colorblind-safe rarity = ornament already carries the signal).
+
+## 17. PHASE 8 — ANIMATION PRODUCTION PLAN & TECHNICAL STANDARDS (2026-11-25)
+STATUS KEY: [LOCKED] = set by art direction, safe to build on. [PROPOSED] = my recommendation, needs developer confirmation. [BLOCKED] = cannot start production without the developer spec.
+
+### 17.1 Animation matrix (sets required per actor class) [LOCKED as scope]
+PLAYER / HUMANOID NPC (per character, per direction): idle, walk, run, dodge-roll, basic attack combo (3), heavy attack, skill cast, channel/cultivate (seated), hurt, death, interact, breakthrough (uses EA-VFX-0002 + body rise), transformation/ascension variant of idle+walk at minimum. Mount/fly states if the design adds them.
+QUADRUPED BEAST (wolf, boar): idle, walk, run/charge, bite/gore attack, pounce (wolf), hurt, death.
+UNDEAD HUMANOID: idle sway, shamble, claw swipe, lunge, hurt (low-flinch variant), death-collapse.
+ELEMENTAL: hover idle, drift, cast/spit, hurt-scatter, death-burst. (Fewer frames, more particle work — elementals animate by shader/particles as much as frames.)
+BOSS (guardian class): dormant, awakening, walk, 2–3 attack patterns, phase-transition, hurt states, death-crumble. Bosses get unique sets; no sharing with normal enemies.
+Frame counts and FPS per set: [PROPOSED] idle 4–6f, walk 6–8f, run 6f, attacks 5–8f with 1–2 anticipation + active + recovery readable at a glance; final numbers [BLOCKED] on developer FPS/animation spec.
+
+### 17.2 Direction policy [PROPOSED — developer decision]
+4-direction (S/E/N/W, diagonals reuse): ~40% less art, classic top-down feel, weaker diagonal combat read. 8-direction: best combat readability for an action RPG, roughly double the directional art of 4-dir. My recommendation for an action RPG with directional attacks: 8-dir for the PLAYER and bosses, 4-dir acceptable for minor NPCs/enemies if budget demands. Sprite mirroring: E/W mirror is allowed only for symmetric designs; asymmetric details (sword hand, crane motif) must be drawn, not flipped. [BLOCKED] until developer confirms.
+
+### 17.3 Production pipeline [LOCKED]
+1. Concept (Phases 1–7 outputs) → 2. Silhouette lock (black-fill test at gameplay size) → 3. Key poses per animation → 4. In-betweens → 5. Cleanup to locked palette + ink color → 6. Layer separation (body / weapon / aura-glow / shadow as separate exports) → 7. Atlas pack + export → 8. In-engine check (movement, sorting, readability vs. tilesets) → 9. Registry entry + QC verdict. AI-generated images feed step 1 ONLY; production sprites are drawn/derived frame work, never raw generations.
+PILOT RULE: the Founder (EA-CHR-0002 design) gets the first complete animation set as the pilot. The pilot proves the pipeline and sets the real per-character cost before any batch production is scheduled.
+
+### 17.4 Technical standards that hold regardless of pending specs [LOCKED]
+Format: PNG with full alpha for sprites/VFX; no baked backgrounds on production assets. Color: sRGB, locked bible palette, ink #1E1B18. Lighting: upper-left on every frame of every set. Pivot [PROPOSED]: bottom-center (feet) for ground actors, center for flyers/elementals. Shadows: separate soft ellipse asset, never painted into frames. Glow/aura: always a separate additive layer. Naming: bible §8 convention, animation files as {actor}_{anim}_{dir}_{frame}. Atlas: one actor per atlas where practical; power-of-two sheets preferred pending engine spec.
+
+### 17.5 BLOCKER LIST — specs required from the developer before production animation starts
+1. TILE SIZE in pixels (blocks tileset production AND boss footprint sizing). 2. Sprite frame size / character canvas in pixels. 3. Direction count (4 or 8) + diagonal policy. 4. Animation FPS targets per animation type. 5. Max texture/atlas size + Godot import filter settings (nearest vs. linear — decides whether art is pixel-crisp or painterly-smooth at runtime). 6. Y-sort / pivot confirmation. 7. Target resolutions + UI scaling policy (blocks final UI production). 8. Performance budget for particles/lighting (blocks VFX density).
+Until items 1–4 land, all further work stays at concept/prototype level — which is exactly where Phases 9–11 operate, so the studio is not idle waiting.
