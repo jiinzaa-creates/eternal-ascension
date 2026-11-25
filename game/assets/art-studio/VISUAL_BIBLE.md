@@ -354,3 +354,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 54. GAIT CYCLES — CORRUPTED SPIRIT WOLF (2026-11-25)
 16 gait frames filed (enemy_corrupted_spirit_wolf_walk_{dir}_{a,b}.png + sheet). FIRST PASS FAILED QC: 9 of 16 frames drifted dark violet (measured luminance 0.27–0.44 vs idle set 0.50–0.58) — the same identity failure as the original idle pass. Those 9 frames were regenerated under an explicit pale lock ("body fur PALE WHITE-GREY, corruption = thin violet cracks/crystals/aura only, NOT dark overall"); re-measured 0.46–0.69 across the set. QC PASS (tests/corrupted_wolf_walk_test.png). Remaining gait: guardian; then attack sets.
+
+## 55. GAIT CYCLES — ANCIENT STONE GUARDIAN + GAIT PROGRAMME COMPLETE (2026-11-25)
+16 heavy stride frames at boss scale filed (boss_ancient_stone_guardian_walk_{dir}_{left,right}.png, 128x128, fit 120 + sheet). QC PASS (tests/guardian_walk_test.png): rune-seamed stone golem, strides alternate, facings verified. GAIT PROGRAMME COMPLETE: every actor with an idle set now has a movement cycle — Founder, Sword Cultivator, Elder, Merchant, Farmer (walks); Spirit Wolf, Boar, Crane, Carp, Mantis, Serpent, Corrupted Wolf (gaits/swims); Hungry Corpse (shamble); Ember Spirit drift 15/16 (NE-B gap, §49); Guardian (boss strides). Next programme: attack sets for the non-Founder cast.
