@@ -357,3 +357,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 55. GAIT CYCLES — ANCIENT STONE GUARDIAN + GAIT PROGRAMME COMPLETE (2026-11-25)
 16 heavy stride frames at boss scale filed (boss_ancient_stone_guardian_walk_{dir}_{left,right}.png, 128x128, fit 120 + sheet). QC PASS (tests/guardian_walk_test.png): rune-seamed stone golem, strides alternate, facings verified. GAIT PROGRAMME COMPLETE: every actor with an idle set now has a movement cycle — Founder, Sword Cultivator, Elder, Merchant, Farmer (walks); Spirit Wolf, Boar, Crane, Carp, Mantis, Serpent, Corrupted Wolf (gaits/swims); Hungry Corpse (shamble); Ember Spirit drift 15/16 (NE-B gap, §49); Guardian (boss strides). Next programme: attack sets for the non-Founder cast.
+
+## 56. ATTACK SETS BEGIN — SWORD CULTIVATOR (2026-11-25)
+Attack format (Founder standard): one mid-action pose per direction, max-dim 62 fit in 64x64, {stem}_attack_{dir}.png + {stem}_attack_8dir_sheet.png (512x64 single row, ORDER). Sword Cultivator set filed (npc_sword_cultivator_attack_*): mid-slash jian poses, sword extended toward facing in all 8. QC PASS (tests/cultivator_attack_test.png). Remaining attack sets: Elder, Brawler, Skirmisher, Sentinel, Qi Archer, Spirit Wolf, Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
