@@ -378,3 +378,6 @@ Qi Archer set filed (enemy_qi_archer_attack_{dir}.png + 8dir sheet): full-draw b
 
 ## 62. ATTACK SET — SPIRIT WOLF (2026-11-25)
 Spirit Wolf set filed (companion_spirit_wolf_attack_{dir}.png + 8dir sheet): lunging bite poses, jaws open toward facing in all 8, pale blue + paw mist match the companion sets. QC PASS (tests/wolf_attack_test.png). Remaining attack sets: Boar, Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 63. ATTACK SET — IRON-TUSK BOAR (2026-11-25)
+Boar set filed (enemy_iron_tusk_boar_attack_{dir}.png + 8dir sheet): charging tusk-gore poses toward facing in all 8. The generator's warm drift recurred (sat 0.061–0.134 vs idle 0.026); per-frame saturation pulled back to the idle value before filing — iron charcoal held, no brown. QC PASS (tests/boar_attack_test.png). Remaining attack sets: Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
