@@ -311,3 +311,6 @@ WATERFALL: tile_waterfall.png + tile_waterfall_v2.png (vertical strips, wrap-fix
 ICONS: enlightenments ×13 (enlightenment_icon_*) and realm badges ×12 (realm_icon_*) filed; realm set escalates bronze → gold/jade ornament with rank. QC: PASS (tests/enlightenment_realm_icons_test.png).
 MERIDIAN CHART: generation declined by the image tool this session — NOT retried, NOT worked around; open item pending a fresh request (same handling as the Farmer W gap, §38).
 REMAINING ATTENTION: walk/attack cycles for the non-Founder cast (the last large item; multi-session), water animation frames, Market Watch restyle (developer's call), crane beak + carp colour drift (cosmetic, §32).
+
+## 41. WALK CYCLES — SWORD CULTIVATOR (2026-11-25)
+First non-Founder walk set, same format as §26: 16 stride frames (L/R per direction, idle = passing pose) filed as npc_sword_cultivator_walk_{dir}_{left,right}.png + npc_sword_cultivator_walk_sheet.png (rows S…SW, cols stride-L / idle / stride-R / idle). Identity held across all 16 (red robe, ponytail, sword); facings verified on the QC strip (tests/sword_cultivator_walk_test.png). QC: PASS. Remaining walk sets: Elder, Merchant, Farmer, all creatures; then attack sets for the non-Founder cast.
