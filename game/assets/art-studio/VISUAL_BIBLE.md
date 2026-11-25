@@ -321,3 +321,6 @@ FREEBUFF PROMPT: at Jawanza's request, a complete self-contained brief for his F
 
 ## 43. WALK CYCLES — ELDER (2026-11-25)
 16 stride frames filed (npc_elder_walk_{dir}_{left,right}.png + npc_elder_walk_sheet.png), same format as §26/§41. Identity held (brown robes, topknot, staff, grey beard); facings verified (tests/elder_walk_test.png). QC: PASS. Walk sets remaining: Merchant, Farmer, creatures; then attack sets for the non-Founder cast.
+
+## 44. WALK CYCLES — MERCHANT (2026-11-25)
+16 stride frames filed (npc_merchant_walk_{dir}_{left,right}.png + npc_merchant_walk_sheet.png). Identity held (portly frame, trade pack, ledger in hand); facings verified (tests/merchant_walk_test.png). QC: PASS. Walk sets remaining: Farmer, creatures; then attack sets for the non-Founder cast.
