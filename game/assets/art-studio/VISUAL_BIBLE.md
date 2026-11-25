@@ -336,3 +336,6 @@ First creature gait set: 16 frames (companion_spirit_wolf_walk_{dir}_{a,b}.png �
 
 ## 48. GAIT CYCLES — HUNGRY CORPSE (2026-11-25)
 16 shamble frames filed (enemy_hungry_corpse_walk_{dir}_{left,right}.png + sheet) — biped stride format with dragging legs and limp swaying arms per the concept. Identity and facings verified (tests/corpse_walk_test.png). QC: PASS. Remaining gaits: ember spirit, crane, carp, mantis, serpent, corrupted wolf, guardian; then attack sets.
+
+## 49. DRIFT CYCLES — EMBER SPIRIT (2026-11-25)
+15 of 16 drift frames filed (enemy_ember_spirit_walk_{dir}_{a,b}.png + enemy_ember_spirit_walk_sheet_partial.png): phase A = flame stretched/leaning, phase B = compressed pulse orb; the two-phase drift reads clearly and facings verified (tests/ember_walk_test.png). OPEN GAP: the NE phase-B frame — the image tool declined that single generation this session; NOT retried or worked around (same handling as §38/§40); the sheet's NE-B cell is left empty, never faked. Closing it needs a fresh user request. Remaining gaits: crane, carp, mantis, serpent, corrupted wolf, guardian; then attack sets.
