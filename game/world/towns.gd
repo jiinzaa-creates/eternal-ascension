@@ -48,6 +48,18 @@ static func spec_for(region: Dictionary, seed_value: int) -> Dictionary:
 
 	var origin := Continent.chunk_origin(coord)
 	var local := Vector2i(6 + r.randi_range(-2, 2), 6 + r.randi_range(-2, 2))
+	# A town never rises in a river or lake: step to the nearest dry
+	# anchor chunk (deterministic order) when the rolled one is wet.
+	var tries := [Vector2i.ZERO, Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1),
+		Vector2i(0, -1), Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2)]
+	for step in tries:
+		var candidate := origin + local + step
+		var centre_tile := Vector2i(
+			int((float(candidate.x) * Continent.CHUNK_PX + 512.0) / 32.0),
+			int((float(candidate.y) * Continent.CHUNK_PX + 512.0) / 32.0))
+		if not ChunkGen.ground_water_at_tile(centre_tile, seed_value):
+			local += step
+			break
 	var centre := Vector2(origin + local) * Continent.CHUNK_PX + Vector2(512, 512)
 
 	var locations: Dictionary = {}

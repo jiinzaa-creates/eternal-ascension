@@ -2842,7 +2842,7 @@ func _economy_tests() -> void:
 
 func _location_tests() -> void:
 	print("[locations] overworld sites, discovery windows and permanence")
-	check(ChunkGen.POI_KINDS.size() == 3, "three kinds of overworld site")
+	check(ChunkGen.POI_KINDS.size() == 6, "six kinds of overworld site")
 
 	var total := 0
 	var kinds := {}
@@ -2884,6 +2884,39 @@ func _location_tests() -> void:
 	var legacy := WorldDelta.from_dict({"2,2": {"herb.old": 10}})
 	check(legacy.is_spent(coord, "herb.old", 12), "legacy day-only deltas still read")
 	check(not legacy.is_spent(coord, "herb.old", 13), "legacy deltas keep the herb regrow window")
+
+	# Hydrology: rivers and lakes exist in the world water mask, and
+	# the ground painter turns a mask into water plus shore transitions.
+	var hydro_water := 0
+	for hx in range(0, 12):
+		for hy in range(0, 12):
+			var mask: PackedByteArray = ChunkGen.payload_for(Vector2i(hx, hy), 5150)["water"]
+			for b in mask:
+				hydro_water += b
+	check(hydro_water > 0, "rivers or lakes wet the home region (%d tiles)" % hydro_water)
+
+	var synthetic: Dictionary = ChunkGen.payload_for(Vector2i(3, 3), 5150)
+	var block := PackedByteArray()
+	block.resize(1024)
+	for by in range(10, 15):
+		for bx in range(10, 15):
+			block[by * 32 + bx] = 1
+	synthetic["water"] = block
+	var painted := ChunkManager.ProvinceChunk.new()
+	painted.world_seed = 5150
+	painted.apply(synthetic)
+	var layer := painted.get_node("GroundTiles") as TileMapLayer
+	var water_cells := 0
+	var edge_cells := 0
+	for cy in 32:
+		for cx in 32:
+			var src := layer.get_cell_source_id(Vector2i(cx, cy))
+			if src == TerrainTiles.WATER:
+				water_cells += 1
+			elif TerrainTiles.WATER_EDGE.values().has(src):
+				edge_cells += 1
+	check(water_cells == 25, "the painter floods exactly the masked tiles (%d)" % water_cells)
+	check(edge_cells >= 16, "shores get transition tiles (%d)" % edge_cells)
 
 	check(Interactable.poi_regrow("ruin") == WorldDelta.PERMANENT, "ruins are permanent")
 	check(Interactable.poi_regrow("mine") > Interactable.poi_regrow("deposit"), "mines take longer than deposits")

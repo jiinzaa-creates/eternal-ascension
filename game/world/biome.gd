@@ -50,6 +50,11 @@ static func prime(seed_value: int) -> void:
 	_continents[seed_value] = Continent.generate(seed_value)
 
 
+## The shared continent for a seed (primed on the main thread).
+static func continent_for(seed_value: int) -> Dictionary:
+	return _continent(seed_value)
+
+
 static func _continent(seed_value: int) -> Dictionary:
 	if _continents.has(seed_value):
 		return _continents[seed_value]

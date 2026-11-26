@@ -17,6 +17,8 @@ const NAMES := ["grass_v1", "grass_v2", "grass_v3", "grass_v4",
 const GRASS := [0, 1, 2, 3]
 const DIRT := [4, 5]
 const WATER := 7
+## Grass-to-water transition sources by the direction the water lies.
+const WATER_EDGE := {"n": 19, "e": 21, "s": 23, "w": 25}
 ## Tiles a body cannot walk through: open water and falling water.
 const SOLID := ["water", "waterfall"]
 

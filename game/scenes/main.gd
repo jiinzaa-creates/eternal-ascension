@@ -4883,6 +4883,27 @@ func _use_interactable(node: Interactable) -> void:
 			Bus.player_stats_changed.emit()
 			Bus.toast.emit("Gathered 25 spirit stones from the deposit.")
 			_award_discovery(node, 15)
+		Interactable.Kind.CAVE:
+			if node.used:
+				return
+			_loot(node, 5, "cave cache", "chest.cave")
+			if Roots.marrow_found(node.chunk_coord, "cave"):
+				player.pick_up(_make_marrow())
+				Bus.toast.emit("Deep in the cave: a knot of root marrow.")
+			_award_discovery(node, 30)
+		Interactable.Kind.BATTLEFIELD:
+			if node.used:
+				return
+			_loot(node, 5, "battlefield cache", "chest.battlefield")
+			if Roots.marrow_found(node.chunk_coord, "battlefield"):
+				player.pick_up(_make_marrow())
+				Bus.toast.emit("Under the rusted blades: a knot of root marrow.")
+			_award_discovery(node, 35)
+		Interactable.Kind.CACHE:
+			if node.used:
+				return
+			_loot(node, 5, "sealed chest", "chest.sealed")
+			_award_discovery(node, 50)
 		Interactable.Kind.ROOT:
 			_use_root_pavilion()
 

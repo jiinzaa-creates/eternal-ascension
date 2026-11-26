@@ -162,6 +162,7 @@ func _install(payload: Dictionary) -> void:
 	if chunks.has(coord):
 		return
 	var chunk := ProvinceChunk.new()
+	chunk.world_seed = world_seed
 	chunk.apply(payload)
 	chunk.position = Vector2(coord) * CHUNK_SIZE
 	add_child(chunk)
@@ -341,6 +342,8 @@ class ProvinceChunk:
 	var features: Array = []
 	var herbs: Array = []
 	var pois: Array = []
+	var water: PackedByteArray = PackedByteArray()
+	var world_seed: int = 0
 	var props: Array = []
 	var interactables: Array = []
 
@@ -355,6 +358,7 @@ class ProvinceChunk:
 		features = payload.get("features", [])
 		herbs = payload.get("herbs", [])
 		pois = payload.get("pois", [])
+		water = payload.get("water", PackedByteArray())
 		_paint_ground()
 
 
@@ -379,11 +383,40 @@ class ProvinceChunk:
 			return
 		for cx in 32:
 			for cy in 32:
+				if _is_water(cx, cy):
+					layer.set_cell(Vector2i(cx, cy), TerrainTiles.WATER, Vector2i.ZERO)
+					continue
+				var edge := _water_edge(cx, cy)
+				if edge != "":
+					layer.set_cell(Vector2i(cx, cy), int(TerrainTiles.WATER_EDGE[edge]), Vector2i.ZERO)
+					continue
 				var h := absi((coord.x * 73856093) ^ (coord.y * 19349663) ^ (cx * 83492791) ^ (cy * 297121507) ^ signature)
 				var src: int = TerrainTiles.GRASS[(h / 100) % TerrainTiles.GRASS.size()]
 				if h % 100 < 7:
 					src = TerrainTiles.DIRT[(h / 7) % TerrainTiles.DIRT.size()]
 				layer.set_cell(Vector2i(cx, cy), src, Vector2i.ZERO)
+
+
+	## Water in this chunk's own mask; outside the mask, the world
+	## function answers so shores agree across chunk borders.
+	func _is_water(cx: int, cy: int) -> bool:
+		if cx >= 0 and cy >= 0 and cx < 32 and cy < 32:
+			return water.size() == 1024 and water[cy * 32 + cx] == 1
+		return ChunkGen.ground_water_at_tile(
+			Vector2i(coord.x * 32 + cx, coord.y * 32 + cy), world_seed)
+
+
+	## The direction of the nearest water neighbour, for shore tiles.
+	func _water_edge(cx: int, cy: int) -> String:
+		if _is_water(cx, cy - 1):
+			return "n"
+		if _is_water(cx + 1, cy):
+			return "e"
+		if _is_water(cx, cy + 1):
+			return "s"
+		if _is_water(cx - 1, cy):
+			return "w"
+		return ""
 
 
 	func _draw() -> void:

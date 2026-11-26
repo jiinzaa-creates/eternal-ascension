@@ -8,7 +8,7 @@ extends Node2D
 ## `can_interact()` is the single rule shared by the prompt and the handler, so a
 ## spent node can never show a prompt that does nothing.
 
-enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN, TRIBULATION, STORAGE, FORGE, ALCHEMY, HERALD }
+enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE, SHOP, INN, RUIN, MINE, DEPOSIT, ROOT, DEMONSTRATION, METHOD, MERIDIAN, TRIBULATION, STORAGE, FORGE, ALCHEMY, HERALD, CAVE, BATTLEFIELD, CACHE }
 
 var kind: int = Kind.HERB
 var id: String = ""
@@ -117,6 +117,12 @@ static func poi_kind(kind_name: String) -> int:
 			return Kind.MINE
 		"deposit":
 			return Kind.DEPOSIT
+		"cave":
+			return Kind.CAVE
+		"battlefield":
+			return Kind.BATTLEFIELD
+		"cache":
+			return Kind.CACHE
 	return Kind.EXAMINE
 
 
@@ -128,6 +134,12 @@ static func poi_label(kind_name: String) -> String:
 			return "Spirit ore vein — mine"
 		"deposit":
 			return "Spirit stone deposit — gather"
+		"cave":
+			return "Beast cave — delve"
+		"battlefield":
+			return "Ancient battlefield — scavenge"
+		"cache":
+			return "Buried cache — dig"
 	return "Strange site — examine"
 
 
@@ -139,6 +151,12 @@ static func poi_regrow(kind_name: String) -> int:
 			return 10
 		"deposit":
 			return 7
+		"cave":
+			return 12
+		"battlefield":
+			return WorldDelta.PERMANENT
+		"cache":
+			return WorldDelta.PERMANENT
 	return WorldDelta.HERB_REGROW_DAYS
 
 
@@ -152,7 +170,7 @@ func setup_poi(id_value: String, kind_name: String, coord: Vector2i) -> void:
 ## Whether the prompt should offer this node right now.
 func can_interact() -> bool:
 	match kind:
-		Kind.HERB, Kind.CONTAINER, Kind.MANUAL, Kind.CHEST, Kind.RUIN, Kind.MINE, Kind.DEPOSIT:
+		Kind.HERB, Kind.CONTAINER, Kind.MANUAL, Kind.CHEST, Kind.RUIN, Kind.MINE, Kind.DEPOSIT, Kind.CAVE, Kind.BATTLEFIELD, Kind.CACHE:
 			return not used
 		_:
 			return true
