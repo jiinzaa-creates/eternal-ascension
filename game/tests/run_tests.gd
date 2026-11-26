@@ -2895,6 +2895,11 @@ func _location_tests() -> void:
 				hydro_water += b
 	check(hydro_water > 0, "rivers or lakes wet the home region (%d tiles)" % hydro_water)
 
+	var town_continent := Continent.generate(5150)
+	var town_specs := Towns.specs(town_continent, 5150)
+	check(town_specs.size() == (town_continent["regions"] as Array).size() - 1,
+		"every non-capital region grows a town (%d)" % town_specs.size())
+
 	var synthetic: Dictionary = ChunkGen.payload_for(Vector2i(3, 3), 5150)
 	var block := PackedByteArray()
 	block.resize(1024)
@@ -2943,6 +2948,21 @@ func _travel_tests() -> void:
 	check(approx(Travel.hours_for(1000.0), Travel.MIN_HOURS), "short trips are floored at the minimum")
 	check(approx(Travel.hours_for(4000.0), 1.4), "four thousand units costs 1.4 hours")
 
+	check(Travel.MAX_ROWS >= 20, "the travel list fits a continent of destinations")
+	check(Travel.hours_for(50000.0) > 12.0, "a cross-continent trip costs most of a day")
+
+	var map_area := Rect2(Vector2(72, 104), Vector2(1136, 512))
+	var capital_centre := Vector2(6144, 6144)
+	var mapped := Continent.map_point(capital_centre, map_area)
+	check(Continent.map_rect(Continent.CAPITAL, map_area).has_point(mapped),
+		"map_point lands inside the capital's map cell")
+
+	var visited_before: Array = Game.visited_regions.duplicate()
+	check(Game.visit_region(19), "a first entry records the visit")
+	check(not Game.visit_region(19), "a repeat entry is not new")
+	check(Game.to_dict().has("visited_regions"), "visited regions are saved")
+	Game.visited_regions = visited_before
+
 	check(approx(Travel.bearing(Vector2.ZERO, Vector2(10, 0)), 0.0), "east is zero radians")
 	check(approx(Travel.bearing(Vector2.ZERO, Vector2(0, 10)), PI * 0.5), "south is a quarter turn")
 	check(approx(Travel.bearing(Vector2.ZERO, Vector2(0, -10)), -PI * 0.5), "north points up")
@@ -2959,7 +2979,7 @@ func _travel_tests() -> void:
 		{"id": "landmark.b", "name": "Shrine", "position": Vector2(20, 20)},
 	]
 	var sites := {}
-	for i in 8:
+	for i in 30:
 		sites["poi.site.%d" % i] = {"name": "Site %d" % i, "x": float(i * 100), "y": 50.0}
 	var list := Travel.destinations(landmarks, sites)
 	check(list.size() == Travel.MAX_ROWS, "the travel list is capped at %d rows" % Travel.MAX_ROWS)

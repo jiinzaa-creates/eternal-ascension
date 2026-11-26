@@ -50,7 +50,7 @@ static func spec_for(region: Dictionary, seed_value: int) -> Dictionary:
 	var local := Vector2i(6 + r.randi_range(-2, 2), 6 + r.randi_range(-2, 2))
 	# A town never rises in a river or lake: step to the nearest dry
 	# anchor chunk (deterministic order) when the rolled one is wet.
-	var tries := [Vector2i.ZERO, Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1),
+	var tries: Array[Vector2i] = [Vector2i.ZERO, Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1),
 		Vector2i(0, -1), Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2)]
 	for step in tries:
 		var candidate := origin + local + step

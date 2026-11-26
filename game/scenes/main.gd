@@ -38,6 +38,7 @@ var lighting: WorldLighting
 ## Continent geography, derived from the seed and never saved.
 var continent: Dictionary = {}
 var _last_dry := Vector2.ZERO
+var _region_now := -1
 var town_specs: Array = []
 var towns_active: Dictionary = {}
 var _town_tick := 0.0
@@ -439,7 +440,7 @@ func _build_hud() -> void:
 	layer.add_child(hud)
 	world_map = WorldMap.new()
 	layer.add_child(world_map)
-	world_map.setup(continent, Continent.region_for_world_position(player.global_position), _realm_map_marks())
+	world_map.setup(continent, Continent.region_for_world_position(player.global_position), _realm_map_marks(), _map_extras())
 	shop_panel = ShopPanel.new()
 	layer.add_child(shop_panel)
 	travel_panel = TravelPanel.new()
@@ -924,6 +925,7 @@ func _process(delta: float) -> void:
 		if _town_tick > 0.5:
 			_town_tick = 0.0
 			_tick_towns()
+			_tick_region()
 	if phase == "creation":
 		return
 
@@ -1768,6 +1770,40 @@ func travel_destinations() -> Array:
 	return Travel.destinations(_travel_landmarks(), travel_sites, Travel.MAX_ROWS)
 
 
+## Region entries: the first observation after a load is silent; after
+## that, crossing into a region records the visit and names the ground.
+func _tick_region() -> void:
+	if player == null or realm_instance != null:
+		return
+	var index := Continent.region_for_world_position(player.global_position)
+	if index < 0 or index == _region_now:
+		return
+	var first := _region_now == -1
+	_region_now = index
+	if Game.visit_region(index) and not first:
+		var region: Dictionary = Continent.region_by_index(continent, index)
+		Bus.toast.emit("Entering %s — %s." % [String(region.get("name", "the wilds")), current_biome_name()])
+
+
+## What the continent map needs beyond geography: discovered towns,
+## visited regions, and each region's biome (id + display name).
+func _map_extras() -> Dictionary:
+	var towns: Array = []
+	for i in town_specs.size():
+		var spec: Dictionary = town_specs[i]
+		if Game.discovered.has("town.%d" % i):
+			towns.append({"name": spec["name"], "position": spec["centre"]})
+	var biomes := {}
+	for region in continent.get("regions", []):
+		var centre_chunk: Vector2i = Continent.chunk_origin(region["coord"]) + Vector2i(6, 6)
+		var biome_id := Biome.for_chunk(centre_chunk, Game.world_seed)
+		biomes[int(region["index"])] = {
+			"id": biome_id,
+			"name": String(DB.biome(biome_id).get("name", biome_id)),
+		}
+	return {"towns": towns, "visited": Game.visited_regions.duplicate(), "biomes": biomes}
+
+
 func _open_travel() -> void:
 	if travel_panel == null or player == null:
 		return
@@ -1897,7 +1933,7 @@ func toggle_map() -> void:
 		return
 	world_map.toggle()
 	if world_map.visible:
-		world_map.setup(continent, Continent.region_for_world_position(player.global_position), _realm_map_marks())
+		world_map.setup(continent, Continent.region_for_world_position(player.global_position), _realm_map_marks(), _map_extras())
 	# Freeze both loops, so an open map is not a blind walk.
 	player.set_physics_process(not world_map.visible)
 	player.set_process(not world_map.visible)
@@ -2157,6 +2193,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if travel_open:
 		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
 			_close_travel()
+			return
+		if event.is_action_pressed("ui_down"):
+			travel_index = mini(travel_index + 1, maxi(0, travel_destinations().size() - 1))
+			_show_travel()
+			return
+		if event.is_action_pressed("ui_up"):
+			travel_index = maxi(travel_index - 1, 0)
+			_show_travel()
 			return
 		if event.is_action_pressed("accept"):
 			_travel_to(travel_index)

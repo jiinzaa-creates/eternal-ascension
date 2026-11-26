@@ -2,14 +2,14 @@ class_name Travel
 extends RefCounted
 ## Travel and navigation maths, as pure functions.
 ##
-## Fast travel crosses the province instantly and charges **time**, not spirit
+## Fast travel crosses the continent instantly and charges **time**, not spirit
 ## stones: NPC schedules, weather and regrowth all advance, so a shortcut is never
 ## free. Nothing here touches the scene; the host moves the player.
 
 const HOURS_PER_THOUSAND := 0.35
 const MIN_HOURS := 0.5
-const MAX_HOURS := 4.0
-const MAX_ROWS := 6
+const MAX_HOURS := 24.0
+const MAX_ROWS := 24
 ## Arriving this close to a waypoint counts as reaching it.
 const ARRIVE_RADIUS := 80.0
 

@@ -79,9 +79,10 @@ func _fit(text: String, font_size: int, max_width: float) -> String:
 
 
 func _panel_rect() -> Rect2:
-	var w := clampf(size.x - 80.0, 760.0, 1180.0)
-	var h := minf(486.0, maxf(320.0, size.y - 40.0))
-	return Rect2(Vector2((size.x - w) * 0.5, (size.y - h) * 0.5), Vector2(w, h))
+	var view := get_viewport_rect().size
+	var w := clampf(view.x - 80.0, 760.0, 1180.0)
+	var h := minf(486.0, maxf(320.0, view.y - 40.0))
+	return Rect2(Vector2((view.x - w) * 0.5, (view.y - h) * 0.5), Vector2(w, h))
 
 
 func _slot_size() -> Vector2:

@@ -41,8 +41,11 @@ func _text(pos: Vector2, text: String, font_size: int = 13, color: Color = INK) 
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), PANEL)
-	var panel := Rect2(Vector2(150, 110), Vector2(size.x - 300.0, size.y - 220.0))
+	# Code-created full-rect controls under a CanvasLayer report size (0, 0);
+	# the viewport is the truth (the same pattern Hud draws with).
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), PANEL)
+	var panel := Rect2(Vector2(150, 110), Vector2(view.x - 300.0, view.y - 220.0))
 	UiFrame.panel(self, panel, Color("#0d1418", 0.98))
 
 	var x := panel.position.x + 24.0
@@ -55,19 +58,26 @@ func _draw() -> void:
 	if rows.is_empty():
 		_text(Vector2(x, y + 20.0), "No known destinations. Discover a site first.", 13, MUTED)
 	else:
+		# A continent of destinations outgrows one column: past eleven
+		# rows the list flows into a second column.
 		var width := panel.size.x - 48.0
+		var two_col := rows.size() > 11
+		var per_col := int(ceil(float(rows.size()) / 2.0)) if two_col else rows.size()
+		var col_width := width / 2.0 - 12.0 if two_col else width
 		for i in rows.size():
 			var row: Dictionary = rows[i]
-			var rect := Rect2(Vector2(x - 8.0, y), Vector2(width, 30.0))
+			var col := i / per_col
+			var rx := x + (col_width + 24.0) * float(col)
+			var ry := y + float(i % per_col) * 28.0
+			var rect := Rect2(Vector2(rx - 8.0, ry), Vector2(col_width, 26.0))
 			if i % 2 == 0:
 				draw_rect(rect, ROW_BG)
 			if i == selected:
 				draw_rect(rect, Color(ACCENT, 0.16))
 				draw_rect(rect, ACCENT, false, 1.0)
 			var color := Color(String(row.get("color", "#e6eef2")))
-			_text(Vector2(x, y + 20.0), "%d.  %s" % [i + 1, String(row.get("name", "?"))], 13, color)
-			_text(Vector2(panel.end.x - 24.0 - 120.0, y + 20.0), String(row.get("detail", "")), 12, MUTED)
-			y += 32.0
+			_text(Vector2(rx, ry + 18.0), "%d.  %s" % [i + 1, String(row.get("name", "?"))], 12, color)
+			_text(Vector2(rx + col_width - 118.0, ry + 18.0), String(row.get("detail", "")), 11, MUTED)
 
-	var footer := "1-6 select · ENTER travel · V set waypoint · E close"
+	var footer := "↑↓ select · 1-6 jump · ENTER travel · V set waypoint · E close"
 	_text(Vector2(x, panel.end.y - 20.0), footer, 11, Color("#6b7b84"))

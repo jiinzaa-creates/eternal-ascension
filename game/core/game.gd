@@ -18,6 +18,8 @@ var biome_density: float = 1.0
 var pending_load_slot: int = 0
 var spirit_stones: int = 0
 var discovered: Dictionary = {}
+## Continent regions the player has entered, by lattice index.
+var visited_regions: Array = []
 ## Origin chosen at creation. Applied once, at the start of a run; loading a save
 ## never re-applies it, because the effects are already in the save.
 var origin_id: String = ""
@@ -135,6 +137,15 @@ func discover(id: String) -> bool:
 	return true
 
 
+## Records a first entry into a continent region (lattice index).
+## Returns true when the region is newly visited.
+func visit_region(index: int) -> bool:
+	if index < 0 or visited_regions.has(index):
+		return false
+	visited_regions.append(index)
+	return true
+
+
 func register_kill() -> void:
 	kills += 1
 
@@ -146,6 +157,7 @@ func to_dict() -> Dictionary:
 		"karma": karma,
 		"spirit_stones": spirit_stones,
 		"discovered": discovered.duplicate(),
+		"visited_regions": visited_regions.duplicate(),
 		"origin": origin_id,
 		"play_time": play_time,
 		"born_day": born_day,
@@ -178,6 +190,11 @@ func from_dict(data: Dictionary) -> void:
 	karma = int(data.get("karma", 0))
 	spirit_stones = int(data.get("spirit_stones", 0))
 	discovered = data.get("discovered", {}).duplicate()
+	visited_regions.clear()
+	for entry in data.get("visited_regions", []):
+		var region_index := int(entry)
+		if region_index >= 0 and region_index < 20 and not visited_regions.has(region_index):
+			visited_regions.append(region_index)
 	origin_id = String(data.get("origin", ""))
 	play_time = float(data.get("play_time", 0.0))
 	# Legacy saves have no birth day: they start their life now, at the age a

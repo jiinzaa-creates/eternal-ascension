@@ -1,12 +1,13 @@
 class_name Continent
 extends RefCounted
-## The continent above the playable province.
+## The continent the game is played on.
 ##
-## One province is all that is walkable so far; the continent is the geography
-## above it. It is generated deterministically from the world seed, so it exists
-## in every save without being stored and cannot drift between sessions.
+## Every land region is walkable: chunk streaming covers the whole lattice,
+## and towns rise in each region. The continent is generated deterministically
+## from the world seed, so it exists in every save without being stored and
+## cannot drift between sessions.
 ##
-## The cell at `CAPITAL` is the province the player walks in. Connectivity is
+## The cell at `CAPITAL` is the region the player starts in. Connectivity is
 ## enforced rather than hoped for: land that cannot be reached from the capital
 ## is drowned, so no named region is ever unreachable.
 
@@ -138,6 +139,22 @@ static func region_by_index(data: Dictionary, index: int) -> Dictionary:
 
 ## One region's rectangle inside a drawing area. Pure so map layout is testable
 ## without a Control.
+## A world position's point inside a drawing area, consistent with
+## map_rect's gapped cell layout. Pure, like map_rect.
+static func map_point(world_position: Vector2, area: Rect2) -> Vector2:
+	var min_chunk := chunk_origin(Vector2i.ZERO)
+	var max_chunk := chunk_origin(Vector2i(COLS - 1, ROWS - 1)) + Vector2i(REGION_CHUNKS, REGION_CHUNKS)
+	var min_px := Vector2(min_chunk) * CHUNK_PX
+	var size_px := Vector2(max_chunk - min_chunk) * CHUNK_PX
+	var frac := (world_position - min_px) / size_px
+	var cell := Vector2i(
+		clampi(int(frac.x * float(COLS)), 0, COLS - 1),
+		clampi(int(frac.y * float(ROWS)), 0, ROWS - 1))
+	var rect := map_rect(cell, area)
+	var cell_frac := Vector2(frac.x * float(COLS) - float(cell.x), frac.y * float(ROWS) - float(cell.y))
+	return rect.position + cell_frac * rect.size
+
+
 static func map_rect(coord: Vector2i, area: Rect2) -> Rect2:
 	var gap := 6.0
 	var cell_size := Vector2(
