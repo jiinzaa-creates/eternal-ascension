@@ -393,3 +393,6 @@ Crane set filed (enemy_storm_crane_attack_{dir}.png + 8dir sheet): neck-dart pec
 
 ## 67. ATTACK SET — ABYSS JADE CARP (2026-11-25)
 Carp set filed (enemy_abyss_jade_carp_attack_{dir}.png + 8dir sheet): S-curve snapping lunges toward facing in all 8, centre-anchored like its swim set. QC PASS (tests/carp_attack_test.png). Remaining attack sets: Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 68. ATTACK SET — SPIRIT MANTIS (2026-11-25)
+Mantis set filed (enemy_spirit_mantis_attack_{dir}.png + 8dir sheet): reared scythe-slash strikes toward facing in all 8. QC PASS (tests/mantis_attack_test.png). Remaining attack sets: Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
