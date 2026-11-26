@@ -152,7 +152,7 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, Vector2(width, height)), Color("#0b1418"))
 	# A dark foot and a wash on the left keep the menu legible over any crop.
 	draw_rect(Rect2(0.0, height * 0.48, width, height * 0.52), Color(0.02, 0.03, 0.04, 0.42))
-	draw_rect(Rect2(0.0, height - 440.0, 560.0, 440.0), PANEL)
+	UiFrame.panel(self, Rect2(0.0, height - 440.0, 560.0, 440.0), PANEL)
 	var palette := Hud.palette(Options.get_bool("high_contrast"))
 	var ink: Color = palette["ink"]
 	var muted: Color = palette["muted"]
@@ -168,9 +168,10 @@ func _draw() -> void:
 		var rect := Rect2(Vector2(float(geometry["x"]), y), Vector2(float(geometry["w"]), float(geometry["h"])))
 		var enabled := _can_activate(i)
 		var selected := i == index
+		UiFrame.plaque(self, rect, Color(0.02, 0.03, 0.04, 0.35), UiFrame.BRONZE_DIM)
 		if selected:
 			draw_rect(Rect2(rect.position, Vector2(3.0, rect.size.y)), accent)
-			draw_rect(rect, Color(accent, 0.08))
+			UiFrame.plaque(self, rect, Color(accent, 0.08), UiFrame.BRONZE)
 		var colour := ink if enabled else muted
 		if selected and enabled:
 			colour = accent

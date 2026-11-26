@@ -53,3 +53,6 @@ Prop, Building and chunk-herb rendering now use Art Studio textures the same way
 
 ## Appearance overlays (2026-11-25, later)
 Hair and skin colourways are no longer idle-only: 288 overlay frames under `colourways/hair_{i}/overlay/` and `colourways/skin_{i}/overlay/` stack over any robe set at runtime (ActorSprite child layers; Player configures them from `appearance`). The full 180-combination appearance matrix renders in motion. See VISUAL_BIBLE §77 for method and measured mask accuracy.
+
+## UI frame language (2026-11-25, later)
+All HUD panels, pages, menus, the title screen, skill bar, shop/travel panels and the world map now draw through `ui/ui_frame.gd` (UiFrame): bronze corner ticks, bronze-dim rules, jade hairlines, plaques — the studio's UI lock expressed in the game's code-drawn style. The authored + high-contrast palettes are untouched. See VISUAL_BIBLE §78.

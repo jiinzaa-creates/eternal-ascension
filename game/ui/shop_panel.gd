@@ -47,8 +47,7 @@ func _text(pos: Vector2, text: String, font_size: int = 13, color: Color = INK) 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), PANEL)
 	var panel := Rect2(Vector2(120, 90), Vector2(size.x - 240.0, size.y - 180.0))
-	draw_rect(panel, Color("#0d1418", 0.98))
-	draw_rect(panel, Color("#2b343a"), false, 1.0)
+	UiFrame.panel(self, panel, Color("#0d1418", 0.98))
 
 	var x := panel.position.x + 24.0
 	var y := panel.position.y + 34.0

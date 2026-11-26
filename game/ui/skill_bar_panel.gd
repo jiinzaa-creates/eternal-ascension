@@ -195,8 +195,7 @@ func _draw() -> void:
 		return
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#05080a", 0.72))
 	var panel := _panel_rect()
-	draw_rect(panel, PANEL)
-	draw_rect(panel, Color("#2b343a"), false, 1.0)
+	UiFrame.panel(self, panel, PANEL)
 
 	var x := panel.position.x + 24.0
 	var y := panel.position.y + 30.0
@@ -220,7 +219,7 @@ func _draw() -> void:
 			var tech_id := player.bar_slot(index)
 			var selected := tech_id != "" and tech_id == String(player.current_technique().get("id", ""))
 			draw_rect(rect, SLOT_ACTIVE if selected else (SLOT_BG if tech_id != "" else SLOT_EMPTY))
-			draw_rect(rect, Color("#7fd3e0") if selected else Color("#2b343a"), false, 2.0 if selected else 1.0)
+			draw_rect(rect, Color("#7fd3e0") if selected else UiFrame.BRONZE_DIM, false, 2.0 if selected else 1.0)
 			_text(rect.position + Vector2(8.0, 15.0), "%d" % (slot + 1), 10, MUTED)
 			if tech_id == "":
 				_text(rect.position + Vector2(26.0, 16.0), "empty", 11, Color("#42515a"))
@@ -242,8 +241,7 @@ func _draw() -> void:
 		_text(Vector2(x, _roster_top() + 12.0), "Every known art has a slot.", 11, Color("#5d6d76"))
 	for i in off_bar.size():
 		var rect := _roster_rect(i)
-		draw_rect(rect, Color("#101a1f", 0.9))
-		draw_rect(rect, Color("#243038"), false, 1.0)
+		UiFrame.card(self, rect, Color("#101a1f", 0.9), Color("#243038"))
 		var tech: Dictionary = DB.technique(String(off_bar[i]))
 		_text(rect.position + Vector2(8.0, 15.0), _fit(String(tech.get("name", "?")), 10, rect.size.x - 14.0), 10, Color("#cfdae0"))
 
@@ -255,6 +253,5 @@ func _draw() -> void:
 		var ghost := String(DB.technique(String(_drag.get("tech", ""))).get("name", "?"))
 		var at := get_local_mouse_position() + Vector2(14.0, -8.0)
 		var width := _text_width(ghost, 12) + 18.0
-		draw_rect(Rect2(at - Vector2(6.0, 14.0), Vector2(width, 22.0)), Color("#0d1b21", 0.95))
-		draw_rect(Rect2(at - Vector2(6.0, 14.0), Vector2(width, 22.0)), ACCENT, false, 1.0)
+		UiFrame.plaque(self, Rect2(at - Vector2(6.0, 14.0), Vector2(width, 22.0)), Color("#0d1b21", 0.95), ACCENT)
 		_text(at, ghost, 12, INK)

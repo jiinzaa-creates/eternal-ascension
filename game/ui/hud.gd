@@ -39,6 +39,11 @@ func apply_palette(high_contrast: bool) -> void:
 	ACCENT = colours["accent"]
 	queue_redraw()
 
+
+## An ambient panel in the shared frame language (see UiFrame).
+func _panel(rect: Rect2) -> void:
+	UiFrame.panel(self, rect, PANEL_BG)
+
 var host: Node
 var _font: Font
 var _toasts: Array = []
@@ -132,7 +137,7 @@ func _item_color(item: Dictionary) -> Color:
 func _bar(pos: Vector2, bar_size: Vector2, ratio: float, color: Color, label: String) -> void:
 	draw_rect(Rect2(pos, bar_size), Color("#000000", 0.55))
 	draw_rect(Rect2(pos, Vector2(bar_size.x * clampf(ratio, 0.0, 1.0), bar_size.y)), color)
-	draw_rect(Rect2(pos, bar_size), Color("#2b343a"), false, 1.0)
+	draw_rect(Rect2(pos, bar_size), UiFrame.BRONZE_DIM, false, 1.0)
 	_text(pos + Vector2(bar_size.x + 8.0, bar_size.y - 1.0), label, 12, MUTED)
 
 
@@ -220,7 +225,7 @@ func draw_ended(player: Player) -> void:
 func draw_vitals(player: Player) -> void:
 	var x := 24.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 292.0), PANEL_BG)
+	_panel(Rect2(x - 12.0, y - 22.0, 316.0, 292.0))
 
 	_text(Vector2(x, y), player.cultivation.stage_title(), 19, ACCENT)
 	y += 20.0
@@ -322,7 +327,7 @@ func draw_boss() -> void:
 	var width := minf(560.0, size.x - 120.0)
 	var x := size.x * 0.5 - width * 0.5
 	var y := 58.0
-	draw_rect(Rect2(x - 10.0, y - 22.0, width + 20.0, 58.0), PANEL_BG)
+	_panel(Rect2(x - 10.0, y - 22.0, width + 20.0, 58.0))
 	_text(Vector2(x, y - 3.0), String(body.get("display_name")), 15, Color("#d8c8ff"))
 	var phase_label := Boss.phase_name(entry, int(body.get("boss_phase")))
 	_text(Vector2(x + width - _text_width(phase_label, 12), y - 3.0), phase_label, 12, MUTED)
@@ -363,7 +368,7 @@ func draw_world_panel(player: Player) -> void:
 	var w := size.x
 	var x := w - 316.0
 	var y := 28.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, 212.0), PANEL_BG)
+	_panel(Rect2(x - 12.0, y - 22.0, 316.0, 212.0))
 	_text(Vector2(x, y), "%s   %s" % [Clock.label(), Weather.label()], 13, MUTED)
 	y += 18.0
 	var tiding: String = host.world_event_line()
@@ -375,6 +380,7 @@ func draw_world_panel(player: Player) -> void:
 	_text(Vector2(x, y), _fit("%s   %s   Kills %d   Karma %d" % [
 		player.display_name, host.current_biome_name(), Game.kills, Game.karma], 11, 292.0), 11, MUTED)
 	y += 18.0
+	UiFrame.divider(self, x, x + 292.0, y - 9.0)
 	_text(Vector2(x, y), "Spirit stones: %d" % Game.spirit_stones, 13, Color("#d8c070"))
 	y += 18.0
 	var weapon: Dictionary = player.equipment.get("weapon", {})
@@ -401,6 +407,7 @@ func draw_world_panel(player: Player) -> void:
 		armor_note = "   armour %d%%" % roundi(armor_condition * 100.0)
 	_text(Vector2(x, y), "Weapon dmg %d   Armor %d%s" % [int(player.weapon_damage()), int(player.armor()), armor_note], 12, Color("#d06060") if armor_condition <= 0.0 else MUTED)
 	y += 18.0
+	UiFrame.divider(self, x, x + 292.0, y - 9.0)
 	var next_move := player.next_move_name()
 	if next_move != "":
 		_text(Vector2(x, y), "Next strike: %s  (%d/%d)" % [
@@ -438,7 +445,7 @@ func draw_waypoint(player: Player) -> void:
 	var w := 230.0
 	var x := size.x * 0.5 - w * 0.5
 	var y := 14.0
-	draw_rect(Rect2(x, y, w, 30.0), PANEL_BG)
+	_panel(Rect2(x, y, w, 30.0))
 	draw_set_transform(Vector2(x + 20.0, y + 15.0), angle, Vector2.ONE)
 	draw_colored_polygon(PackedVector2Array([Vector2(8, 0), Vector2(-5, 5), Vector2(-5, -5)]), ACCENT)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -458,7 +465,7 @@ func draw_quest(_player: Player) -> void:
 	var w := size.x
 	var y := 210.0
 	var width := 316.0
-	draw_rect(Rect2(w - 316.0 - 12.0, y - 22.0, width, 22.0 + float(lines.size()) * 18.0), PANEL_BG)
+	_panel(Rect2(w - 316.0 - 12.0, y - 22.0, width, 22.0 + float(lines.size()) * 18.0))
 	for i in lines.size():
 		var line := String(lines[i])
 		var color := INK
@@ -490,7 +497,7 @@ func draw_party(player: Player) -> void:
 	var x := size.x - 316.0
 	var y := _side_panel_y()
 	var height := 34.0 + float(members.size()) * 34.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, height), PANEL_BG)
+	_panel(Rect2(x - 12.0, y - 22.0, 316.0, height))
 	_text(Vector2(x, y), "PARTY  %s" % Party.slots_label(members.size(), player.stats.party_slots()), 12, ACCENT)
 	y += 20.0
 	for value in members:
@@ -521,7 +528,7 @@ func draw_captives(player: Player) -> void:
 		y += 34.0 + float(members.size()) * 34.0
 	var shown := mini(rows.size(), 3)
 	var height := 58.0 + float(shown) * 18.0 + (16.0 if rows.size() > shown else 0.0)
-	draw_rect(Rect2(x - 12.0, y - 22.0, 316.0, height), PANEL_BG)
+	_panel(Rect2(x - 12.0, y - 22.0, 316.0, height))
 	_text(Vector2(x, y), "CAPTIVES  %d/%d · %s" % [rows.size(), Captivity.max_held(),
 		Captivity.policy_name(Game.captive_policy)], 12, ACCENT)
 	var legal_colour := Color("#d06060") if Captivity.wanted(Game.notoriety) else MUTED
@@ -550,8 +557,7 @@ func draw_captive_ledger(player: Player) -> void:
 	var x := view.x * 0.5 - w * 0.5
 	var y := 92.0
 	var h := 470.0
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.96))
-	draw_rect(Rect2(x, y, w, h), Color("#7fd3e0", 0.4), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.96), Color("#7fd3e0", 0.4))
 	_text(Vector2(x + 24.0, y + 34.0), "THE HOLDING YARD", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Terms: %s — %s" % [
 		Captivity.policy_name(Game.captive_policy), Captivity.policy_blurb(Game.captive_policy)], 11, MUTED)
@@ -593,8 +599,7 @@ func draw_chronicle(player: Player) -> void:
 	var h := 500.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.96))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.4), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.96), Color("#c8b070", 0.4))
 	_text(Vector2(x + 24.0, y + 34.0), "THE MARKET'S TONGUE", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Day %d — word travels faster than feet." % Clock.day, 11, MUTED)
 	draw_line(Vector2(x + 20.0, y + 74.0), Vector2(x + w - 20.0, y + 74.0), Color("#2b343a"), 1.0)
@@ -637,8 +642,7 @@ func draw_factions(player: Player) -> void:
 	var h := 470.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.97))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.97), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "STANDINGS", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "What each house thinks of you, and what the band buys.", 11, MUTED)
 	if Game.notoriety > 0:
@@ -689,8 +693,7 @@ func draw_sects(player: Player) -> void:
 	var h := 600.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "THE TWELVE SECTS", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Twelve houses, twelve answers to the same mountain.", 11, MUTED)
 	var local := Sects.local_sect()
@@ -738,8 +741,7 @@ func draw_hierarchy(player: Player) -> void:
 	var h := 570.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT HIERARCHY", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "The Azure Cloud's ladder — a station is earned by standing and realm, not granted by a key.", 11, MUTED)
 	var realm := player.cultivation.realm
@@ -812,8 +814,7 @@ func draw_sect_ledger(player: Player) -> void:
 	var h := 500.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT LEDGER", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Contribution is earned in service and spent at the quartermaster's counter.", 11, MUTED)
 	var rank := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
@@ -857,8 +858,7 @@ func draw_council(player: Player) -> void:
 	var h := 520.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT COUNCIL", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "The master's seat is held. The blocs decide whether it opens to a challenge.",
 		11, MUTED)
@@ -913,8 +913,7 @@ func draw_player_sect(player: Player) -> void:
 	var h := 560.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	var founded := not Game.player_sect.is_empty()
 	if founded:
 		_text(Vector2(x + 24.0, y + 34.0), _fit(String(Game.player_sect.get("name", "YOUR SECT")), 22, 520.0),
@@ -1001,8 +1000,7 @@ func draw_storylines(_player: Player) -> void:
 	var h := 652.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0d1216", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT STORYLINES", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Twelve houses, one story each — the same stakes, never the same work.", 11, MUTED)
 	var active := 0
@@ -1070,8 +1068,7 @@ func draw_narrative(_player: Player) -> void:
 	var h := 664.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0c1114", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#8fb0c0", 0.42), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1114", 0.98), Color("#8fb0c0", 0.42))
 	_text(Vector2(x + 24.0, y + 34.0), "THE ARCHIVE", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Four questions the province never answered. No prophecy, no chosen reader.", 11, MUTED)
 	var total := 0
@@ -1135,8 +1132,7 @@ func draw_narrative(_player: Player) -> void:
 		row_y += 66.0
 
 	var detail_rect := Rect2(x + 376.0, y + 392.0, 700.0, 218.0)
-	draw_rect(detail_rect, Color("#0a0f12", 0.94))
-	draw_rect(detail_rect, Color("#2b343a"), false, 1.0)
+	UiFrame.card(self, detail_rect, Color("#0a0f12", 0.94), Color("#2b343a"))
 	if not fragments.is_empty():
 		var detail: Dictionary = fragments[fragment_cursor]
 		var detail_known := bool(detail.get("known", false))
@@ -1170,8 +1166,7 @@ func draw_endgame(_player: Player) -> void:
 	var h := 664.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0c1012", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#c8b070", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "THE BLANK PAGE", 22, Color("#e0d0a0"))
 	_text(Vector2(x + 24.0, y + 58.0), "The book's last page is blank because the reader writes it. It is written once.", 11, MUTED)
 	_text(Vector2(x + 24.0, y + 80.0), _fit("%s  ·  %s" % [
@@ -1262,8 +1257,7 @@ func _draw_page_choices(x: float, y: float, w: float) -> void:
 	var px := x + 476.0
 	var pw := 600.0
 	var py := y + 108.0
-	draw_rect(Rect2(px, py, pw, 512.0), Color("#0a0f12", 0.94))
-	draw_rect(Rect2(px, py, pw, 512.0), Color("#2b343a"), false, 1.0)
+	UiFrame.card(self, Rect2(px, py, pw, 512.0), Color("#0a0f12", 0.94), Color("#2b343a"))
 	_text(Vector2(px + 22.0, py + 32.0), _fit(String(chosen_row.get("title", "")), 19, pw - 44.0), 19, colour)
 	var cy := py + 56.0
 	var approach := _wrapped(String(chosen_row.get("approach", "")), 12, pw - 44.0)
@@ -1312,8 +1306,7 @@ func draw_character(_player: Player) -> void:
 	var h := 664.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0c1012", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#9fe0c0", 0.42), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#9fe0c0", 0.42))
 	_text(Vector2(x + 24.0, y + 34.0), "CHARACTER SHEET", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Everything the body carries, read from the run itself.", 11, MUTED)
 	_text(Vector2(x + w - 250.0, y + 34.0), "C / E / ESC — close", 10, Color("#7b8b94"))
@@ -1327,8 +1320,7 @@ func draw_character(_player: Player) -> void:
 		var row_index := 0 if i < 3 else 1
 		var cx := x + 24.0 + float(column) * (card_w + 12.0)
 		var cy := y + 96.0 + float(row_index) * (card_h + 12.0)
-		draw_rect(Rect2(cx, cy, card_w, card_h), Color("#0a0f12", 0.94))
-		draw_rect(Rect2(cx, cy, card_w, card_h), Color("#2b343a"), false, 1.0)
+		UiFrame.card(self, Rect2(cx, cy, card_w, card_h), Color("#0a0f12", 0.94), Color("#2b343a"))
 		var colour := Color(String(section.get("colour", "#9fe0c0")))
 		_text(Vector2(cx + 14.0, cy + 24.0), String(section.get("title", "")), 12, colour)
 		draw_line(Vector2(cx + 14.0, cy + 32.0), Vector2(cx + card_w - 14.0, cy + 32.0),
@@ -1357,8 +1349,7 @@ func draw_settings(_player: Player) -> void:
 	var h := 600.0
 	var x := view.x * 0.5 - w * 0.5
 	var y := view.y * 0.5 - h * 0.5
-	draw_rect(Rect2(x, y, w, h), Color("#0c1012", 0.98))
-	draw_rect(Rect2(x, y, w, h), Color("#9fe0c0", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#9fe0c0", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SETTINGS & ACCESSIBILITY", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "These belong to you, not to the run: they survive every new life.", 11, MUTED)
 
@@ -1401,8 +1392,7 @@ func draw_settings(_player: Player) -> void:
 	var px := x + 568.0
 	var pw := 408.0
 	var py := y + 104.0
-	draw_rect(Rect2(px, py, pw, 430.0), Color("#0a0f12", 0.94))
-	draw_rect(Rect2(px, py, pw, 430.0), Color("#2b343a"), false, 1.0)
+	UiFrame.card(self, Rect2(px, py, pw, 430.0), Color("#0a0f12", 0.94), Color("#2b343a"))
 	_text(Vector2(px + 20.0, py + 30.0), _fit(String(chosen.get("label", "")), 16, pw - 40.0), 16, ACCENT)
 	var detail := _wrapped(String(chosen.get("detail", "")), 11, pw - 40.0)
 	var detail_y := py + 56.0
@@ -1445,7 +1435,7 @@ func draw_techniques(player: Player) -> void:
 	var x := 24.0
 	var y := size.y - 96.0
 	var slot_size := Vector2(112.0, 46.0)
-	draw_rect(Rect2(x - 12.0, y - 24.0, slot_size.x * 6.0 + 24.0, 92.0), PANEL_BG)
+	_panel(Rect2(x - 12.0, y - 24.0, slot_size.x * 6.0 + 24.0, 92.0))
 	_text(Vector2(x, y - 8.0), "Skill bar %s/%s  (1-6 select · [ ] bar · B arrange · Q cycle · LMB execute)" % [
 		SkillBar.bar_label(player.active_bar), SkillBar.bar_label(SkillBar.BAR_COUNT - 1)], 11, MUTED)
 	y += 2.0
@@ -1489,7 +1479,7 @@ func draw_techniques(player: Player) -> void:
 func draw_inventory(player: Player) -> void:
 	var w := size.x
 	var y := 290.0
-	draw_rect(Rect2(w - 316.0 - 12.0, y - 22.0, 316.0, 170.0), PANEL_BG)
+	_panel(Rect2(w - 316.0 - 12.0, y - 22.0, 316.0, 170.0))
 	_text(Vector2(w - 316.0, y), "Satchel  (%d items, %d kinds)" % [Items.total_count(player.inventory), player.inventory.size()], 13, INK)
 	_text(Vector2(w - 96.0, y), Inventory.sort_label(player.inventory_sort), 11, MUTED)
 	y += 20.0
@@ -1512,8 +1502,7 @@ func draw_gear(player: Player) -> void:
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
 	var panel := Rect2(view * 0.5 - Vector2(440.0, 260.0), Vector2(880.0, 520.0))
-	draw_rect(panel, Color("#0b1014", 0.97))
-	draw_rect(panel, Color("#7fd3e0", 0.45), false, 1.5)
+	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#7fd3e0", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "SATCHEL", 18, ACCENT)
 	_text(origin + Vector2(112.0, 32.0), "sort: %s (R)    I — close    arrows — choose    ENTER — wear    U — use" % Inventory.sort_label(player.inventory_sort), 11, MUTED)
@@ -1531,8 +1520,7 @@ func draw_gear(player: Player) -> void:
 	for i in Inventory.PAGE_SIZE:
 		var index := page * Inventory.PAGE_SIZE + i
 		var rect := Rect2(grid_origin + Vector2(float(i % Inventory.COLS) * (cell.x + 4.0), float(i / Inventory.COLS) * (cell.y + 4.0)), cell)
-		draw_rect(rect, Color("#111a1f"))
-		draw_rect(rect, Color("#243039"), false, 1.0)
+		UiFrame.card(self, rect, Color("#111a1f"), Color("#243039"))
 		if index >= count:
 			continue
 		var item: Dictionary = rows[index]
@@ -1622,8 +1610,7 @@ func draw_forge(player: Player) -> void:
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
 	var panel := Rect2(view * 0.5 - Vector2(390.0, 240.0), Vector2(780.0, 480.0))
-	draw_rect(panel, Color("#0b1014", 0.97))
-	draw_rect(panel, Color("#e0a060", 0.45), false, 1.5)
+	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#e0a060", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "AZURE FORGE", 18, Color("#e8b070"))
 	var modes: Array[String] = ["FORGE", "REFINE", "DISASSEMBLE"]
@@ -1712,8 +1699,7 @@ func draw_alchemy(player: Player) -> void:
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
 	var panel := Rect2(view * 0.5 - Vector2(370.0, 215.0), Vector2(740.0, 430.0))
-	draw_rect(panel, Color("#0b1014", 0.97))
-	draw_rect(panel, Color("#8fd8a0", 0.45), false, 1.5)
+	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#8fd8a0", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "HERB-GARDEN CAULDRON", 18, Color("#9fe0a8"))
 	_text(origin + Vector2(272.0, 32.0), "↑/↓ choose    ENTER brew    E — close", 11, MUTED)
@@ -1778,8 +1764,7 @@ func draw_npc_dossier(_player: Player) -> void:
 	var x := 24.0
 	var y := 334.0
 	var width := 432.0
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 302.0), PANEL_BG)
-	draw_rect(Rect2(x - 12.0, y - 22.0, width, 302.0), Color("#5f7f8c", 0.45), false, 1.0)
+	UiFrame.page(self, Rect2(x - 12.0, y - 22.0, width, 302.0), PANEL_BG, Color("#5f7f8c", 0.45))
 	_text(Vector2(x, y), _fit("%s — %s" % [npc.display_name, npc.role], 15, 408.0), 15, ACCENT)
 	y += 20.0
 	var sect_part := ""
@@ -1867,8 +1852,7 @@ func draw_storage(player: Player) -> void:
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.86))
 	var panel := Rect2(view * 0.5 - Vector2(380.0, 240.0), Vector2(760.0, 480.0))
-	draw_rect(panel, Color("#0b1014", 0.97))
-	draw_rect(panel, Color("#c8b070", 0.45), false, 1.5)
+	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#c8b070", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "STOREHOUSE", 18, Color("#d8c070"))
 	_text(origin + Vector2(166.0, 32.0), "←/→ side    ↑/↓ choose    ENTER move    E — close", 11, MUTED)
@@ -1914,8 +1898,7 @@ func draw_prompt() -> void:
 		return
 	var width := _text_width(prompt, 14) + 28.0
 	var pos := Vector2(size.x * 0.5 - width * 0.5, size.y - 116.0)
-	draw_rect(Rect2(pos, Vector2(width, 28.0)), Color("#0d1216", 0.85))
-	draw_rect(Rect2(pos, Vector2(width, 28.0)), Color("#7fd3e0", 0.5), false, 1.0)
+	UiFrame.plaque(self, Rect2(pos, Vector2(width, 28.0)), Color("#0d1216", 0.85), Color("#7fd3e0", 0.5))
 	_text(pos + Vector2(14.0, 19.0), prompt, 14, INK)
 
 
@@ -1939,8 +1922,7 @@ func draw_inheritance_trial() -> void:
 		return
 	var width := _text_width(text, 15) + 28.0
 	var pos := Vector2(size.x * 0.5 - width * 0.5, 56.0)
-	draw_rect(Rect2(pos, Vector2(width, 28.0)), Color("#18140f", 0.88))
-	draw_rect(Rect2(pos, Vector2(width, 28.0)), Color("#e0c060", 0.7), false, 1.5)
+	UiFrame.plaque(self, Rect2(pos, Vector2(width, 28.0)), Color("#18140f", 0.88), Color("#e0c060", 0.7), 1.5)
 	_text(pos + Vector2(14.0, 19.0), text, 15, Color("#f0d890"))
 
 
@@ -1956,8 +1938,7 @@ func draw_tribulation() -> void:
 	]
 	var width := _text_width(text, 16) + 32.0
 	var pos := Vector2(size.x * 0.5 - width * 0.5, 56.0)
-	draw_rect(Rect2(pos, Vector2(width, 30.0)), Color("#120d18", 0.85))
-	draw_rect(Rect2(pos, Vector2(width, 30.0)), Color(color, 0.7), false, 1.5)
+	UiFrame.plaque(self, Rect2(pos, Vector2(width, 30.0)), Color("#120d18", 0.85), Color(color, 0.7), 1.5)
 	_text(pos + Vector2(16.0, 20.0), text, 16, color)
 
 
@@ -1969,6 +1950,8 @@ func draw_toasts() -> void:
 		var alpha := clampf(float(toast["ttl"]), 0.0, 1.0)
 		var text := String(toast["text"])
 		var width := _text_width(text, 13)
+		UiFrame.plaque(self, Rect2(x - width * 0.5 - 10.0, y - 13.0, width + 20.0, 18.0),
+			Color(PANEL_BG, alpha * 0.9), Color(UiFrame.BRONZE_DIM, alpha))
 		_text(Vector2(x - width * 0.5, y), text, 13, Color(INK, alpha))
 		y -= 19.0
 
@@ -1985,7 +1968,7 @@ func draw_help() -> void:
 			rows.append(String(row))
 	var row_height := 14.0
 	var top := size.y - 152.0 - row_height * float(rows.size())
-	draw_rect(Rect2(12.0, top - 12.0, size.x - 24.0, row_height * float(rows.size()) + 18.0),
+	UiFrame.panel(self, Rect2(12.0, top - 12.0, size.x - 24.0, row_height * float(rows.size()) + 18.0),
 		Color("#070b0d", 0.55))
 	for i in rows.size():
 		var colour := Color("#7b8b94") if i < rows.size() - 2 else Color("#6b7b84")

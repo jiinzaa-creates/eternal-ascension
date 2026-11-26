@@ -80,6 +80,8 @@ func _draw() -> void:
 			draw_rect(rect, SEA)
 		draw_rect(rect, EDGE, false, 1.0)
 
+	UiFrame.frame(self, area, UiFrame.BRONZE_DIM)
+
 	# Land connections, drawn under the labels.
 	for cell in cells:
 		if not bool(cell["land"]):

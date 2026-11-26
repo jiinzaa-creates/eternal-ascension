@@ -98,6 +98,20 @@ func _process(delta: float) -> bool:
 		8:  # in front of a textured building
 			if _stage_t > 1.2:
 				_shot("settlement.png")
+				current_scene.set("character_open", true)
+				_stage = 9
+				_stage_t = 0.0
+		9:  # character sheet page (UI frame check)
+			if _stage_t > 1.2:
+				_shot("sheet.png")
+				current_scene.set("character_open", false)
+				current_scene.set("settings_open", true)
+				_stage = 10
+				_stage_t = 0.0
+		10:  # settings page (UI frame check)
+			if _stage_t > 1.2:
+				_shot("settings.png")
+				current_scene.set("settings_open", false)
 				_start_walk_east()
 				_stage_t = 0.0
 		2:  # walking east
