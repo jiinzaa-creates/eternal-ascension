@@ -1629,7 +1629,7 @@ func _defense_tests() -> void:
 
 func _technique_combat_tests() -> void:
 	print("[technique combat] kinds, projectiles, spells, summons, buffs and steps")
-	check(TechniqueCombat.KINDS.size() == 6, "six technique deliveries are declared")
+	check(TechniqueCombat.KINDS.size() == 11, "eleven technique kinds are declared")
 	check(TechniqueCombat.kind_of({}) == "melee", "a technique with no kind is a melee art")
 	check(TechniqueCombat.kind_of({"kind": "projectile"}) == "projectile", "a declared kind is read")
 	check(TechniqueCombat.kind_of({"kind": "bogus"}) == "melee", "an unknown kind falls back to melee")
@@ -1653,11 +1653,42 @@ func _technique_combat_tests() -> void:
 			check(float(TechniqueCombat.projectile_of(tech)["range"]) > 0.0, "projectile %s reaches" % tech.get("id", "?"))
 		elif tech_kind == "movement":
 			check(float(TechniqueCombat.movement_of(tech)["distance"]) > 0.0, "movement %s moves" % tech.get("id", "?"))
+		elif tech_kind == "heal":
+			check(float(TechniqueCombat.heal_of(tech)["amount"]) > 0.0, "heal %s restores" % tech.get("id", "?"))
+		elif tech_kind == "transformation":
+			check(not TechniqueCombat.form_entry(tech).is_empty(), "form %s can be taken" % tech.get("id", "?"))
+		elif tech_kind == "ward":
+			check(float(TechniqueCombat.ward_of(tech)["shield"]) > 0.0, "ward %s shields" % tech.get("id", "?"))
 	for kind in TechniqueCombat.KINDS:
 		check(kinds_seen.has(kind), "content ships a %s technique" % kind)
 	check(String(DB.technique("tech.sword.piercing_thrust").get("kind", "")) == "projectile", "a sword thrust carries sword Qi")
 	check(String(DB.technique("tech.formation.sealing_array").get("kind", "")) == "spell", "a formation art is a spell")
 	check(String(DB.technique("tech.body.golden_bell").get("kind", "")) == "buff", "a body art is a buff")
+
+	check(DB.techniques.size() >= 30, "the roster carries real breadth (%d arts)" % DB.techniques.size())
+	check(Sects.TECHNIQUE_KINDS == TechniqueCombat.KINDS, "sect signature arts draw from the same kinds")
+	check(not TechniqueCombat.is_castable("passive") and not TechniqueCombat.is_castable("cultivation"), "passive and cultivation arts are never cast")
+	check(TechniqueCombat.is_castable("heal") and TechniqueCombat.is_castable("ward"), "heals and wards are cast")
+
+	var mending := DB.technique("tech.medicine.spring_mending")
+	check(TechniqueCombat.heal_amount(mending, StatBlock.new(Attributes.new())) >= 26.0, "a heal restores its base before scaling")
+	var rain := DB.technique("tech.medicine.renewal_rain")
+	var hot := TechniqueCombat.heal_entry(rain, 9.0)
+	check(int(hot.get("ticks", 0)) == 4, "a five-tick rain carries four ticks after the first")
+	var ticked := TechniqueCombat.tick_heals([hot], 1.2)
+	check((ticked["pulses"] as Array).size() == 1, "the rain pulses on its interval")
+	check(approx(float((ticked["pulses"] as Array)[0]), 9.0), "a pulse restores the per-tick amount")
+
+	var ape := DB.technique("tech.body.stone_ape_form")
+	var formed := TechniqueCombat.apply_form([], ape)
+	check(formed.size() == 1 and (formed[0] as Dictionary).has("form"), "taking a form registers it with its tint")
+	var crow := DB.technique("tech.beast.storm_crow_form")
+	var reformed := TechniqueCombat.apply_form(formed, crow)
+	check(reformed.size() == 1 and String((reformed[0] as Dictionary).get("id", "")) == "tech.beast.storm_crow_form", "a new form ends the old one")
+
+	check(TechniqueCombat.passive_mods([DB.technique("tech.body.iron_meridian"), mending]).size() == 2, "passive arts contribute their mods and nothing else does")
+	check(approx(TechniqueCombat.cultivation_factor([DB.technique("tech.qi.deep_breath")], false), 1.15), "a cultivation art deepens meditation")
+	check(TechniqueCombat.cultivation_factor([DB.technique("tech.qi.star_drinking")], true) > TechniqueCombat.cultivation_factor([DB.technique("tech.qi.star_drinking")], false), "the star art drinks deeper at night")
 	check(String(DB.technique("tech.step.cloud_step").get("kind", "")) == "movement", "cloud step is a movement art")
 
 	var shot := TechniqueCombat.projectile_of({"kind": "projectile",

@@ -54,6 +54,9 @@ var observed: Dictionary = {}
 ## Live body-art buffs: [{id, name, duration, remaining, mods}]. Their mods enter
 ## the one stat pipeline while they last. Transient, so never saved.
 var active_buffs: Array = []
+var active_heals: Array = []
+var _shield_hp := 0.0
+var _shield_timer := 0.0
 
 var hp: float = 100.0
 var hp_max: float = 100.0
@@ -146,11 +149,21 @@ func dormant_passives() -> Array:
 	return Passives.issues(passives, passive_state())
 
 
+## The known passive arts whose mods ride the stat pipeline.
+func _passive_techs() -> Array:
+	var out: Array = []
+	for id in technique_ids:
+		var tech := DB.technique(String(id))
+		if TechniqueCombat.kind_of(tech) == "passive":
+			out.append(tech)
+	return out
+
+
 func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
 		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()),
-		TechniqueCombat.buff_mods(active_buffs))
+		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs()))
 	# Condition is applied after the pipeline has summed every source, so a
 	# rebuild can never compound it: a broken piece simply contributes nothing.
 	for slot in Items.DURABLE_SLOTS:
@@ -530,6 +543,17 @@ func _tick_timers(delta: float) -> void:
 			Bus.player_stats_changed.emit()
 		else:
 			active_buffs = living
+		_sync_form_visual()
+	if not active_heals.is_empty():
+		var ticked := TechniqueCombat.tick_heals(active_heals, delta)
+		active_heals = ticked["entries"]
+		for pulse in ticked["pulses"]:
+			if hp > 0.0:
+				heal(float(pulse))
+	if _shield_timer > 0.0:
+		_shield_timer -= delta
+		if _shield_timer <= 0.0:
+			_shield_hp = 0.0
 	_tick_statuses(delta)
 	if _guard_held:
 		_guard_time += delta
@@ -694,7 +718,13 @@ func slot_for(tech_id: String) -> int:
 
 ## Known arts sitting on no bar; the HUD and the arrangement panel list them.
 func known_off_bar() -> Array:
-	return SkillBar.unplaced(technique_ids, bars)
+	# The roster feeds the loadout's slots, so it lists castable arts only:
+	# passive and cultivation arts are always on and never take a slot.
+	var out: Array = []
+	for id in SkillBar.unplaced(technique_ids, bars):
+		if TechniqueCombat.is_castable(TechniqueCombat.kind_of(DB.technique(String(id)))):
+			out.append(id)
+	return out
 
 
 ## Q brings the next known technique to hand. The bars hold eighteen slots, so
@@ -703,7 +733,12 @@ func known_off_bar() -> Array:
 func cycle_technique() -> String:
 	if technique_ids.is_empty():
 		return ""
-	selected_technique = (clampi(selected_technique, 0, technique_ids.size() - 1) + 1) % technique_ids.size()
+	# Only castable arts come to hand; passive and cultivation arts are
+	# always on and are skipped over.
+	for step in technique_ids.size():
+		selected_technique = (clampi(selected_technique, 0, technique_ids.size() - 1) + 1) % technique_ids.size()
+		if TechniqueCombat.is_castable(current_technique_kind()):
+			break
 	# Follow the art across bars, so the HUD shows the bar it actually sits on.
 	var slot := slot_for(String(current_technique().get("id", "")))
 	if slot >= 0:
@@ -758,6 +793,8 @@ func try_attack() -> void:
 		return
 	var tech := current_technique()
 	if tech.is_empty():
+		return
+	if not TechniqueCombat.is_castable(TechniqueCombat.kind_of(tech)):
 		return
 	var tech_id := String(tech.get("id", ""))
 	if cooldown_left(tech_id) > 0.0:
@@ -851,7 +888,8 @@ func _strike() -> void:
 	var is_light := bool(attack.get("light", false))
 	var tech_id := String(attack.get("id", ""))
 	var strike := _resolve_strike(attack)
-	if kind != "buff" and kind != "movement":
+	if kind != "buff" and kind != "movement" and kind != "heal" \
+			and kind != "transformation" and kind != "ward":
 		_wear("weapon", Items.WEAR_PER_STRIKE)
 	if not is_light:
 		add_technique_xp(tech_id, Mastery.XP_PER_HIT)
@@ -886,6 +924,21 @@ func _strike() -> void:
 		"movement":
 			_slide_step(attack)
 			_arc_flash = 0.0
+		"heal":
+			_apply_heal(attack)
+			_arc_radius = RADIUS + 30.0
+			_arc_angle = TAU
+			_arc_flash = 0.3
+		"transformation":
+			_apply_form(attack)
+			_arc_radius = RADIUS + 24.0
+			_arc_angle = TAU
+			_arc_flash = 0.3
+		"ward":
+			_apply_ward(attack)
+			_arc_radius = RADIUS + 24.0
+			_arc_angle = TAU
+			_arc_flash = 0.3
 		_:
 			_resolve_melee(attack, strike)
 
@@ -932,6 +985,65 @@ func _apply_buff(attack: Dictionary) -> void:
 	active_buffs = TechniqueCombat.apply_buff(active_buffs, attack)
 	rebuild_stats()
 	Bus.toast.emit("%s holds for %ds." % [String(entry["name"]), int(round(float(entry["duration"])))])
+	Bus.player_stats_changed.emit()
+
+
+func _apply_heal(attack: Dictionary) -> void:
+	var tech_id := String(attack.get("id", ""))
+	var spec := TechniqueCombat.heal_of(attack)
+	var amount := TechniqueCombat.heal_amount(attack, stats, Mastery.damage_mult(mastery_tier(tech_id)))
+	if hp > 0.0:
+		heal(amount)
+	var radius := float(spec["radius"])
+	if radius > 0.0:
+		for npc in get_tree().get_nodes_in_group("npc"):
+			var node := npc as Node2D
+			if node == null or not Game.party_ids.has(String(node.get("npc_id"))):
+				continue
+			if node.global_position.distance_to(global_position) <= radius:
+				if node.has_method("heal"):
+					node.call("heal", amount)
+				elif node.get("hp") != null and node.get("hp_max") != null:
+					node.set("hp", minf(float(node.get("hp_max")), float(node.get("hp")) + amount))
+	var entry := TechniqueCombat.heal_entry(attack, amount)
+	if not entry.is_empty():
+		active_heals.append(entry)
+	if bool(spec.get("cleanse", false)) and not statuses.is_empty():
+		statuses = []
+		Bus.toast.emit("The phoenix fire burns your afflictions away.")
+	Bus.toast.emit("%s restores %d." % [String(attack.get("name", "Art")), int(round(amount))])
+	Bus.player_stats_changed.emit()
+
+
+func _apply_form(attack: Dictionary) -> void:
+	var entry := TechniqueCombat.form_entry(attack)
+	if entry.is_empty():
+		return
+	active_buffs = TechniqueCombat.apply_form(active_buffs, attack)
+	rebuild_stats()
+	_sync_form_visual()
+	Bus.toast.emit("%s takes hold for %ds." % [String(entry["name"]), int(round(float(entry["duration"])))])
+	Bus.player_stats_changed.emit()
+
+
+## The body's colour follows its form: while a form entry lives in the buff
+## list the sprite wears its tint; when the entry expires the tint clears.
+func _sync_form_visual() -> void:
+	if _sprite == null:
+		return
+	var tint := Color.WHITE
+	for entry in active_buffs:
+		if typeof(entry) == TYPE_DICTIONARY and (entry as Dictionary).has("form"):
+			tint = Color(String((entry as Dictionary)["form"].get("tint", "#ffffff")))
+			break
+	_sprite.modulate = tint
+
+
+func _apply_ward(attack: Dictionary) -> void:
+	var spec := TechniqueCombat.ward_of(attack)
+	_shield_hp = maxf(_shield_hp, float(spec["shield"]))
+	_shield_timer = float(spec["duration"])
+	Bus.toast.emit("A ward rises (%d)." % int(round(_shield_hp)))
 	Bus.player_stats_changed.emit()
 
 
@@ -1026,6 +1138,13 @@ func take_hit(amount: float, from: Vector2 = Vector2.ZERO, can_evade: bool = tru
 	amount *= Status.taken_multiplier(statuses)
 	var raw := Damage.mitigate_armor(amount * amount_mult, stats.armor())
 	var final := Damage.resolve(raw, stats.physical_resist() * 100.0, 1.0)
+	# A standing ward drinks the blow before the body does.
+	if _shield_hp > 0.0 and final > 0.0:
+		var soaked := minf(_shield_hp, final)
+		_shield_hp -= soaked
+		final -= soaked
+		if _shield_hp <= 0.0:
+			Bus.toast.emit("Your ward shatters.")
 	hp = maxf(0.0, hp - final)
 	_hurt_flash = 0.18
 	if final > 0.0:
@@ -1138,6 +1257,14 @@ func method_state() -> Dictionary:
 func meditate_tick(delta: float) -> float:
 	var state := method_state()
 	var factor := Methods.meditation_multiplier(cultivation.method_id, state)
+	# Known cultivation arts deepen every sitting (TechniqueCombat caps the
+	# stack, so the arts season the method rather than replacing it).
+	var cult_arts: Array = []
+	for id in technique_ids:
+		var known := DB.technique(String(id))
+		if TechniqueCombat.kind_of(known) == "cultivation":
+			cult_arts.append(known)
+	factor *= TechniqueCombat.cultivation_factor(cult_arts, Clock.is_night())
 	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
 	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
 	# Sitting with a method is the slow, reliable road to understanding.

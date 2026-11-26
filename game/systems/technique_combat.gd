@@ -12,13 +12,19 @@ extends RefCounted
 ##   summon      — allies that hunt enemies for a while, each carrying a share
 ##   buff        — timed mods fed into the one stat pipeline
 ##   movement    — a step along the aim with its own brief i-frames
+##   heal        — restoration for the caster (and party in its radius)
+##   transformation — a timed form: buff-strength mods plus a visible tint
+##   ward        — a shield pool that drinks damage before the body does
+##   passive     — always-on mods while the art is known; never cast
+##   cultivation — a meditation factor while the art is known; never cast
 ##
 ## Everything here is pure: no nodes, no scene tree, no time. The entities own
 ## the nodes and the clocks, and ask these functions for the numbers. `kind`
 ## defaults to `melee`, so every technique written before this milestone — and
 ## every save that references one — keeps its old behaviour with no migration.
 
-const KINDS: Array[String] = ["melee", "projectile", "spell", "summon", "buff", "movement"]
+const KINDS: Array[String] = ["melee", "projectile", "spell", "summon", "buff", "movement",
+	"heal", "transformation", "ward", "passive", "cultivation"]
 const DEFAULT_KIND := "melee"
 
 const PROJECTILE_DEFAULTS := {"speed": 560.0, "radius": 9.0, "range": 440.0, "pierce": 0}
@@ -28,6 +34,9 @@ const SUMMON_DEFAULTS := {
 	"interval": 1.0, "damage_mult": 0.4,
 }
 const BUFF_DEFAULTS := {"duration": 8.0, "mods": []}
+const HEAL_DEFAULTS := {"amount": 10.0, "ticks": 0, "interval": 1.0, "cleanse": false, "radius": 0.0}
+const FORM_DEFAULTS := {"duration": 12.0, "mods": [], "tint": "#ffffff"}
+const WARD_DEFAULTS := {"shield": 25.0, "duration": 10.0}
 const MOVEMENT_DEFAULTS := {"distance": 150.0, "iframes": 0.18}
 ## Where summons appear around their caller, in world units.
 const SUMMON_SPREAD := 30.0
@@ -57,7 +66,23 @@ static func kind_label(kind: String) -> String:
 			return "Buff"
 		"movement":
 			return "Movement"
+		"heal":
+			return "Heal"
+		"transformation":
+			return "Transformation"
+		"ward":
+			return "Ward"
+		"passive":
+			return "Passive"
+		"cultivation":
+			return "Cultivation"
 	return "Melee"
+
+
+## Passive and cultivation arts are always on; they have no cast, no frames
+## and no slot behaviour, so the cast path and the skill bar both refuse them.
+static func is_castable(kind: String) -> bool:
+	return kind != "passive" and kind != "cultivation"
 
 
 ## A kind that strikes something at a distance. Melee is the only delivery that
@@ -243,6 +268,141 @@ static func buff_labels(buffs: Array) -> Array:
 			String(existing.get("name", "Art")), maxi(1, int(ceil(float(existing.get("remaining", 0.0))))),
 		])
 	return out
+
+
+# --- heal --------------------------------------------------------------------
+
+static func heal_of(tech: Dictionary) -> Dictionary:
+	var spec: Dictionary = (HEAL_DEFAULTS as Dictionary).duplicate(true)
+	_merge(spec, tech, "heal")
+	spec["amount"] = maxf(0.0, float(spec.get("amount", 0.0)))
+	spec["ticks"] = maxi(0, int(spec.get("ticks", 0)))
+	spec["interval"] = maxf(0.1, float(spec.get("interval", 1.0)))
+	spec["radius"] = maxf(0.0, float(spec.get("radius", 0.0)))
+	return spec
+
+
+## What one application restores: the art's base plus its attribute scaling,
+## grown by mastery — the shape of technique_damage without weapon or the
+## physical multiplier, because mending is not a blow.
+static func heal_amount(tech: Dictionary, stats: StatBlock, mastery_mult: float = 1.0) -> float:
+	var spec := heal_of(tech)
+	var scaled := 0.0
+	var scaling: Dictionary = tech.get("scaling", {})
+	for key in scaling.keys():
+		scaled += float(stats.get_attr(String(key))) * float(scaling[key])
+	return (float(spec["amount"]) + scaled) * maxf(0.0, mastery_mult)
+
+
+## A live heal-over-time entry, or empty when the art resolves in one burst.
+## The first tick lands at cast time; the entry carries the rest.
+static func heal_entry(tech: Dictionary, per_tick: float) -> Dictionary:
+	var spec := heal_of(tech)
+	var ticks := int(spec["ticks"])
+	if ticks <= 1:
+		return {}
+	return {"id": String(tech.get("id", "")), "name": String(tech.get("name", "Art")),
+		"amount": per_tick, "ticks": ticks - 1, "interval": float(spec["interval"]),
+		"timer": float(spec["interval"])}
+
+
+static func tick_heals(entries: Array, delta: float) -> Dictionary:
+	var out: Array = []
+	var pulses: Array = []
+	var step := maxf(0.0, delta)
+	for existing in entries:
+		if typeof(existing) != TYPE_DICTIONARY:
+			continue
+		var copy: Dictionary = (existing as Dictionary).duplicate(true)
+		copy["timer"] = float(copy.get("timer", 0.0)) - step
+		if float(copy["timer"]) <= 0.0 and int(copy.get("ticks", 0)) > 0:
+			pulses.append(float(copy.get("amount", 0.0)))
+			copy["ticks"] = int(copy["ticks"]) - 1
+			copy["timer"] = float(copy.get("timer", 0.0)) + float(copy.get("interval", 1.0))
+		if int(copy.get("ticks", 0)) > 0:
+			out.append(copy)
+	return {"entries": out, "pulses": pulses}
+
+
+# --- transformation ------------------------------------------------------------
+
+static func form_of(tech: Dictionary) -> Dictionary:
+	var spec: Dictionary = (FORM_DEFAULTS as Dictionary).duplicate(true)
+	_merge(spec, tech, "transformation")
+	spec["duration"] = maxf(0.1, float(spec.get("duration", 0.1)))
+	var mods: Variant = spec.get("mods", [])
+	spec["mods"] = (mods as Array).duplicate(true) if typeof(mods) == TYPE_ARRAY else []
+	return spec
+
+
+## A form rides the buff pipeline (its mods rebuild stats like any body art)
+## and carries its tint alongside, so the body can show what it became.
+static func form_entry(tech: Dictionary) -> Dictionary:
+	if kind_of(tech) != "transformation":
+		return {}
+	var spec := form_of(tech)
+	var mods: Array = spec.get("mods", [])
+	if mods.is_empty():
+		return {}
+	return {"id": String(tech.get("id", "")), "name": String(tech.get("name", "Art")),
+		"duration": float(spec["duration"]), "remaining": float(spec["duration"]),
+		"mods": mods, "form": {"tint": String(spec.get("tint", "#ffffff"))}}
+
+
+## One form at a time: taking a new form ends the old one, and recasting the
+## same form refreshes it instead of stacking it.
+static func apply_form(buffs: Array, tech: Dictionary) -> Array:
+	var entry := form_entry(tech)
+	if entry.is_empty():
+		return buffs.duplicate(true)
+	var out: Array = []
+	for existing in buffs:
+		if typeof(existing) != TYPE_DICTIONARY:
+			continue
+		var copy: Dictionary = (existing as Dictionary).duplicate(true)
+		if copy.has("form") or String(copy.get("id", "")) == String(entry["id"]):
+			continue
+		out.append(copy)
+	out.append(entry)
+	return out
+
+
+# --- ward ----------------------------------------------------------------------
+
+static func ward_of(tech: Dictionary) -> Dictionary:
+	var spec: Dictionary = (WARD_DEFAULTS as Dictionary).duplicate(true)
+	_merge(spec, tech, "ward")
+	spec["shield"] = maxf(0.0, float(spec.get("shield", 0.0)))
+	spec["duration"] = maxf(0.1, float(spec.get("duration", 0.1)))
+	return spec
+
+
+# --- passive & cultivation -----------------------------------------------------
+
+## Mods from every known passive art, flattened for the stat pipeline.
+static func passive_mods(techs: Array) -> Array:
+	var out: Array = []
+	for tech in techs:
+		if typeof(tech) != TYPE_DICTIONARY or kind_of(tech) != "passive":
+			continue
+		var payload: Dictionary = (tech as Dictionary).get("passive", {})
+		for mod in payload.get("mods", []):
+			out.append(mod)
+	return out
+
+
+## The meditation factor of every known cultivation art, night-aware and
+## capped, so stacking arts can never make sitting the only road.
+static func cultivation_factor(techs: Array, night: bool) -> float:
+	var factor := 1.0
+	for tech in techs:
+		if typeof(tech) != TYPE_DICTIONARY or kind_of(tech) != "cultivation":
+			continue
+		var payload: Dictionary = (tech as Dictionary).get("cultivation", {})
+		factor *= float(payload.get("meditation_mult", 1.0))
+		if night:
+			factor *= float(payload.get("night_mult", 1.0))
+	return clampf(factor, 1.0, 1.6)
 
 
 # --- movement ----------------------------------------------------------------

@@ -10,7 +10,8 @@ extends RefCounted
 ## exist, and exactly one sect the player can call their own gate.
 
 const EXPECTED := 12
-const TECHNIQUE_KINDS := ["melee", "projectile", "spell", "summon", "buff", "movement"]
+const TECHNIQUE_KINDS := ["melee", "projectile", "spell", "summon", "buff", "movement",
+	"heal", "transformation", "ward", "passive", "cultivation"]
 
 
 # ------------------------------------------------------------------ data ----
