@@ -1689,6 +1689,18 @@ func _technique_combat_tests() -> void:
 	check(TechniqueCombat.passive_mods([DB.technique("tech.body.iron_meridian"), mending]).size() == 2, "passive arts contribute their mods and nothing else does")
 	check(approx(TechniqueCombat.cultivation_factor([DB.technique("tech.qi.deep_breath")], false), 1.15), "a cultivation art deepens meditation")
 	check(TechniqueCombat.cultivation_factor([DB.technique("tech.qi.star_drinking")], true) > TechniqueCombat.cultivation_factor([DB.technique("tech.qi.star_drinking")], false), "the star art drinks deeper at night")
+
+	var chains := 0
+	for tech in DB.techniques:
+		var target := String(tech.get("evolves_to", ""))
+		if target == "":
+			continue
+		chains += 1
+		var evolved := DB.technique(target)
+		check(not evolved.is_empty(), "%s evolves into a real art" % tech.get("id", "?"))
+		check(TechniqueCombat.kind_of(evolved) == TechniqueCombat.kind_of(tech), "evolution keeps the art's kind (%s)" % tech.get("id", "?"))
+		check(int(evolved.get("rank", 0)) > int(tech.get("rank", 0)), "the evolved art outranks its root (%s)" % tech.get("id", "?"))
+	check(chains >= 8, "at least eight arts carry an evolution path (%d)" % chains)
 	check(String(DB.technique("tech.step.cloud_step").get("kind", "")) == "movement", "cloud step is a movement art")
 
 	var shot := TechniqueCombat.projectile_of({"kind": "projectile",

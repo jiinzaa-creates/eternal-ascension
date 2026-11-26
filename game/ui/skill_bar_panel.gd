@@ -169,10 +169,23 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 			return
 		var slot := _slot_at(event.position)
-		if slot >= 0 and player.clear_slot(slot):
+		if slot >= 0:
+			var slotted := player.bar_slot(slot)
+			if slotted != "" and player.can_evolve(slotted):
+				player.evolve_technique(slotted)
+				queue_redraw()
+				accept_event()
+				return
+			if player.clear_slot(slot):
+				queue_redraw()
+			accept_event()
+			return
+		var roster := _roster_at(event.position)
+		if roster != "" and player.can_evolve(roster):
+			player.evolve_technique(roster)
 			queue_redraw()
-		accept_event()
-		return
+			accept_event()
+			return
 	if event is InputEventMouseButton and event.pressed \
 			and (event.button_index == MOUSE_BUTTON_WHEEL_DOWN or event.button_index == MOUSE_BUTTON_WHEEL_UP):
 		# Scrolling a slot walks the unplaced arts into it, one per notch.
@@ -282,7 +295,10 @@ func _draw() -> void:
 				continue
 			var tech: Dictionary = DB.technique(tech_id)
 			_text(rect.position + Vector2(26.0, 16.0), _fit(String(tech.get("name", "?")), 11, rect.size.x - 34.0), 11, INK)
-			_text(rect.position + Vector2(8.0, 32.0), player.mastery_label(tech_id), 9, MUTED)
+			if player.can_evolve(tech_id):
+				_text(rect.position + Vector2(8.0, 32.0), "PERFECTED — RIGHT-CLICK EVOLVES", 9, ACCENT)
+			else:
+				_text(rect.position + Vector2(8.0, 32.0), player.mastery_label(tech_id), 9, MUTED)
 			var kind := TechniqueCombat.kind_label(TechniqueCombat.kind_of(tech))
 			_text(rect.position + Vector2(8.0, 46.0), kind, 9, Color("#7fa8b8"))
 			var left := player.slot_cooldown_left(index)
@@ -302,7 +318,7 @@ func _draw() -> void:
 		_text(rect.position + Vector2(8.0, 15.0), _fit(String(tech.get("name", "?")), 10, rect.size.x - 14.0), 10, Color("#cfdae0"))
 
 	_text(Vector2(x, panel.end.y - 18.0),
-		"B / E close · click a roster art, then a slot, to place it · drag a slot off the panel to clear it · clicking a slot selects that art",
+		"B / E close · click a roster art, then a slot, to place it · right-click clears a slot, or evolves a Perfected art",
 		11, Color("#6b7b84"))
 
 	if not _drag.is_empty():

@@ -297,6 +297,43 @@ func mastery_label(id: String) -> String:
 	return Mastery.label(mastery_tier(id))
 
 
+## The stronger variation mastery unlocks, or "" when the art has none.
+func evolution_target(id: String) -> String:
+	return String(DB.technique(id).get("evolves_to", ""))
+
+
+## Evolution is mastery's reward (Directive s.4: stronger variations through
+## mastery): a Perfected art whose variation exists and is not already known.
+func can_evolve(id: String) -> bool:
+	if not technique_ids.has(id):
+		return false
+	var target := evolution_target(id)
+	if target == "" or DB.technique(target).is_empty() or technique_ids.has(target):
+		return false
+	return mastery_tier(id) >= Mastery.MAX_TIER
+
+
+func evolve_technique(id: String) -> Dictionary:
+	if not can_evolve(id):
+		return {"ok": false, "reason": "not ready"}
+	var target := evolution_target(id)
+	var old_name := String(DB.technique(id).get("name", id))
+	technique_ids[technique_ids.find(id)] = target
+	for slot in bars.size():
+		if String(bars[slot]) == id:
+			bars[slot] = target
+	# The new art is no stranger: it opens at Adept, carrying the old art's
+	# discipline rather than its full perfection.
+	technique_xp[target] = Mastery.total_xp(2)
+	technique_xp.erase(id)
+	tech_cooldowns.erase(id)
+	rebuild_stats()
+	Bus.toast.emit("%s evolves into %s." % [old_name, String(DB.technique(target).get("name", target))])
+	Bus.cultivation_changed.emit()
+	Bus.player_stats_changed.emit()
+	return {"ok": true, "reason": "", "target": target}
+
+
 func add_technique_xp(id: String, amount: int) -> void:
 	if amount <= 0 or DB.technique(id).is_empty():
 		return
