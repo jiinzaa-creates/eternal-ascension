@@ -300,6 +300,9 @@ func _draw() -> void:
 			else:
 				_text(rect.position + Vector2(8.0, 32.0), player.mastery_label(tech_id), 9, MUTED)
 			var kind := TechniqueCombat.kind_label(TechniqueCombat.kind_of(tech))
+			var affix_names: Array = player.technique_affix_names(tech_id)
+			if not affix_names.is_empty():
+				kind = "%s · %s" % [kind, " · ".join(affix_names)]
 			_text(rect.position + Vector2(8.0, 46.0), kind, 9, Color("#7fa8b8"))
 			var left := player.slot_cooldown_left(index)
 			if left > 0.0:

@@ -25,6 +25,7 @@ func _ready() -> void:
 	_passive_system_tests()
 	_technique_mastery_tests()
 	_method_tests()
+	_affix_tests()
 	_qi_meridian_tests()
 	_realm_tests()
 	_breakthrough_tests()
@@ -803,6 +804,57 @@ func _technique_mastery_tests() -> void:
 
 
 # --------------------------------------------------------------- methods ----
+
+func _affix_tests() -> void:
+	print("[affixes] gates, rolls, effective arts, method profiles")
+	check(DB.technique_affixes.size() >= 10, "technique affixes are defined (%d)" % DB.technique_affixes.size())
+	check(DB.method_affixes.size() >= 8, "method affixes are defined (%d)" % DB.method_affixes.size())
+	for affix in DB.technique_affixes + DB.method_affixes:
+		check(String(affix.get("name", "")) != "", "%s is named" % affix.get("id", "?"))
+		check(not (affix.get("effects", {}) as Dictionary).is_empty(), "%s does something" % affix.get("id", "?"))
+
+	var cleave := DB.technique("tech.sword.azure_cleave")
+	var pool_ids: Array = []
+	for affix in Affixes.technique_pool(cleave):
+		pool_ids.append(String(affix.get("id", "")))
+	check(pool_ids.has("affix.tech.keen"), "a melee sword art can draw Keen")
+	check(not pool_ids.has("affix.tech.patient"), "a melee sword art cannot draw Patient")
+	check(not pool_ids.has("affix.tech.lingering"), "an art with no status cannot draw Lingering")
+	var rain := DB.technique("tech.medicine.renewal_rain")
+	var rain_ids: Array = []
+	for affix in Affixes.technique_pool(rain):
+		rain_ids.append(String(affix.get("id", "")))
+	check(rain_ids.has("affix.tech.patient"), "a heal can draw Patient")
+
+	var roll_a := Affixes.roll_technique(cleave, [], 12345)
+	var roll_b := Affixes.roll_technique(cleave, [], 12345)
+	check(roll_a != "" and roll_a == roll_b, "a technique roll is deterministic for its seed")
+	check(Affixes.roll_technique(cleave, pool_ids, 1) == "", "an exhausted pool rolls nothing")
+
+	var keen := Affixes.effective(cleave, ["affix.tech.keen"])
+	check(float(keen["base_damage"]) > float(cleave["base_damage"]), "Keen raises the art's damage")
+	check(is_equal_approx(float(keen["base_damage"]), float(cleave["base_damage"]) * 1.12), "Keen raises it by its twelve percent")
+	var swift := Affixes.effective(cleave, ["affix.tech.swift"])
+	check(float(swift["cooldown"]) < float(cleave["cooldown"]), "Swift shortens the cooldown")
+	var patient := Affixes.effective(rain, ["affix.tech.patient"])
+	check(float((patient["heal"] as Dictionary)["amount"]) > float((rain["heal"] as Dictionary)["amount"]), "Patient deepens a heal")
+	check(Affixes.effective(cleave, []) == cleave, "an art with no affixes is itself")
+
+	var beast := Methods.find("method.beast")
+	var method_ids: Array = []
+	for affix in Affixes.method_pool(beast):
+		method_ids.append(String(affix.get("id", "")))
+	check(method_ids.has("affix.method.packbond"), "the beast path can draw Packbond")
+	check(not method_ids.has("affix.method.stillwater"), "the beast path cannot draw Stillwater")
+	check(Affixes.roll_method(beast, 777) == Affixes.roll_method(beast, 777), "a method roll is deterministic for its seed")
+	check(is_equal_approx(Affixes.method_meditation_factor("affix.method.deep_root"), 1.1), "Deep Root deepens meditation by a tenth")
+	check(is_equal_approx(Affixes.method_meditation_factor(""), 1.0), "no affix is no factor")
+	var profile := {"chance": 0.0, "tribulation": 1.0, "harm": 1.0, "note": "steady"}
+	var veiled := Affixes.apply_method_profile(profile, "affix.method.veiled")
+	check(float(veiled["tribulation"]) < 1.0, "Veiled Crossing lightens Heaven's weight")
+	check(String(veiled["note"]).contains("Veiled Crossing"), "the profile note names its affix")
+	check(Affixes.apply_method_profile(profile, "") == profile, "no affix leaves the profile itself")
+
 
 func _method_tests() -> void:
 	print("[methods] requirements, meditation fit, insight")

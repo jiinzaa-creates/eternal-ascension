@@ -28,6 +28,7 @@ var root_tier: int = 3
 var identified := false
 var purity_bonus := 0.0
 var method_id: String = "method.traditional"
+var method_affixes: Dictionary = {}
 ## Method id -> insight 0..100, earned by meditating well with that method.
 var method_insight: Dictionary = {}
 ## Blood Sea resource: gained by kills, burned while meditating.
@@ -216,28 +217,47 @@ func tribulation_scale(kills: int = 0, karma: int = 0) -> float:
 	return clampf(scale, 0.0, 2.0)
 
 
+## The affix this life has drawn for the method being practised, rolled
+## once when first needed and kept: a method's character, like a
+## technique's, is something it grows into, not something chosen.
+func method_affix() -> String:
+	var existing := String(method_affixes.get(method_id, ""))
+	if existing != "":
+		return existing
+	var rolled := Affixes.roll_method(Methods.find(method_id),
+		method_id.hash() + breakthrough_attempts * 131 + failures * 17)
+	if rolled != "":
+		method_affixes[method_id] = rolled
+	return rolled
+
+
+## The breakthrough profile with this method's affix laid over it.
+func _affixed_profile(method_state: Dictionary) -> Dictionary:
+	return Affixes.apply_method_profile(Methods.breakthrough_profile(method_id, method_state), method_affix())
+
+
 ## Heaven's weight for this attempt: behaviour and realm, reshaped by the method
 ## being practised and lightened by banked preparations.
 func tribulation_with(kills: int = 0, karma: int = 0, method_state: Dictionary = {}) -> float:
-	var profile := Methods.breakthrough_profile(method_id, method_state)
+	var profile := _affixed_profile(method_state)
 	var scale := tribulation_scale(kills, karma) * float(profile.get("tribulation", 1.0))
 	return clampf(scale * (1.0 - PREP_TRIBULATION * float(preparation)), 0.0, 3.0)
 
 
 ## The profile the next attempt will use. Exposed for the HUD and for tests.
 func method_breakthrough_profile(method_state: Dictionary = {}) -> Dictionary:
-	return Methods.breakthrough_profile(method_id, method_state)
+	return _affixed_profile(method_state)
 
 
 ## What the next failure would cost, as a multiplier on the base fallout.
 func failure_harm(method_state: Dictionary = {}) -> float:
-	var profile := Methods.breakthrough_profile(method_id, method_state)
+	var profile := _affixed_profile(method_state)
 	return float(profile.get("harm", 1.0)) * (1.0 - PREP_HARM * float(preparation))
 
 
 ## The chance the HUD shows and the attempt rolls, from one formula.
 func estimated_chance(stats: StatBlock, kills: int = 0, karma: int = 0, method_state: Dictionary = {}) -> float:
-	var profile := Methods.breakthrough_profile(method_id, method_state)
+	var profile := _affixed_profile(method_state)
 	var bonus := PREP_CHANCE * float(preparation) + float(profile.get("chance", 0.0))
 	return breakthrough_chance(stats, tribulation_with(kills, karma, method_state), bonus, 0.0)
 
@@ -412,6 +432,7 @@ func to_dict() -> Dictionary:
 		"purity_bonus": purity_bonus,
 		"method_id": method_id,
 		"method_insight": method_insight.duplicate(),
+		"method_affixes": method_affixes.duplicate(),
 		"blood_charge": blood_charge,
 		"meridians": meridians.duplicate(),
 		"contamination": contamination,
@@ -435,6 +456,7 @@ func from_dict(data: Dictionary) -> void:
 	purity_bonus = clampf(float(data.get("purity_bonus", 0.0)), 0.0, Roots.PURITY_BONUS_MAX)
 	method_id = String(data.get("method_id", "method.traditional"))
 	method_insight = data.get("method_insight", {}).duplicate()
+	method_affixes = data.get("method_affixes", {}).duplicate()
 	blood_charge = clampf(float(data.get("blood_charge", 0.0)), 0.0, 100.0)
 	meridians = data.get("meridians", []).duplicate()
 	contamination = clampf(float(data.get("contamination", 0.0)), 0.0, Meridians.MAX_CONTAMINATION)

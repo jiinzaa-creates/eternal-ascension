@@ -17,6 +17,8 @@ var meridians: Array = []
 var tribulations: Array = []
 var enlightenments: Array = []
 var techniques: Array = []
+var technique_affixes: Array = []
+var method_affixes: Array = []
 var bases: Array = []
 var prefixes: Array = []
 var suffixes: Array = []
@@ -99,6 +101,9 @@ func load_all() -> void:
 	tribulations = _read("tribulations.json").get("tribulations", [])
 	enlightenments = _read("enlightenments.json").get("enlightenments", [])
 	techniques = _read("techniques.json").get("techniques", [])
+	var affix_doc := _read("affixes.json")
+	technique_affixes = affix_doc.get("technique_affixes", [])
+	method_affixes = affix_doc.get("method_affixes", [])
 	var items := _read("items.json")
 	bases = items.get("bases", [])
 	prefixes = items.get("prefixes", [])
@@ -155,6 +160,8 @@ func load_all() -> void:
 	_index("tribulation", tribulations)
 	_index("enlightenment", enlightenments)
 	_index("technique", techniques)
+	_index("technique_affix", technique_affixes)
+	_index("method_affix", method_affixes)
 	_index("base", bases)
 	_index("prefix", prefixes)
 	_index("suffix", suffixes)

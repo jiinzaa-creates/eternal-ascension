@@ -49,6 +49,7 @@ var active_bar: int = 0
 var tech_cooldowns: Dictionary = {}
 ## Technique id -> mastery xp. Everything else about mastery is derived.
 var technique_xp: Dictionary = {}
+var technique_affixes: Dictionary = {}
 ## Technique id -> times watched for observation-based learning.
 var observed: Dictionary = {}
 ## Live body-art buffs: [{id, name, duration, remaining, mods}]. Their mods enter
@@ -327,6 +328,10 @@ func evolve_technique(id: String) -> Dictionary:
 	# discipline rather than its full perfection.
 	technique_xp[target] = Mastery.total_xp(2)
 	technique_xp.erase(id)
+	# The evolved art keeps its root's character: affixes transfer.
+	if technique_affixes.has(id):
+		technique_affixes[target] = technique_affixes[id]
+		technique_affixes.erase(id)
 	tech_cooldowns.erase(id)
 	rebuild_stats()
 	Bus.toast.emit("%s evolves into %s." % [old_name, String(DB.technique(target).get("name", target))])
@@ -346,6 +351,31 @@ func add_technique_xp(id: String, amount: int) -> void:
 	if mastery_tier(id) != before:
 		var tech := DB.technique(id)
 		Bus.toast.emit("%s — %s (%d)." % [String(tech.get("name", id)), mastery_label(id), mastery_tier(id)])
+		_maybe_roll_affix(id, before, mastery_tier(id))
+
+
+## Affix slots open as mastery deepens (tiers 3 and 5): the art takes a
+## character of its own, rolled once from what its kind, school and tags
+## allow, and kept. Passive and cultivation arts never cast, so they
+## never take affixes.
+func _maybe_roll_affix(id: String, before: int, after: int) -> void:
+	var tech := DB.technique(id)
+	if not TechniqueCombat.is_castable(TechniqueCombat.kind_of(tech)):
+		return
+	for tier in [3, 5]:
+		if before < tier and after >= tier:
+			var owned: Array = technique_affixes.get(id, [])
+			var rolled := Affixes.roll_technique(tech, owned, int(hash("%s|%d|%d" % [id, tier, Game.kills])))
+			if rolled != "":
+				technique_affixes[id] = owned + [rolled]
+				Bus.toast.emit("%s takes an affix: %s." % [String(tech.get("name", id)), Affixes.technique_name(rolled)])
+
+
+func technique_affix_names(id: String) -> Array:
+	var out: Array = []
+	for affix_id in technique_affixes.get(id, []):
+		out.append(Affixes.technique_name(String(affix_id)))
+	return out
 
 
 ## Watch a technique being performed. Returns {ok, reason, progress, learned}.
@@ -841,6 +871,9 @@ func try_attack() -> void:
 	if not TechniqueCombat.is_castable(TechniqueCombat.kind_of(tech)):
 		return
 	var tech_id := String(tech.get("id", ""))
+	# Affixes ride the cast: the effective art carries their adjustments to
+	# cost, cooldown, damage, healing and status alike.
+	tech = Affixes.effective(tech, technique_affixes.get(tech_id, []))
 	if cooldown_left(tech_id) > 0.0:
 		return
 	var cost := float(tech.get("qi_cost", 0.0)) * Mastery.qi_mult(mastery_tier(tech_id)) \
@@ -1328,6 +1361,7 @@ func meditate_tick(delta: float) -> float:
 		if TechniqueCombat.kind_of(known) == "cultivation":
 			cult_arts.append(known)
 	factor *= TechniqueCombat.cultivation_factor(cult_arts, Clock.is_night())
+	factor *= Affixes.method_meditation_factor(cultivation.method_affix())
 	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
 	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
 	# Sitting with a method is the slow, reliable road to understanding.
@@ -1703,6 +1737,7 @@ func to_dict() -> Dictionary:
 		"bars": bars.duplicate(),
 		"active_bar": active_bar,
 		"technique_xp": technique_xp.duplicate(),
+		"technique_affixes": technique_affixes.duplicate(true),
 		"observed": observed.duplicate(),
 	}
 
@@ -1736,6 +1771,7 @@ func from_dict(data: Dictionary) -> void:
 		technique_ids = ids.duplicate()
 	selected_technique = clampi(int(data.get("selected_technique", 0)), 0, maxi(0, technique_ids.size() - 1))
 	technique_xp = data.get("technique_xp", {}).duplicate()
+	technique_affixes = data.get("technique_affixes", {}).duplicate(true)
 	observed = data.get("observed", {}).duplicate()
 	# A pre-M34 save has no layout: derive one from the known kit. A corrupt
 	# layout is pruned to known, unique arts rather than trusted.
