@@ -43,6 +43,9 @@ var town_specs: Array = []
 var towns_active: Dictionary = {}
 var seat_specs: Array = []
 var seats_active: Dictionary = {}
+var founded_sites_active: Dictionary = {}
+var _founding_doctrine := ""
+var _name_edit: LineEdit = null
 var _town_tick := 0.0
 var world_map: WorldMap
 ## Settlement services: the merchant's stock and the shop overlay.
@@ -1031,7 +1034,7 @@ func _process(delta: float) -> void:
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
 			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open \
-			or sect_seat_open \
+			or sect_seat_open or _name_edit != null \
 			or endgame_open or character_open or settings_open or menu_open:
 		return
 
@@ -1055,6 +1058,7 @@ func _process(delta: float) -> void:
 			_town_tick = 0.0
 			_tick_towns()
 			_tick_seats()
+			_tick_founded_sites()
 			_tick_region()
 	if phase == "creation":
 		return
@@ -2162,6 +2166,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("accept"):
 			_sect_ledger_activate(sect_ledger_index)
 			return
+		return
+
+	if _name_edit != null:
+		if event.is_action_pressed("ui_cancel"):
+			_cancel_founding()
 		return
 
 	if sect_seat_open:
@@ -3728,6 +3737,7 @@ func player_sect_rows() -> Array:
 			"enabled": false,
 			"reason": "",
 		})
+	out.append_array(_player_sect_management_rows())
 	return out
 
 
@@ -3740,7 +3750,7 @@ func _player_sect_activate(index: int) -> void:
 	if kind == "info":
 		return
 	if kind == "doctrine":
-		_found_player_sect(String(row.get("id", "")))
+		_begin_founding(String(row.get("id", "")))
 		return
 	if not bool(row.get("enabled", false)):
 		var reason := String(row.get("reason", ""))
@@ -3751,6 +3761,301 @@ func _player_sect_activate(index: int) -> void:
 		return
 	if kind == "recruit":
 		_recruit_player_sect_member(String(row.get("id", "")))
+		return
+	if kind == "law":
+		_cycle_player_sect_law(String(row.get("id", "")))
+		return
+	if kind == "build":
+		_raise_player_sect_building(String(row.get("id", "")))
+		return
+	if kind == "office":
+		_cycle_player_sect_office(String(row.get("id", "")))
+		return
+	if kind == "branch":
+		_raise_player_sect_branch()
+		return
+	if kind == "abdicate":
+		_abdicate_player_sect()
+		return
+
+
+# ------------------------------------------------- the founded hall (§9.2) ----
+
+func _player_sect_management_rows() -> Array:
+	var out: Array = []
+	var sect := Game.player_sect
+	if sect.is_empty():
+		return out
+	var abdicated := bool(sect.get("abdicated", false))
+	var site: Dictionary = sect.get("site", {})
+	if not site.is_empty():
+		var region := Continent.region_by_index(continent, int(site.get("region", -1)))
+		out.append({"kind": "info", "id": "site", "enabled": false,
+			"label": "The hall stands in %s" % String(region.get("name", "the wilds")),
+			"detail": "Master: %s." % (String(sect.get("master", "")) if abdicated else "you, its founder"),
+			"blurb": "", "reason": ""})
+	if abdicated:
+		out.append({"kind": "info", "id": "abdicated", "enabled": false,
+			"label": "%s holds the hall now" % String(sect.get("master", "Your heir")),
+			"detail": "You remain its founder. The laws and ledgers are theirs to keep.",
+			"blurb": "", "reason": ""})
+		return out
+	for key in PlayerSect.LAW_DEFAULTS.keys():
+		var law: Dictionary = PlayerSect.laws().get(key, {})
+		var current := PlayerSect.law_of(sect, key)
+		var blurb := ""
+		for option in law.get("options", []):
+			if String((option as Dictionary).get("id", "")) == current:
+				blurb = String((option as Dictionary).get("blurb", ""))
+		out.append({"kind": "law", "id": key, "enabled": true,
+			"label": "Law — %s: %s" % [String(law.get("name", key)), current.capitalize()],
+			"detail": blurb, "blurb": "Enter rewrites the law.", "reason": ""})
+	for value in PlayerSect.buildings_data():
+		var building: Dictionary = value
+		var bid := String(building.get("id", ""))
+		if PlayerSect.has_building(sect, bid):
+			out.append({"kind": "info", "id": "built." + bid, "enabled": false,
+				"label": "%s — raised" % String(building.get("name", bid)),
+				"detail": String(building.get("blurb", "")), "blurb": "", "reason": ""})
+		else:
+			var cost := int(building.get("cost", 0))
+			out.append({"kind": "build", "id": bid,
+				"enabled": int(sect.get("treasury", 0)) >= cost,
+				"label": "Raise the %s — %d from the treasury" % [String(building.get("name", bid)), cost],
+				"detail": String(building.get("blurb", "")), "blurb": "",
+				"reason": "The treasury cannot cover it."})
+	var offices: Dictionary = sect.get("offices", {})
+	var members: Array = sect.get("members", [])
+	for office in ["deputy", "steward", "heir"]:
+		var holder := String(offices.get(office, ""))
+		out.append({"kind": "office", "id": office, "enabled": not members.is_empty(),
+			"label": "%s: %s" % [office.capitalize(), _npc_names.get(holder, holder) if holder != "" else "—"],
+			"detail": "Enter appoints the next member in the roll, or clears the office.",
+			"blurb": "", "reason": "The hall has no members yet."})
+	var elders: Array = offices.get("elders", [])
+	var elder_names: Array = []
+	for elder in elders:
+		elder_names.append(String(_npc_names.get(String(elder), String(elder))))
+	out.append({"kind": "office", "id": "elders", "enabled": not members.is_empty(),
+		"label": "Elders: %s" % (", ".join(elder_names) if not elder_names.is_empty() else "—"),
+		"detail": "Enter seats the next realm-4 member as elder (two seats), or clears them.",
+		"blurb": "", "reason": "The hall has no members yet."})
+	var branch: Dictionary = sect.get("branch", {})
+	if branch.is_empty():
+		var cost := PlayerSect.branch_cost()
+		var enough := PlayerSect.member_count(sect) >= 4
+		var elsewhere := _region_now >= 0 and _region_now != int(site.get("region", -1))
+		out.append({"kind": "branch", "id": "branch",
+			"enabled": int(sect.get("treasury", 0)) >= cost and enough and elsewhere,
+			"label": "Raise a branch hall where you stand — %d from the treasury" % cost,
+			"detail": "A second seat in this region: capacity +3, levy +2 a day.",
+			"blurb": "",
+			"reason": "The treasury cannot cover it." if int(sect.get("treasury", 0)) < cost
+				else ("The hall needs four members first." if not enough
+				else "Stand in another region to raise its branch there.")})
+	return out
+
+
+func _cycle_player_sect_law(key: String) -> void:
+	var sect := Game.player_sect.duplicate(true)
+	var options: Array = (PlayerSect.laws().get(key, {}) as Dictionary).get("options", [])
+	if options.is_empty():
+		return
+	var current := PlayerSect.law_of(sect, key)
+	var next := String((options[0] as Dictionary).get("id", current))
+	for i in options.size():
+		if String((options[i] as Dictionary).get("id", "")) == current:
+			next = String((options[(i + 1) % options.size()] as Dictionary).get("id", current))
+	var laws: Dictionary = sect.get("laws", {}).duplicate()
+	laws[key] = next
+	sect["laws"] = laws
+	Game.player_sect = sect
+	Bus.toast.emit("The law of %s is rewritten: %s." % [String(Game.player_sect.get("name", "the hall")), next])
+	Bus.player_stats_changed.emit()
+
+
+func _raise_player_sect_building(building_id: String) -> void:
+	var building := PlayerSect.building_by(building_id)
+	if building.is_empty() or PlayerSect.has_building(Game.player_sect, building_id):
+		return
+	var cost := int(building.get("cost", 0))
+	if int(Game.player_sect.get("treasury", 0)) < cost:
+		Bus.toast.emit("The treasury cannot cover the %s." % String(building.get("name", building_id)))
+		return
+	var sect := Game.player_sect.duplicate(true)
+	sect["treasury"] = int(sect.get("treasury", 0)) - cost
+	var buildings: Dictionary = sect.get("buildings", {}).duplicate()
+	buildings[building_id] = true
+	sect["buildings"] = buildings
+	Game.player_sect = sect
+	Bus.toast.emit("The %s rises at %s." % [String(building.get("name", building_id)), String(sect.get("name", "the hall"))])
+	Bus.player_stats_changed.emit()
+
+
+func _cycle_player_sect_office(office: String) -> void:
+	var sect := Game.player_sect.duplicate(true)
+	var members: Array = sect.get("members", [])
+	if members.is_empty():
+		return
+	var offices: Dictionary = sect.get("offices", {}).duplicate(true)
+	if office == "elders":
+		var elders: Array = (offices.get("elders", []) as Array).duplicate()
+		if elders.size() >= 2:
+			elders.clear()
+		else:
+			var realms := _player_sect_realms()
+			var member_ids: Array = sect.get("members", [])
+			for i in member_ids.size():
+				var candidate := String(member_ids[i])
+				if elders.has(candidate) or i >= realms.size() or int(realms[i]) < 4:
+					continue
+				elders.append(candidate)
+				break
+		offices["elders"] = elders
+	else:
+		var roll: Array = [""] + members
+		var current := String(offices.get(office, ""))
+		var index := roll.find(current)
+		var next := String(roll[(index + 1) % roll.size()])
+		if next == "":
+			offices.erase(office)
+		else:
+			offices[office] = next
+	sect["offices"] = offices
+	Game.player_sect = sect
+	Bus.toast.emit("The offices of %s are set." % String(sect.get("name", "the hall")))
+	Bus.player_stats_changed.emit()
+
+
+func _raise_player_sect_branch() -> void:
+	var sect := Game.player_sect
+	var cost := PlayerSect.branch_cost()
+	if not (sect.get("branch", {}) as Dictionary).is_empty() or int(sect.get("treasury", 0)) < cost:
+		return
+	var next := sect.duplicate(true)
+	next["treasury"] = int(next.get("treasury", 0)) - cost
+	var anchor := _dry_anchor(player.global_position)
+	next["branch"] = {"region": _region_now, "x": anchor.x, "y": anchor.y}
+	Game.player_sect = next
+	Bus.toast.emit("A branch hall of %s rises in this region." % String(next.get("name", "the hall")))
+	Bus.player_stats_changed.emit()
+
+
+func _abdicate_player_sect() -> void:
+	var sect := Game.player_sect.duplicate(true)
+	var heir := String((sect.get("offices", {}) as Dictionary).get("heir", ""))
+	if heir == "" or bool(sect.get("abdicated", false)):
+		return
+	sect["master"] = String(_npc_names.get(heir, heir))
+	sect["abdicated"] = true
+	Game.player_sect = sect
+	Bus.toast.emit("%s takes the master's seat of %s. You remain its founder." % [
+		String(sect.get("master", "")), String(sect.get("name", "the hall"))])
+	Bus.player_stats_changed.emit()
+
+
+# ------------------------------------------------------- founded sites ----
+
+func _tick_founded_sites() -> void:
+	if player == null:
+		return
+	var sect := Game.player_sect
+	var sites: Dictionary = {}
+	if not sect.is_empty():
+		if not (sect.get("site", {}) as Dictionary).is_empty():
+			sites["main"] = sect["site"]
+		if not (sect.get("branch", {}) as Dictionary).is_empty():
+			sites["branch"] = sect["branch"]
+	for key in sites.keys():
+		var site: Dictionary = sites[key]
+		var centre := Vector2(float(site.get("x", 0.0)), float(site.get("y", 0.0)))
+		var distance := player.global_position.distance_to(centre)
+		if distance < 2300.0 and not founded_sites_active.has(key):
+			_spawn_founded_site(key, site)
+		elif distance > 3300.0 and founded_sites_active.has(key):
+			_despawn_founded_site(key)
+	for key in founded_sites_active.keys().duplicate():
+		if not sites.has(key):
+			_despawn_founded_site(key)
+
+
+func _spawn_founded_site(key: String, site: Dictionary) -> void:
+	var sect := Game.player_sect
+	var branch := key == "branch"
+	var scale := 0.7 if branch else 0.85
+	var region_index := int(site.get("region", -1))
+	var locations: Dictionary = {}
+	var r := Rng.stream_from(Game.world_seed, "founded_site", region_index * 2 + (1 if branch else 0))
+	for loc_key in Settlement.LOCATIONS.keys():
+		var base: Vector2 = Settlement.LOCATIONS[loc_key]
+		var jitter := Vector2(r.randf_range(-26.0, 26.0), r.randf_range(-26.0, 26.0))
+		locations[loc_key] = base * scale + (jitter if loc_key != "plaza" else Vector2.ZERO)
+	var wanted: Array = ["sect_hall"]
+	if not branch and PlayerSect.has_building(sect, "pill_garden"):
+		wanted.append("fields")
+	if not branch and PlayerSect.has_building(sect, "forge"):
+		wanted.append("forge")
+	var buildings: Array = []
+	for building in Settlement.BUILDINGS:
+		if not wanted.has(String(building["location"])):
+			continue
+		var copy: Dictionary = building.duplicate()
+		copy["size"] = (building["size"] as Vector2) * scale
+		buildings.append(copy)
+	var centre := Vector2(float(site.get("x", 0.0)), float(site.get("y", 0.0)))
+	var node := Settlement.new()
+	node.configure({"name": String(sect.get("name", "Your sect")), "locations": locations, "buildings": buildings})
+	node.name = "FoundedSect_" + key
+	node.position = centre
+	node.z_index = -15
+	world.add_child(node)
+	node.build_buildings(world)
+	var owned: Dictionary = {"node": node, "items": []}
+	founded_sites_active[key] = owned
+	for building_spec in buildings:
+		var location := String(building_spec["location"])
+		var building := node.building_for(location)
+		if building == null:
+			continue
+		var door := Interactable.new()
+		door.setup_door("door.founded.%s.%s" % [key, location], "%s door" % location.capitalize(), building)
+		door.position = building.global_position + Vector2(0, (building_spec["size"] as Vector2).y * 0.5 + 8.0)
+		world.add_child(door)
+		interactables.append(door)
+		(owned["items"] as Array).append(door)
+	var doctrine := PlayerSect.doctrine(String(sect.get("doctrine", "")))
+	var gate := Interactable.new()
+	gate.setup_examine("founded.gate." + key, "%s — gate board" % String(sect.get("name", "Your sect")),
+		"%s · %s. %s Master: %s. Laws — tithe %s, gates %s, guard %s, recruitment %s." % [
+			String(sect.get("name", "Your sect")), String(doctrine.get("name", "")),
+			String(doctrine.get("motto", "")),
+			String(sect.get("master", "")) if bool(sect.get("abdicated", false)) else "you, its founder",
+			PlayerSect.law_of(sect, "tithe"), PlayerSect.law_of(sect, "gates"),
+			PlayerSect.law_of(sect, "guard"), PlayerSect.law_of(sect, "recruitment")])
+	gate.position = node.position_for("gate")
+	world.add_child(gate)
+	interactables.append(gate)
+	(owned["items"] as Array).append(gate)
+	var travel_key := "founded." + key
+	if Game.discover(travel_key):
+		travel_sites[travel_key] = {"name": String(sect.get("name", "Your sect")) + (" (branch)" if branch else ""),
+			"x": centre.x, "y": centre.y}
+		Bus.toast.emit("Your hall stands here — %s." % String(sect.get("name", "")))
+
+
+func _despawn_founded_site(key: String) -> void:
+	if not founded_sites_active.has(key):
+		return
+	var owned: Dictionary = founded_sites_active[key]
+	for item in owned["items"]:
+		interactables.erase(item)
+		item.queue_free()
+	var node: Settlement = owned["node"]
+	for building in node.buildings:
+		if is_instance_valid(building):
+			building.queue_free()
+	node.queue_free()
+	founded_sites_active.erase(key)
 
 
 func _is_captive_id(npc_id: String) -> bool:
@@ -3760,19 +4065,76 @@ func _is_captive_id(npc_id: String) -> bool:
 	return false
 
 
-func _found_player_sect(doctrine_id: String) -> void:
+func _found_player_sect(doctrine_id: String, sect_name: String = "") -> void:
 	if not PlayerSect.can_found(Game.player_sect, Game.spirit_stones, _player_rank_id()).is_empty():
 		Bus.toast.emit("You cannot found a hall yet.")
 		return
-	var result := PlayerSect.found(doctrine_id, Game.spirit_stones, Clock.day)
+	var result := PlayerSect.found(doctrine_id, Game.spirit_stones, Clock.day, sect_name)
 	if not bool(result.get("ok", false)):
 		Bus.toast.emit("The hall refuses: %s." % String(result.get("reason", "")))
 		return
 	Game.spirit_stones = int(result.get("stones", Game.spirit_stones))
 	Game.player_sect = (result.get("sect", {}) as Dictionary).duplicate(true)
+	# The hall rises where the founder stands: §9.2's chosen location is
+	# the ground under their feet, in the region they stand in.
+	var anchor := _dry_anchor(player.global_position)
+	Game.player_sect["site"] = {"region": _region_now, "x": anchor.x, "y": anchor.y}
 	player_sect_index = 0
 	Bus.toast.emit("%s is founded. The hall is yours." % String(Game.player_sect.get("name", "Your sect")))
 	Bus.player_stats_changed.emit()
+
+
+## Founding begins with a name. The doctrine's preset is offered in the
+## field; whatever the founder writes there is the hall's name (§9.2).
+func _begin_founding(doctrine_id: String) -> void:
+	if not PlayerSect.can_found(Game.player_sect, Game.spirit_stones, _player_rank_id()).is_empty():
+		Bus.toast.emit("You cannot found a hall yet.")
+		return
+	_cancel_founding()
+	_founding_doctrine = doctrine_id
+	_name_edit = LineEdit.new()
+	_name_edit.placeholder_text = "Name your sect"
+	_name_edit.text = String(PlayerSect.doctrine(doctrine_id).get("sect_name", ""))
+	_name_edit.max_length = 40
+	_name_edit.custom_minimum_size = Vector2(460, 46)
+	_name_edit.position = Vector2(410, 300)
+	_name_edit.add_theme_font_size_override("font_size", 20)
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color("#10161b", 0.97)
+	box.border_color = Color("#c8b070")
+	box.set_border_width_all(2)
+	box.set_corner_radius_all(4)
+	_name_edit.add_theme_stylebox_override("normal", box)
+	_name_edit.add_theme_stylebox_override("focus", box)
+	hud.add_child(_name_edit)
+	_name_edit.grab_focus()
+	_name_edit.select_all()
+	_name_edit.text_submitted.connect(_on_founding_name_submitted)
+	Bus.toast.emit("Name your sect — Enter founds it where you stand, Esc withdraws.")
+
+
+func _on_founding_name_submitted(text: String) -> void:
+	var doctrine_id := _founding_doctrine
+	_cancel_founding()
+	_found_player_sect(doctrine_id, text)
+
+
+func _cancel_founding() -> void:
+	if _name_edit != null:
+		_name_edit.queue_free()
+		_name_edit = null
+	_founding_doctrine = ""
+
+
+## A dry standing-place near a point: the same ring step the seats use.
+func _dry_anchor(centre: Vector2) -> Vector2:
+	for step in [Vector2.ZERO, Vector2(96, 0), Vector2(-96, 0), Vector2(0, 96),
+			Vector2(0, -96), Vector2(192, 0), Vector2(-192, 0), Vector2(0, 192), Vector2(0, -192)]:
+		var candidate: Vector2 = centre + step
+		var tile := Vector2i(int(candidate.x / 32.0), int(candidate.y / 32.0))
+		if not ChunkGen.ground_water_at_tile(tile, Game.world_seed):
+			return candidate
+	return centre
 
 
 func _recruit_player_sect_member(npc_id: String) -> void:

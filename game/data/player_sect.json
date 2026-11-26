@@ -34,9 +34,118 @@
     }
   ],
   "member_ranks": [
-    {"min_realm": 1, "name": "Initiate"},
-    {"min_realm": 2, "name": "Disciple"},
-    {"min_realm": 4, "name": "Steward"},
-    {"min_realm": 6, "name": "Elder"}
-  ]
+    {
+      "min_realm": 1,
+      "name": "Initiate"
+    },
+    {
+      "min_realm": 2,
+      "name": "Disciple"
+    },
+    {
+      "min_realm": 4,
+      "name": "Steward"
+    },
+    {
+      "min_realm": 6,
+      "name": "Elder"
+    }
+  ],
+  "laws": {
+    "tithe": {
+      "name": "Tithe",
+      "options": [
+        {
+          "id": "light",
+          "name": "Light tithe",
+          "blurb": "The levy is halved; the hall lives lean and liked."
+        },
+        {
+          "id": "standard",
+          "name": "Standard tithe",
+          "blurb": "The levy as every hall expects it."
+        },
+        {
+          "id": "heavy",
+          "name": "Heavy tithe",
+          "blurb": "The levy rises by three fifths; full coffers, thin patience."
+        }
+      ]
+    },
+    "gates": {
+      "name": "Gates",
+      "options": [
+        {
+          "id": "open",
+          "name": "Open gates",
+          "blurb": "Petitioners come and go; the world knocks."
+        },
+        {
+          "id": "secluded",
+          "name": "Secluded gates",
+          "blurb": "No petitioners; the quiet doubles the chance of found wealth."
+        }
+      ]
+    },
+    "guard": {
+      "name": "Guard",
+      "options": [
+        {
+          "id": "none",
+          "name": "No rota",
+          "blurb": "The gate keeps itself."
+        },
+        {
+          "id": "rota",
+          "name": "Guard rota",
+          "blurb": "Raids bite two fifths less; the rota costs a stone a day."
+        }
+      ]
+    },
+    "recruitment": {
+      "name": "Recruitment",
+      "options": [
+        {
+          "id": "open",
+          "name": "Open recruitment",
+          "blurb": "Any friend of the hall may be asked."
+        },
+        {
+          "id": "selective",
+          "name": "Selective recruitment",
+          "blurb": "Only the sworn-close may be asked; a smaller, tighter hall."
+        }
+      ]
+    }
+  },
+  "buildings": [
+    {
+      "id": "training_yard",
+      "name": "Training Yard",
+      "cost": 120,
+      "blurb": "Capacity +2. Disputes halve — drilled disciples argue less."
+    },
+    {
+      "id": "pill_garden",
+      "name": "Pill Garden",
+      "cost": 150,
+      "blurb": "The beds yield two stones of levy a day."
+    },
+    {
+      "id": "forge",
+      "name": "Forge",
+      "cost": 180,
+      "blurb": "A stone a day from the work, and raids bite a fifth less again."
+    },
+    {
+      "id": "vault",
+      "name": "Deep Vault",
+      "cost": 200,
+      "blurb": "Losses from ill fortune are halved before they land."
+    }
+  ],
+  "branch": {
+    "cost": 300,
+    "min_members": 4
+  }
 }

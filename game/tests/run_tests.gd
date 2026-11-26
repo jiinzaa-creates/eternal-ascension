@@ -86,6 +86,7 @@ func _ready() -> void:
 	_sect_seat_tests()
 	_sect_membership_tests()
 	_sect_world_tests()
+	_player_sect_v2_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
@@ -4782,6 +4783,55 @@ func _sect_world_tests() -> void:
 		"the master's seat needs the council's word, not standing alone")
 
 
+func _player_sect_v2_tests() -> void:
+	print("[founded sect v2] name, laws, offices, buildings")
+	var founded := PlayerSect.found("doctrine.sword", 500, 3, "  Probe Hall  ")
+	check(bool(founded.get("ok", false)), "founding with a chosen name succeeds")
+	var sect: Dictionary = founded["sect"]
+	check(String(sect.get("name", "")) == "Probe Hall", "the founder's name is the hall's name")
+	check(String(PlayerSect.found("doctrine.sword", 500, 3)["sect"].get("name", "")) == "Dawn Blade Hall",
+		"an unwritten name falls back to the doctrine's hall")
+	check(PlayerSect.law_of(sect, "tithe") == "standard", "laws begin at their defaults")
+	sect["members"] = ["npc.a", "npc.b"]
+	sect["buildings"] = {"training_yard": true}
+	sect["branch"] = {"region": 2, "x": 10.0, "y": 20.0}
+	sect["offices"] = {"steward": "npc.a", "deputy": "npc.b", "elders": ["npc.a"], "heir": "npc.b"}
+	sect["laws"] = {"tithe": "heavy", "gates": "secluded", "guard": "rota", "recruitment": "selective"}
+	sect["site"] = {"region": 1, "x": 5.0, "y": 6.0}
+	var cleaned := PlayerSect.sanitize(sect)
+	check(String(cleaned.get("name", "")) == "Probe Hall" and PlayerSect.law_of(cleaned, "tithe") == "heavy"
+		and PlayerSect.has_building(cleaned, "training_yard")
+		and String((cleaned.get("offices", {}) as Dictionary).get("steward", "")) == "npc.a"
+		and not (cleaned.get("branch", {}) as Dictionary).is_empty(),
+		"laws, offices, buildings and both sites survive the save")
+	check(PlayerSect.capacity(cleaned) == 6 + PlayerSect.YARD_CAPACITY + PlayerSect.BRANCH_CAPACITY
+		+ PlayerSect.DEPUTY_CAPACITY, "yard, branch and deputy widen the roster")
+	var realms := [3, 3]
+	var light: Dictionary = PlayerSect.found("doctrine.alchemy", 500, 3, "Same Name")["sect"]
+	light["members"] = ["npc.a", "npc.b"]
+	var heavy: Dictionary = light.duplicate(true)
+	heavy["laws"] = {"tithe": "heavy"}
+	var light_day := SectAutonomy.settle_day(light, realms, 5, 99, "event.quiet")
+	var heavy_day := SectAutonomy.settle_day(heavy, realms, 5, 99, "event.quiet")
+	check(int(heavy_day.get("income", 0)) > int(light_day.get("income", 0)),
+		"a heavy tithe fills the treasury faster than a standard one")
+	var stewarded: Dictionary = light.duplicate(true)
+	stewarded["offices"] = {"steward": "npc.a"}
+	var stewarded_day := SectAutonomy.settle_day(stewarded, realms, 5, 99, "event.quiet")
+	check(int(stewarded_day.get("income", 0)) == int(light_day.get("income", 0)) + SectAutonomy.steward_bonus(),
+		"the steward's bonus is earned by an appointment, not granted free")
+	var secluded: Dictionary = light.duplicate(true)
+	secluded["laws"] = {"gates": "secluded"}
+	var petition_seen := false
+	var open_seen := false
+	for day in range(1, 61):
+		if String(SectAutonomy.event_for(day, 7, secluded).get("id", "")) == "event.petition":
+			petition_seen = true
+		if String(SectAutonomy.event_for(day, 7, light).get("id", "")) == "event.petition":
+			open_seen = true
+	check(not petition_seen and open_seen, "secluded gates turn petitioners away; open gates receive them")
+
+
 func _sect_economy_tests() -> void:
 	print("[sect economy] contribution, stipend and the quartermaster")
 	check(SectEconomy.quest_award() == 40, "a completed sect quest pays contribution")
@@ -5181,6 +5231,7 @@ func _sect_autonomy_tests() -> void:
 	check(approx(SectAutonomy.guard_for("doctrine.nope"), 1.0), "an unknown doctrine takes the full loss")
 
 	var sect: Dictionary = PlayerSect.found("doctrine.sword", 500, 1).get("sect", {})
+	sect["offices"] = {"steward": "npc.fixture"}
 	var quiet := SectAutonomy.settle_day(sect, [4], 2, 424242, "event.quiet")
 	check(bool(quiet.get("ok", false)), "a staffed hall settles")
 	check(int(quiet.get("income", 0)) == 5, "levy plus steward bonus comes in")
@@ -5194,11 +5245,13 @@ func _sect_autonomy_tests() -> void:
 	check(int((raid.get("sect", {}) as Dictionary).get("treasury", 0)) == 498,
 		"income, upkeep and the raid all land")
 	var alchemy: Dictionary = PlayerSect.found("doctrine.alchemy", 500, 1).get("sect", {})
+	alchemy["offices"] = {"steward": "npc.fixture"}
 	var burned := SectAutonomy.settle_day(alchemy, [1, 1], 2, 424242, "event.raid")
 	check(int(burned.get("event_stones", 0)) == -12, "an alchemy hall takes the full raid")
 	check(int((burned.get("sect", {}) as Dictionary).get("treasury", 0)) == 494,
 		"the alchemy levy offsets some of it")
 	var formation: Dictionary = PlayerSect.found("doctrine.formation", 500, 1).get("sect", {})
+	formation["offices"] = {"steward": "npc.fixture"}
 	var held := SectAutonomy.settle_day(formation, [4], 2, 424242, "event.raid")
 	check(int(held.get("event_stones", 0)) == -3, "a formation hall quarters a raid")
 	check(int((held.get("sect", {}) as Dictionary).get("treasury", 0)) == 502,

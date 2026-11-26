@@ -46,12 +46,24 @@ static func guard_for(doctrine_id: String) -> float:
 ## so the same day rebuilds the same news for the same hall and seed.
 static func event_for(day: int, world_seed: int, sect: Dictionary) -> Dictionary:
 	var table := events()
+	var secluded := PlayerSect.law_of(sect, "gates") == "secluded"
 	var weights: Array = []
 	for value in table:
 		if typeof(value) != TYPE_DICTIONARY:
 			weights.append(0)
 			continue
-		weights.append(int((value as Dictionary).get("weight", 0)))
+		var weight := int((value as Dictionary).get("weight", 0))
+		match String((value as Dictionary).get("id", "")):
+			"event.petition":
+				if secluded:
+					weight = 0
+			"event.vein":
+				if secluded:
+					weight *= 2
+			"event.dispute":
+				if PlayerSect.has_building(sect, "training_yard"):
+					weight /= 2
+		weights.append(weight)
 	var rng := Rng.stream_from(world_seed, DOMAIN, hash(String(sect.get("name", "sect"))), day)
 	var index := Rng.pick_weighted(weights, rng)
 	if index < 0:
@@ -74,12 +86,34 @@ static func settle_day(sect: Dictionary, realms: Array, day: int, world_seed: in
 			"treasury": int(out["treasury"]), "line": "", "sect": out}
 
 	var doctrine_id := String(sect.get("doctrine", ""))
-	var income := PlayerSect.tribute_for(doctrine_id, realms) + steward_bonus()
+	var tithe_factor: float = float({"light": 0.5, "standard": 1.0, "heavy": 1.6}.get(
+		PlayerSect.law_of(sect, "tithe"), 1.0))
+	var offices: Dictionary = sect.get("offices", {})
+	var stewarded := String(offices.get("steward", "")) != "" or String(offices.get("heir", "")) != ""
+	var income := floori(float(PlayerSect.tribute_for(doctrine_id, realms)) * float(tithe_factor))
+	if stewarded:
+		income += steward_bonus()
+	if PlayerSect.has_building(sect, "pill_garden"):
+		income += 2
+	if PlayerSect.has_building(sect, "forge"):
+		income += 1
+	if not (sect.get("branch", {}) as Dictionary).is_empty():
+		income += 2
+	income += mini(2, (offices.get("elders", []) as Array).size())
 	var upkeep := upkeep_per_member() * realms.size()
+	if PlayerSect.law_of(sect, "guard") == "rota":
+		upkeep += 1
 	var entry: Dictionary = event(force_event) if force_event != "" else event_for(day, world_seed, sect)
 	var stones := int(entry.get("stones", 0))
 	if stones < 0 and bool(entry.get("guarded", false)):
-		stones = -floori(float(-stones) * guard_for(doctrine_id))
+		var guard := guard_for(doctrine_id)
+		if PlayerSect.law_of(sect, "guard") == "rota":
+			guard *= 0.6
+		if PlayerSect.has_building(sect, "forge"):
+			guard *= 0.8
+		stones = -floori(float(-stones) * guard)
+	if stones < 0 and PlayerSect.has_building(sect, "vault"):
+		stones = floori(float(stones) * 0.5)
 	var before := int(sect.get("treasury", 0))
 	var treasury := before + income - upkeep + stones
 	var shortfall := treasury < 0

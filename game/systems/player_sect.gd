@@ -84,18 +84,64 @@ static func can_found(sect: Dictionary, stones: int, rank_id: String) -> Array:
 
 ## Founds the hall and moves the endowment into its treasury. The founding fee is
 ## not lost to the world: it becomes the first purse the hall can spend from.
-static func found(doctrine_id: String, stones: int, day: int) -> Dictionary:
+const LAW_DEFAULTS := {"tithe": "standard", "gates": "open", "guard": "none",
+	"recruitment": "open"}
+const BRANCH_CAPACITY := 3
+const YARD_CAPACITY := 2
+const DEPUTY_CAPACITY := 1
+
+
+static func laws() -> Dictionary:
+	var value: Variant = data().get("laws", {})
+	return value if typeof(value) == TYPE_DICTIONARY else {}
+
+
+static func law_of(sect: Dictionary, key: String) -> String:
+	var current: Dictionary = sect.get("laws", {})
+	var fallback := String(LAW_DEFAULTS.get(key, ""))
+	var value := String(current.get(key, fallback))
+	var options: Array = (laws().get(key, {}) as Dictionary).get("options", [])
+	for option in options:
+		if String((option as Dictionary).get("id", "")) == value:
+			return value
+	return fallback
+
+
+static func buildings_data() -> Array:
+	var value: Variant = data().get("buildings", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+static func building_by(id: String) -> Dictionary:
+	for value in buildings_data():
+		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
+			return value
+	return {}
+
+
+static func has_building(sect: Dictionary, id: String) -> bool:
+	return bool((sect.get("buildings", {}) as Dictionary).get(id, false))
+
+
+static func branch_cost() -> int:
+	return maxi(0, int((data().get("branch", {}) as Dictionary).get("cost", 300)))
+
+
+static func found(doctrine_id: String, stones: int, day: int, sect_name: String = "") -> Dictionary:
 	var entry := doctrine(doctrine_id)
 	if entry.is_empty():
 		return {"ok": false, "reason": "unknown doctrine", "stones": stones, "sect": {}}
 	if stones < founding_cost():
 		return {"ok": false, "reason": "not enough spirit stones", "stones": stones, "sect": {}}
+	var chosen := sect_name.strip_edges().left(40)
+	if chosen == "":
+		chosen = String(entry.get("sect_name", "New Hall"))
 	return {
 		"ok": true,
 		"reason": "",
 		"stones": stones - founding_cost(),
 		"sect": {
-			"name": String(entry.get("sect_name", "New Hall")),
+			"name": chosen,
 			"doctrine": doctrine_id,
 			"founded_day": maxi(1, day),
 			"treasury": founding_cost(),
@@ -103,13 +149,27 @@ static func found(doctrine_id: String, stones: int, day: int) -> Dictionary:
 			"tribute_day": -1,
 			"autonomy_day": maxi(1, day),
 			"log": [],
+			"laws": LAW_DEFAULTS.duplicate(),
+			"offices": {},
+			"buildings": {},
+			"site": {},
+			"branch": {},
+			"master": "",
+			"abdicated": false,
 		},
 	}
 
 
 static func capacity(sect: Dictionary) -> int:
 	var entry := doctrine(String(sect.get("doctrine", "")))
-	return clampi(int(entry.get("capacity", 0)), 0, ROSTER_CAP)
+	var total := int(entry.get("capacity", 0))
+	if has_building(sect, "training_yard"):
+		total += YARD_CAPACITY
+	if not (sect.get("branch", {}) as Dictionary).is_empty():
+		total += BRANCH_CAPACITY
+	if String((sect.get("offices", {}) as Dictionary).get("deputy", "")) != "":
+		total += DEPUTY_CAPACITY
+	return clampi(total, 0, ROSTER_CAP)
 
 
 static func member_count(sect: Dictionary) -> int:
@@ -188,6 +248,10 @@ static func can_recruit(sect: Dictionary, npc_id: String, bond_score: int, membe
 	if not Relationships.warns(bond_score):
 		out["reason"] = "does not trust you that far"
 		return out
+	if law_of(sect, "recruitment") == "selective" \
+			and Relationships.band_id(bond_score) != Relationships.SWORN_BAND:
+		out["reason"] = "the hall's law asks only for the sworn-close"
+		return out
 	if members >= capacity(sect):
 		out["reason"] = "the hall is full"
 		return out
@@ -232,7 +296,9 @@ static func sanitize(value: Variant) -> Dictionary:
 		name = String(entry.get("sect_name", "New Hall"))
 	var roster: Array = []
 	var seen: Dictionary = {}
-	var limit := capacity({"doctrine": doctrine_id})
+	# Collection runs against the hard ceiling; the true cap is applied
+	# below, once the hall's buildings and offices are known.
+	var limit := ROSTER_CAP
 	var raw: Variant = source.get("members", [])
 	if typeof(raw) == TYPE_ARRAY:
 		for item in (raw as Array):
@@ -251,6 +317,36 @@ static func sanitize(value: Variant) -> Dictionary:
 			log.append(line.left(180))
 	while log.size() > 8:
 		log.pop_front()
+	var clean_laws: Dictionary = {}
+	var raw_laws: Dictionary = source.get("laws", {})
+	for key in LAW_DEFAULTS.keys():
+		clean_laws[key] = law_of(source, key) if raw_laws.has(key) else String(LAW_DEFAULTS[key])
+	var clean_offices: Dictionary = {}
+	var raw_offices: Dictionary = source.get("offices", {})
+	for office in ["deputy", "steward", "heir"]:
+		var holder := String(raw_offices.get(office, ""))
+		if holder != "" and seen.has(holder):
+			clean_offices[office] = holder
+	var elders: Array = []
+	for elder in raw_offices.get("elders", []):
+		if typeof(elder) == TYPE_STRING and seen.has(String(elder)) and elders.size() < 2:
+			elders.append(String(elder))
+	if not elders.is_empty():
+		clean_offices["elders"] = elders
+	var clean_buildings: Dictionary = {}
+	var raw_buildings: Dictionary = source.get("buildings", {})
+	for building_value in buildings_data():
+		var bid := String((building_value as Dictionary).get("id", ""))
+		if bool(raw_buildings.get(bid, false)):
+			clean_buildings[bid] = true
+	var clean_site := _clean_site(source.get("site", {}))
+	var clean_branch := _clean_site(source.get("branch", {}))
+	# The roster caps at the cleaned hall's true capacity: the doctrine's
+	# size, widened by whatever yard, branch and deputy survived cleaning.
+	var true_cap := capacity({"doctrine": doctrine_id, "buildings": clean_buildings,
+		"offices": clean_offices, "branch": clean_branch})
+	while roster.size() > true_cap:
+		roster.pop_back()
 	return {
 		"name": name,
 		"doctrine": doctrine_id,
@@ -260,7 +356,24 @@ static func sanitize(value: Variant) -> Dictionary:
 		"tribute_day": int(source.get("tribute_day", -1)),
 		"autonomy_day": maxi(1, int(source.get("autonomy_day", source.get("founded_day", 1)))),
 		"log": log,
+		"laws": clean_laws,
+		"offices": clean_offices,
+		"buildings": clean_buildings,
+		"site": clean_site,
+		"branch": clean_branch,
+		"master": String(source.get("master", "")).strip_edges().left(40),
+		"abdicated": bool(source.get("abdicated", false)),
 	}
+
+
+static func _clean_site(value: Variant) -> Dictionary:
+	if typeof(value) != TYPE_DICTIONARY:
+		return {}
+	var source: Dictionary = value
+	if not source.has("x") or not source.has("y"):
+		return {}
+	return {"region": int(source.get("region", -1)),
+		"x": float(source.get("x", 0.0)), "y": float(source.get("y", 0.0))}
 
 
 static func summary_line(sect: Dictionary) -> String:
