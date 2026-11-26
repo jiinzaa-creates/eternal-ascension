@@ -59,3 +59,5 @@ All HUD panels, pages, menus, the title screen, skill bar, shop/travel panels an
 
 ## HUD diet, minimap, menu hub (2026-11-25, later still)
 Per Jawanza's spec the ambient HUD is now only: HP/Qi orbs top-left, skill slots bottom-left, a live circular minimap bottom-right, and a MENU button beside it that opens a grouped, keyboard-navigable hub for every system (Esc). Everything else moved to its page. See VISUAL_BIBLE §79.
+
+- §80 (2026-11-25): F-keys fully remapped (help ?, mute `, save 8, load 9, council 7, my sect 0, stories ., archive ,, endgame Z, settings X); HUD mouse live (hub hover/wheel/click, clickable MENU plaque, list-page wheel/click via shared hit table); HUD skill-slot click opens the arrange panel, which gained click-to-place and wheel-swap; all 14 hud pages clamp to the viewport via _page_rect. Suite 4330/0; mouse paths probe- and screenshot-verified; fit verified at 1024x576.

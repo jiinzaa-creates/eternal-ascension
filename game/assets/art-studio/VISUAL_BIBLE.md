@@ -445,3 +445,41 @@ On Jawanza's instruction the studio took over the texture integration from Freeb
 - MINIMAP (hud.gd draw_minimap): terrain sampled from the actual streamed GroundTiles (per-source average colour, cached), herbs + POIs from chunk payloads, NPCs as jade dots, enemies (group "enemy") as red dots, the waypoint as a gold diamond (rim-clamped), the player as a facing arrow, bronze rim with an accent sweep and an N marker. Palette fallback when tiles are off.
 - MENU HUB: Esc (ui_cancel, when no page is open) opens a grouped hub — CHARACTER / WORLD / SECT / SYSTEM — listing every system page with its direct key on a bronze chip; Up/Down + Enter activates through the SAME open functions the keys call (main.gd menu_entries/_open_menu/_menu_activate); Esc closes a page first, then opens the menu. The key help moved to the menu's footer. World simulation pauses while the menu is open.
 - VERIFICATION: suite 4330 PASS / 0 FAIL; a probe proved Esc opens and closes the menu through the real input pipeline; harness screenshots: world_spawn.png (orbs + minimap + menu button, nothing else), menu.png (the hub, first entry selected), menu_gear.png (Down x2 + Enter from the hub landed on the Satchel page — connectivity proven end to end).
+
+## 80. No F-keys, full mouse, fit-to-screen (2026-11-25, Jawanza's spec)
+
+**Keys.** Every F1–F12 binding is gone from `core/settings.gd` defaults:
+help `?` (Slash), mute `` ` `` (QuoteLeft), quick save **8**, quick load
+**9**, council **7**, my sect **0**, storylines **.**, archive **,**
+blank page **Z**, settings **X** — all collision-free against the
+existing table, all rebindable in Settings as before. Menu chips, the
+menu footer, the key-help line and the title footer were updated to
+match; two label bugs found and fixed on the way (Gear & Satchel is
+**I**, not G — G is the tribulation; Meridians has no key — its entry
+runs the meridian-opening action directly). Note: a player's *saved*
+bindings file still overrides defaults until reset in Settings.
+
+**Mouse.** The HUD now takes mouse input for its own elements only
+(unhandled events fall through untouched). Menu hub: hover highlights,
+the wheel walks the cursor, a click opens the row, a click outside
+closes. The MENU plaque beside the minimap is clickable. The four list
+pages (ledger, council, my sect, storylines) share one hit-test table
+mirroring their draw geometry: wheel scrolls, click selects, clicking
+the selected row again activates it. Proven through the real input
+pipeline: wheel moved the ledger cursor 0→1, a click selected row 0;
+the harness drove Esc → wheel → click into the Satchel with no keys.
+
+**Skill slots.** The combat bar stays a readout (a stray click can
+never rearrange an art mid-fight), but clicking any HUD slot now opens
+the arrange panel. In the panel: click a roster art to pick it up,
+click a slot to place it (drag still works), and scrolling a slot
+walks the unplaced arts into it one per notch; right-click still
+clears, and now also cancels a held art.
+
+**Fit.** Every full-screen page in hud.gd (14 panels incl. the menu)
+now takes its rect from `_page_rect()`: the authored size, centred,
+clamped to the viewport minus a 32px margin, and the hit tests read
+the same rect. Verified at 1024×576 — menu and character sheet sit
+fully on screen (verification/menu_small_window.png). Shop, travel,
+world map and the skill panel were already size-relative. Suite
+4330 PASS / 0 FAIL.

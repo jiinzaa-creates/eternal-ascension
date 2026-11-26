@@ -183,7 +183,7 @@ func _draw() -> void:
 	_text(Vector2(84.0, height - 42.0), "UP / DOWN choose   ·   ENTER confirm   ·   ESC quit", 11, muted)
 	var version := "v%s   ·   Godot %s" % [version_string(), String(Engine.get_version_info().get("string", ""))]
 	_text(Vector2(84.0, height - 20.0), version, 10, muted)
-	_text(Vector2(width - 330.0, height - 20.0), "F10 opens settings in game", 10, muted)
+	_text(Vector2(width - 330.0, height - 20.0), "Esc opens the menu in game", 10, muted)
 
 
 func _text(at: Vector2, text: String, font_size: int, colour: Color) -> void:

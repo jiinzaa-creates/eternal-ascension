@@ -3535,8 +3535,8 @@ func menu_entries() -> Array:
 		{"header": "CHARACTER"},
 		{"id": "character", "label": "Character Sheet", "key": "C"},
 		{"id": "bars", "label": "Skill Bars", "key": "B"},
-		{"id": "gear", "label": "Gear & Satchel", "key": "G"},
-		{"id": "meridian", "label": "Meridians", "key": "U"},
+		{"id": "gear", "label": "Gear & Satchel", "key": "I"},
+		{"id": "meridian", "label": "Meridians", "key": ""},
 		{"header": "WORLD"},
 		{"id": "map", "label": "World Map", "key": "M"},
 		{"id": "chronicle", "label": "Chronicle", "key": "J"},
@@ -3546,12 +3546,12 @@ func menu_entries() -> Array:
 		{"id": "sects", "label": "Sects", "key": "Y"},
 		{"id": "hierarchy", "label": "Ranks", "key": "N"},
 		{"id": "ledger", "label": "Sect Ledger", "key": "O"},
-		{"id": "council", "label": "Council", "key": "F3"},
-		{"id": "player_sect", "label": "My Sect", "key": "F4"},
-		{"id": "storylines", "label": "Sect Stories", "key": "F6"},
-		{"id": "narrative", "label": "Sect Archive", "key": "F7"},
+		{"id": "council", "label": "Council", "key": "7"},
+		{"id": "player_sect", "label": "My Sect", "key": "0"},
+		{"id": "storylines", "label": "Sect Stories", "key": "."},
+		{"id": "narrative", "label": "Sect Archive", "key": ","},
 		{"header": "SYSTEM"},
-		{"id": "settings", "label": "Settings", "key": "F10"},
+		{"id": "settings", "label": "Settings", "key": "X"},
 	]
 
 

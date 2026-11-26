@@ -44,6 +44,15 @@ func apply_palette(high_contrast: bool) -> void:
 func _panel(rect: Rect2) -> void:
 	UiFrame.panel(self, rect, PANEL_BG)
 
+
+## A full page's rect: the authored size, centred, and never larger than
+## the screen minus a margin — no page hangs off the edge at any window
+## size, and every hit test works from this same rect.
+func _page_rect(want_w: float, want_h: float) -> Rect2:
+	var w := minf(want_w, maxf(320.0, size.x - 32.0))
+	var h := minf(want_h, maxf(240.0, size.y - 32.0))
+	return Rect2(Vector2((size.x - w) * 0.5, (size.y - h) * 0.5), Vector2(w, h))
+
 var host: Node
 var _font: Font
 var _toasts: Array = []
@@ -63,7 +72,7 @@ func _ready() -> void:
 	# Without this the title-to-run change left the HUD at size zero: left panels
 	# still drew, but centered text and right/bottom panels went off-screen.
 	get_viewport().size_changed.connect(_sync_view_size)
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	_font = ThemeDB.fallback_font
 	Bus.toast.connect(_on_toast)
 	Bus.help_toggled.connect(func(visible: bool) -> void: _help_visible = visible)
@@ -478,10 +487,10 @@ func draw_captive_ledger(player: Player) -> void:
 	var rows: Array = host.captive_rows()
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.82))
-	var w := 720.0
+	var w := minf(720.0, maxf(320.0, view.x - 32.0))
+	var h := minf(470.0, maxf(240.0, view.y - 32.0))
 	var x := view.x * 0.5 - w * 0.5
-	var y := 92.0
-	var h := 470.0
+	var y := minf(92.0, maxf(16.0, view.y - h - 16.0))
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.96), Color("#7fd3e0", 0.4))
 	_text(Vector2(x + 24.0, y + 34.0), "THE HOLDING YARD", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Terms: %s — %s" % [
@@ -520,10 +529,11 @@ func draw_chronicle(player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.82))
-	var w := 760.0
-	var h := 500.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(760.0, 500.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.96), Color("#c8b070", 0.4))
 	_text(Vector2(x + 24.0, y + 34.0), "THE MARKET'S TONGUE", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Day %d — word travels faster than feet." % Clock.day, 11, MUTED)
@@ -563,10 +573,11 @@ func draw_factions(player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.84))
-	var w := 760.0
-	var h := 470.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(760.0, 470.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.97), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "STANDINGS", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "What each house thinks of you, and what the band buys.", 11, MUTED)
@@ -614,10 +625,11 @@ func draw_sects(player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
-	var w := 1000.0
-	var h := 600.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(1000.0, 600.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "THE TWELVE SECTS", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Twelve houses, twelve answers to the same mountain.", 11, MUTED)
@@ -662,10 +674,11 @@ func draw_hierarchy(player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
-	var w := 900.0
-	var h := 570.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(900.0, 570.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT HIERARCHY", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "The Azure Cloud's ladder — a station is earned by standing and realm, not granted by a key.", 11, MUTED)
@@ -735,10 +748,11 @@ func draw_sect_ledger(player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
-	var w := 820.0
-	var h := 500.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(820.0, 500.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT LEDGER", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Contribution is earned in service and spent at the quartermaster's counter.", 11, MUTED)
@@ -779,10 +793,11 @@ func draw_council(player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
-	var w := 860.0
-	var h := 520.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(860.0, 520.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT COUNCIL", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "The master's seat is held. The blocs decide whether it opens to a challenge.",
@@ -834,10 +849,11 @@ func draw_player_sect(player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
-	var w := 880.0
-	var h := 560.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(880.0, 560.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	var founded := not Game.player_sect.is_empty()
 	if founded:
@@ -921,10 +937,11 @@ func draw_storylines(_player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
-	var w := 1040.0
-	var h := 652.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(1040.0, 652.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SECT STORYLINES", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Twelve houses, one story each — the same stakes, never the same work.", 11, MUTED)
@@ -989,10 +1006,11 @@ func draw_narrative(_player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.88))
-	var w := 1100.0
-	var h := 664.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(1100.0, 664.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1114", 0.98), Color("#8fb0c0", 0.42))
 	_text(Vector2(x + 24.0, y + 34.0), "THE ARCHIVE", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Four questions the province never answered. No prophecy, no chosen reader.", 11, MUTED)
@@ -1087,10 +1105,11 @@ func draw_endgame(_player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
-	var w := 1100.0
-	var h := 664.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(1100.0, 664.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#c8b070", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "THE BLANK PAGE", 22, Color("#e0d0a0"))
 	_text(Vector2(x + 24.0, y + 58.0), "The book's last page is blank because the reader writes it. It is written once.", 11, MUTED)
@@ -1227,10 +1246,11 @@ func draw_character(_player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
-	var w := 1120.0
-	var h := 664.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(1120.0, 664.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#9fe0c0", 0.42))
 	_text(Vector2(x + 24.0, y + 34.0), "CHARACTER SHEET", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "Everything the body carries, read from the run itself.", 11, MUTED)
@@ -1270,10 +1290,11 @@ func draw_settings(_player: Player) -> void:
 		return
 	var view := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
-	var w := 1000.0
-	var h := 600.0
-	var x := view.x * 0.5 - w * 0.5
-	var y := view.y * 0.5 - h * 0.5
+	var _pr := _page_rect(1000.0, 600.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#9fe0c0", 0.45))
 	_text(Vector2(x + 24.0, y + 34.0), "SETTINGS & ACCESSIBILITY", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "These belong to you, not to the run: they survive every new life.", 11, MUTED)
@@ -1882,7 +1903,7 @@ func draw_toasts() -> void:
 
 
 func draw_help() -> void:
-	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · F3 council · F4 sect · F6 stories · F7 archive · F8 blank page · C sheet · F10 settings · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · F5 save · F9 load · F2 mute · F1 hide"
+	var lines := "WASD move · SHIFT sprint · LMB technique · RMB weapon strike · CTRL guard · SPACE dodge · F meditate · G tribulation · E interact · P party · H bind · L captives · J chronicle · K standings · Y sects · N ranks · O ledger · 7 council · 0 sect · . stories · , archive · Z blank page · C sheet · X settings · 1-6 slot · Q cycle · [ ] bar · B bars · I satchel (U drinks a pill) · M map · 8 save · 9 load · ` mute · ? hide"
 	var trade := "At a merchant: 1-6 buy/sell · TAB switch · E close · T travel · M map"
 	var pad := "Gamepad: left stick move · right stick aim · X attack · LS click guard · A dodge · B interact · Y meditate · RB sprint · LB shop · DPAD travel/waypoint"
 	# The skill bar owns the bottom 120 px. Help lives above it, wrapped to the
@@ -2177,9 +2198,13 @@ func _mm_source_colour(tile_set: TileSet, source_id: int) -> Color:
 
 
 ## The door, drawn beside the minimap: one plaque that opens the menu.
-func draw_menu_button() -> void:
+func menu_button_rect() -> Rect2:
 	var centre := _minimap_center()
-	var rect := Rect2(centre.x - MM_RADIUS - 98.0, size.y - 46.0, 86.0, 30.0)
+	return Rect2(centre.x - MM_RADIUS - 98.0, size.y - 46.0, 86.0, 30.0)
+
+
+func draw_menu_button() -> void:
+	var rect := menu_button_rect()
 	var open := host != null and bool(host.get("menu_open"))
 	UiFrame.plaque(self, rect, Color(PANEL_BG, 0.92), UiFrame.BRONZE if open else UiFrame.BRONZE_DIM)
 	_text_centred(rect.get_center() + Vector2(0.0, 1.0), "MENU", 11, ACCENT if open else INK)
@@ -2192,10 +2217,11 @@ func draw_menu_button() -> void:
 func draw_menu() -> void:
 	var view := size
 	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
-	var w := 720.0
-	var h := 660.0
-	var x := (view.x - w) * 0.5
-	var y := (view.y - h) * 0.5
+	var _pr := _page_rect(720.0, 660.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#9fe0c0", 0.42))
 	_text(Vector2(x + 28.0, y + 42.0), "MENU", 24, ACCENT)
 	_text(Vector2(x + 28.0, y + 64.0), "Every system behind one door.  Up / Down choose, Enter opens, Esc closes.", 12, MUTED)
@@ -2218,12 +2244,164 @@ func draw_menu() -> void:
 		_text(Vector2(x + 40.0, ry + 16.0), String(row.get("label", "")), 13,
 			INK if seen == selected else Color("#c3ced4"))
 		var key := String(row.get("key", ""))
-		var kw := _text_width(key, 10)
-		UiFrame.plaque(self, Rect2(x + w - 44.0 - kw - 14.0, ry + 3.0, kw + 14.0, 18.0),
-			Color("#10161a", 0.9), UiFrame.BRONZE_DIM)
-		_text(Vector2(x + w - 44.0 - kw - 7.0, ry + 16.0), key, 10, Color("#d8c070"))
+		if key != "":
+			var kw := _text_width(key, 10)
+			UiFrame.plaque(self, Rect2(x + w - 44.0 - kw - 14.0, ry + 3.0, kw + 14.0, 18.0),
+				Color("#10161a", 0.9), UiFrame.BRONZE_DIM)
+			_text(Vector2(x + w - 44.0 - kw - 7.0, ry + 16.0), key, 10, Color("#d8c070"))
 		ry += 24.0
 	_text(Vector2(x + 28.0, y + h - 38.0),
-		"F5 save · F9 load · F1 hide interface · F2 mute · E interact · Space dodge · Shift sprint · LMB art · RMB guard", 10, MUTED)
+		"8 save · 9 load · ` mute · ? key help · E interact · Space dodge · Shift sprint · LMB art · RMB guard", 10, MUTED)
 	_text(Vector2(x + 28.0, y + h - 20.0),
 		"Merchants, forges, storage and roads open their own pages where you find them.", 10, MUTED)
+
+
+# ---------------------------------------------------------------- mouse ----
+## The mouse, alongside the keys. Hover highlights, the wheel walks the
+## open list, a click chooses — and in the world, the MENU plaque and the
+## skill bar answer a click. Only events the HUD actually uses are
+## accepted; everything else falls through to the game untouched.
+
+const LIST_PAGES := {
+	"ledger": {"open": "sect_ledger_open", "index": "sect_ledger_index", "rows": "sect_ledger_rows",
+		"activate": "_sect_ledger_activate", "size": Vector2(820.0, 500.0), "top": 112.0,
+		"step": 50.0, "off": -14.0, "height": 44.0, "width": -36.0},
+	"council": {"open": "council_open", "index": "council_index", "rows": "council_rows",
+		"activate": "_council_activate", "size": Vector2(860.0, 520.0), "top": 112.0,
+		"step": 68.0, "off": -14.0, "height": 60.0, "width": -36.0},
+	"player_sect": {"open": "player_sect_open", "index": "player_sect_index", "rows": "player_sect_rows",
+		"activate": "_player_sect_activate", "size": Vector2(880.0, 560.0), "top": 112.0,
+		"step": 52.0, "off": -14.0, "height": 48.0, "width": 520.0},
+	"storylines": {"open": "storylines_open", "index": "storyline_index", "rows": "storyline_rows",
+		"activate": "_storylines_activate", "size": Vector2(1040.0, 652.0), "top": 112.0,
+		"step": 36.0, "off": -13.0, "height": 34.0, "width": -36.0},
+}
+
+
+func menu_panel_rect() -> Rect2:
+	return _page_rect(720.0, 660.0)
+
+
+## The selectable menu row under `pos`, or -1. Mirrors draw_menu's layout.
+func menu_hit(pos: Vector2) -> int:
+	if host == null:
+		return -1
+	var rect := menu_panel_rect()
+	var entries: Array = host.menu_entries()
+	var ry := rect.position.y + 88.0
+	var seen := -1
+	for entry in entries:
+		var row: Dictionary = entry
+		if row.has("header"):
+			ry += 24.0
+			continue
+		seen += 1
+		if Rect2(rect.position.x + 24.0, ry, rect.size.x - 48.0, 24.0).has_point(pos):
+			return seen
+		ry += 24.0
+	return -1
+
+
+## A row of a list page under `pos`, or -1. Mirrors the page's own draw.
+func _list_hit(page_key: String, pos: Vector2) -> int:
+	var cfg: Dictionary = LIST_PAGES[page_key]
+	var rows: Array = host.call(String(cfg["rows"]))
+	var rect := _page_rect((cfg["size"] as Vector2).x, (cfg["size"] as Vector2).y)
+	var width := float(cfg["width"])
+	if width < 0.0:
+		width = rect.size.x + width
+	for i in rows.size():
+		var row_rect := Rect2(rect.position.x + 18.0,
+			rect.position.y + float(cfg["top"]) + float(i) * float(cfg["step"]) + float(cfg["off"]),
+			width, float(cfg["height"]))
+		if row_rect.has_point(pos):
+			return i
+	return -1
+
+
+## The HUD skill slot under `pos`, or -1. Mirrors draw_techniques.
+func technique_slot_at(pos: Vector2) -> int:
+	for i in range(6):
+		if Rect2(Vector2(24.0 + float(i) * 118.0, size.y - 94.0), Vector2(112.0, 46.0)).has_point(pos):
+			return i
+	return -1
+
+
+func _any_page_open() -> bool:
+	if host == null:
+		return false
+	for flag in ["character_open", "settings_open", "gear_open", "shop_open", "travel_open",
+			"bars_open", "storage_open", "forge_open", "alchemy_open", "factions_open",
+			"sects_open", "hierarchy_open", "sect_ledger_open", "council_open",
+			"player_sect_open", "storylines_open", "narrative_open", "endgame_open",
+			"captives_open", "chronicle_open"]:
+		if bool(host.get(flag)):
+			return true
+	var wm: Object = host.get("world_map")
+	return wm != null and bool(wm.get("visible"))
+
+
+func _gui_input(event: InputEvent) -> void:
+	if host == null or String(host.get("phase")) != "play":
+		return
+	if event is InputEventMouseMotion:
+		if bool(host.get("menu_open")):
+			var hovered := menu_hit((event as InputEventMouseMotion).position)
+			if hovered >= 0 and hovered != int(host.get("menu_index")):
+				host.set("menu_index", hovered)
+				queue_redraw()
+		return
+	if not (event is InputEventMouseButton) or not (event as InputEventMouseButton).pressed:
+		return
+	var button := (event as InputEventMouseButton).button_index
+	var pos := (event as InputEventMouseButton).position
+	if button == MOUSE_BUTTON_WHEEL_DOWN or button == MOUSE_BUTTON_WHEEL_UP:
+		var dir := 1 if button == MOUSE_BUTTON_WHEEL_DOWN else -1
+		if bool(host.get("menu_open")):
+			host.set("menu_index", clampi(int(host.get("menu_index")) + dir, 0, host.menu_selectable_count() - 1))
+			queue_redraw()
+			accept_event()
+			return
+		for page_key in LIST_PAGES.keys():
+			var cfg: Dictionary = LIST_PAGES[page_key]
+			if bool(host.get(String(cfg["open"]))):
+				var rows: Array = host.call(String(cfg["rows"]))
+				if not rows.is_empty():
+					host.set(String(cfg["index"]), clampi(int(host.get(String(cfg["index"]))) + dir, 0, rows.size() - 1))
+					queue_redraw()
+				accept_event()
+				return
+		return
+	if button != MOUSE_BUTTON_LEFT:
+		return
+	if bool(host.get("menu_open")):
+		var idx := menu_hit(pos)
+		if idx >= 0:
+			host.set("menu_index", idx)
+			host._menu_activate()
+		elif not menu_panel_rect().has_point(pos):
+			host._close_menu()
+		accept_event()
+		return
+	for page_key in LIST_PAGES.keys():
+		var cfg: Dictionary = LIST_PAGES[page_key]
+		if bool(host.get(String(cfg["open"]))):
+			var row := _list_hit(page_key, pos)
+			if row >= 0:
+				if row == int(host.get(String(cfg["index"]))):
+					host.call(String(cfg["activate"]), row)
+				else:
+					host.set(String(cfg["index"]), row)
+					queue_redraw()
+				accept_event()
+			return
+	if _any_page_open():
+		return
+	if menu_button_rect().has_point(pos):
+		host._open_menu()
+		accept_event()
+		return
+	if technique_slot_at(pos) >= 0:
+		host.toggle_bars()
+		accept_event()
+		return

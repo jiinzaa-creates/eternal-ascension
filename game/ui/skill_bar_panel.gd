@@ -29,6 +29,10 @@ var player: Player
 var _font: Font
 ## The art being dragged: {tech: String, from: int}. `from` is -1 for a roster art.
 var _drag: Dictionary = {}
+## A click, not a drag, picked the art up: it stays in hand until the next
+## click places it. `_press_pos` tells a click from a drag on release.
+var _held_click := false
+var _press_pos := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -138,19 +142,70 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_begin_drag(event.position)
+			if _held_click:
+				_place_held(event.position)
+			else:
+				_press_pos = event.position
+				_begin_drag(event.position)
 		else:
-			_finish_drag(event.position)
+			if _held_click:
+				pass  # placement happens on the next press, not this release
+			elif not _drag.is_empty() and int(_drag.get("from", -1)) == -1 \
+					and event.position.distance_to(_press_pos) < 6.0 \
+					and _roster_at(event.position) == String(_drag.get("tech", "")):
+				# A click on a roster art picks it up instead of dragging.
+				_held_click = true
+				queue_redraw()
+			else:
+				_finish_drag(event.position)
 		accept_event()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if _held_click:
+			_drag = {}
+			_held_click = false
+			queue_redraw()
+			accept_event()
+			return
 		var slot := _slot_at(event.position)
 		if slot >= 0 and player.clear_slot(slot):
 			queue_redraw()
 		accept_event()
 		return
+	if event is InputEventMouseButton and event.pressed \
+			and (event.button_index == MOUSE_BUTTON_WHEEL_DOWN or event.button_index == MOUSE_BUTTON_WHEEL_UP):
+		# Scrolling a slot walks the unplaced arts into it, one per notch.
+		var slot := _slot_at(event.position)
+		if slot >= 0:
+			var off_bar: Array = player.known_off_bar()
+			if not off_bar.is_empty():
+				var pick := String(off_bar[0]) if event.button_index == MOUSE_BUTTON_WHEEL_DOWN \
+					else String(off_bar[off_bar.size() - 1])
+				player.assign_slot(slot, pick)
+				queue_redraw()
+		accept_event()
+		return
 	if event is InputEventMouseMotion and not _drag.is_empty():
 		queue_redraw()
+
+
+## Put down an art that a click picked up: onto a slot, or nowhere (the
+## click missed every slot and the hand simply empties).
+func _place_held(pos: Vector2) -> void:
+	var target := _slot_at(pos)
+	var from := int(_drag.get("from", -1))
+	var tech_id := String(_drag.get("tech", ""))
+	if target >= 0:
+		if from >= 0 and from != target:
+			player.move_slot(from, target)
+		elif from >= 0:
+			if player.select_slot(target):
+				player.set_active_bar(SkillBar.bar_of(target))
+		else:
+			player.assign_slot(target, tech_id)
+	_drag = {}
+	_held_click = false
+	queue_redraw()
 
 
 func _begin_drag(pos: Vector2) -> void:
@@ -200,7 +255,7 @@ func _draw() -> void:
 	var x := panel.position.x + 24.0
 	var y := panel.position.y + 30.0
 	_text(Vector2(x, y), "SKILL BARS", 20, INK)
-	_text(Vector2(x + 150.0, y), "drag to arrange · right-click clears · 1-6 selects the active bar", 12, MUTED)
+	_text(Vector2(x + 150.0, y), "drag, or click an art then a slot · scroll a slot to swap its art · right-click clears", 12, MUTED)
 
 	for bar in SkillBar.BAR_COUNT:
 		var row := _slot_rect(bar, 0)
@@ -246,7 +301,7 @@ func _draw() -> void:
 		_text(rect.position + Vector2(8.0, 15.0), _fit(String(tech.get("name", "?")), 10, rect.size.x - 14.0), 10, Color("#cfdae0"))
 
 	_text(Vector2(x, panel.end.y - 18.0),
-		"B / E close · drag a slot off the panel to clear it · clicking a slot selects that art",
+		"B / E close · click a roster art, then a slot, to place it · drag a slot off the panel to clear it · clicking a slot selects that art",
 		11, Color("#6b7b84"))
 
 	if not _drag.is_empty():

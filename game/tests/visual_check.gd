@@ -52,6 +52,27 @@ func _press(action: String) -> void:
 	Input.parse_input_event(up)
 
 
+func _click(pos: Vector2) -> void:
+	var down := InputEventMouseButton.new()
+	down.button_index = MOUSE_BUTTON_LEFT
+	down.pressed = true
+	down.position = pos
+	Input.parse_input_event(down)
+	var up := InputEventMouseButton.new()
+	up.button_index = MOUSE_BUTTON_LEFT
+	up.pressed = false
+	up.position = pos
+	Input.parse_input_event(up)
+
+
+func _wheel(pos: Vector2, down_dir: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_WHEEL_DOWN if down_dir else MOUSE_BUTTON_WHEEL_UP
+	ev.pressed = true
+	ev.position = pos
+	Input.parse_input_event(ev)
+
+
 func _process(delta: float) -> bool:
 	_t += delta
 	_stage_t += delta
@@ -107,22 +128,36 @@ func _process(delta: float) -> bool:
 				_press("ui_cancel")
 			elif _stage_t > 1.2:
 				_shot("menu.png")
-				_press("ui_down")
-				_press("ui_down")
+				_wheel(Vector2(640, 300), true)
+				_wheel(Vector2(640, 300), true)
 				_stage = 10
 				_stage_t = 0.0
 				_acted = false
-		10:  # Enter follows the menu into the gear page (connectivity check)
-			if _stage_t > 0.4 and not _acted:
-				_acted = true
-				_press("accept")
-			elif _stage_t > 1.2:
-				_shot("menu_gear.png")
-				_press("ui_cancel")
+		10:  # the wheel walked the menu cursor to Gear; a click opens it
+			if _stage_t > 1.2:
+				_shot("menu_wheel.png")
+				_click(Vector2(640, 202))
 				_stage = 11
 				_stage_t = 0.0
 				_acted = false
-		11:  # character sheet still draws over the lean HUD
+		11:  # the satchel, opened by mouse alone
+			if _stage_t > 1.2:
+				_shot("menu_gear.png")
+				_press("ui_cancel")
+				_stage = 12
+				_stage_t = 0.0
+				_acted = false
+		12:  # the MENU plaque beside the minimap opens the hub on a click
+			if _stage_t > 0.4 and not _acted:
+				_acted = true
+				_click(Vector2(1051, 689))
+			elif _stage_t > 1.2:
+				_shot("menu_button.png")
+				_press("ui_cancel")
+				_stage = 13
+				_stage_t = 0.0
+				_acted = false
+		13:  # character sheet still draws over the lean HUD
 			if _stage_t > 0.4 and not _acted:
 				_acted = true
 				current_scene.set("character_open", true)
@@ -130,15 +165,16 @@ func _process(delta: float) -> bool:
 				_shot("sheet.png")
 				current_scene.set("character_open", false)
 				current_scene.set("settings_open", true)
-				_stage = 12
+				_stage = 14
 				_stage_t = 0.0
 				_acted = false
-		12:  # settings page (UI frame check)
+		14:  # settings page (UI frame check)
 			if _stage_t > 1.2:
 				_shot("settings.png")
 				current_scene.set("settings_open", false)
 				_start_walk_east()
 				_stage_t = 0.0
+
 		2:  # walking east
 			if _stage_t > 0.9:
 				_shot("walk_east.png")
