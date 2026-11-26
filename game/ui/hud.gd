@@ -1609,7 +1609,7 @@ func draw_forge(player: Player) -> void:
 	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#e0a060", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "AZURE FORGE", 18, Color("#e8b070"))
-	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "DISASSEMBLE"]
+	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "ENCHANT", "DISASSEMBLE"]
 	var mode := int(host.forge_mode)
 	var tabs := ""
 	for i in modes.size():
@@ -1689,6 +1689,35 @@ func draw_forge(player: Player) -> void:
 			_text(Vector2(cx, cy), _fit("Needs %s." % String(up_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
 		else:
 			_text(Vector2(cx, cy), "ENTER raises it one level.", 12, ACCENT)
+		return
+	if mode == 3:
+		var marked_id := String(host.forge_enchant_item)
+		var en_check: Dictionary = Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(rules), 11, 360.0), 11, Color("#d8c070"))
+		cy += 20.0
+		if marked_id == "":
+			_text(Vector2(cx, cy), _fit("Failure %d%% — the piece keeps what it had." % int(round(float(rules.get("failure_chance", 0.0)) * 100.0)), 11, 360.0), 11, Color("#7f9098"))
+			cy += 32.0
+			if bool(chosen.get("unique", false)):
+				_text(Vector2(cx, cy), "An authored relic refuses a smith.", 11, Color("#e08f8f"))
+			else:
+				_text(Vector2(cx, cy), "ENTER chooses this piece, then the enchantment.", 12, ACCENT)
+			return
+		var marked: Dictionary = {}
+		for candidate in host.gear_candidates():
+			if String((candidate as Dictionary).get("id", "")) == marked_id:
+				marked = candidate
+				break
+		var current: Dictionary = marked.get("enchant", {})
+		var for_line := "For %s (item level %d)." % [String(marked.get("name", "the piece")), int(marked.get("ilvl", 1))]
+		if not current.is_empty():
+			for_line += " Now carries: " + String(current.get("text", ""))
+		_text(Vector2(cx, cy), _fit(for_line, 11, 360.0), 11, Color("#7f9098"))
+		cy += 32.0
+		if not bool(en_check.get("ok", false)):
+			_text(Vector2(cx, cy), _fit("Needs %s." % String(en_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
+		else:
+			_text(Vector2(cx, cy), "ENTER lays this enchantment.", 12, ACCENT)
 		return
 	var ore := Crafting.disassemble_ore(chosen)
 	_text(Vector2(cx, cy), "Yields: %d Spirit Ore" % ore, 12, Color("#d8c070"))

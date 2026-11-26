@@ -214,6 +214,14 @@ func refine(item: Dictionary, key: int, counter: int, quality_mult: float = 1.0,
 		out["reason"] = "the piece cannot be reforged"
 		return out
 	refined["durability"] = Items.durability_of(item)
+	# An enchantment is not a rolled affix: it survives the reroll whole.
+	var kept_enchant: Dictionary = item.get("enchant", {})
+	if not kept_enchant.is_empty():
+		refined["enchant"] = kept_enchant.duplicate()
+		for mod_value in (item.get("mods", []) as Array):
+			var kept_mod: Dictionary = mod_value
+			if bool(kept_mod.get("enchant", false)):
+				(refined["mods"] as Array).append(kept_mod.duplicate())
 	out["ok"] = true
 	out["quality"] = quality
 	out["item"] = refined
@@ -297,3 +305,71 @@ static func disassemble_ore(item: Dictionary) -> int:
 	if bool(item.get("unique", false)):
 		return 0
 	return maxi(1, ORE_BASE + int(item.get("rarity", 0)) * ORE_PER_RARITY + int(item.get("ilvl", 1)) / 2)
+
+
+## Lays one lasting enchantment on a piece of gear (Directive 12.2: Enchant).
+## The enchantment rides in the piece's mods like an affix, flagged, with its
+## own record on the item; there is one per piece, and a new one replaces the
+## old. Failure is gentle by design: the materials are spent at the forge, but
+## the piece — and any enchantment it already carries — is untouched.
+func enchant(item: Dictionary, enchant_id: String, key: int, counter: int, failure_mult: float = 1.0) -> Dictionary:
+	var out := {"ok": false, "failed": false, "item": item, "reason": ""}
+	if not Items.is_equipment(String(item.get("slot", ""))):
+		out["reason"] = "only gear can be enchanted"
+		return out
+	if bool(item.get("unique", false)):
+		out["reason"] = "an authored relic refuses a smith"
+		return out
+	var data: Dictionary = db.by_id("enchant", enchant_id)
+	if data.is_empty():
+		out["reason"] = "unknown enchantment"
+		return out
+	var slots: Array = data.get("slots", [])
+	if not slots.is_empty() and not slots.has(String(item.get("slot", ""))):
+		out["reason"] = "that enchantment will not take on this piece"
+		return out
+	var rules := action("enchant")
+	if rules.is_empty():
+		out["reason"] = "enchanting is not offered here"
+		return out
+	var r := Rng.stream("craft.enchant", key, counter)
+	var chance := clampf(float(rules.get("failure_chance", 0.0)) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0)
+	if r.randf() < chance:
+		out["failed"] = true
+		out["reason"] = "the working fails; the piece keeps what it had"
+		return out
+	var worked: Dictionary = item.duplicate(true)
+	var tier_index := ItemGen.tier_for(data, int(item.get("ilvl", 1)))
+	var tier := ItemGen.tier_data(data, tier_index)
+	var lo := float(tier.get("min", data.get("min", 0.0)))
+	var hi := float(tier.get("max", data.get("max", lo)))
+	var value := lo + r.randf() * maxf(0.0, hi - lo)
+	if String(data.get("unit", "")) == "%" or hi >= 10.0:
+		value = snappedf(value, 0.1)
+	else:
+		value = maxf(1.0, roundf(value))
+	var record := {
+		"id": enchant_id,
+		"name": String(data.get("name", "")),
+		"stat": String(data.get("stat", "")),
+		"value": value,
+		"text": ItemGen.affix_text(data, value),
+	}
+	var mods: Array = []
+	for mod_value in (worked.get("mods", []) as Array):
+		var mod: Dictionary = mod_value
+		if not bool(mod.get("enchant", false)):
+			mods.append(mod)
+	mods.append({
+		"id": enchant_id,
+		"stat": String(data.get("stat", "")),
+		"value": value,
+		"tier": tier_index + 1,
+		"text": String(record["text"]),
+		"enchant": true,
+	})
+	worked["mods"] = mods
+	worked["enchant"] = record
+	out["ok"] = true
+	out["item"] = worked
+	return out

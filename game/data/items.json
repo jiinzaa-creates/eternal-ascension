@@ -1,68 +1,1175 @@
 {
-  "bases": [
-    {"id": "base.sword.iron_jian", "name": "Iron Jian", "slot": "weapon", "weapon_type": "sword", "damage": 8, "ilvl": 1, "weight": 20, "value": 12, "tags": ["blade"], "implicit": "1.00 attack speed"},
-    {"id": "base.sword.heavy_saber", "name": "Heavy Saber", "slot": "weapon", "weapon_type": "saber", "damage": 15, "ilvl": 2, "weight": 14, "value": 18, "tags": ["blade", "heavy"], "requires": {"str": 12}, "implicit": "+12 poise damage"},
-    {"id": "base.staff.azure_rod", "name": "Azure Rod", "slot": "weapon", "weapon_type": "staff", "damage": 6, "ilvl": 3, "weight": 10, "value": 30, "tags": ["channel"], "conflicts": ["heavy"], "requires": {"int": 14}, "implicit": "+1.5 Qi per second"},
-    {"id": "base.whip.spirit_silk", "name": "Spirit Silk Whip", "slot": "weapon", "weapon_type": "whip", "damage": 7, "ilvl": 4, "weight": 7, "value": 34, "tags": ["wind"], "conflicts": ["heavy"], "requires": {"agi": 12}, "implicit": "+8% reach"},
-    {"id": "base.robe.cloud_silk", "name": "Cloud Silk Robe", "slot": "armor", "armor": 5, "ilvl": 1, "weight": 20, "value": 12, "tags": ["light"], "implicit": "+15 maximum Qi"},
-    {"id": "base.robe.iron_plate", "name": "Iron-Scaled Plate", "slot": "armor", "armor": 14, "ilvl": 2, "weight": 12, "value": 20, "tags": ["heavy"], "requires": {"str": 12}, "implicit": "+8% physical resistance"},
-    {"id": "base.ring.jade", "name": "Jade Ring", "slot": "ring", "ilvl": 1, "weight": 18, "value": 10, "tags": ["jade"], "implicit": "+2% critical chance"},
-    {"id": "base.ring.spirit_iron", "name": "Spirit Iron Ring", "slot": "ring", "ilvl": 3, "weight": 9, "value": 28, "tags": ["jade"], "requires": {"realm": 2}, "implicit": "+6% cultivation speed"},
-    {"id": "base.talisman.wind_charm", "name": "Wind Charm", "slot": "talisman", "ilvl": 1, "weight": 15, "value": 14, "tags": ["wind"], "conflicts": ["heavy"], "implicit": "+4% movement speed"},
-    {"id": "base.pill.qi_gathering", "name": "Qi Gathering Pill", "slot": "consumable", "ilvl": 1, "weight": 22, "value": 6, "implicit": "Restores Qi"},
-    {"id": "base.pill.mending", "name": "Mending Pill", "slot": "consumable", "ilvl": 1, "weight": 14, "value": 7, "implicit": "Mends wounds"},
-    {"id": "base.pill.cleansing", "name": "Cleansing Pill", "slot": "consumable", "ilvl": 2, "weight": 10, "value": 9, "implicit": "Purges Qi contamination"},
-    {"id": "base.pill.longevity", "name": "Longevity Pill", "slot": "consumable", "ilvl": 3, "weight": 4, "value": 120, "implicit": "Adds ten years of life"},
-    {"id": "base.pill.peach", "name": "Immortal Peach Pill", "slot": "consumable", "ilvl": 5, "weight": 1, "value": 400, "implicit": "Adds forty years of life"},
-    {"id": "base.pill.phoenix", "name": "Phoenix Rebirth Pill", "slot": "consumable", "ilvl": 5, "weight": 1, "value": 500, "implicit": "Cheats death once, if carried"},
-    {"id": "base.soul_vessel", "name": "Soul Vessel", "slot": "consumable", "ilvl": 6, "weight": 1, "value": 800, "implicit": "A prepared body, waiting for a soul"}
-  ],
-  "prefixes": [
-    {"id": "prefix.sharpened", "name": "Sharpened", "kind": "prefix", "stat": "physical_damage_pct", "stat_label": "physical damage", "unit": "%", "ilvl": 1, "slots": ["weapon"], "weight": 14, "min": 8, "max": 22,
-      "tiers": [{"ilvl": 1, "min": 8, "max": 22}, {"ilvl": 5, "min": 12, "max": 30}, {"ilvl": 9, "min": 18, "max": 40}]},
-    {"id": "prefix.swift", "name": "Swift", "kind": "prefix", "stat": "attack_speed_pct", "stat_label": "attack speed", "unit": "%", "ilvl": 1, "slots": ["weapon"], "weight": 12, "min": 4, "max": 12,
-      "tiers": [{"ilvl": 1, "min": 4, "max": 12}, {"ilvl": 5, "min": 7, "max": 17}, {"ilvl": 9, "min": 10, "max": 24}]},
-    {"id": "prefix.azure", "name": "Azure", "kind": "prefix", "stat": "qi_regen_flat", "stat_label": "Qi regeneration", "unit": "", "ilvl": 2, "slots": ["weapon", "ring", "talisman"], "weight": 8, "min": 0.5, "max": 2.0,
-      "tiers": [{"ilvl": 1, "min": 0.5, "max": 2.0}, {"ilvl": 4, "min": 1.0, "max": 3.0}, {"ilvl": 8, "min": 1.5, "max": 4.5}]},
-    {"id": "prefix.gleaming", "name": "Gleaming", "kind": "prefix", "stat": "crit_chance", "stat_label": "critical chance", "unit": "%", "ilvl": 2, "slots": ["weapon", "ring"], "weight": 8, "min": 2, "max": 7,
-      "tiers": [{"ilvl": 1, "min": 2, "max": 7}, {"ilvl": 5, "min": 3, "max": 10}, {"ilvl": 9, "min": 5, "max": 14}]},
-    {"id": "prefix.warding", "name": "Warding", "kind": "prefix", "stat": "physical_resist", "stat_label": "physical resistance", "unit": "%", "ilvl": 1, "slots": ["armor", "talisman"], "weight": 12, "min": 4, "max": 14,
-      "tiers": [{"ilvl": 1, "min": 4, "max": 14}, {"ilvl": 5, "min": 7, "max": 19}, {"ilvl": 9, "min": 10, "max": 26}]},
-    {"id": "prefix.flowing", "name": "Flowing", "kind": "prefix", "stat": "move_speed_pct", "stat_label": "movement speed", "unit": "%", "ilvl": 1, "slots": ["armor", "talisman"], "weight": 10, "min": 3, "max": 9,
-      "tiers": [{"ilvl": 1, "min": 3, "max": 9}, {"ilvl": 5, "min": 5, "max": 13}, {"ilvl": 9, "min": 7, "max": 18}]},
-    {"id": "prefix.spirit_bound", "name": "Spirit-Bound", "kind": "prefix", "stat": "cult_speed_pct", "stat_label": "cultivation speed", "unit": "%", "ilvl": 3, "slots": ["ring", "talisman"], "weight": 5, "min": 4, "max": 16,
-      "tiers": [{"ilvl": 1, "min": 4, "max": 16}, {"ilvl": 6, "min": 8, "max": 24}, {"ilvl": 10, "min": 12, "max": 32}]},
-    {"id": "prefix.heavenly", "name": "Heavenly", "kind": "prefix", "stat": "qi_max_pct", "stat_label": "maximum Qi", "unit": "%", "ilvl": 2, "slots": ["armor", "ring"], "weight": 6, "min": 5, "max": 18,
-      "tiers": [{"ilvl": 1, "min": 5, "max": 18}, {"ilvl": 5, "min": 9, "max": 26}, {"ilvl": 9, "min": 14, "max": 36}]},
-    {"id": "prefix.piercing", "name": "Piercing", "kind": "prefix", "stat": "penetration", "stat_label": "armour penetration", "unit": "%", "ilvl": 2, "slots": ["weapon", "ring"], "weight": 9, "min": 4, "max": 12,
-      "tiers": [{"ilvl": 1, "min": 4, "max": 12}, {"ilvl": 5, "min": 7, "max": 17}, {"ilvl": 9, "min": 10, "max": 22}]},
-    {"id": "prefix.hasty", "name": "Hasty", "kind": "prefix", "stat": "cooldown_reduction", "stat_label": "cooldown reduction", "unit": "%", "ilvl": 2, "slots": ["weapon", "ring", "talisman"], "weight": 8, "min": 3, "max": 9,
-      "tiers": [{"ilvl": 1, "min": 3, "max": 9}, {"ilvl": 5, "min": 5, "max": 13}, {"ilvl": 9, "min": 7, "max": 18}]},
-    {"id": "prefix.ruinous", "name": "Ruinous", "kind": "prefix", "stat": "crit_damage", "stat_label": "critical damage", "unit": "%", "ilvl": 3, "slots": ["weapon", "ring"], "weight": 5, "min": 10, "max": 30,
-      "tiers": [{"ilvl": 1, "min": 10, "max": 30}, {"ilvl": 5, "min": 16, "max": 42}, {"ilvl": 9, "min": 24, "max": 60}]}
-  ],
-  "suffixes": [
-    {"id": "suffix.tiger", "name": "of the Tiger", "kind": "suffix", "stat": "str", "stat_label": "STR", "unit": "", "ilvl": 1, "slots": ["weapon", "armor", "ring"], "weight": 12, "slot_weights": {"weapon": 18, "armor": 8, "ring": 14}, "min": 1, "max": 5,
-      "tiers": [{"ilvl": 1, "min": 1, "max": 5}, {"ilvl": 5, "min": 2, "max": 8}, {"ilvl": 9, "min": 3, "max": 11}]},
-    {"id": "suffix.swallow", "name": "of the Swallow", "kind": "suffix", "stat": "dex", "stat_label": "DEX", "unit": "", "ilvl": 1, "slots": ["weapon", "armor", "ring"], "weight": 12, "min": 1, "max": 5,
-      "tiers": [{"ilvl": 1, "min": 1, "max": 5}, {"ilvl": 5, "min": 2, "max": 8}, {"ilvl": 9, "min": 3, "max": 11}]},
-    {"id": "suffix.cloud", "name": "of the Cloud", "kind": "suffix", "stat": "agi", "stat_label": "AGI", "unit": "", "ilvl": 1, "slots": ["weapon", "armor", "talisman"], "weight": 10, "min": 1, "max": 5,
-      "tiers": [{"ilvl": 1, "min": 1, "max": 5}, {"ilvl": 5, "min": 2, "max": 8}, {"ilvl": 9, "min": 3, "max": 11}]},
-    {"id": "suffix.insight", "name": "of Insight", "kind": "suffix", "stat": "int", "stat_label": "INT", "unit": "", "ilvl": 2, "slots": ["ring", "talisman"], "weight": 8, "min": 1, "max": 4,
-      "tiers": [{"ilvl": 1, "min": 1, "max": 4}, {"ilvl": 5, "min": 2, "max": 7}, {"ilvl": 9, "min": 3, "max": 10}]},
-    {"id": "suffix.stillness", "name": "of Stillness", "kind": "suffix", "stat": "wis", "stat_label": "WIS", "unit": "", "ilvl": 2, "slots": ["ring", "talisman", "armor"], "weight": 9, "min": 1, "max": 4,
-      "tiers": [{"ilvl": 1, "min": 1, "max": 4}, {"ilvl": 5, "min": 2, "max": 7}, {"ilvl": 9, "min": 3, "max": 10}]},
-    {"id": "suffix.command", "name": "of Command", "kind": "suffix", "stat": "char", "stat_label": "CHA", "unit": "", "ilvl": 3, "slots": ["ring", "talisman"], "weight": 4, "min": 1, "max": 4,
-      "tiers": [{"ilvl": 1, "min": 1, "max": 4}, {"ilvl": 6, "min": 2, "max": 6}, {"ilvl": 10, "min": 3, "max": 9}]},
-    {"id": "suffix.vein", "name": "of the Vein", "kind": "suffix", "stat": "qi_max_flat", "stat_label": "maximum Qi", "unit": "", "ilvl": 1, "slots": ["ring", "armor", "talisman"], "weight": 10, "min": 8, "max": 30,
-      "tiers": [{"ilvl": 1, "min": 8, "max": 30}, {"ilvl": 5, "min": 14, "max": 44}, {"ilvl": 9, "min": 22, "max": 60}]},
-    {"id": "suffix.thunder", "name": "of Thunder", "kind": "suffix", "stat": "lightning_damage_pct", "stat_label": "lightning damage", "unit": "%", "ilvl": 3, "slots": ["weapon", "ring"], "weight": 6, "min": 6, "max": 20,
-      "tiers": [{"ilvl": 1, "min": 6, "max": 20}, {"ilvl": 5, "min": 10, "max": 28}, {"ilvl": 9, "min": 16, "max": 40}]},
-    {"id": "suffix.evasion", "name": "of Evasion", "kind": "suffix", "stat": "evasion", "stat_label": "evasion", "unit": "%", "ilvl": 2, "slots": ["armor", "ring", "talisman"], "weight": 10, "min": 3, "max": 10,
-      "tiers": [{"ilvl": 1, "min": 3, "max": 10}, {"ilvl": 5, "min": 5, "max": 14}, {"ilvl": 9, "min": 7, "max": 20}]},
-    {"id": "suffix.vitality", "name": "of Vitality", "kind": "suffix", "stat": "health_regen", "stat_label": "health regeneration", "unit": "/s", "ilvl": 1, "slots": ["armor", "ring", "talisman"], "weight": 12, "min": 0.3, "max": 1.2,
-      "tiers": [{"ilvl": 1, "min": 0.3, "max": 1.2}, {"ilvl": 5, "min": 0.6, "max": 2.0}, {"ilvl": 9, "min": 1.0, "max": 3.0}]},
-    {"id": "suffix.longevity", "name": "of Longevity", "kind": "suffix", "stat": "lifespan", "stat_label": "lifespan", "unit": " years", "ilvl": 3, "slots": ["talisman", "ring"], "weight": 4, "min": 5, "max": 25,
-      "tiers": [{"ilvl": 1, "min": 5, "max": 25}, {"ilvl": 6, "min": 10, "max": 40}, {"ilvl": 10, "min": 20, "max": 60}]}
-  ]
+ "bases": [
+  {
+   "id": "base.sword.iron_jian",
+   "name": "Iron Jian",
+   "slot": "weapon",
+   "weapon_type": "sword",
+   "damage": 8,
+   "ilvl": 1,
+   "weight": 20,
+   "value": 12,
+   "tags": [
+    "blade"
+   ],
+   "implicit": "1.00 attack speed"
+  },
+  {
+   "id": "base.sword.heavy_saber",
+   "name": "Heavy Saber",
+   "slot": "weapon",
+   "weapon_type": "saber",
+   "damage": 15,
+   "ilvl": 2,
+   "weight": 14,
+   "value": 18,
+   "tags": [
+    "blade",
+    "heavy"
+   ],
+   "requires": {
+    "str": 12
+   },
+   "implicit": "+12 poise damage"
+  },
+  {
+   "id": "base.staff.azure_rod",
+   "name": "Azure Rod",
+   "slot": "weapon",
+   "weapon_type": "staff",
+   "damage": 6,
+   "ilvl": 3,
+   "weight": 10,
+   "value": 30,
+   "tags": [
+    "channel"
+   ],
+   "conflicts": [
+    "heavy"
+   ],
+   "requires": {
+    "int": 14
+   },
+   "implicit": "+1.5 Qi per second"
+  },
+  {
+   "id": "base.whip.spirit_silk",
+   "name": "Spirit Silk Whip",
+   "slot": "weapon",
+   "weapon_type": "whip",
+   "damage": 7,
+   "ilvl": 4,
+   "weight": 7,
+   "value": 34,
+   "tags": [
+    "wind"
+   ],
+   "conflicts": [
+    "heavy"
+   ],
+   "requires": {
+    "agi": 12
+   },
+   "implicit": "+8% reach"
+  },
+  {
+   "id": "base.robe.cloud_silk",
+   "name": "Cloud Silk Robe",
+   "slot": "armor",
+   "armor": 5,
+   "ilvl": 1,
+   "weight": 20,
+   "value": 12,
+   "tags": [
+    "light"
+   ],
+   "implicit": "+15 maximum Qi"
+  },
+  {
+   "id": "base.robe.iron_plate",
+   "name": "Iron-Scaled Plate",
+   "slot": "armor",
+   "armor": 14,
+   "ilvl": 2,
+   "weight": 12,
+   "value": 20,
+   "tags": [
+    "heavy"
+   ],
+   "requires": {
+    "str": 12
+   },
+   "implicit": "+8% physical resistance"
+  },
+  {
+   "id": "base.ring.jade",
+   "name": "Jade Ring",
+   "slot": "ring",
+   "ilvl": 1,
+   "weight": 18,
+   "value": 10,
+   "tags": [
+    "jade"
+   ],
+   "implicit": "+2% critical chance"
+  },
+  {
+   "id": "base.ring.spirit_iron",
+   "name": "Spirit Iron Ring",
+   "slot": "ring",
+   "ilvl": 3,
+   "weight": 9,
+   "value": 28,
+   "tags": [
+    "jade"
+   ],
+   "requires": {
+    "realm": 2
+   },
+   "implicit": "+6% cultivation speed"
+  },
+  {
+   "id": "base.talisman.wind_charm",
+   "name": "Wind Charm",
+   "slot": "talisman",
+   "ilvl": 1,
+   "weight": 15,
+   "value": 14,
+   "tags": [
+    "wind"
+   ],
+   "conflicts": [
+    "heavy"
+   ],
+   "implicit": "+4% movement speed"
+  },
+  {
+   "id": "base.pill.qi_gathering",
+   "name": "Qi Gathering Pill",
+   "slot": "consumable",
+   "ilvl": 1,
+   "weight": 22,
+   "value": 6,
+   "implicit": "Restores Qi"
+  },
+  {
+   "id": "base.pill.mending",
+   "name": "Mending Pill",
+   "slot": "consumable",
+   "ilvl": 1,
+   "weight": 14,
+   "value": 7,
+   "implicit": "Mends wounds"
+  },
+  {
+   "id": "base.pill.cleansing",
+   "name": "Cleansing Pill",
+   "slot": "consumable",
+   "ilvl": 2,
+   "weight": 10,
+   "value": 9,
+   "implicit": "Purges Qi contamination"
+  },
+  {
+   "id": "base.pill.longevity",
+   "name": "Longevity Pill",
+   "slot": "consumable",
+   "ilvl": 3,
+   "weight": 4,
+   "value": 120,
+   "implicit": "Adds ten years of life"
+  },
+  {
+   "id": "base.pill.peach",
+   "name": "Immortal Peach Pill",
+   "slot": "consumable",
+   "ilvl": 5,
+   "weight": 1,
+   "value": 400,
+   "implicit": "Adds forty years of life"
+  },
+  {
+   "id": "base.pill.phoenix",
+   "name": "Phoenix Rebirth Pill",
+   "slot": "consumable",
+   "ilvl": 5,
+   "weight": 1,
+   "value": 500,
+   "implicit": "Cheats death once, if carried"
+  },
+  {
+   "id": "base.soul_vessel",
+   "name": "Soul Vessel",
+   "slot": "consumable",
+   "ilvl": 6,
+   "weight": 1,
+   "value": 800,
+   "implicit": "A prepared body, waiting for a soul"
+  }
+ ],
+ "prefixes": [
+  {
+   "id": "prefix.sharpened",
+   "name": "Sharpened",
+   "kind": "prefix",
+   "stat": "physical_damage_pct",
+   "stat_label": "physical damage",
+   "unit": "%",
+   "ilvl": 1,
+   "slots": [
+    "weapon"
+   ],
+   "weight": 14,
+   "min": 8,
+   "max": 22,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 8,
+     "max": 22
+    },
+    {
+     "ilvl": 5,
+     "min": 12,
+     "max": 30
+    },
+    {
+     "ilvl": 9,
+     "min": 18,
+     "max": 40
+    }
+   ]
+  },
+  {
+   "id": "prefix.swift",
+   "name": "Swift",
+   "kind": "prefix",
+   "stat": "attack_speed_pct",
+   "stat_label": "attack speed",
+   "unit": "%",
+   "ilvl": 1,
+   "slots": [
+    "weapon"
+   ],
+   "weight": 12,
+   "min": 4,
+   "max": 12,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 4,
+     "max": 12
+    },
+    {
+     "ilvl": 5,
+     "min": 7,
+     "max": 17
+    },
+    {
+     "ilvl": 9,
+     "min": 10,
+     "max": 24
+    }
+   ]
+  },
+  {
+   "id": "prefix.azure",
+   "name": "Azure",
+   "kind": "prefix",
+   "stat": "qi_regen_flat",
+   "stat_label": "Qi regeneration",
+   "unit": "",
+   "ilvl": 2,
+   "slots": [
+    "weapon",
+    "ring",
+    "talisman"
+   ],
+   "weight": 8,
+   "min": 0.5,
+   "max": 2.0,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 0.5,
+     "max": 2.0
+    },
+    {
+     "ilvl": 4,
+     "min": 1.0,
+     "max": 3.0
+    },
+    {
+     "ilvl": 8,
+     "min": 1.5,
+     "max": 4.5
+    }
+   ]
+  },
+  {
+   "id": "prefix.gleaming",
+   "name": "Gleaming",
+   "kind": "prefix",
+   "stat": "crit_chance",
+   "stat_label": "critical chance",
+   "unit": "%",
+   "ilvl": 2,
+   "slots": [
+    "weapon",
+    "ring"
+   ],
+   "weight": 8,
+   "min": 2,
+   "max": 7,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 2,
+     "max": 7
+    },
+    {
+     "ilvl": 5,
+     "min": 3,
+     "max": 10
+    },
+    {
+     "ilvl": 9,
+     "min": 5,
+     "max": 14
+    }
+   ]
+  },
+  {
+   "id": "prefix.warding",
+   "name": "Warding",
+   "kind": "prefix",
+   "stat": "physical_resist",
+   "stat_label": "physical resistance",
+   "unit": "%",
+   "ilvl": 1,
+   "slots": [
+    "armor",
+    "talisman"
+   ],
+   "weight": 12,
+   "min": 4,
+   "max": 14,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 4,
+     "max": 14
+    },
+    {
+     "ilvl": 5,
+     "min": 7,
+     "max": 19
+    },
+    {
+     "ilvl": 9,
+     "min": 10,
+     "max": 26
+    }
+   ]
+  },
+  {
+   "id": "prefix.flowing",
+   "name": "Flowing",
+   "kind": "prefix",
+   "stat": "move_speed_pct",
+   "stat_label": "movement speed",
+   "unit": "%",
+   "ilvl": 1,
+   "slots": [
+    "armor",
+    "talisman"
+   ],
+   "weight": 10,
+   "min": 3,
+   "max": 9,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 3,
+     "max": 9
+    },
+    {
+     "ilvl": 5,
+     "min": 5,
+     "max": 13
+    },
+    {
+     "ilvl": 9,
+     "min": 7,
+     "max": 18
+    }
+   ]
+  },
+  {
+   "id": "prefix.spirit_bound",
+   "name": "Spirit-Bound",
+   "kind": "prefix",
+   "stat": "cult_speed_pct",
+   "stat_label": "cultivation speed",
+   "unit": "%",
+   "ilvl": 3,
+   "slots": [
+    "ring",
+    "talisman"
+   ],
+   "weight": 5,
+   "min": 4,
+   "max": 16,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 4,
+     "max": 16
+    },
+    {
+     "ilvl": 6,
+     "min": 8,
+     "max": 24
+    },
+    {
+     "ilvl": 10,
+     "min": 12,
+     "max": 32
+    }
+   ]
+  },
+  {
+   "id": "prefix.heavenly",
+   "name": "Heavenly",
+   "kind": "prefix",
+   "stat": "qi_max_pct",
+   "stat_label": "maximum Qi",
+   "unit": "%",
+   "ilvl": 2,
+   "slots": [
+    "armor",
+    "ring"
+   ],
+   "weight": 6,
+   "min": 5,
+   "max": 18,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 5,
+     "max": 18
+    },
+    {
+     "ilvl": 5,
+     "min": 9,
+     "max": 26
+    },
+    {
+     "ilvl": 9,
+     "min": 14,
+     "max": 36
+    }
+   ]
+  },
+  {
+   "id": "prefix.piercing",
+   "name": "Piercing",
+   "kind": "prefix",
+   "stat": "penetration",
+   "stat_label": "armour penetration",
+   "unit": "%",
+   "ilvl": 2,
+   "slots": [
+    "weapon",
+    "ring"
+   ],
+   "weight": 9,
+   "min": 4,
+   "max": 12,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 4,
+     "max": 12
+    },
+    {
+     "ilvl": 5,
+     "min": 7,
+     "max": 17
+    },
+    {
+     "ilvl": 9,
+     "min": 10,
+     "max": 22
+    }
+   ]
+  },
+  {
+   "id": "prefix.hasty",
+   "name": "Hasty",
+   "kind": "prefix",
+   "stat": "cooldown_reduction",
+   "stat_label": "cooldown reduction",
+   "unit": "%",
+   "ilvl": 2,
+   "slots": [
+    "weapon",
+    "ring",
+    "talisman"
+   ],
+   "weight": 8,
+   "min": 3,
+   "max": 9,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 3,
+     "max": 9
+    },
+    {
+     "ilvl": 5,
+     "min": 5,
+     "max": 13
+    },
+    {
+     "ilvl": 9,
+     "min": 7,
+     "max": 18
+    }
+   ]
+  },
+  {
+   "id": "prefix.ruinous",
+   "name": "Ruinous",
+   "kind": "prefix",
+   "stat": "crit_damage",
+   "stat_label": "critical damage",
+   "unit": "%",
+   "ilvl": 3,
+   "slots": [
+    "weapon",
+    "ring"
+   ],
+   "weight": 5,
+   "min": 10,
+   "max": 30,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 10,
+     "max": 30
+    },
+    {
+     "ilvl": 5,
+     "min": 16,
+     "max": 42
+    },
+    {
+     "ilvl": 9,
+     "min": 24,
+     "max": 60
+    }
+   ]
+  }
+ ],
+ "suffixes": [
+  {
+   "id": "suffix.tiger",
+   "name": "of the Tiger",
+   "kind": "suffix",
+   "stat": "str",
+   "stat_label": "STR",
+   "unit": "",
+   "ilvl": 1,
+   "slots": [
+    "weapon",
+    "armor",
+    "ring"
+   ],
+   "weight": 12,
+   "slot_weights": {
+    "weapon": 18,
+    "armor": 8,
+    "ring": 14
+   },
+   "min": 1,
+   "max": 5,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 1,
+     "max": 5
+    },
+    {
+     "ilvl": 5,
+     "min": 2,
+     "max": 8
+    },
+    {
+     "ilvl": 9,
+     "min": 3,
+     "max": 11
+    }
+   ]
+  },
+  {
+   "id": "suffix.swallow",
+   "name": "of the Swallow",
+   "kind": "suffix",
+   "stat": "dex",
+   "stat_label": "DEX",
+   "unit": "",
+   "ilvl": 1,
+   "slots": [
+    "weapon",
+    "armor",
+    "ring"
+   ],
+   "weight": 12,
+   "min": 1,
+   "max": 5,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 1,
+     "max": 5
+    },
+    {
+     "ilvl": 5,
+     "min": 2,
+     "max": 8
+    },
+    {
+     "ilvl": 9,
+     "min": 3,
+     "max": 11
+    }
+   ]
+  },
+  {
+   "id": "suffix.cloud",
+   "name": "of the Cloud",
+   "kind": "suffix",
+   "stat": "agi",
+   "stat_label": "AGI",
+   "unit": "",
+   "ilvl": 1,
+   "slots": [
+    "weapon",
+    "armor",
+    "talisman"
+   ],
+   "weight": 10,
+   "min": 1,
+   "max": 5,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 1,
+     "max": 5
+    },
+    {
+     "ilvl": 5,
+     "min": 2,
+     "max": 8
+    },
+    {
+     "ilvl": 9,
+     "min": 3,
+     "max": 11
+    }
+   ]
+  },
+  {
+   "id": "suffix.insight",
+   "name": "of Insight",
+   "kind": "suffix",
+   "stat": "int",
+   "stat_label": "INT",
+   "unit": "",
+   "ilvl": 2,
+   "slots": [
+    "ring",
+    "talisman"
+   ],
+   "weight": 8,
+   "min": 1,
+   "max": 4,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 1,
+     "max": 4
+    },
+    {
+     "ilvl": 5,
+     "min": 2,
+     "max": 7
+    },
+    {
+     "ilvl": 9,
+     "min": 3,
+     "max": 10
+    }
+   ]
+  },
+  {
+   "id": "suffix.stillness",
+   "name": "of Stillness",
+   "kind": "suffix",
+   "stat": "wis",
+   "stat_label": "WIS",
+   "unit": "",
+   "ilvl": 2,
+   "slots": [
+    "ring",
+    "talisman",
+    "armor"
+   ],
+   "weight": 9,
+   "min": 1,
+   "max": 4,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 1,
+     "max": 4
+    },
+    {
+     "ilvl": 5,
+     "min": 2,
+     "max": 7
+    },
+    {
+     "ilvl": 9,
+     "min": 3,
+     "max": 10
+    }
+   ]
+  },
+  {
+   "id": "suffix.command",
+   "name": "of Command",
+   "kind": "suffix",
+   "stat": "char",
+   "stat_label": "CHA",
+   "unit": "",
+   "ilvl": 3,
+   "slots": [
+    "ring",
+    "talisman"
+   ],
+   "weight": 4,
+   "min": 1,
+   "max": 4,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 1,
+     "max": 4
+    },
+    {
+     "ilvl": 6,
+     "min": 2,
+     "max": 6
+    },
+    {
+     "ilvl": 10,
+     "min": 3,
+     "max": 9
+    }
+   ]
+  },
+  {
+   "id": "suffix.vein",
+   "name": "of the Vein",
+   "kind": "suffix",
+   "stat": "qi_max_flat",
+   "stat_label": "maximum Qi",
+   "unit": "",
+   "ilvl": 1,
+   "slots": [
+    "ring",
+    "armor",
+    "talisman"
+   ],
+   "weight": 10,
+   "min": 8,
+   "max": 30,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 8,
+     "max": 30
+    },
+    {
+     "ilvl": 5,
+     "min": 14,
+     "max": 44
+    },
+    {
+     "ilvl": 9,
+     "min": 22,
+     "max": 60
+    }
+   ]
+  },
+  {
+   "id": "suffix.thunder",
+   "name": "of Thunder",
+   "kind": "suffix",
+   "stat": "lightning_damage_pct",
+   "stat_label": "lightning damage",
+   "unit": "%",
+   "ilvl": 3,
+   "slots": [
+    "weapon",
+    "ring"
+   ],
+   "weight": 6,
+   "min": 6,
+   "max": 20,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 6,
+     "max": 20
+    },
+    {
+     "ilvl": 5,
+     "min": 10,
+     "max": 28
+    },
+    {
+     "ilvl": 9,
+     "min": 16,
+     "max": 40
+    }
+   ]
+  },
+  {
+   "id": "suffix.evasion",
+   "name": "of Evasion",
+   "kind": "suffix",
+   "stat": "evasion",
+   "stat_label": "evasion",
+   "unit": "%",
+   "ilvl": 2,
+   "slots": [
+    "armor",
+    "ring",
+    "talisman"
+   ],
+   "weight": 10,
+   "min": 3,
+   "max": 10,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 3,
+     "max": 10
+    },
+    {
+     "ilvl": 5,
+     "min": 5,
+     "max": 14
+    },
+    {
+     "ilvl": 9,
+     "min": 7,
+     "max": 20
+    }
+   ]
+  },
+  {
+   "id": "suffix.vitality",
+   "name": "of Vitality",
+   "kind": "suffix",
+   "stat": "health_regen",
+   "stat_label": "health regeneration",
+   "unit": "/s",
+   "ilvl": 1,
+   "slots": [
+    "armor",
+    "ring",
+    "talisman"
+   ],
+   "weight": 12,
+   "min": 0.3,
+   "max": 1.2,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 0.3,
+     "max": 1.2
+    },
+    {
+     "ilvl": 5,
+     "min": 0.6,
+     "max": 2.0
+    },
+    {
+     "ilvl": 9,
+     "min": 1.0,
+     "max": 3.0
+    }
+   ]
+  },
+  {
+   "id": "suffix.longevity",
+   "name": "of Longevity",
+   "kind": "suffix",
+   "stat": "lifespan",
+   "stat_label": "lifespan",
+   "unit": " years",
+   "ilvl": 3,
+   "slots": [
+    "talisman",
+    "ring"
+   ],
+   "weight": 4,
+   "min": 5,
+   "max": 25,
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 5,
+     "max": 25
+    },
+    {
+     "ilvl": 6,
+     "min": 10,
+     "max": 40
+    },
+    {
+     "ilvl": 10,
+     "min": 20,
+     "max": 60
+    }
+   ]
+  }
+ ],
+ "enchants": [
+  {
+   "id": "enchant.stormbrand",
+   "name": "Stormbrand",
+   "stat": "lightning_damage_pct",
+   "stat_label": "lightning damage",
+   "unit": "%",
+   "slots": [
+    "weapon"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 4,
+     "max": 10
+    },
+    {
+     "ilvl": 4,
+     "min": 8,
+     "max": 16
+    },
+    {
+     "ilvl": 7,
+     "min": 12,
+     "max": 24
+    }
+   ]
+  },
+  {
+   "id": "enchant.stonehide",
+   "name": "Stonehide",
+   "stat": "physical_resist",
+   "stat_label": "physical resistance",
+   "unit": "%",
+   "slots": [
+    "armor"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 3,
+     "max": 6
+    },
+    {
+     "ilvl": 4,
+     "min": 5,
+     "max": 9
+    },
+    {
+     "ilvl": 7,
+     "min": 8,
+     "max": 13
+    }
+   ]
+  },
+  {
+   "id": "enchant.wellspring",
+   "name": "Wellspring",
+   "stat": "qi_regen_flat",
+   "stat_label": "Qi regeneration",
+   "unit": "",
+   "slots": [
+    "ring",
+    "talisman"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 1,
+     "max": 3
+    },
+    {
+     "ilvl": 4,
+     "min": 2,
+     "max": 5
+    },
+    {
+     "ilvl": 7,
+     "min": 4,
+     "max": 8
+    }
+   ]
+  },
+  {
+   "id": "enchant.longevity",
+   "name": "Longevity",
+   "stat": "lifespan",
+   "stat_label": "lifespan",
+   "unit": " years",
+   "slots": [
+    "talisman",
+    "ring"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 2,
+     "max": 5
+    },
+    {
+     "ilvl": 4,
+     "min": 4,
+     "max": 9
+    },
+    {
+     "ilvl": 7,
+     "min": 7,
+     "max": 14
+    }
+   ]
+  },
+  {
+   "id": "enchant.daoflow",
+   "name": "Daoflow",
+   "stat": "cult_speed_pct",
+   "stat_label": "cultivation speed",
+   "unit": "%",
+   "slots": [
+    "ring",
+    "talisman"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 5,
+     "max": 10
+    },
+    {
+     "ilvl": 4,
+     "min": 8,
+     "max": 15
+    },
+    {
+     "ilvl": 7,
+     "min": 12,
+     "max": 22
+    }
+   ]
+  },
+  {
+   "id": "enchant.piercing",
+   "name": "Piercing",
+   "stat": "penetration",
+   "stat_label": "armour penetration",
+   "unit": "%",
+   "slots": [
+    "weapon"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 4,
+     "max": 8
+    },
+    {
+     "ilvl": 4,
+     "min": 7,
+     "max": 13
+    },
+    {
+     "ilvl": 7,
+     "min": 11,
+     "max": 20
+    }
+   ]
+  },
+  {
+   "id": "enchant.swiftness",
+   "name": "Swiftness",
+   "stat": "cooldown_reduction",
+   "stat_label": "cooldown reduction",
+   "unit": "%",
+   "slots": [
+    "weapon",
+    "talisman"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 3,
+     "max": 6
+    },
+    {
+     "ilvl": 4,
+     "min": 5,
+     "max": 9
+    },
+    {
+     "ilvl": 7,
+     "min": 8,
+     "max": 13
+    }
+   ]
+  },
+  {
+   "id": "enchant.fortune",
+   "name": "Fortune",
+   "stat": "crit_chance",
+   "stat_label": "critical chance",
+   "unit": "%",
+   "slots": [
+    "weapon",
+    "ring"
+   ],
+   "tiers": [
+    {
+     "ilvl": 1,
+     "min": 2,
+     "max": 5
+    },
+    {
+     "ilvl": 4,
+     "min": 4,
+     "max": 8
+    },
+    {
+     "ilvl": 7,
+     "min": 6,
+     "max": 12
+    }
+   ]
+  }
+ ]
 }

@@ -2432,6 +2432,53 @@ func _crafting_tests() -> void:
 		"a failed upgrade keeps the level and spends the piece's durability")
 	check(not bool(rules.upgrade({"slot": "consumable"}, 1, 0, 0.0).get("ok", false)),
 		"a consumable cannot be upgraded")
+
+	# Enchanting: one lasting enchantment per piece, riding in the mods.
+	check(DB.enchants_for("weapon").size() >= 2 and not DB.by_id("enchant", "enchant.stormbrand").is_empty(),
+		"the enchant pool offers weapon enchantments")
+	var en_piece := gen.generate(5, 70007, 1, 2, "weapon")
+	var laid := rules.enchant(en_piece, "enchant.stormbrand", 90001, 0, 0.0)
+	check(bool(laid.get("ok", false)), "a sure-handed enchantment lands")
+	var laid_item: Dictionary = laid["item"]
+	var record: Dictionary = laid_item.get("enchant", {})
+	check(String(record.get("id", "")) == "enchant.stormbrand", "the piece records its enchantment")
+	var enchant_mods := 0
+	for mod_value in (laid_item.get("mods", []) as Array):
+		if bool((mod_value as Dictionary).get("enchant", false)):
+			enchant_mods += 1
+	check(enchant_mods == 1, "exactly one enchantment rides in the mods")
+	var replaced := rules.enchant(laid_item, "enchant.piercing", 90002, 0, 0.0)
+	var replaced_item: Dictionary = replaced["item"]
+	var replaced_mods := 0
+	for mod_value in (replaced_item.get("mods", []) as Array):
+		if bool((mod_value as Dictionary).get("enchant", false)):
+			replaced_mods += 1
+	check(bool(replaced.get("ok", false)) and String((replaced_item.get("enchant", {}) as Dictionary).get("id", "")) == "enchant.piercing"
+		and replaced_mods == 1, "a new enchantment replaces the old, never stacks")
+	var en_failed: Dictionary = {}
+	for counter in range(0, 400):
+		var attempt := rules.enchant(laid_item, "enchant.fortune", 90003, counter, 1.0)
+		if bool(attempt.get("failed", false)):
+			en_failed = attempt
+			break
+	check(not en_failed.is_empty()
+		and String(((en_failed["item"] as Dictionary).get("enchant", {}) as Dictionary).get("id", "")) == "enchant.stormbrand",
+		"a failed enchantment leaves the piece and its old enchantment untouched")
+	var armor_piece := gen.generate(5, 70008, 1, 2, "armor")
+	check(not bool(rules.enchant(armor_piece, "enchant.stormbrand", 90004, 0, 0.0).get("ok", true)),
+		"an enchantment refuses a slot it will not take")
+	var refined_kept := rules.refine(laid_item, 60009, 0, 0.0, 0.0)
+	var kept_item: Dictionary = refined_kept["item"]
+	var kept_mods := 0
+	for mod_value in (kept_item.get("mods", []) as Array):
+		if bool((mod_value as Dictionary).get("enchant", false)):
+			kept_mods += 1
+	check(bool(refined_kept.get("ok", false))
+		and String((kept_item.get("enchant", {}) as Dictionary).get("id", "")) == "enchant.stormbrand" and kept_mods == 1,
+		"refinement rerolls the affixes but the enchantment survives")
+	var round_trip: Dictionary = Items.normalize_item(laid_item)
+	check(String((round_trip.get("enchant", {}) as Dictionary).get("id", "")) == "enchant.stormbrand",
+		"a saved piece keeps its enchantment")
 	check(not bool(Crafting.check(recipe, bag, 10, 1)["ok"]), "a recipe refuses an empty purse")
 	check(String(Crafting.check(recipe, bag, 10, 1)["reason"]).contains("spirit stones"), "the refusal names the missing stones")
 	check(bool(Crafting.check(recipe, bag, 100, 1)["ok"]), "a payable recipe passes")

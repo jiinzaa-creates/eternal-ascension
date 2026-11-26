@@ -34,7 +34,7 @@ const REPAIR_RATE := 0.18
 const FIELDS: Array[String] = [
 	"id", "seed", "base", "base_name", "slot", "weapon_type", "ilvl", "rarity",
 	"rarity_name", "name", "implicit", "base_damage", "armor", "mods", "value",
-	"unique", "lore", "material", "potency", "count", "durability",
+	"unique", "lore", "material", "potency", "count", "durability", "enchant",
 ]
 
 
@@ -168,6 +168,15 @@ static func normalize_item(value: Variant) -> Dictionary:
 	out["material"] = String(data.get("material", ""))
 	out["potency"] = clampf(float(data.get("potency", 1.0)), 0.1, 5.0)
 	out["count"] = clampi(int(data.get("count", 1)), 1, 999)
+	var enchant_data: Dictionary = data.get("enchant", {})
+	if not enchant_data.is_empty() and String(enchant_data.get("id", "")) != "":
+		out["enchant"] = {
+			"id": String(enchant_data.get("id", "")),
+			"name": String(enchant_data.get("name", "")),
+			"stat": String(enchant_data.get("stat", "")),
+			"value": float(enchant_data.get("value", 0.0)),
+			"text": String(enchant_data.get("text", "")),
+		}
 	if DURABLE_SLOTS.has(String(out["slot"])):
 		var maximum := max_durability(String(out["slot"]))
 		out["durability"] = clampf(float(data.get("durability", maximum)), 0.0, maximum)
@@ -188,6 +197,7 @@ static func _normalize_mods(value: Variant) -> Array:
 			"value": float(data.get("value", 0.0)),
 			"tier": maxi(1, int(data.get("tier", 1))),
 			"text": String(data.get("text", "")),
+			"enchant": bool(data.get("enchant", false)),
 		})
 	return out
 

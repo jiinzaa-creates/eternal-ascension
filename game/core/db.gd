@@ -22,6 +22,7 @@ var method_affixes: Array = []
 var bases: Array = []
 var prefixes: Array = []
 var suffixes: Array = []
+var enchants: Array = []
 var passives: Array = []
 var quests: Array = []
 var npc_data: Dictionary = {}
@@ -108,6 +109,7 @@ func load_all() -> void:
 	bases = items.get("bases", [])
 	prefixes = items.get("prefixes", [])
 	suffixes = items.get("suffixes", [])
+	enchants = items.get("enchants", [])
 	passives = _read("passives.json").get("passives", [])
 	quests = _read("quests.json").get("quests", [])
 	npc_data = _read("npcs.json")
@@ -165,6 +167,7 @@ func load_all() -> void:
 	_index("base", bases)
 	_index("prefix", prefixes)
 	_index("suffix", suffixes)
+	_index("enchant", enchants)
 	_index("passive", passives)
 	_index("quest", quests)
 	_index("biome", biomes)
@@ -447,6 +450,16 @@ func bases_for(slot: String) -> Array:
 	return out
 
 
+## The enchantments that will take on a slot, in data order.
+func enchants_for(slot: String) -> Array:
+	var out: Array = []
+	for e in enchants:
+		var slots: Array = e.get("slots", [])
+		if slots.is_empty() or slots.has(slot):
+			out.append(e)
+	return out
+
+
 func affixes_for(slot: String, kind: String) -> Array:
 	var pool: Array = prefixes if kind == "prefix" else suffixes
 	var out: Array = []
@@ -719,6 +732,24 @@ func validate() -> Array:
 	for pool in [prefixes, suffixes]:
 		for a in pool:
 			_validate_affix(a, affix_ids, problems)
+	var enchant_ids: Dictionary = {}
+	for e in enchants:
+		var enchant_id := String(e.get("id", ""))
+		if enchant_id == "":
+			problems.append("enchant without id")
+			continue
+		if enchant_ids.has(enchant_id):
+			problems.append("duplicate enchant id " + enchant_id)
+		enchant_ids[enchant_id] = true
+		if String(e.get("name", "")) == "":
+			problems.append("enchant %s has no name" % enchant_id)
+		var enchant_stat := String(e.get("stat", ""))
+		if not (Attributes.KEYS.has(enchant_stat) or StatBlock.PERCENT_STATS.has(enchant_stat) or StatBlock.FLAT_STATS.has(enchant_stat)):
+			problems.append("enchant %s uses unknown stat %s" % [enchant_id, enchant_stat])
+		if (e.get("slots", []) as Array).is_empty():
+			problems.append("enchant %s fits no slot" % enchant_id)
+		if (e.get("tiers", []) as Array).is_empty():
+			problems.append("enchant %s has no tiers" % enchant_id)
 	# Every equipment slot must be able to roll both halves, or a treasure item
 	# would come up short of the affix count its rarity promises.
 	for slot in ["weapon", "armor", "ring", "talisman"]:
