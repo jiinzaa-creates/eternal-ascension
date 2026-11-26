@@ -326,9 +326,35 @@ class ProvinceChunk:
 		features = payload.get("features", [])
 		herbs = payload.get("herbs", [])
 		pois = payload.get("pois", [])
+		_paint_ground()
+
+
+	## Paints the Art Studio ground for this chunk: 32x32 tiles from
+	## the biome folder, hash-varied grass with a dirt sprinkle. Runs
+	## once per payload; the TileMapLayer is reused on re-apply.
+	func _paint_ground() -> void:
+		if not TerrainTiles.tiles_enabled():
+			return
+		var layer := get_node_or_null("GroundTiles") as TileMapLayer
+		if layer == null:
+			layer = TileMapLayer.new()
+			layer.name = "GroundTiles"
+			layer.z_index = -20
+			layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(layer)
+		layer.tile_set = TerrainTiles.tileset_for(biome)
+		for cx in 32:
+			for cy in 32:
+				var h := absi((coord.x * 73856093) ^ (coord.y * 19349663) ^ (cx * 83492791) ^ (cy * 297121507) ^ signature)
+				var src: int = TerrainTiles.GRASS[(h / 100) % TerrainTiles.GRASS.size()]
+				if h % 100 < 7:
+					src = TerrainTiles.DIRT[(h / 7) % TerrainTiles.DIRT.size()]
+				layer.set_cell(Vector2i(cx, cy), src, Vector2i.ZERO)
 
 
 	func _draw() -> void:
+		if TerrainTiles.tiles_enabled():
+			return
 		var colors: Array = palette if not palette.is_empty() else PALETTES
 		draw_rect(Rect2(Vector2.ZERO, Vector2(SIZE, SIZE)), colors[abs(coord.x + coord.y) % colors.size()])
 		# A faint boundary makes streaming invisible glitches obvious during play.

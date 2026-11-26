@@ -76,6 +76,7 @@ var retreat_left := 0.0
 var statuses: Array = []
 
 var animator := Animator.new()
+var _sprite: ActorSprite = null
 
 var _entry: Dictionary = {}
 var _facing := Vector2.DOWN
@@ -253,6 +254,8 @@ func _physics_process(delta: float) -> void:
 	_cooldown = maxf(0.0, _cooldown - delta)
 	animator.update(delta, velocity.length() / maxf(1.0, speed), false,
 		_windup > 0.0, false, poise.is_staggered(), false, false)
+	_refresh_sprite()
+	_sprite.present(_facing, animator, velocity.length() / maxf(1.0, speed))
 
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
 
@@ -652,7 +655,50 @@ func _die() -> void:
 	queue_free()
 
 
+## Resolves the Art Studio set for the body this Dummy currently is:
+## a spirit beast by species, a boss by archetype at boss scale with a
+## colour tint, a biome human by name variant or archetype. A body with
+## no identity applied (the plain training dummy) keeps its shapes.
+func _refresh_sprite() -> void:
+	if _sprite == null:
+		_sprite = ActorSprite.new()
+		add_child(_sprite)
+	var root := "res://assets/art-studio/assets/"
+	match species_id:
+		"beast.moonfang":
+			_sprite.configure(root + "characters/companions/companion_spirit_wolf", 64.0, ["a", "b"])
+			return
+		"beast.stoneback":
+			_sprite.configure(root + "enemies/beasts/enemy_iron_tusk_boar", 64.0, ["a", "b"])
+			return
+		"beast.thundercrane":
+			_sprite.configure(root + "enemies/beasts/enemy_storm_crane", 64.0, ["left", "right"])
+			return
+		"beast.gloomserpent":
+			_sprite.configure(root + "enemies/beasts/enemy_gloom_serpent", 64.0, ["a", "b"], 1.0, Color.WHITE, true)
+			return
+	if is_boss:
+		_sprite.configure(_human_base(root), 64.0, ["left", "right"], 1.7,
+			Color.WHITE.lerp(body_color, 0.30))
+		return
+	if not _entry.is_empty() or display_name != "Cultivator Dummy":
+		_sprite.configure(_human_base(root))
+		return
+	_sprite.configure("")
+
+
+func _human_base(root: String) -> String:
+	var stem := "enemy_qi_archer" if archetype == "archer" else "enemy_" + archetype
+	var slug := display_name.to_snake_case()
+	var variant := root + "enemies/humans/variants/" + slug + "/enemy_" + slug
+	if ResourceLoader.exists(variant + "_idle_s.png"):
+		return variant
+	return root + "enemies/humans/" + stem
+
+
 func _draw() -> void:
+	if _sprite != null:
+		_sprite.visible = _sprite.is_active() and not _dead
 	var radius := RADIUS * (1.7 if is_boss else 1.0)
 	draw_circle(Vector2(0, 6), radius * 0.9, Color(0, 0, 0, 0.28))
 	if is_elite and not is_boss:
@@ -673,10 +719,11 @@ func _draw() -> void:
 
 	var pose := Animator.pose(animator.state, animator.time, 0.0)
 	draw_set_transform(pose["bob"], float(pose["lean"]), pose["squash"])
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(0, -radius), Vector2(radius, 0), Vector2(0, radius), Vector2(-radius, 0),
-	]), body)
-	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, Color("#2a1c1c"), 2.0)
+	if _sprite == null or not _sprite.is_active():
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(0, -radius), Vector2(radius, 0), Vector2(0, radius), Vector2(-radius, 0),
+		]), body)
+		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, Color("#2a1c1c"), 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# A beaten body wears a cold ring and a short trickle of sand: the window in

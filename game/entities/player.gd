@@ -60,6 +60,8 @@ var hp_max: float = 100.0
 var spawn_point := Vector2.ZERO
 
 var animator := Animator.new()
+var _sprite: ActorSprite = null
+var _sprite_robe := -1
 
 var _attack_state := "idle"  # idle | startup | active | recovery
 var _attack_timer := 0.0
@@ -363,6 +365,23 @@ func _move_ratio() -> float:
 func _sync_animation(delta: float) -> void:
 	animator.update(delta, _move_ratio(), _sprinting, _attack_state != "idle",
 		_dodge_timer > 0.0, _hurt_flash > 0.0, _meditating, false)
+	_present_sprite()
+
+
+## Feeds the Art Studio sprite the same state the pose Animator just took.
+## The robe colourway follows `appearance.robe`; robe 2 (jade) is the
+## master set at the folder root, the rest are pre-baked colourways.
+func _present_sprite() -> void:
+	if _sprite == null:
+		_sprite = ActorSprite.new()
+		add_child(_sprite)
+	if appearance.robe != _sprite_robe:
+		_sprite_robe = appearance.robe
+		var root := "res://assets/art-studio/assets/characters/player/"
+		var base := root + "player_founder" if _sprite_robe == 2 \
+			else root + "colourways/robe_%d/player_founder" % _sprite_robe
+		_sprite.configure(base)
+	_sprite.present(_facing, animator, _move_ratio())
 
 
 func _attack_swing() -> float:
@@ -1412,20 +1431,21 @@ func _draw() -> void:
 	var lean := float(pose["lean"]) * (1.0 if _facing.x >= 0.0 else -1.0)
 	var attack := _attack_swing()
 
-	# Limbs and torso share one transform so bob, lean and squash stay coherent.
-	draw_set_transform(bob, lean, squash)
-	var limb := Color("#3a454c")
-	draw_line(Vector2(-5, 2), Vector2(-5.0 + swing * 5.0, 12.0), limb, 3.0)
-	draw_line(Vector2(5, 2), Vector2(5.0 - swing * 5.0, 12.0), limb, 3.0)
-	draw_line(Vector2(-4, -3), Vector2(-4.0 - swing * 3.0, -9.0), limb, 2.5)
-	draw_line(Vector2(4, -3), Vector2(4.0 + swing * 3.0 + attack * 5.0, -9.0 - attack * 6.0), limb, 2.5)
-	draw_circle(Vector2.ZERO, RADIUS, body)
-	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 28, Color("#232b31"), 2.0)
-	# Head and hair sit inside the silhouette, so appearance reads from above.
-	draw_circle(Vector2(0, -3), 6.0, appearance.skin_color())
-	draw_arc(Vector2(0, -3), 6.5, PI, TAU, 16, appearance.hair_color(), 3.0)
-	draw_line(Vector2.ZERO, _facing * (RADIUS + 7.0 + attack * 6.0), Color("#7fd3e0"), 3.0)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if _sprite == null or not _sprite.is_active():
+		# Limbs and torso share one transform so bob, lean and squash stay coherent.
+		draw_set_transform(bob, lean, squash)
+		var limb := Color("#3a454c")
+		draw_line(Vector2(-5, 2), Vector2(-5.0 + swing * 5.0, 12.0), limb, 3.0)
+		draw_line(Vector2(5, 2), Vector2(5.0 - swing * 5.0, 12.0), limb, 3.0)
+		draw_line(Vector2(-4, -3), Vector2(-4.0 - swing * 3.0, -9.0), limb, 2.5)
+		draw_line(Vector2(4, -3), Vector2(4.0 + swing * 3.0 + attack * 5.0, -9.0 - attack * 6.0), limb, 2.5)
+		draw_circle(Vector2.ZERO, RADIUS, body)
+		draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 28, Color("#232b31"), 2.0)
+		# Head and hair sit inside the silhouette, so appearance reads from above.
+		draw_circle(Vector2(0, -3), 6.0, appearance.skin_color())
+		draw_arc(Vector2(0, -3), 6.5, PI, TAU, 16, appearance.hair_color(), 3.0)
+		draw_line(Vector2.ZERO, _facing * (RADIUS + 7.0 + attack * 6.0), Color("#7fd3e0"), 3.0)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	if _arc_flash > 0.0:
 		var base := _facing.angle()

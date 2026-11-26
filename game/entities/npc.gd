@@ -48,6 +48,7 @@ var current_activity := "idle"
 var current_location := ""
 var target := Vector2.ZERO
 var animator := Animator.new()
+var _sprite: ActorSprite = null
 
 ## The archetype's brain, from `NpcAi.profile`. A reaction is live state and is
 ## never saved: a threat does not survive a load, so neither does the alarm.
@@ -279,6 +280,7 @@ func _physics_process(delta: float) -> void:
 		velocity = _wander
 	move_and_slide()
 	animator.update(delta, velocity.length() / maxf(1.0, speed), false, false, false, false, false, false)
+	_present_sprite()
 	queue_redraw()
 
 
@@ -487,6 +489,7 @@ func _party_process(delta: float) -> void:
 	move_and_slide()
 	animator.update(delta, velocity.length() / maxf(1.0, speed), false,
 		_party_swing > 0.0, false, false, false, false)
+	_present_sprite()
 	queue_redraw()
 
 
@@ -664,13 +667,54 @@ func travelling() -> bool:
 	return simulated and settlement != null and global_position.distance_to(goal_position()) > 24.0
 
 
+## The Art Studio set for this person: role first (a merchant reads as
+## a merchant whatever his archetype), then the archetype fallback.
+func _npc_base() -> String:
+	var root := "res://assets/art-studio/assets/"
+	match role:
+		"Sect Master", "Elder":
+			return root + "characters/npcs/npc_elder"
+		"Inner Disciple", "Sword Instructor":
+			return root + "characters/npcs/npc_sword_cultivator"
+		"Merchant":
+			return root + "characters/npcs/npc_merchant"
+		"Farmer":
+			return root + "characters/npcs/npc_farmer"
+		"Guard":
+			return root + "enemies/humans/enemy_sentinel"
+		"Outer Disciple":
+			return root + "characters/player/player_founder"
+	match archetype_id:
+		"sect_master", "elder":
+			return root + "characters/npcs/npc_elder"
+		"inner_disciple":
+			return root + "characters/npcs/npc_sword_cultivator"
+		"guard":
+			return root + "enemies/humans/enemy_sentinel"
+		"outer_disciple":
+			return root + "characters/player/player_founder"
+	return ""
+
+
+func _present_sprite() -> void:
+	if _sprite == null:
+		_sprite = ActorSprite.new()
+		add_child(_sprite)
+		_sprite.configure(_npc_base())
+	var hint := _party_facing
+	if velocity.length() > 4.0:
+		hint = velocity.normalized()
+	_sprite.present(hint, animator, velocity.length() / maxf(1.0, speed))
+
+
 func _draw() -> void:
 	var color := Color(ROLE_COLORS.get(role, "#9aa0a6"))
 	draw_circle(Vector2(0, 6), RADIUS * 0.9, Color(0, 0, 0, 0.3))
 	var pose := Animator.pose(animator.state, animator.time, 0.0)
 	draw_set_transform(pose["bob"], float(pose["lean"]), pose["squash"])
-	draw_circle(Vector2.ZERO, RADIUS, color)
-	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 20, Color("#22282c"), 1.5)
+	if _sprite == null or not _sprite.is_active():
+		draw_circle(Vector2.ZERO, RADIUS, color)
+		draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 20, Color("#22282c"), 1.5)
 
 	# Activity marker: a small ring whose colour reads at a glance.
 	var activity_color := Color("#6a7a72")
