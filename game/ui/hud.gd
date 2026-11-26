@@ -802,9 +802,12 @@ func draw_sect_seat(player: Player) -> void:
 	var y := _pr.position.y
 	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
 	var sect := Sects.sect(String(host.current_sect_id))
+	var lead: Dictionary = Game.sect_leadership.get(String(host.current_sect_id), {})
 	_text(Vector2(x + 24.0, y + 34.0), _fit(String(sect.get("name", "Sect")).to_upper(), 22, w - 48.0), 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), _fit("%s · Master %s · Deputy %s" % [
-		String(sect.get("seat", "")), String(sect.get("master", "")), String(sect.get("deputy", ""))],
+		String(sect.get("seat", "")),
+		String(lead.get("master_name", "")) if String(lead.get("master_name", "")) != "" else String(sect.get("master", "")),
+		String(lead.get("deputy_name", "")) if String(lead.get("deputy_name", "")) != "" else String(sect.get("deputy", ""))],
 		11, w - 48.0), 11, MUTED)
 	_text(Vector2(x + w - 24.0 - 150.0, y + 58.0), "%d stones" % Game.spirit_stones, 11, Color("#e0c880"))
 	draw_line(Vector2(x + 20.0, y + 74.0), Vector2(x + w - 20.0, y + 74.0), Color("#2b343a"), 1.0)

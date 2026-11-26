@@ -49,6 +49,12 @@ var death_wound_day: int = 0
 ## and whether the boon still waits for a breakthrough.
 var sacrifice_day: int = -1
 var sacrifice_boon: bool = false
+## NPC mortality (M29): seeded birth days and recorded deaths for the
+## persistent population (sect seats, towns), and who currently holds
+## each sect's offices after successions.
+var npc_born_days: Dictionary = {}
+var npc_deaths: Dictionary = {}
+var sect_leadership: Dictionary = {}
 
 
 ## Records a combat death: the count, a fresh wound, and a tenth of the
@@ -158,6 +164,9 @@ func new_run(seed_value: int = 0) -> void:
 	death_wound_day = 0
 	sacrifice_day = -1
 	sacrifice_boon = false
+	npc_born_days = {}
+	npc_deaths = {}
+	sect_leadership = {}
 	crafts_made = 0
 	professions.clear()
 	npc_memory.clear()
@@ -231,6 +240,9 @@ func to_dict() -> Dictionary:
 		"death_wound_day": death_wound_day,
 		"sacrifice_day": sacrifice_day,
 		"sacrifice_boon": sacrifice_boon,
+		"npc_born_days": npc_born_days,
+		"npc_deaths": npc_deaths,
+		"sect_leadership": sect_leadership,
 		"crafts_made": crafts_made,
 		"professions": professions.duplicate(true),
 		"npc_memory": npc_memory.duplicate(true),
@@ -281,6 +293,9 @@ func from_dict(data: Dictionary) -> void:
 	death_wound_day = maxi(0, int(data.get("death_wound_day", 0)))
 	sacrifice_day = int(data.get("sacrifice_day", -1))
 	sacrifice_boon = bool(data.get("sacrifice_boon", false))
+	npc_born_days = _int_dict(data.get("npc_born_days", {}))
+	npc_deaths = _int_dict(data.get("npc_deaths", {}))
+	sect_leadership = _leadership_dict(data.get("sect_leadership", {}))
 	crafts_made = int(data.get("crafts_made", 0))
 	professions = Professions.sanitize(data.get("professions", {}))
 	npc_memory = NpcDb.sanitize_memory(data.get("npc_memory", {}))
@@ -317,3 +332,32 @@ func from_dict(data: Dictionary) -> void:
 	sect_lobby = SectPolitics.sanitize_lobby(data.get("sect_lobby", {}))
 	sect_seat_open = bool(data.get("sect_seat_open", false))
 	player_sect = PlayerSect.sanitize(data.get("player_sect", {}))
+
+
+## Saved id -> day maps: string keys, integer values, nothing else.
+func _int_dict(value: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	if typeof(value) != TYPE_DICTIONARY:
+		return out
+	for key in (value as Dictionary).keys():
+		out[String(key)] = int((value as Dictionary)[key])
+	return out
+
+
+## Saved sect leadership: real sects only, id and name strings only.
+func _leadership_dict(value: Variant) -> Dictionary:
+	var out: Dictionary = {}
+	if typeof(value) != TYPE_DICTIONARY:
+		return out
+	for key in (value as Dictionary).keys():
+		var sect_id := String(key)
+		if Sects.sect(sect_id).is_empty():
+			continue
+		var entry: Dictionary = (value as Dictionary)[key]
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var clean: Dictionary = {}
+		for field in ["master_id", "deputy_id", "elder_id", "master_name", "deputy_name"]:
+			clean[field] = String(entry.get(field, ""))
+		out[sect_id] = clean
+	return out

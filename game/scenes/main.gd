@@ -42,6 +42,7 @@ var _region_now := -1
 var town_specs: Array = []
 var towns_active: Dictionary = {}
 var _sacrifice_offer_day := -1
+var _mortality_day := -1
 var seat_specs: Array = []
 var seats_active: Dictionary = {}
 var founded_sites_active: Dictionary = {}
@@ -295,6 +296,7 @@ func _build_world() -> void:
 
 	town_specs = Towns.specs(continent, Game.world_seed)
 	seat_specs = SectSeats.specs(continent, Game.world_seed, SPAWN)
+	_seed_population()
 	settlement = Settlement.new()
 	settlement.name = "AzureCloudMarket"
 	settlement.position = SPAWN
@@ -372,10 +374,13 @@ func _spawn_town(spec: Dictionary) -> void:
 		if archetype.is_empty():
 			continue
 		for i in int(entry[1]):
+			var npc_id := "npc.town.%d.%s.%d" % [index, String(entry[0]), i]
+			if _npc_dead(npc_id, String(archetype.get("role", "")), int(archetype.get("realm", 1))):
+				continue
 			var offset := Vector2(_name_rng.randf_range(-140.0, 140.0),
 				_name_rng.randf_range(-100.0, 160.0))
 			var npc := _make_npc(
-				"npc.town.%d.%s.%d" % [index, String(entry[0]), i],
+				npc_id,
 				_random_name(),
 				String(archetype.get("role", "Wanderer")),
 				String(archetype.get("sect", "")),
@@ -439,14 +444,17 @@ func _spawn_seat(spec: Dictionary) -> void:
 		(owned["items"] as Array).append(door)
 
 	# The gate board: who holds this seat, what they believe, who stands
-	# with them and who stands against.
+	# with them and who stands against. Holders are read from the living
+	# leadership record, so a succession is never announced wrong.
+	var lead: Dictionary = Game.sect_leadership.get(sect_id, {})
 	var relations: Dictionary = sect.get("relations", {})
 	var gate := Interactable.new()
 	gate.setup_examine("sect.gate." + sect_id.trim_prefix("sect."),
 		"%s — gate board" % String(sect.get("name", sect_id)),
 		"%s · Seat: %s · Master %s, Deputy %s. %s Allies: %s. Rivals: %s." % [
 			String(sect.get("name", sect_id)), String(sect.get("seat", "")),
-			String(sect.get("master", "")), String(sect.get("deputy", "")),
+			String(lead.get("master_name", "")) if String(lead.get("master_name", "")) != "" else String(sect.get("master", "")),
+			String(lead.get("deputy_name", "")) if String(lead.get("deputy_name", "")) != "" else String(sect.get("deputy", "")),
 			String(sect.get("philosophy", "")),
 			_sect_names(relations.get("allies", [])), _sect_names(relations.get("rivals", []))]
 		+ _gate_feud_line(sect_id))
@@ -455,9 +463,13 @@ func _spawn_seat(spec: Dictionary) -> void:
 	interactables.append(gate)
 	(owned["items"] as Array).append(gate)
 
-	# The population: the hierarchy made flesh, homed to this seat.
-	var schedules: Dictionary = DB.schedules()
+	# The population: the hierarchy made flesh, homed to this seat. The
+	# dead do not spawn; office holders carry their offices' titles.
 	for entry in spec["residents"]:
+		_npc_dead(String(entry["npc_id"]), String(entry["role"]), int(entry["realm"]), false)
+	var presented := SectSeats.presented_residents(spec, Game.npc_deaths, lead)
+	var schedules: Dictionary = DB.schedules()
+	for entry in presented:
 		var archetype := _archetype(String(entry["archetype"]))
 		if archetype.is_empty():
 			continue
@@ -1030,6 +1042,7 @@ func _process(delta: float) -> void:
 	_check_captivity()
 	_check_sect_autonomy()
 	_check_sect_world()
+	_check_npc_mortality()
 	_check_npc_progress()
 	_check_stories()
 	_tick_world_event()
@@ -3637,6 +3650,182 @@ func player_sect_steward() -> Dictionary:
 ## treasuries breathe, disciples are recruited, feuds ignite and cool.
 ## The state is a pure function of seed and day, so a reload picks the
 ## world up exactly where the calendar left it.
+# ------------------------------------------------------- npc mortality ----
+
+## Ages for the persistent population, seeded once per id: a fraction of
+## the lifespan their realm allows, by the station they hold.
+func _seed_population() -> void:
+	for spec in seat_specs:
+		var sect_id := String(spec["sect_id"])
+		if not Game.sect_leadership.has(sect_id):
+			var lead := SectSeats.default_leadership(spec)
+			var sect := Sects.sect(sect_id)
+			lead["master_name"] = String(sect.get("master", ""))
+			lead["deputy_name"] = String(sect.get("deputy", ""))
+			Game.sect_leadership[sect_id] = lead
+		for entry in spec["residents"]:
+			_seed_npc_age(String(entry["npc_id"]), String(entry["role"]), int(entry["realm"]))
+	for t in town_specs.size():
+		var spec: Dictionary = town_specs[t]
+		for entry in spec["residents"]:
+			var archetype := _archetype(String(entry[0]))
+			if archetype.is_empty():
+				continue
+			for i in int(entry[1]):
+				_seed_npc_age("npc.town.%d.%s.%d" % [t, String(entry[0]), i],
+					String(archetype.get("role", "")), int(archetype.get("realm", 1)))
+
+
+func _seed_npc_age(npc_id: String, role: String, realm: int) -> void:
+	if Game.npc_born_days.has(npc_id) or Game.npc_deaths.has(npc_id):
+		return
+	var lifespan := Realms.lifespan(realm)
+	if lifespan <= 0:
+		return
+	var span := _age_span(role)
+	var r := Rng.stream_from(Game.world_seed, "npc_age", npc_id.hash())
+	var age := maxf(float(lifespan) * r.randf_range(span.x, span.y), float(Aging.START_AGE) + 1.0)
+	Game.npc_born_days[npc_id] = 1 - int((age - float(Aging.START_AGE)) * Aging.DAYS_PER_YEAR)
+
+
+func _age_span(role: String) -> Vector2:
+	var r := role.to_lower()
+	if r.contains("sect master"):
+		return Vector2(0.60, 0.85)
+	if r.contains("deputy"):
+		return Vector2(0.45, 0.65)
+	if r.contains("elder"):
+		return Vector2(0.40, 0.70)
+	if r.contains("instructor"):
+		return Vector2(0.30, 0.50)
+	if r.contains("guardian") or r.contains("guard"):
+		return Vector2(0.22, 0.42)
+	if r.contains("core"):
+		return Vector2(0.12, 0.28)
+	if r.contains("inner"):
+		return Vector2(0.07, 0.18)
+	if r.contains("outer"):
+		return Vector2(0.04, 0.12)
+	if r.contains("servant"):
+		return Vector2(0.10, 0.35)
+	if r.contains("merchant"):
+		return Vector2(0.30, 0.55)
+	if r.contains("farmer"):
+		return Vector2(0.25, 0.50)
+	return Vector2(0.15, 0.40)
+
+
+func _is_office_holder(npc_id: String) -> bool:
+	for sect_id in Game.sect_leadership.keys():
+		var lead: Dictionary = Game.sect_leadership[sect_id]
+		if npc_id in [String(lead.get("master_id", "")), String(lead.get("deputy_id", "")),
+				String(lead.get("elder_id", ""))]:
+			return true
+	return false
+
+
+## Dead, for spawning purposes. In a TOWN, a death older than a month
+## has been replaced by someone new (re-seeded young). At a sect seat
+## nobody is replaced: the dead stay dead and offices succeed.
+func _npc_dead(npc_id: String, role: String = "", realm: int = 1, replaceable: bool = true) -> bool:
+	if not Game.npc_deaths.has(npc_id):
+		return false
+	if Clock.day - int(Game.npc_deaths[npc_id]) <= 30:
+		return true
+	if not replaceable or _is_office_holder(npc_id):
+		return true
+	Game.npc_deaths.erase(npc_id)
+	var lifespan := Realms.lifespan(realm)
+	if lifespan <= 0:
+		Game.npc_born_days.erase(npc_id)
+		return false
+	var r := Rng.stream_from(Game.world_seed, "npc_age", npc_id.hash() + Clock.day)
+	var age := maxf(float(lifespan) * r.randf_range(0.05, 0.2), float(Aging.START_AGE) + 1.0)
+	Game.npc_born_days[npc_id] = 1 - int((age - float(Aging.START_AGE)) * Aging.DAYS_PER_YEAR)
+	return false
+
+
+func _resident_name(spec: Dictionary, npc_id: String) -> String:
+	for entry in spec.get("residents", []):
+		if String((entry as Dictionary).get("npc_id", "")) == npc_id:
+			var authored := String((entry as Dictionary).get("name", ""))
+			if authored != "":
+				return authored
+	if _npc_names.has(npc_id):
+		return String(_npc_names[npc_id])
+	return _random_name()
+
+
+## Once a day, the persistent population ages against its spans. Deaths
+## are recorded, offices succeed, and your own hall's roll is amended.
+func _check_npc_mortality() -> void:
+	if player == null or String(phase) != "play" or Game.dead:
+		return
+	if _mortality_day == Clock.day:
+		return
+	_mortality_day = Clock.day
+	for spec in seat_specs:
+		for entry in spec["residents"]:
+			_mortal_check(String(entry["npc_id"]), int(entry["realm"]),
+				String(entry["role"]), String(entry["name"]), spec)
+	for t in town_specs.size():
+		var spec: Dictionary = town_specs[t]
+		for entry in spec["residents"]:
+			var archetype := _archetype(String(entry[0]))
+			if archetype.is_empty():
+				continue
+			for i in int(entry[1]):
+				_mortal_check("npc.town.%d.%s.%d" % [t, String(entry[0]), i],
+					int(archetype.get("realm", 1)), String(archetype.get("role", "")), "", spec)
+
+
+func _mortal_check(npc_id: String, realm: int, role: String, authored_name: String, spec: Dictionary) -> void:
+	if Game.npc_deaths.has(npc_id) or Game.party_ids.has(npc_id):
+		return
+	if not Game.npc_born_days.has(npc_id):
+		return
+	var lifespan := Realms.lifespan(realm)
+	if lifespan <= 0:
+		return
+	if Aging.age_for(int(Game.npc_born_days[npc_id]), Clock.day) < float(lifespan):
+		return
+	Game.npc_deaths[npc_id] = Clock.day
+	var display := authored_name
+	if display == "":
+		display = String(_npc_names.get(npc_id, ""))
+	if display == "":
+		display = "A %s" % role.to_lower()
+	if not Game.player_sect.is_empty() and (Game.player_sect.get("members", []) as Array).has(npc_id):
+		var own := Game.player_sect.duplicate(true)
+		(own["members"] as Array).erase(npc_id)
+		Game.player_sect = own
+		Bus.toast.emit("%s, of your own hall, has died of age. The roll is amended." % display)
+		Bus.player_stats_changed.emit()
+		return
+	if spec.has("sect_id"):
+		var sect_id := String(spec["sect_id"])
+		var sect := Sects.sect(sect_id)
+		var lead := SectSeats.advance_leadership(spec,
+			(Game.sect_leadership.get(sect_id, {}) as Dictionary), Game.npc_deaths)
+		lead["master_name"] = _resident_name(spec, String(lead.get("master_id", "")))
+		lead["deputy_name"] = _resident_name(spec, String(lead.get("deputy_id", "")))
+		Game.sect_leadership[sect_id] = lead
+		if SectSeats.office_of(npc_id) != "":
+			Bus.toast.emit("Word from the jianghu — %s, %s of %s, has died of age. %s takes the seat." % [
+				display, role, String(sect.get("name", sect_id)), String(lead.get("master_name", "A successor"))])
+		else:
+			Bus.toast.emit("Word from the jianghu — %s, %s of %s, has died of age." % [
+				display, role, String(sect.get("name", sect_id))])
+		if seats_active.has(sect_id):
+			_despawn_seat(sect_id, true)
+	else:
+		var index := town_specs.find(spec)
+		if index >= 0 and Game.discovered.has("town.%d" % index):
+			Bus.toast.emit("Word reaches you — %s of %s has died of age." % [display, String(spec.get("name", "the town"))])
+		if index >= 0 and towns_active.has(index):
+			_despawn_town(index, true)
+
+
 func _check_sect_world() -> void:
 	if String(phase) != "play":
 		return
@@ -4884,7 +5073,18 @@ func _storyline_context() -> Dictionary:
 
 ## A house's letter begins in its own conversation: Elder Bai for the local gate,
 ## the notice board for every correspondence from beyond the province.
+## A storyline's giver is an office — the senior elder of a house. When
+## succession has moved that office, the holder answers to the office's id.
+func _giver_id_for(npc_id: String) -> String:
+	for sect_id in Game.sect_leadership.keys():
+		var lead: Dictionary = Game.sect_leadership[sect_id]
+		if String(lead.get("elder_id", "")) == npc_id:
+			return "npc.sect.%s.elder.0" % String(sect_id).trim_prefix("sect.")
+	return npc_id
+
+
 func _accept_giver_storylines(giver_id: String) -> void:
+	giver_id = _giver_id_for(giver_id)
 	if player == null or storylines == null or giver_id == "":
 		return
 	var context := _storyline_context()
@@ -6885,6 +7085,7 @@ func _load_game(slot: int) -> void:
 		_despawn_town(int(town_index), true)
 	town_specs = Towns.specs(continent, Game.world_seed)
 	seat_specs = SectSeats.specs(continent, Game.world_seed, SPAWN)
+	_seed_population()
 	# Rebuild the province so loaded deltas decide which resources exist.
 	chunks.today = Clock.day
 	chunks.resync(player.global_position)

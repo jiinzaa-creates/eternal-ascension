@@ -89,6 +89,7 @@ func _ready() -> void:
 	_player_sect_v2_tests()
 	_lifespan_tests()
 	_death_tests()
+	_succession_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
@@ -4882,6 +4883,52 @@ func _death_tests() -> void:
 		"the death record survives the save")
 	check(Game.sacrifice_day == 42 and Game.sacrifice_boon, "the rite's mark survives the save")
 	Clock.day = saved_day
+	Game.from_dict(saved)
+
+
+func _succession_tests() -> void:
+	print("[succession] offices move up when a holder dies")
+	var spec := {"residents": [
+		{"npc_id": "npc.sect.x.master", "name": "A", "role": "Sect Master"},
+		{"npc_id": "npc.sect.x.deputy", "name": "B", "role": "Deputy Sect Master"},
+		{"npc_id": "npc.sect.x.elder.0", "name": "", "role": "Elder"},
+		{"npc_id": "npc.sect.x.elder.1", "name": "", "role": "Elder"},
+		{"npc_id": "npc.sect.x.outer.0", "name": "", "role": "Outer Disciple"},
+	]}
+	var lead := SectSeats.default_leadership(spec)
+	check(String(lead.get("master_id", "")) == "npc.sect.x.master"
+		and String(lead.get("elder_id", "")) == "npc.sect.x.elder.0",
+		"a fresh seat's offices are its authored holders")
+	var after := SectSeats.advance_leadership(spec, lead, {"npc.sect.x.master": 40})
+	check(String(after.get("master_id", "")) == "npc.sect.x.deputy"
+		and String(after.get("deputy_id", "")) == "npc.sect.x.elder.0"
+		and String(after.get("elder_id", "")) == "npc.sect.x.elder.1",
+		"the chain moves up: deputy, senior elder, next elder")
+	var unchanged := SectSeats.advance_leadership(spec, lead, {"npc.sect.x.outer.0": 40})
+	check(String(unchanged.get("master_id", "")) == "npc.sect.x.master",
+		"a death outside the chain moves no office")
+	var twice := SectSeats.advance_leadership(spec, after,
+		{"npc.sect.x.master": 40, "npc.sect.x.deputy": 55})
+	check(String(twice.get("master_id", "")) == "npc.sect.x.elder.0",
+		"a second death moves the chain again, never back")
+	after["master_name"] = "B"
+	after["deputy_name"] = "Elder C"
+	var presented := SectSeats.presented_residents(spec, {"npc.sect.x.master": 40}, after)
+	check(presented.size() == 4, "the dead master does not spawn")
+	var roles: Dictionary = {}
+	for entry in presented:
+		roles[String((entry as Dictionary).get("npc_id", ""))] = String((entry as Dictionary).get("role", ""))
+	check(String(roles.get("npc.sect.x.deputy", "")) == "Sect Master"
+		and String(roles.get("npc.sect.x.elder.0", "")) == "Deputy Sect Master",
+		"successors carry their new offices' titles")
+	var saved := Game.to_dict()
+	Game.npc_deaths = {"npc.sect.x.master": 40}
+	Game.sect_leadership = {"sect.heavenly_sword": after}
+	var round := Game.to_dict()
+	Game.from_dict(round)
+	check(int(Game.npc_deaths.get("npc.sect.x.master", 0)) == 40
+		and String((Game.sect_leadership.get("sect.heavenly_sword", {}) as Dictionary).get("master_id", "")) == "npc.sect.x.deputy",
+		"deaths and leadership survive the save")
 	Game.from_dict(saved)
 
 

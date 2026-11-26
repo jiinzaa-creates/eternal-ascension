@@ -206,3 +206,82 @@ static func _anchor(sect: Dictionary, region: Dictionary, seed_value: int,
 	if best != Vector2.INF:
 		return best
 	return Vector2(origin + local) * Continent.CHUNK_PX + Vector2(512, 512)
+
+
+# ------------------------------------------------------------ mortality ----
+
+## Which office a seat resident holds, from their stable id: leadership
+## ids are offices (npc.sect.<short>.master / .deputy / .elder.0).
+static func office_of(npc_id: String) -> String:
+	if npc_id.ends_with(".master"):
+		return "master"
+	if npc_id.ends_with(".deputy"):
+		return "deputy"
+	if npc_id.ends_with(".elder.0"):
+		return "elder"
+	return ""
+
+
+## The offices as a fresh spec fills them.
+static func default_leadership(spec: Dictionary) -> Dictionary:
+	var out := {"master_id": "", "deputy_id": "", "elder_id": "",
+		"master_name": "", "deputy_name": ""}
+	for entry in spec.get("residents", []):
+		var office := office_of(String((entry as Dictionary).get("npc_id", "")))
+		if office != "":
+			out[office + "_id"] = String((entry as Dictionary).get("npc_id", ""))
+	return out
+
+
+## The office chain in succession order: master, deputy, then every
+## elder by seniority.
+static func office_chain(spec: Dictionary) -> Array:
+	var chain: Array = []
+	var elders: Array = []
+	for entry in spec.get("residents", []):
+		var id := String((entry as Dictionary).get("npc_id", ""))
+		if office_of(id) == "master" or office_of(id) == "deputy":
+			chain.append(id)
+		elif id.contains(".elder."):
+			elders.append(id)
+	elders.sort()
+	return chain + elders
+
+
+## The offices belong to the living: rebuild them from the spec's chain
+## with every recorded death removed, so two deaths on different days
+## can never resurrect the first holder. Ids only — names are the
+## caller's record.
+static func advance_leadership(spec: Dictionary, leadership: Dictionary, deaths: Dictionary) -> Dictionary:
+	var out := leadership.duplicate(true)
+	var chain: Array = []
+	for id in office_chain(spec):
+		if not deaths.has(id):
+			chain.append(id)
+	out["master_id"] = String(chain[0]) if chain.size() > 0 else ""
+	out["deputy_id"] = String(chain[1]) if chain.size() > 1 else ""
+	out["elder_id"] = String(chain[2]) if chain.size() > 2 else ""
+	return out
+
+
+## The roster as the world presents it today: the dead do not spawn, and
+## the current office holders carry their offices' titles and recorded
+## names, whoever they were born as.
+static func presented_residents(spec: Dictionary, deaths: Dictionary, leadership: Dictionary) -> Array:
+	var lead: Dictionary = leadership if not leadership.is_empty() else default_leadership(spec)
+	var out: Array = []
+	for entry in spec.get("residents", []):
+		var e: Dictionary = (entry as Dictionary).duplicate()
+		var id := String(e.get("npc_id", ""))
+		if deaths.has(id):
+			continue
+		if id == String(lead.get("master_id", "")):
+			e["role"] = "Sect Master"
+			if String(lead.get("master_name", "")) != "":
+				e["name"] = String(lead["master_name"])
+		elif id == String(lead.get("deputy_id", "")):
+			e["role"] = "Deputy Sect Master"
+			if String(lead.get("deputy_name", "")) != "":
+				e["name"] = String(lead["deputy_name"])
+		out.append(e)
+	return out
