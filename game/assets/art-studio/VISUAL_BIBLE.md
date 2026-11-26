@@ -539,3 +539,16 @@ Azure Cleave medallion as the style reference and QC'd on contact sheets:
 Files: assets/art-studio/assets/ui/icons/technique_icon_<name>.png,
 64x64 RGBA, one per technique — the library now holds an icon for all
 39 techniques.
+
+## 84. Sects pass — the twelve houses stand (2026-11-26)
+
+Seven new medallion icons in the locked house style for the sects'
+signature arts, bringing the library to one icon per technique across
+all 46: Heaven Splitting Slash (Heavenly Sword), Nine Reversal Needles
+(Eternal Medicine), Veil of Ten Thousand Faces (Shadow Veil), Sovereign
+Thunderfall (Thunder Sovereign), Frost Soul Requiem (Frozen Heaven),
+Ten Thousand Refinements (Golden Cauldron), Page of Unmaking (Void
+Scripture). The seats themselves reuse the locked settlement kit —
+sect hall, dorms, forge, fields — at population scale (0.8/0.95/1.1);
+the founded hall reuses the same kit at 0.85 (branch 0.7), gaining a
+fields plot with a pill garden and a forge when those are raised.
