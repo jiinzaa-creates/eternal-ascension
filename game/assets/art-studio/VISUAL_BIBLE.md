@@ -483,3 +483,30 @@ the same rect. Verified at 1024×576 — menu and character sheet sit
 fully on screen (verification/menu_small_window.png). Shop, travel,
 world map and the skill panel were already size-relative. Suite
 4330 PASS / 0 FAIL.
+
+## 81. Keybinds spot, Quit Game, and a way out of cultivation (2026-11-25)
+
+**Keybinds.** The settings page always had a controls tab; it is now a
+proper spot: the tabs render as plaques labelled DISPLAY / **KEYBINDS**,
+the hub's SYSTEM group has its own **Keybinds** entry that opens
+Settings straight onto that tab, and the whole page answers the mouse —
+wheel scrolls, click selects, clicking the selected binding row starts
+the key capture (Enter-then-press, Esc cancels, Backspace unbinds,
+Reset-all row at the bottom; all pre-existing Options machinery). The
+stale "F10" in the settings footer is gone.
+
+**Quit.** The hub's SYSTEM group ends with **Quit Game**: it saves the
+run (slot 1, the quick-save path) and quits. The title screen already
+had Quit. Probe-verified: selecting it ends the process cleanly.
+
+**Stop cultivating — a real bug, fixed.** Meditation is toggled by F,
+but the player's physics reads the meditate branch with an early
+return BEFORE the input section, so once cultivating started, the F
+key (and movement) never reached the toggle: the only ways out were
+swinging a technique or taking a hit. The branch now reads its stop
+inputs first — F again, any step, dodge, or interact ends cultivation
+(the stop press is fenced so it cannot re-trigger the toggle on the
+same frame). A CULTIVATING plaque under the orbs shows the way out
+while it lasts ("F to stop · step to rise"). Probe-verified through
+the real input pipeline: F on, F off, F on, step east off. Suite
+4330 PASS / 0 FAIL.

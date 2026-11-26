@@ -168,6 +168,7 @@ func _draw() -> void:
 		return
 
 	draw_vitals(player)
+	draw_cultivating(player)
 	draw_techniques(player)
 	draw_minimap(player)
 	draw_menu_button()
@@ -1299,11 +1300,13 @@ func draw_settings(_player: Player) -> void:
 	_text(Vector2(x + 24.0, y + 34.0), "SETTINGS & ACCESSIBILITY", 22, ACCENT)
 	_text(Vector2(x + 24.0, y + 58.0), "These belong to you, not to the run: they survive every new life.", 11, MUTED)
 
-	var tab_names: Array[String] = ["DISPLAY", "CONTROLS"]
+	var tab_names: Array[String] = ["DISPLAY", "KEYBINDS"]
 	var tab := clampi(int(host.settings_tab), 0, 1)
 	for i in tab_names.size():
-		var label := ("[ %s ]" % tab_names[i]) if i == tab else ("  %s  " % tab_names[i])
-		_text(Vector2(x + 24.0 + float(i) * 150.0, y + 84.0), label, 12,
+		var tab_rect := settings_tab_rect(i)
+		UiFrame.plaque(self, tab_rect, Color("#10161a", 0.95),
+			UiFrame.BRONZE if i == tab else UiFrame.BRONZE_DIM)
+		_text(tab_rect.position + Vector2(12.0, 17.0), tab_names[i], 12,
 			ACCENT if i == tab else Color("#7b8b94"))
 	if String(host.settings_rebind_action) != "":
 		_text(Vector2(x + 360.0, y + 84.0), "PRESS A KEY — ESC cancels, BACKSPACE unbinds", 11,
@@ -1352,7 +1355,7 @@ func draw_settings(_player: Player) -> void:
 	_text(Vector2(px + 20.0, py + 376.0), String(chosen.get("hint", "")), 10, Color("#7f9098"))
 
 	_text(Vector2(x + 24.0, y + h - 22.0),
-		"TAB page   ·   ↑/↓ choose   ·   ←/→ adjust   ·   ENTER change   ·   F10 / E / ESC — close",
+		"TAB page   ·   ↑/↓ choose   ·   ←/→ adjust   ·   ENTER change   ·   mouse works too   ·   X / E / ESC — close",
 		10, Color("#7b8b94"))
 
 
@@ -2256,6 +2259,43 @@ func draw_menu() -> void:
 		"Merchants, forges, storage and roads open their own pages where you find them.", 10, MUTED)
 
 
+## While the player cultivates, the way back out is written on screen.
+func draw_cultivating(player: Player) -> void:
+	if not player.is_meditating():
+		return
+	var label := "CULTIVATING"
+	var hint := " — F to stop · step to rise"
+	var w := _text_width(label, 11) + _text_width(hint, 11) + 24.0
+	var rect := Rect2(16.0, 118.0, w, 26.0)
+	UiFrame.plaque(self, rect, Color("#0d1216", 0.92), UiFrame.BRONZE)
+	_text(rect.position + Vector2(12.0, 17.0), label, 11, ACCENT)
+	_text(rect.position + Vector2(12.0 + _text_width(label, 11), 17.0), hint, 11, INK)
+
+
+## The settings page's tab chips, shared by its draw and its hit tests.
+func settings_tab_rect(i: int) -> Rect2:
+	var rect := _page_rect(1000.0, 600.0)
+	return Rect2(rect.position.x + 24.0 + float(i) * 150.0, rect.position.y + 68.0, 132.0, 24.0)
+
+
+## The settings row under `pos`, mirroring draw_settings' window, or -1.
+func settings_row_at(pos: Vector2) -> int:
+	if host == null:
+		return -1
+	var rect := _page_rect(1000.0, 600.0)
+	var rows: Array = host.settings_rows()
+	if rows.is_empty():
+		return -1
+	var cursor := clampi(int(host.get("settings_index")), 0, rows.size() - 1)
+	var first := maxi(0, cursor - 11)
+	for i in range(first, mini(rows.size(), first + 12)):
+		var row_rect := Rect2(rect.position.x + 18.0,
+			rect.position.y + 116.0 + float(i - first) * 30.0 - 14.0, 520.0, 30.0)
+		if row_rect.has_point(pos):
+			return i
+	return -1
+
+
 # ---------------------------------------------------------------- mouse ----
 ## The mouse, alongside the keys. Hover highlights, the wheel walks the
 ## open list, a click chooses — and in the world, the MENU plaque and the
@@ -2362,6 +2402,14 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			accept_event()
 			return
+		if bool(host.get("settings_open")):
+			if String(host.get("settings_rebind_action")) == "":
+				var srows: Array = host.settings_rows()
+				if not srows.is_empty():
+					host.set("settings_index", clampi(int(host.get("settings_index")) + dir, 0, srows.size() - 1))
+					queue_redraw()
+			accept_event()
+			return
 		for page_key in LIST_PAGES.keys():
 			var cfg: Dictionary = LIST_PAGES[page_key]
 			if bool(host.get(String(cfg["open"]))):
@@ -2382,6 +2430,25 @@ func _gui_input(event: InputEvent) -> void:
 		elif not menu_panel_rect().has_point(pos):
 			host._close_menu()
 		accept_event()
+		return
+	if bool(host.get("settings_open")):
+		if String(host.get("settings_rebind_action")) == "":
+			for i in range(2):
+				if settings_tab_rect(i).has_point(pos):
+					if int(host.get("settings_tab")) != i:
+						host.set("settings_tab", i)
+						host.set("settings_index", 0)
+						queue_redraw()
+					accept_event()
+					return
+			var srow := settings_row_at(pos)
+			if srow >= 0:
+				if srow == int(host.get("settings_index")):
+					host._settings_activate(srow)
+				else:
+					host.set("settings_index", srow)
+					queue_redraw()
+				accept_event()
 		return
 	for page_key in LIST_PAGES.keys():
 		var cfg: Dictionary = LIST_PAGES[page_key]

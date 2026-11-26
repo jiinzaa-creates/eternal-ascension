@@ -3551,7 +3551,9 @@ func menu_entries() -> Array:
 		{"id": "storylines", "label": "Sect Stories", "key": "."},
 		{"id": "narrative", "label": "Sect Archive", "key": ","},
 		{"header": "SYSTEM"},
+		{"id": "keybinds", "label": "Keybinds", "key": ""},
 		{"id": "settings", "label": "Settings", "key": "X"},
+		{"id": "quit", "label": "Quit Game", "key": ""},
 	]
 
 
@@ -3630,8 +3632,15 @@ func _menu_activate() -> void:
 			_open_storylines()
 		"narrative":
 			_open_narrative()
+		"keybinds":
+			_open_settings()
+			settings_tab = 1
+			settings_index = 0
 		"settings":
 			_open_settings()
+		"quit":
+			_save(1)
+			get_tree().quit()
 
 
 func toggle_character() -> void:

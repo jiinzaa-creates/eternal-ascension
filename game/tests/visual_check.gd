@@ -171,6 +171,13 @@ func _process(delta: float) -> bool:
 		14:  # settings page (UI frame check)
 			if _stage_t > 1.2:
 				_shot("settings.png")
+				_press("shop_mode")
+				_stage = 15
+				_stage_t = 0.0
+				_acted = false
+		15:  # the KEYBINDS tab of settings
+			if _stage_t > 1.2:
+				_shot("keybinds.png")
 				current_scene.set("settings_open", false)
 				_start_walk_east()
 				_stage_t = 0.0

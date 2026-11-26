@@ -415,6 +415,19 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
+	# Cultivating ends the moment the cultivator chooses: the meditate
+	# key again, a step in any direction, a dodge or an interaction.
+	# These are read here, before the tick, because the early return
+	# below used to swallow every one of them — short of swinging a
+	# technique or taking a hit, there was no way out.
+	var rose_from_cultivation := false
+	if _meditating:
+		if Input.is_action_just_pressed("meditate"):
+			toggle_meditation()
+			rose_from_cultivation = true
+		elif Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO \
+				or Input.is_action_just_pressed("dodge") or Input.is_action_just_pressed("interact"):
+			toggle_meditation()
 	if _meditating:
 		velocity = Vector2.ZERO
 		var gained := meditate_tick(delta)
@@ -451,7 +464,7 @@ func _physics_process(delta: float) -> void:
 		set_guard(false)
 	if Input.is_action_just_pressed("dodge"):
 		try_dodge(input_dir)
-	if Input.is_action_just_pressed("meditate"):
+	if Input.is_action_just_pressed("meditate") and not rose_from_cultivation:
 		toggle_meditation()
 
 	if _dodge_timer > 0.0:
