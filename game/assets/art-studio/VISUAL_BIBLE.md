@@ -384,3 +384,6 @@ Boar set filed (enemy_iron_tusk_boar_attack_{dir}.png + 8dir sheet): charging tu
 
 ## 64. ATTACK SET — HUNGRY CORPSE (2026-11-25)
 Corpse set filed (enemy_hungry_corpse_attack_{dir}.png + 8dir sheet): lunging two-handed claw grabs toward facing in all 8, gaunt rags match the idle/shamble sets. QC PASS (tests/corpse_attack_test.png). Remaining attack sets: Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 65. ATTACK SET — EMBER SPIRIT (2026-11-25)
+Ember set filed (enemy_ember_spirit_attack_{dir}.png + 8dir sheet): flame-burst flares spewing toward facing in all 8. QC note: the frames show a dark charred centre, but measured colour matches the idle set (hue 0.069–0.093 vs 0.070–0.073; value 0.57–0.70 vs 0.53–0.65; saturation slightly hotter, right for an attack) — identity holds. QC PASS (tests/ember_attack_test.png). Remaining attack sets: Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
