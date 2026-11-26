@@ -399,3 +399,6 @@ Mantis set filed (enemy_spirit_mantis_attack_{dir}.png + 8dir sheet): reared scy
 
 ## 69. ATTACK SET — GLOOM SERPENT (2026-11-25)
 Serpent set filed (enemy_gloom_serpent_attack_{dir}.png + 8dir sheet): coiled strike poses, head lunged and jaws open toward facing in all 8, centre-anchored like its swim set. QC PASS (tests/serpent_attack_test.png). Remaining attack sets: Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 70. ATTACK SET — CORRUPTED SPIRIT WOLF (2026-11-25)
+Corrupted Wolf set filed (enemy_corrupted_spirit_wolf_attack_{dir}.png + 8dir sheet): lunging bite poses toward facing in all 8. The §54 pale lock was in every prompt this time and held first try — measured luminance 0.656–0.711 vs idle 0.661, violet only in cracks/crystals/eyes. QC PASS (tests/corrupted_wolf_attack_test.png). CREATURE ATTACK SETS COMPLETE. Remaining attack sets: Guardian, Merchant, Farmer.
