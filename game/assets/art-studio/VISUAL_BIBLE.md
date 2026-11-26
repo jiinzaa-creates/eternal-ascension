@@ -402,3 +402,6 @@ Serpent set filed (enemy_gloom_serpent_attack_{dir}.png + 8dir sheet): coiled st
 
 ## 70. ATTACK SET — CORRUPTED SPIRIT WOLF (2026-11-25)
 Corrupted Wolf set filed (enemy_corrupted_spirit_wolf_attack_{dir}.png + 8dir sheet): lunging bite poses toward facing in all 8. The §54 pale lock was in every prompt this time and held first try — measured luminance 0.656–0.711 vs idle 0.661, violet only in cracks/crystals/eyes. QC PASS (tests/corrupted_wolf_attack_test.png). CREATURE ATTACK SETS COMPLETE. Remaining attack sets: Guardian, Merchant, Farmer.
+
+## 71. ATTACK SET — ANCIENT STONE GUARDIAN (2026-11-25)
+Guardian set filed at boss scale (boss_ancient_stone_guardian_attack_{dir}.png, 128x128 fit 120 + 8dir sheet): overhead stone-fist slams toward facing in all 8; small rubble at the striking fist is attached impact debris, kept as design. QC PASS (tests/guardian_attack_test.png). Remaining attack sets: Merchant, Farmer.
