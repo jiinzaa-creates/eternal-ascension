@@ -149,6 +149,22 @@ static func roll_method(method: Dictionary, seed_value: int) -> String:
 	return String(pool[rng.randi_range(0, pool.size() - 1)])
 
 
+## A pair's fusion affix: rolled from the union of both methods'
+## mechanic families, so a pairing can draw colours neither method
+## would meet alone.
+static func roll_pair(primary: Dictionary, secondary: Dictionary, seed_value: int) -> String:
+	var pool: Array = []
+	for affix in method_pool(primary) + method_pool(secondary):
+		var id := String((affix as Dictionary).get("id", ""))
+		if id != "" and not pool.has(id):
+			pool.append(id)
+	if pool.is_empty():
+		return ""
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	return String(pool[rng.randi_range(0, pool.size() - 1)])
+
+
 ## The meditation multiplier a method affix contributes (1.0 when none).
 static func method_meditation_factor(affix_id: String) -> float:
 	if affix_id == "":

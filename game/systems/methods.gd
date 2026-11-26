@@ -175,6 +175,44 @@ static func breakthrough_profile(id: String, state: Dictionary) -> Dictionary:
 	return profile
 
 
+## Whether two methods can be practised as a pair (Directive s.7.1:
+## combinable where compatible). The data is kept symmetric; the AND here
+## means a one-sided edit to the data fails safe instead of half-working.
+static func compatible(a: String, b: String) -> bool:
+	if a == "" or b == "" or a == b:
+		return false
+	var first := find(a)
+	var second := find(b)
+	if first.is_empty() or second.is_empty():
+		return false
+	return (first.get("combines_with", []) as Array).has(b) \
+		and (second.get("combines_with", []) as Array).has(a)
+
+
+## Meditation for a pair: the primary method drives, the secondary bends
+## the result halfway toward its own fit. An unpaired method is itself.
+static func combined_meditation(primary: String, secondary: String, state: Dictionary) -> float:
+	var base := meditation_multiplier(primary, state)
+	if secondary == "" or not compatible(primary, secondary):
+		return base
+	return base + (meditation_multiplier(secondary, state) - 1.0) * 0.5
+
+
+## A breakthrough for a pair: the chances average, Heaven's weight
+## averages, and the worse harm rules - two circulations share the storm,
+## but the frailer one sets what failure costs.
+static func combined_profile(primary: String, secondary: String, state: Dictionary) -> Dictionary:
+	var profile := breakthrough_profile(primary, state)
+	if secondary == "" or not compatible(primary, secondary):
+		return profile
+	var other := breakthrough_profile(secondary, state)
+	profile["chance"] = (float(profile["chance"]) + float(other["chance"])) / 2.0
+	profile["tribulation"] = (float(profile["tribulation"]) + float(other["tribulation"])) / 2.0
+	profile["harm"] = maxf(float(profile["harm"]), float(other["harm"]))
+	profile["note"] = "%s · paired with %s" % [String(profile["note"]), String(find(secondary).get("name", secondary))]
+	return profile
+
+
 ## Insight is a long, slow bonus: at most +20% to the method's own multiplier.
 static func insight_bonus(insight: int) -> float:
 	return 1.0 + clampf(float(insight), 0.0, 100.0) * 0.002

@@ -672,6 +672,11 @@ func _spawn_interactables() -> void:
 	method_stele.position = settlement.position_for("shrine") + Vector2(112, -26)
 	world.add_child(method_stele)
 	interactables.append(method_stele)
+	var pairing_stele := Interactable.new()
+	pairing_stele.setup_method("method.stele.pairing", "Pairing stele")
+	pairing_stele.position = settlement.position_for("shrine") + Vector2(160, -26)
+	world.add_child(pairing_stele)
+	interactables.append(pairing_stele)
 
 	# A disciple practising a technique nobody wrote down: watch and learn.
 	var demonstration := Interactable.new()
@@ -4695,8 +4700,47 @@ func _cycle_method() -> void:
 		return
 	Game.spirit_stones -= Methods.SWITCH_COST
 	player.cultivation.method_id = next_id
+	# A pairing survives only while the two methods still agree: if the new
+	# primary cannot walk with the old companion, the pairing dissolves.
+	if player.cultivation.secondary_method_id != "" \
+			and not Methods.compatible(next_id, player.cultivation.secondary_method_id):
+		player.cultivation.secondary_method_id = ""
+		Bus.toast.emit("The old pairing dissolves; the new circulation walks alone.")
 	var method: Dictionary = DB.by_id("method", next_id)
 	Bus.toast.emit("The stele reshapes your circulation: %s." % String(method.get("name", next_id)))
+	Bus.cultivation_changed.emit()
+
+
+## The pairing stele cycles a companion method for the current primary:
+## none -> each compatible, qualified method -> none again. Pairing costs
+## what switching costs; unpairing is free.
+func _cycle_secondary() -> void:
+	var state := player.method_state()
+	var primary := player.cultivation.method_id
+	var ring: Array = [""]
+	for method in DB.methods:
+		var id := String(method.get("id", ""))
+		if id != primary and Methods.compatible(primary, id) \
+				and bool(Methods.qualifies(id, state)["ok"]):
+			ring.append(id)
+	if ring.size() == 1:
+		Bus.toast.emit("No compatible method answers your %s." % String(DB.by_id("method", primary).get("name", primary)))
+		return
+	var current := player.cultivation.secondary_method_id
+	var index := ring.find(current)
+	var next_id := String(ring[(index + 1) % ring.size()])
+	if next_id != "" and Game.spirit_stones < Methods.SWITCH_COST:
+		Bus.toast.emit("The stele wants %d stones to weave a second circulation." % Methods.SWITCH_COST)
+		return
+	if next_id != "":
+		Game.spirit_stones -= Methods.SWITCH_COST
+	player.cultivation.secondary_method_id = next_id
+	if next_id == "":
+		Bus.toast.emit("The pairing dissolves; one circulation remains.")
+	else:
+		Bus.toast.emit("Two circulations turn together: %s walks with %s." % [
+			String(DB.by_id("method", primary).get("name", primary)),
+			String(DB.by_id("method", next_id).get("name", next_id))])
 	Bus.cultivation_changed.emit()
 
 
@@ -4866,7 +4910,10 @@ func _use_interactable(node: Interactable) -> void:
 			else:
 				Bus.toast.emit("You already know what this manual teaches.")
 		Interactable.Kind.METHOD:
-			_cycle_method()
+			if node.id == "method.stele.pairing":
+				_cycle_secondary()
+			else:
+				_cycle_method()
 		Interactable.Kind.MERIDIAN:
 			_open_meridian()
 		Interactable.Kind.TRIBULATION:

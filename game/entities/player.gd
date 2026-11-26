@@ -1352,7 +1352,7 @@ func method_state() -> Dictionary:
 ## One meditation step: Qi, method insight, and the blood method's fuel.
 func meditate_tick(delta: float) -> float:
 	var state := method_state()
-	var factor := Methods.meditation_multiplier(cultivation.method_id, state)
+	var factor := Methods.combined_meditation(cultivation.method_id, cultivation.secondary_method_id, state)
 	# Known cultivation arts deepen every sitting (TechniqueCombat caps the
 	# stack, so the arts season the method rather than replacing it).
 	var cult_arts: Array = []
@@ -1362,6 +1362,7 @@ func meditate_tick(delta: float) -> float:
 			cult_arts.append(known)
 	factor *= TechniqueCombat.cultivation_factor(cult_arts, Clock.is_night())
 	factor *= Affixes.method_meditation_factor(cultivation.method_affix())
+	factor *= Affixes.method_meditation_factor(cultivation.pair_affix())
 	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
 	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
 	# Sitting with a method is the slow, reliable road to understanding.

@@ -855,6 +855,25 @@ func _affix_tests() -> void:
 	check(String(veiled["note"]).contains("Veiled Crossing"), "the profile note names its affix")
 	check(Affixes.apply_method_profile(profile, "") == profile, "no affix leaves the profile itself")
 
+	for method in DB.methods:
+		var mid := String(method.get("id", ""))
+		for partner in method.get("combines_with", []):
+			check(Methods.compatible(mid, String(partner)), "%s combines with %s, in the data and in the check" % [mid, partner])
+	check(not Methods.compatible("method.forbidden", "method.traditional"), "the forbidden scripture walks with no orthodoxy")
+	check(Methods.compatible("method.forbidden", "method.blood"), "the forbidden scripture walks with the blood sea")
+	check(not Methods.compatible("method.sword", "method.sword"), "a method does not pair with itself")
+	var calm := {"attrs": Attributes.new(), "realm": 3, "kills": 0, "physique_tier": 3, "night": true}
+	check(is_equal_approx(Methods.combined_meditation("method.traditional", "", calm),
+		Methods.meditation_multiplier("method.traditional", calm)), "unpaired meditation is the method itself")
+	check(is_equal_approx(Methods.combined_meditation("method.traditional", "method.heavenly", calm),
+		1.0 + (1.8 - 1.0) * 0.5), "a companion bends meditation halfway toward its own fit")
+	check(is_equal_approx(Methods.combined_meditation("method.traditional", "method.forbidden", calm),
+		Methods.meditation_multiplier("method.traditional", calm)), "an incompatible companion changes nothing")
+	var pair_profile := Methods.combined_profile("method.blood", "method.forbidden", calm)
+	var blood_profile := Methods.breakthrough_profile("method.blood", calm)
+	check(float(pair_profile["harm"]) >= float(blood_profile["harm"]), "in a pair, the worse harm rules")
+	check(String(pair_profile["note"]).contains("paired with"), "the pair profile names the pairing")
+
 
 func _method_tests() -> void:
 	print("[methods] requirements, meditation fit, insight")

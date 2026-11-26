@@ -29,6 +29,8 @@ var identified := false
 var purity_bonus := 0.0
 var method_id: String = "method.traditional"
 var method_affixes: Dictionary = {}
+var secondary_method_id: String = ""
+var pair_affixes: Dictionary = {}
 ## Method id -> insight 0..100, earned by meditating well with that method.
 var method_insight: Dictionary = {}
 ## Blood Sea resource: gained by kills, burned while meditating.
@@ -231,9 +233,27 @@ func method_affix() -> String:
 	return rolled
 
 
+## The fusion affix the current pairing has drawn, or "" unpaired.
+## Rolled once per pair from the union of both methods' families.
+func pair_affix() -> String:
+	if secondary_method_id == "":
+		return ""
+	var key := "%s|%s" % [method_id, secondary_method_id]
+	var existing := String(pair_affixes.get(key, ""))
+	if existing != "":
+		return existing
+	var rolled := Affixes.roll_pair(Methods.find(method_id), Methods.find(secondary_method_id),
+		key.hash() + breakthrough_attempts * 131 + failures * 17)
+	if rolled != "":
+		pair_affixes[key] = rolled
+	return rolled
+
+
 ## The breakthrough profile with this method's affix laid over it.
 func _affixed_profile(method_state: Dictionary) -> Dictionary:
-	return Affixes.apply_method_profile(Methods.breakthrough_profile(method_id, method_state), method_affix())
+	var profile := Methods.combined_profile(method_id, secondary_method_id, method_state)
+	profile = Affixes.apply_method_profile(profile, method_affix())
+	return Affixes.apply_method_profile(profile, pair_affix())
 
 
 ## Heaven's weight for this attempt: behaviour and realm, reshaped by the method
@@ -433,6 +453,8 @@ func to_dict() -> Dictionary:
 		"method_id": method_id,
 		"method_insight": method_insight.duplicate(),
 		"method_affixes": method_affixes.duplicate(),
+		"secondary_method_id": secondary_method_id,
+		"pair_affixes": pair_affixes.duplicate(),
 		"blood_charge": blood_charge,
 		"meridians": meridians.duplicate(),
 		"contamination": contamination,
@@ -457,6 +479,10 @@ func from_dict(data: Dictionary) -> void:
 	method_id = String(data.get("method_id", "method.traditional"))
 	method_insight = data.get("method_insight", {}).duplicate()
 	method_affixes = data.get("method_affixes", {}).duplicate()
+	secondary_method_id = String(data.get("secondary_method_id", ""))
+	if not Methods.compatible(method_id, secondary_method_id):
+		secondary_method_id = ""
+	pair_affixes = data.get("pair_affixes", {}).duplicate()
 	blood_charge = clampf(float(data.get("blood_charge", 0.0)), 0.0, 100.0)
 	meridians = data.get("meridians", []).duplicate()
 	contamination = clampf(float(data.get("contamination", 0.0)), 0.0, Meridians.MAX_CONTAMINATION)
