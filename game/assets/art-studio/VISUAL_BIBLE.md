@@ -381,3 +381,6 @@ Spirit Wolf set filed (companion_spirit_wolf_attack_{dir}.png + 8dir sheet): lun
 
 ## 63. ATTACK SET — IRON-TUSK BOAR (2026-11-25)
 Boar set filed (enemy_iron_tusk_boar_attack_{dir}.png + 8dir sheet): charging tusk-gore poses toward facing in all 8. The generator's warm drift recurred (sat 0.061–0.134 vs idle 0.026); per-frame saturation pulled back to the idle value before filing — iron charcoal held, no brown. QC PASS (tests/boar_attack_test.png). Remaining attack sets: Corpse, Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 64. ATTACK SET — HUNGRY CORPSE (2026-11-25)
+Corpse set filed (enemy_hungry_corpse_attack_{dir}.png + 8dir sheet): lunging two-handed claw grabs toward facing in all 8, gaunt rags match the idle/shamble sets. QC PASS (tests/corpse_attack_test.png). Remaining attack sets: Ember, Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
