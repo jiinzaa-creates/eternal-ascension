@@ -88,6 +88,7 @@ func _ready() -> void:
 	_sect_world_tests()
 	_player_sect_v2_tests()
 	_lifespan_tests()
+	_death_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
@@ -4852,6 +4853,32 @@ func _lifespan_tests() -> void:
 	var round := Game.to_dict()
 	Game.from_dict(round)
 	check(Game.lifespan_years_bonus == 25, "bought years survive the save")
+	Game.from_dict(saved)
+
+
+func _death_tests() -> void:
+	print("[death] wounds, stone loss, fading")
+	var saved := Game.to_dict()
+	var saved_day := Clock.day
+	Clock.day = 100
+	Game.spirit_stones = 1000
+	var first := Game.note_death()
+	check(int(first.get("stones_lost", 0)) == 100 and Game.spirit_stones == 900,
+		"a death scatters a tenth of your stones")
+	check(Game.deaths == 1 and Game.death_wounds == 1, "the death and its wound are recorded")
+	for i in 6:
+		Game.note_death()
+	check(Game.death_wounds == Game.MAX_DEATH_WOUNDS, "wounds cap before they can cripple")
+	Clock.day = 106
+	check(Game.fade_death_wounds() == 0, "six days is not a week")
+	Clock.day = 107
+	check(Game.fade_death_wounds() == 1 and Game.death_wounds == Game.MAX_DEATH_WOUNDS - 1,
+		"a week survived closes a wound")
+	var round := Game.to_dict()
+	Game.from_dict(round)
+	check(Game.deaths == 7 and Game.death_wounds == Game.MAX_DEATH_WOUNDS - 1,
+		"the death record survives the save")
+	Clock.day = saved_day
 	Game.from_dict(saved)
 
 

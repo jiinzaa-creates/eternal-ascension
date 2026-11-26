@@ -166,7 +166,8 @@ func rebuild_stats() -> void:
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
 		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()),
 		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs())
-		+ ([{"stat": "lifespan", "value": Game.lifespan_years_bonus}] if Game.lifespan_years_bonus > 0 else []))
+		+ ([{"stat": "lifespan", "value": Game.lifespan_years_bonus}] if Game.lifespan_years_bonus > 0 else [])
+		+ ([{"stat": "qi_max_pct", "value": -5.0 * float(Game.death_wounds)}] if Game.death_wounds > 0 else []))
 	# Condition is applied after the pipeline has summed every source, so a
 	# rebuild can never compound it: a broken piece simply contributes nothing.
 	for slot in Items.DURABLE_SLOTS:
@@ -1277,8 +1278,56 @@ func heal(amount: float) -> void:
 	Bus.player_stats_changed.emit()
 
 
+## Consumes one carried item by base id (a stacked pill counts once).
+func _consume_carried(base_id: String) -> bool:
+	for i in inventory.size():
+		var entry: Dictionary = inventory[i]
+		if String(entry.get("base", "")) != base_id:
+			continue
+		var left := int(entry.get("count", 1)) - 1
+		if left <= 0:
+			inventory.remove_at(i)
+		else:
+			entry["count"] = left
+			inventory[i] = entry
+		return true
+	return false
+
+
+func _has_carried(base_id: String) -> bool:
+	for entry in inventory:
+		if String((entry as Dictionary).get("base", "")) == base_id:
+			return true
+	return false
+
+
+## The soul's way out, when a vessel was prepared (D5 fills this in).
+func _soul_escape_death() -> bool:
+	return false
+
+
 func _die() -> void:
-	Bus.toast.emit("Your body fails. You wake at the edge of the clearing, weaker.")
+	# A carried Phoenix Rebirth Pill burns in the body's place: the death
+	# simply does not happen, and you rise where you fell.
+	if _consume_carried("base.pill.phoenix"):
+		statuses.clear()
+		Game.hitstop.clear()
+		active_buffs.clear()
+		cultivation.qi = cultivation.qi_max(stats) * 0.5
+		hp = hp_max
+		_iframes = 3.0
+		poise.reset()
+		_knock = Vector2.ZERO
+		_attack_state = "idle"
+		Bus.toast.emit("The Phoenix Rebirth Pill burns in your place. You rise where you fell, whole.")
+		Bus.cultivation_changed.emit()
+		Bus.player_stats_changed.emit()
+		return
+	if _soul_escape_death():
+		return
+	var record := Game.note_death()
+	Bus.toast.emit("Your body fails. You wake at the edge of the clearing, weaker — death wound %d, and %d stones scattered where you fell." % [
+		int(record.get("wounds", 1)), int(record.get("stones_lost", 0))])
 	statuses.clear()
 	Game.hitstop.clear()
 	if not active_buffs.is_empty():
@@ -1538,6 +1587,8 @@ func _recalc_vitals() -> void:
 	hp_max = BASE_HP + float(cultivation.realm) * 20.0 \
 		+ Attributes.soft(float(stats.get_attr("str")), 20.0) \
 		+ Attributes.soft(cultivation.attr_mult() * 10.0, 12.0)
+	if Game.death_wounds > 0:
+		hp_max *= 1.0 - 0.05 * float(Game.death_wounds)
 	hp = minf(hp, hp_max)
 
 

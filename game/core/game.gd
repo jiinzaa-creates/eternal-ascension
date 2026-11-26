@@ -38,6 +38,34 @@ var age_warning_stage: int = 0
 ## player's stat pipeline reads it as a lifespan mod so every lifespan
 ## figure in the game agrees.
 var lifespan_years_bonus: int = 0
+## Death, counted (M29). Combat deaths leave wounds: each wound is -5%
+## max HP and Qi until a week of living closes it. Wounds cap so a bad
+## season cannot make the game unplayable.
+const MAX_DEATH_WOUNDS := 5
+var deaths: int = 0
+var death_wounds: int = 0
+var death_wound_day: int = 0
+
+
+## Records a combat death: the count, a fresh wound, and a tenth of the
+## stones the body was carrying, scattered where it fell.
+func note_death() -> Dictionary:
+	deaths += 1
+	death_wounds = mini(MAX_DEATH_WOUNDS, death_wounds + 1)
+	death_wound_day = Clock.day
+	var lost := int(float(spirit_stones) * 0.1)
+	spirit_stones -= lost
+	return {"deaths": deaths, "wounds": death_wounds, "stones_lost": lost}
+
+
+## A week survived closes the oldest wound. Returns how many closed.
+func fade_death_wounds() -> int:
+	var faded := 0
+	while death_wounds > 0 and Clock.day >= death_wound_day + 7:
+		death_wounds -= 1
+		death_wound_day += 7
+		faded += 1
+	return faded
 ## Crafting attempts this run. Every attempt advances it, failures included, so
 ## a retry rolls a new item instead of repeating the failed stream.
 var crafts_made: int = 0
@@ -121,6 +149,9 @@ func new_run(seed_value: int = 0) -> void:
 	dead = false
 	age_warning_stage = 0
 	lifespan_years_bonus = 0
+	deaths = 0
+	death_wounds = 0
+	death_wound_day = 0
 	crafts_made = 0
 	professions.clear()
 	npc_memory.clear()
@@ -189,6 +220,9 @@ func to_dict() -> Dictionary:
 		"dead": dead,
 		"age_warning_stage": age_warning_stage,
 		"lifespan_years_bonus": lifespan_years_bonus,
+		"deaths": deaths,
+		"death_wounds": death_wounds,
+		"death_wound_day": death_wound_day,
 		"crafts_made": crafts_made,
 		"professions": professions.duplicate(true),
 		"npc_memory": npc_memory.duplicate(true),
@@ -234,6 +268,9 @@ func from_dict(data: Dictionary) -> void:
 	dead = bool(data.get("dead", false))
 	age_warning_stage = int(data.get("age_warning_stage", 0))
 	lifespan_years_bonus = maxi(0, int(data.get("lifespan_years_bonus", 0)))
+	deaths = maxi(0, int(data.get("deaths", 0)))
+	death_wounds = clampi(int(data.get("death_wounds", 0)), 0, MAX_DEATH_WOUNDS)
+	death_wound_day = maxi(0, int(data.get("death_wound_day", 0)))
 	crafts_made = int(data.get("crafts_made", 0))
 	professions = Professions.sanitize(data.get("professions", {}))
 	npc_memory = NpcDb.sanitize_memory(data.get("npc_memory", {}))

@@ -958,6 +958,11 @@ func _check_aging() -> void:
 		if warning != "":
 			Bus.toast.emit(warning)
 			Bus.player_stats_changed.emit()
+	var faded := Game.fade_death_wounds()
+	if faded > 0:
+		player.rebuild_stats()
+		Bus.toast.emit("A death wound closes. %s" % ("The body is whole again." if Game.death_wounds == 0
+			else "%d still linger%s." % [Game.death_wounds, "s" if Game.death_wounds > 1 else ""]))
 	if Aging.is_dead(age, lifespan):
 		_end_run()
 
