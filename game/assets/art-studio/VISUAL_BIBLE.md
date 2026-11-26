@@ -516,3 +516,26 @@ the real input pipeline: F on, F off, F on, step east off. Suite
 Stages A–E, all remote-HEAD verified (82de311, 160b5d1, dedf661, e917ba4, c3eed6f). The world the art serves is now a 5×4-cell continent (60×48 chunks, ~245k×147k px): every land region walkable, each with its own biome heart (12 biomes, art by HSV grading of the locked tilesets — desert/volcanic hues tuned so grades never wrap magenta; volcanic water reads as lava), one town per region (village/town/city by distance tier, full NPC schedules), rivers with dry fords and lakes per region, three new POI kinds (cave, battlefield, cache), shores that actually stop the player at the waterline, and a continent map that tells the truth: biome colours, visited-region fog ("Uncharted"), capital in gold, discovered towns marked, region-entry banners. Travel prices up to 24 destinations / 24 hours in a two-column Routes panel.
 
 Two defects found by live probes during this pass and fixed: towns.gd silently failed to compile after the Stage D dry-anchor change (no town spawned; a unit check now pins one spec per non-capital region), and all four code-drawn full-screen panels (map, Routes, shop, skill bar) drew with size (0,0) — they now size from the viewport like the HUD. Verification: unit suite 4389/0; integration failures only in the known timing-flaky pool; every stage screenshot-verified in-game.
+
+## 83. Combat Breadth — technique & method icon sets (2026-11-26)
+
+Twenty-eight medallion icons in the locked house style (bronze rim, dark
+teal field, painterly spirit-ink glyph, no text), generated against the
+Azure Cleave medallion as the style reference and QC'd on contact sheets:
+
+- F1 roster (20): Spring Mending (sprout + droplet), Renewal Rain (leaf),
+  Phoenix Heart Sutra (flame phoenix), Stone Ape Form (stone ape head),
+  Storm Crow Form (crow + lightning), Asura War Form (horned war mask),
+  Aegis of Still Water (water shield), Mountain Root Stance (rooted
+  peak), Ember Lance, Frost Nova, Thunder Judgment, Earthen Spears,
+  Gale Kick, Serpent Coil, Starfall Sword Rain, Phantom Steps (violet
+  footprints — regenerated once after the first pass broke the rim),
+  Iron Meridian Flow (channel-lit torso), Keen Sword Heart, Deep Breath
+  Circulation (breath spiral), Star Drinking Art (star spiral + vessel).
+- F2 evolution (8): Heavenly Azure Cleave, Diamond Bone (crystal fist),
+  Ten Thousand Petals, Sunfire Lance, Jade Spring Restoration, Adamant
+  Bell Cover, Void Step (void spiral), Crimson Moon Eclipse.
+
+Files: assets/art-studio/assets/ui/icons/technique_icon_<name>.png,
+64x64 RGBA, one per technique — the library now holds an icon for all
+39 techniques.
