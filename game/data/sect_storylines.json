@@ -165,7 +165,7 @@
       "sect": "sect.heavenly_sword",
       "title": "The Honest Edge",
       "summary": "Cliffspire's hardliners keep the gate shut to rootless talent, and a generation of outer disciples has never been given a real blade.",
-      "giver": "board.market",
+      "giver": "npc.sect.heavenly_sword.elder.0",
       "unlock": {
         "min_realm": 3,
         "min_contribution": 60
@@ -297,7 +297,7 @@
       "sect": "sect.crimson_lotus",
       "title": "The Poisoned Heir",
       "summary": "Two heirs, one cup, and a house that considers poison a form of etiquette. The wrong answer makes you part of the inheritance.",
-      "giver": "board.market",
+      "giver": "npc.sect.crimson_lotus.elder.0",
       "unlock": {
         "min_realm": 3,
         "min_contribution": 80
@@ -431,7 +431,7 @@
       "sect": "sect.thousand_beast",
       "title": "The Communion",
       "summary": "Ten Thousand Hoof Plain cannot agree whether the herds are brothers or stock, and the pens are filling either way.",
-      "giver": "board.market",
+      "giver": "npc.sect.thousand_beast.elder.0",
       "unlock": {
         "min_realm": 3,
         "min_contribution": 70
@@ -564,7 +564,7 @@
       "sect": "sect.celestial_formation",
       "title": "The Failing Array",
       "summary": "The grand array under Inkstone Plateau is failing, and the house that draws reality has been drawing over the crack for forty years.",
-      "giver": "board.market",
+      "giver": "npc.sect.celestial_formation.elder.0",
       "unlock": {
         "min_realm": 4,
         "min_contribution": 120
@@ -696,7 +696,7 @@
       "sect": "sect.blood_moon",
       "title": "Succession by Murder",
       "summary": "Blood Moon's master is dead by doctrine and the new heir needs a witness with clean hands and a full purse.",
-      "giver": "board.market",
+      "giver": "npc.sect.blood_moon.elder.0",
       "unlock": {
         "min_realm": 4,
         "min_contribution": 140
@@ -834,7 +834,7 @@
       "sect": "sect.eternal_medicine",
       "title": "The Plague They Made",
       "summary": "Green Hollow has a cure for the plague in the eastern villages. Green Hollow also has the plague's original recipe.",
-      "giver": "board.market",
+      "giver": "npc.sect.eternal_medicine.elder.0",
       "unlock": {
         "min_realm": 3,
         "min_contribution": 100
@@ -968,7 +968,7 @@
       "sect": "sect.shadow_veil",
       "title": "The Seller of Secrets",
       "summary": "Someone under the market is selling all twelve houses' business to each other, and Shadow Veil would like to know who before the houses do.",
-      "giver": "board.market",
+      "giver": "npc.sect.shadow_veil.elder.0",
       "unlock": {
         "min_realm": 3,
         "min_contribution": 90
@@ -1102,7 +1102,7 @@
       "sect": "sect.thunder_sovereign",
       "title": "The Rented Sky",
       "summary": "Stormcrown can call a tribulation down on anyone with the silver, and the villages under the cloud have started paying not to be chosen.",
-      "giver": "board.market",
+      "giver": "npc.sect.thunder_sovereign.elder.0",
       "unlock": {
         "min_realm": 4,
         "min_contribution": 130
@@ -1236,7 +1236,7 @@
       "sect": "sect.frozen_heaven",
       "title": "The Thawing Elder",
       "summary": "An elder is coming out of a century of ice, and Frozen Heaven would rather she stayed a perfectly preserved lesson.",
-      "giver": "board.market",
+      "giver": "npc.sect.frozen_heaven.elder.0",
       "unlock": {
         "min_realm": 4,
         "min_contribution": 110
@@ -1370,7 +1370,7 @@
       "sect": "sect.golden_cauldron",
       "title": "The God-Killing Commission",
       "summary": "Furnace City has accepted a commission for a weapon that can kill gods, and the client has paid in advance.",
-      "giver": "board.market",
+      "giver": "npc.sect.golden_cauldron.elder.0",
       "unlock": {
         "min_realm": 4,
         "min_contribution": 150
@@ -1503,7 +1503,7 @@
       "sect": "sect.void_scripture",
       "title": "The Book That Rewrites",
       "summary": "The Floating Archive holds a book that edits its readers, and the Pavilion wants a copy made by someone who has not read it.",
-      "giver": "board.market",
+      "giver": "npc.sect.void_scripture.elder.0",
       "unlock": {
         "min_realm": 5,
         "min_contribution": 180

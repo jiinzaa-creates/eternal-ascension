@@ -124,6 +124,9 @@ var hierarchy_open := false
 ## The sect ledger: stipend, donations and the quartermaster's shelf.
 var sect_ledger_open := false
 var sect_ledger_index := 0
+var sect_seat_open := false
+var sect_seat_index := 0
+var current_sect_id := ""
 ## The council: three blocs, their support, and the vote on the master's seat.
 var council_open := false
 var council_index := 0
@@ -1026,6 +1029,7 @@ func _process(delta: float) -> void:
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
 			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open \
+			or sect_seat_open \
 			or endgame_open or character_open or settings_open or menu_open:
 		return
 
@@ -2158,6 +2162,21 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		return
 
+	if sect_seat_open:
+		if event.is_action_pressed("interact") or event.is_action_pressed("ui_cancel"):
+			_close_sect_seat()
+			return
+		if event.is_action_pressed("ui_down"):
+			sect_seat_index = mini(sect_seat_index + 1, maxi(0, sect_seat_rows().size() - 1))
+			return
+		if event.is_action_pressed("ui_up"):
+			sect_seat_index = maxi(0, sect_seat_index - 1)
+			return
+		if event.is_action_pressed("accept"):
+			_sect_seat_activate(sect_seat_index)
+			return
+		return
+
 	if council_open:
 		if event.is_action_pressed("open_council") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
@@ -3075,6 +3094,164 @@ func _close_sect_ledger() -> void:
 	if not sect_ledger_open:
 		return
 	sect_ledger_open = false
+
+func _open_sect_seat(sect_id: String) -> void:
+	if Sects.sect(sect_id).is_empty():
+		return
+	current_sect_id = sect_id
+	sect_seat_index = 0
+	sect_seat_open = true
+
+
+func _close_sect_seat() -> void:
+	sect_seat_open = false
+
+
+## The player's rank inside one established house, or "" when they hold no
+## standing there. Azure Cloud reads its older ledgers; every other house
+## reads the membership standing.
+func _sect_rank_id(sect_id: String) -> String:
+	if player == null or sect_id == "":
+		return ""
+	if sect_id == String(Sects.local_sect().get("id", "")):
+		return _player_rank_id()
+	if Game.player_sect_id != sect_id:
+		return ""
+	return String(Hierarchy.rank_for(int(Game.sect_standing.get(sect_id, 0)),
+		player.cultivation.realm).get("id", "rank.servant"))
+
+
+func _sect_rank_level(sect_id: String) -> int:
+	var rank_id := _sect_rank_id(sect_id)
+	if rank_id == "":
+		return -1
+	return int(Hierarchy.rank(rank_id).get("level", 0))
+
+
+func sect_seat_rows() -> Array:
+	var rows: Array = []
+	var sect := Sects.sect(current_sect_id)
+	if sect.is_empty() or player == null:
+		return rows
+	var name := String(sect.get("name", current_sect_id))
+	rows.append({"kind": "info", "enabled": false,
+		"label": "%s — %s" % [name, String(sect.get("seat", ""))],
+		"detail": "%s %s" % [String(sect.get("philosophy", "")), String(sect.get("fault_line", ""))]})
+	var member := Game.player_sect_id == current_sect_id
+	if member:
+		var rank := Hierarchy.rank(_sect_rank_id(current_sect_id))
+		var standing_line := "Rank %s" % String(rank.get("name", ""))
+		if current_sect_id != String(Sects.local_sect().get("id", "")):
+			standing_line += " · standing %d" % int(Game.sect_standing.get(current_sect_id, 0))
+		rows.append({"kind": "info", "enabled": false, "label": "You hold this house's seal.",
+			"detail": standing_line})
+	elif Game.player_sect_id != "":
+		rows.append({"kind": "info", "enabled": false,
+			"label": "You hold the seal of %s." % String(Sects.sect(Game.player_sect_id).get("name", Game.player_sect_id)),
+			"detail": "One seal, one house. Renounce it at its own gate before swearing elsewhere."})
+	else:
+		rows.append({"kind": "info", "enabled": false, "label": "You hold no sect's seal.",
+			"detail": "The house elder at this seat holds its story — speak with the elders."})
+	if not member:
+		var join_ok := Game.player_sect_id == ""
+		rows.append({"kind": "join", "enabled": join_ok,
+			"label": "Swear to the %s" % name,
+			"detail": "Master %s receives your oath at this gate." % String(sect.get("master", "")),
+			"reason": "" if join_ok else "You already hold a seal."})
+		return rows
+	rows.append({"kind": "leave", "enabled": true, "label": "Renounce the seal",
+		"detail": "Standing with this house falls by 10. The road back is long."})
+	var tech_id := String((sect.get("technique", {}) as Dictionary).get("id", ""))
+	var tech := DB.technique(tech_id)
+	if not tech.is_empty():
+		var known := player.technique_ids.has(tech_id)
+		var rank_ok := _sect_rank_level(current_sect_id) >= 2
+		var learn := Techniques.can_learn(tech_id, player.technique_state()) if rank_ok and not known else {}
+		var enabled := rank_ok and not known and bool(learn.get("ok", false))
+		var reason := ""
+		if known:
+			reason = "Already learned."
+		elif not rank_ok:
+			reason = "Inner disciples and above only."
+		elif not enabled:
+			reason = String(learn.get("reason", ""))
+		rows.append({"kind": "technique", "enabled": enabled, "id": tech_id,
+			"label": "Learn %s" % String(tech.get("name", tech_id)),
+			"detail": "The house teaches its signature art to inner disciples and above.",
+			"reason": reason})
+	var method_id := String((sect.get("method", {}) as Dictionary).get("id", ""))
+	var method := Methods.find(method_id)
+	if not method.is_empty():
+		var rank_ok := _sect_rank_level(current_sect_id) >= 3
+		var current := player.cultivation.method_id == method_id
+		rows.append({"kind": "method", "enabled": rank_ok and not current, "id": method_id,
+			"label": "Attune to %s" % String((sect.get("method", {}) as Dictionary).get("name", method_id)),
+			"detail": "The seat's stele turns a core disciple's circulation to the house method.",
+			"reason": "Your circulation already follows it." if current else ("" if rank_ok else "Core disciples and above only.")})
+	for donation in SectEconomy.donations():
+		rows.append({"kind": "donate", "enabled": Game.spirit_stones >= int(donation.get("stones", 0)),
+			"id": String(donation.get("id", "")),
+			"label": String(donation.get("label", "Donate")),
+			"detail": "Standing with the house rises by %d." % (int(donation.get("points", 0)) * 5),
+			"reason": "Not enough spirit stones."})
+	return rows
+
+
+func _sect_seat_activate(index: int) -> void:
+	var rows := sect_seat_rows()
+	if index < 0 or index >= rows.size():
+		return
+	var row: Dictionary = rows[index]
+	if not bool(row.get("enabled", false)):
+		var reason := String(row.get("reason", ""))
+		Bus.toast.emit("The gate refuses%s." % (": " + reason if reason != "" else ""))
+		return
+	var sect := Sects.sect(current_sect_id)
+	var name := String(sect.get("name", current_sect_id))
+	match String(row.get("kind", "")):
+		"join":
+			Game.player_sect_id = current_sect_id
+			if not Game.sect_standing.has(current_sect_id):
+				Game.sect_standing[current_sect_id] = 0
+			Bus.toast.emit("You swear to the %s. Master %s accepts your oath." % [
+				name, String(sect.get("master", ""))])
+			Bus.cultivation_changed.emit()
+		"leave":
+			Game.player_sect_id = ""
+			Game.sect_standing[current_sect_id] = clampi(
+				int(Game.sect_standing.get(current_sect_id, 0)) - 10, -100, 100)
+			Bus.toast.emit("You renounce the %s seal. The gate closes behind you." % name)
+			Bus.cultivation_changed.emit()
+		"technique":
+			var tech_id := String(row.get("id", ""))
+			var learned := player.try_learn_technique(tech_id)
+			if bool(learned.get("ok", false)):
+				Bus.toast.emit("The house masters teach you %s." % String(DB.technique(tech_id).get("name", tech_id)))
+				Bus.cultivation_changed.emit()
+			else:
+				Bus.toast.emit("The masters refuse: %s." % String(learned.get("reason", "")))
+		"method":
+			var method_id := String(row.get("id", ""))
+			var check := Methods.qualifies(method_id, player.method_state())
+			if bool(check.get("ok", false)):
+				player.cultivation.method_id = method_id
+				Bus.toast.emit("The stele reshapes your circulation: %s." % String(Methods.find(method_id).get("name", method_id)))
+				Bus.cultivation_changed.emit()
+			else:
+				Bus.toast.emit("The stele refuses: %s." % String(check.get("reason", "")))
+		"donate":
+			var donation := SectEconomy.donation(String(row.get("id", "")))
+			var cost := int(donation.get("stones", 0))
+			if Game.spirit_stones >= cost:
+				Game.spirit_stones -= cost
+				Game.sect_standing[current_sect_id] = clampi(
+					int(Game.sect_standing.get(current_sect_id, 0)) + int(donation.get("points", 0)) * 5,
+					-100, 100)
+				Bus.toast.emit("The house accepts your gift. Standing rises.")
+				Bus.cultivation_changed.emit()
+	sect_seat_index = clampi(sect_seat_index, 0, maxi(0, sect_seat_rows().size() - 1))
+
+
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process(true)
@@ -4408,6 +4585,13 @@ func _choose_storyline(id: String, choice_id: String) -> void:
 	var effects_value: Variant = result.get("effects", {})
 	var effects: Dictionary = effects_value if typeof(effects_value) == TYPE_DICTIONARY else {}
 	_apply_storyline_effects(effects)
+	if Game.player_sect_id != "":
+		var sect_of: Dictionary = storylines.sect_of(id)
+		if String(sect_of.get("id", "")) == Game.player_sect_id:
+			var regard_delta := int(effects.get("regard", 0))
+			if regard_delta != 0:
+				Game.sect_standing[Game.player_sect_id] = clampi(
+					int(Game.sect_standing.get(Game.player_sect_id, 0)) + regard_delta, -100, 100)
 	Bus.toast.emit("Story — %s: %s." % [storylines.title_of(id), _storyline_effect_line(effects)])
 	if bool(result.get("completed", false)):
 		var ending_value: Variant = result.get("ending", {})
@@ -5050,13 +5234,17 @@ func _use_interactable(node: Interactable) -> void:
 			else:
 				Bus.toast.emit("The disciple's cut is beyond you: %s required." % String(watched["reason"]))
 		Interactable.Kind.EXAMINE:
-			if node.id == "board.market":
+			if node.id.begins_with("sect.gate."):
+				_open_sect_seat("sect." + node.id.trim_prefix("sect.gate."))
+			elif node.id == "board.market":
 				_hear_realm_rumor("The notice board")
 				_accept_giver_quests("board.market")
 				_accept_giver_storylines("board.market")
 				_report_quests("talk", "board.market")
 				_report_quests("return", "board.market")
-			Bus.toast.emit(node.examine_text)
+				Bus.toast.emit(node.examine_text)
+			else:
+				Bus.toast.emit(node.examine_text)
 		Interactable.Kind.HERALD:
 			_read_world_event()
 		Interactable.Kind.SHOP:

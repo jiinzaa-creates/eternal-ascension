@@ -84,6 +84,7 @@ func _ready() -> void:
 	_factions_tests()
 	_sects_tests()
 	_sect_seat_tests()
+	_sect_membership_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
@@ -4713,6 +4714,38 @@ func _sect_seat_tests() -> void:
 	var again := SectSeats.specs(continent, 20261126, Vector2.ZERO)
 	check(String((specs[3] as Dictionary)["centre"]) == String((again[3] as Dictionary)["centre"]),
 		"seat placement is deterministic")
+
+
+func _sect_membership_tests() -> void:
+	print("[sect membership] one seal, twelve houses")
+	for value in SectStorylines.new().storylines():
+		var entry: Dictionary = value
+		var giver := String(entry.get("giver", ""))
+		if String(entry.get("sect", "")) == "sect.azure_cloud":
+			check(giver == "elder_bai", "the Azure arc still begins with Elder Bai")
+		else:
+			check(giver.begins_with("npc.sect.") and giver.ends_with(".elder.0"),
+				"%s arc begins with its seat elder (%s)" % [entry.get("sect", ""), giver])
+	var via_faction := Hierarchy.player_rank(3, {"faction.azure_cloud": 45}, 0)
+	var direct := Hierarchy.rank_for(45, 3)
+	check(String(via_faction.get("id", "")) == String(direct.get("id", "")),
+		"rank_for reads the ladder exactly as the Azure path does")
+	check(String(Hierarchy.rank_for(-100, 1).get("id", "")) == "rank.servant",
+		"a stranger to a house starts at its lowest rung")
+	check(String(Hierarchy.rank_for(100, 7, true).get("id", "")) == "rank.sect_master",
+		"full standing and realm can read the seat itself")
+	var game := Game
+	game.player_sect_id = "sect.heavenly_sword"
+	game.sect_standing = {"sect.heavenly_sword": 33, "sect.nope": 5}
+	var saved: Dictionary = game.to_dict()
+	game.player_sect_id = ""
+	game.sect_standing = {}
+	game.from_dict(saved)
+	check(game.player_sect_id == "sect.heavenly_sword", "membership survives the save")
+	check(int(game.sect_standing.get("sect.heavenly_sword", 0)) == 33
+		and not game.sect_standing.has("sect.nope"), "standing survives, pruned of unknown houses")
+	game.player_sect_id = ""
+	game.sect_standing = {}
 
 
 func _sect_economy_tests() -> void:

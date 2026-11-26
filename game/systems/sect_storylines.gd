@@ -12,9 +12,10 @@ extends RefCounted
 ## herbs and brews, an archive for a copied page. The class is pure; the scene
 ## owns the purse, the standing and the satchel.
 ##
-## The Azure Cloud's arc begins in conversation with Elder Bai. The other eleven
-## houses write to the market board; only one such correspondence may be open at
-## a time, and two houses refuse each other outright.
+## Every house's arc begins in conversation at its own seat: Elder Bai for
+## the Azure Cloud, the senior elder at the gate for the other eleven. Only
+## one foreign arc may be open at a time, and two houses refuse each other
+## outright.
 
 const SAVE_VERSION := 1
 ## Every gameplay event a chapter may listen for. The quest log exposes the same

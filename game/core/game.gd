@@ -69,6 +69,12 @@ var faction_standing: Dictionary = {}
 ## Sect contribution points: earned by service and donations, spent at the
 ## quartermaster. Bounded by the economy data's cap.
 var sect_contribution := 0
+## The established sect whose seal the player holds ("" = none), and the
+## standing earned inside each house. Azure Cloud keeps its older ledgers
+## (contribution, faction standing); this is the membership every house
+## shares.
+var player_sect_id := ""
+var sect_standing: Dictionary = {}
 ## Last world day the sect stipend was claimed; −1 means never.
 var sect_stipend_day := SectEconomy.DEFAULT_STIPEND_DAY
 ## How many quartermaster purchases this run, so every issued item gets a new
@@ -116,6 +122,8 @@ func new_run(seed_value: int = 0) -> void:
 	story_offers.clear()
 	faction_standing = Factions.sanitize({})
 	sect_contribution = 0
+	player_sect_id = ""
+	sect_standing = {}
 	sect_stipend_day = SectEconomy.DEFAULT_STIPEND_DAY
 	sect_purchases = 0
 	sect_lobby.clear()
@@ -178,6 +186,8 @@ func to_dict() -> Dictionary:
 		"story_offers": story_offers.duplicate(true),
 		"faction_standing": faction_standing.duplicate(true),
 		"sect_contribution": sect_contribution,
+		"player_sect_id": player_sect_id,
+		"sect_standing": sect_standing.duplicate(true),
 		"sect_stipend_day": sect_stipend_day,
 		"sect_purchases": sect_purchases,
 		"sect_lobby": sect_lobby.duplicate(true),
@@ -217,6 +227,14 @@ func from_dict(data: Dictionary) -> void:
 	story_offers = Stories.sanitize_offers(data.get("story_offers", []), Clock.day)
 	faction_standing = Factions.sanitize(data.get("faction_standing", {}))
 	sect_contribution = clampi(int(data.get("sect_contribution", 0)), 0, SectEconomy.cap())
+	player_sect_id = String(data.get("player_sect_id", ""))
+	if player_sect_id != "" and Sects.sect(player_sect_id).is_empty():
+		player_sect_id = ""
+	sect_standing = {}
+	var raw_standing: Dictionary = data.get("sect_standing", {})
+	for key in raw_standing.keys():
+		if not Sects.sect(String(key)).is_empty():
+			sect_standing[String(key)] = clampi(int(raw_standing[key]), -100, 100)
 	sect_stipend_day = int(data.get("sect_stipend_day", SectEconomy.DEFAULT_STIPEND_DAY))
 	sect_purchases = maxi(0, int(data.get("sect_purchases", 0)))
 	sect_lobby = SectPolitics.sanitize_lobby(data.get("sect_lobby", {}))

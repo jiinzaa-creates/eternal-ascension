@@ -188,6 +188,7 @@ func _draw() -> void:
 	draw_sect_ledger(player)
 	draw_council(player)
 	draw_player_sect(player)
+	draw_sect_seat(player)
 	draw_storylines(player)
 	draw_narrative(player)
 	draw_endgame(player)
@@ -784,6 +785,49 @@ func draw_sect_ledger(player: Player) -> void:
 		row_y += 50.0
 
 	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER transact   ·   O / E / ESC — close",
+		10, Color("#7b8b94"))
+
+
+## The sect seat: the gate board as a page of choices — swear, renounce,
+## learn the house's art, attune to its method, or buy standing with gifts.
+func draw_sect_seat(player: Player) -> void:
+	if not bool(host.sect_seat_open):
+		return
+	var view := get_viewport_rect().size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#06080a", 0.86))
+	var _pr := _page_rect(860.0, 540.0)
+	var w := _pr.size.x
+	var h := _pr.size.y
+	var x := _pr.position.x
+	var y := _pr.position.y
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0d1216", 0.98), Color("#c8b070", 0.45))
+	var sect := Sects.sect(String(host.current_sect_id))
+	_text(Vector2(x + 24.0, y + 34.0), _fit(String(sect.get("name", "Sect")).to_upper(), 22, w - 48.0), 22, ACCENT)
+	_text(Vector2(x + 24.0, y + 58.0), _fit("%s · Master %s · Deputy %s" % [
+		String(sect.get("seat", "")), String(sect.get("master", "")), String(sect.get("deputy", ""))],
+		11, w - 48.0), 11, MUTED)
+	_text(Vector2(x + w - 24.0 - 150.0, y + 58.0), "%d stones" % Game.spirit_stones, 11, Color("#e0c880"))
+	draw_line(Vector2(x + 20.0, y + 74.0), Vector2(x + w - 20.0, y + 74.0), Color("#2b343a"), 1.0)
+
+	var rows: Array = host.sect_seat_rows()
+	var cursor := clampi(int(host.sect_seat_index), 0, maxi(0, rows.size() - 1))
+	var row_y := y + 112.0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var enabled := bool(row.get("enabled", false))
+		if i == cursor:
+			draw_rect(Rect2(x + 18.0, row_y - 14.0, w - 36.0, 44.0), Color("#1b2328", 0.92))
+		var title := String(row.get("label", "?"))
+		_text(Vector2(x + 28.0, row_y), _fit(title, 13, w - 56.0), 13,
+			ACCENT if i == cursor else (INK if enabled else Color("#6f7f88")))
+		var detail := String(row.get("detail", ""))
+		if not enabled and String(row.get("reason", "")) != "":
+			detail += "   — " + String(row.get("reason", ""))
+		_text(Vector2(x + 28.0, row_y + 17.0), _fit(detail, 10, w - 56.0), 10,
+			MUTED if enabled else Color("#8a7070"))
+		row_y += 50.0
+
+	_text(Vector2(x + 24.0, y + h - 22.0), "↑/↓ choose   ·   ENTER decide   ·   E / ESC — close",
 		10, Color("#7b8b94"))
 
 
@@ -2309,6 +2353,9 @@ const LIST_PAGES := {
 	"council": {"open": "council_open", "index": "council_index", "rows": "council_rows",
 		"activate": "_council_activate", "size": Vector2(860.0, 520.0), "top": 112.0,
 		"step": 68.0, "off": -14.0, "height": 60.0, "width": -36.0},
+	"sect_seat": {"open": "sect_seat_open", "index": "sect_seat_index", "rows": "sect_seat_rows",
+		"activate": "_sect_seat_activate", "size": Vector2(860.0, 540.0), "top": 112.0,
+		"step": 50.0, "off": -14.0, "height": 44.0, "width": -36.0},
 	"player_sect": {"open": "player_sect_open", "index": "player_sect_index", "rows": "player_sect_rows",
 		"activate": "_player_sect_activate", "size": Vector2(880.0, 560.0), "top": 112.0,
 		"step": 52.0, "off": -14.0, "height": 48.0, "width": 520.0},
@@ -2372,7 +2419,7 @@ func _any_page_open() -> bool:
 		return false
 	for flag in ["character_open", "settings_open", "gear_open", "shop_open", "travel_open",
 			"bars_open", "storage_open", "forge_open", "alchemy_open", "factions_open",
-			"sects_open", "hierarchy_open", "sect_ledger_open", "council_open",
+			"sects_open", "hierarchy_open", "sect_ledger_open", "council_open", "sect_seat_open",
 			"player_sect_open", "storylines_open", "narrative_open", "endgame_open",
 			"captives_open", "chronicle_open"]:
 		if bool(host.get(flag)):

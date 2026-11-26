@@ -104,8 +104,13 @@ static func station_line(npc_id: String, archetype_id: String) -> String:
 ## notoriety costs a place in the hall just as it costs a welcome at the gate.
 static func player_rank(realm: int, standing: Dictionary, notoriety: int = 0,
 		seat_open: bool = false) -> Dictionary:
+	return rank_for(Factions.effective_standing(FACTION, standing, notoriety), realm, seat_open)
+
+
+## The ladder read against one house's standing: the same rungs, the same
+## requirements, whatever sect's seal the climber holds.
+static func rank_for(standing_value: int, realm: int, seat_open: bool = false) -> Dictionary:
 	var best: Dictionary = {}
-	var effective := Factions.effective_standing(FACTION, standing, notoriety)
 	var level := maxi(1, realm)
 	for value in ladder():
 		if typeof(value) != TYPE_DICTIONARY:
@@ -114,7 +119,7 @@ static func player_rank(realm: int, standing: Dictionary, notoriety: int = 0,
 		if bool(entry.get("seat", false)) and not seat_open:
 			continue
 		var need: Dictionary = entry.get("requires", {})
-		if effective >= int(need.get("standing", -100)) and level >= int(need.get("realm", 1)):
+		if standing_value >= int(need.get("standing", -100)) and level >= int(need.get("realm", 1)):
 			best = entry
 	if best.is_empty():
 		return rank("rank.servant")
