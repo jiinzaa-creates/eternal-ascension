@@ -56,3 +56,6 @@ Hair and skin colourways are no longer idle-only: 288 overlay frames under `colo
 
 ## UI frame language (2026-11-25, later)
 All HUD panels, pages, menus, the title screen, skill bar, shop/travel panels and the world map now draw through `ui/ui_frame.gd` (UiFrame): bronze corner ticks, bronze-dim rules, jade hairlines, plaques — the studio's UI lock expressed in the game's code-drawn style. The authored + high-contrast palettes are untouched. See VISUAL_BIBLE §78.
+
+## HUD diet, minimap, menu hub (2026-11-25, later still)
+Per Jawanza's spec the ambient HUD is now only: HP/Qi orbs top-left, skill slots bottom-left, a live circular minimap bottom-right, and a MENU button beside it that opens a grouped, keyboard-navigable hub for every system (Esc). Everything else moved to its page. See VISUAL_BIBLE §79.

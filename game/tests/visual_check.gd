@@ -16,6 +16,7 @@ const WATER := 7
 var _t := 0.0
 var _stage := 0
 var _stage_t := 0.0
+var _acted := false
 var _arena: Array = []
 var _props: Array = []
 var _herbs: Array = []
@@ -98,17 +99,41 @@ func _process(delta: float) -> bool:
 		8:  # in front of a textured building
 			if _stage_t > 1.2:
 				_shot("settlement.png")
-				current_scene.set("character_open", true)
 				_stage = 9
 				_stage_t = 0.0
-		9:  # character sheet page (UI frame check)
-			if _stage_t > 1.2:
+		9:  # Esc opens the menu hub
+			if _stage_t > 0.4 and not _acted:
+				_acted = true
+				_press("ui_cancel")
+			elif _stage_t > 1.2:
+				_shot("menu.png")
+				_press("ui_down")
+				_press("ui_down")
+				_stage = 10
+				_stage_t = 0.0
+				_acted = false
+		10:  # Enter follows the menu into the gear page (connectivity check)
+			if _stage_t > 0.4 and not _acted:
+				_acted = true
+				_press("accept")
+			elif _stage_t > 1.2:
+				_shot("menu_gear.png")
+				_press("ui_cancel")
+				_stage = 11
+				_stage_t = 0.0
+				_acted = false
+		11:  # character sheet still draws over the lean HUD
+			if _stage_t > 0.4 and not _acted:
+				_acted = true
+				current_scene.set("character_open", true)
+			elif _stage_t > 1.2:
 				_shot("sheet.png")
 				current_scene.set("character_open", false)
 				current_scene.set("settings_open", true)
-				_stage = 10
+				_stage = 12
 				_stage_t = 0.0
-		10:  # settings page (UI frame check)
+				_acted = false
+		12:  # settings page (UI frame check)
 			if _stage_t > 1.2:
 				_shot("settings.png")
 				current_scene.set("settings_open", false)

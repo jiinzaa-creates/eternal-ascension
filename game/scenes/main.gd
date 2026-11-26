@@ -144,6 +144,8 @@ var endgame_confirm_index := -1
 ## The character sheet and the persistent options screen. Both freeze play.
 var character_open := false
 var settings_open := false
+var menu_open := false
+var menu_index := 0
 var settings_tab := 0
 var settings_index := 0
 ## The action waiting for its next key, or "" when the controls page is idle.
@@ -775,7 +777,7 @@ func _process(delta: float) -> void:
 	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
 			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
 			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open \
-			or endgame_open or character_open or settings_open:
+			or endgame_open or character_open or settings_open or menu_open:
 		return
 
 	_tick_inheritance_trial(delta)
@@ -2122,6 +2124,21 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		return
 
+	if menu_open:
+		if event.is_action_pressed("ui_cancel") or event.is_action_pressed("interact"):
+			_close_menu()
+			return
+		if event.is_action_pressed("ui_down"):
+			menu_index = mini(menu_index + 1, menu_selectable_count() - 1)
+			return
+		if event.is_action_pressed("ui_up"):
+			menu_index = maxi(menu_index - 1, 0)
+			return
+		if event.is_action_pressed("accept"):
+			_menu_activate()
+			return
+		return
+
 	if event.is_action_pressed("open_inventory"):
 		toggle_gear()
 		return
@@ -2148,6 +2165,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					_sell_index(_sell_base + i)
 				return
+		return
+
+	if event.is_action_pressed("ui_cancel"):
+		_open_menu()
 		return
 
 	if event.is_action_pressed("quick_save"):
@@ -3504,6 +3525,113 @@ func _endgame_choose(index: int) -> bool:
 
 
 # ------------------------------------------------------- interface options ----
+
+
+## The one door: every system page, grouped the way the systems group
+## themselves. The menu carries no state of its own beyond the cursor;
+## opening an entry calls the same function its own key calls.
+func menu_entries() -> Array:
+	return [
+		{"header": "CHARACTER"},
+		{"id": "character", "label": "Character Sheet", "key": "C"},
+		{"id": "bars", "label": "Skill Bars", "key": "B"},
+		{"id": "gear", "label": "Gear & Satchel", "key": "G"},
+		{"id": "meridian", "label": "Meridians", "key": "U"},
+		{"header": "WORLD"},
+		{"id": "map", "label": "World Map", "key": "M"},
+		{"id": "chronicle", "label": "Chronicle", "key": "J"},
+		{"id": "captives", "label": "Captives", "key": "L"},
+		{"header": "SECT"},
+		{"id": "factions", "label": "Standings", "key": "K"},
+		{"id": "sects", "label": "Sects", "key": "Y"},
+		{"id": "hierarchy", "label": "Ranks", "key": "N"},
+		{"id": "ledger", "label": "Sect Ledger", "key": "O"},
+		{"id": "council", "label": "Council", "key": "F3"},
+		{"id": "player_sect", "label": "My Sect", "key": "F4"},
+		{"id": "storylines", "label": "Sect Stories", "key": "F6"},
+		{"id": "narrative", "label": "Sect Archive", "key": "F7"},
+		{"header": "SYSTEM"},
+		{"id": "settings", "label": "Settings", "key": "F10"},
+	]
+
+
+func menu_selectable_count() -> int:
+	var n := 0
+	for entry in menu_entries():
+		if not (entry as Dictionary).has("header"):
+			n += 1
+	return n
+
+
+func toggle_menu() -> void:
+	if menu_open:
+		_close_menu()
+	else:
+		_open_menu()
+
+
+func _open_menu() -> void:
+	if player == null or String(phase) != "play":
+		return
+	menu_open = true
+	menu_index = 0
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_menu() -> void:
+	if not menu_open:
+		return
+	menu_open = false
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process(true)
+
+
+func _menu_activate() -> void:
+	var seen := -1
+	var target := ""
+	for entry in menu_entries():
+		if (entry as Dictionary).has("header"):
+			continue
+		seen += 1
+		if seen == menu_index:
+			target = String((entry as Dictionary).get("id", ""))
+			break
+	_close_menu()
+	match target:
+		"character":
+			_open_character()
+		"bars":
+			toggle_bars()
+		"gear":
+			toggle_gear()
+		"meridian":
+			_open_meridian()
+		"map":
+			toggle_map()
+		"chronicle":
+			_open_chronicle()
+		"captives":
+			_open_captives()
+		"factions":
+			_open_factions()
+		"sects":
+			_open_sects()
+		"hierarchy":
+			_open_hierarchy()
+		"ledger":
+			_open_sect_ledger()
+		"council":
+			_open_council()
+		"player_sect":
+			_open_player_sect()
+		"storylines":
+			_open_storylines()
+		"narrative":
+			_open_narrative()
+		"settings":
+			_open_settings()
 
 
 func toggle_character() -> void:

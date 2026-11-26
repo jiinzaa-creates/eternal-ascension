@@ -159,25 +159,17 @@ func _draw() -> void:
 		return
 
 	draw_vitals(player)
-	draw_statuses(player)
-	draw_world_panel(player)
-	draw_waypoint(player)
 	draw_techniques(player)
-	draw_inventory(player)
-	# The dossier is ambient HUD; every full-screen screen opens over it.
-	draw_npc_dossier(player)
+	draw_minimap(player)
+	draw_menu_button()
 	draw_gear(player)
 	draw_storage(player)
 	draw_forge(player)
 	draw_alchemy(player)
-	draw_quest(player)
-	draw_party(player)
-	draw_captives(player)
 	draw_prompt()
 	draw_realm_banner()
 	draw_tribulation()
 	draw_inheritance_trial()
-	draw_boss()
 	draw_captive_ledger(player)
 	draw_chronicle(player)
 	draw_factions(player)
@@ -191,9 +183,9 @@ func _draw() -> void:
 	draw_endgame(player)
 	draw_character(player)
 	draw_settings(player)
+	if host != null and bool(host.get("menu_open")):
+		draw_menu()
 	draw_toasts()
-	if _help_visible:
-		draw_help()
 
 
 ## The end of the road: a quiet screen with the life that was lived, and the
@@ -223,126 +215,59 @@ func draw_ended(player: Player) -> void:
 
 
 func draw_vitals(player: Player) -> void:
-	var x := 24.0
-	var y := 28.0
-	_panel(Rect2(x - 12.0, y - 22.0, 316.0, 292.0))
-
-	_text(Vector2(x, y), player.cultivation.stage_title(), 19, ACCENT)
-	y += 20.0
-	var root: Dictionary = player.cultivation.root_data()
-	var root_label := String(root.get("name", "?"))
-	if not player.cultivation.identified:
-		root_label = "unread root"
-	_text(Vector2(x, y), "Root: %s   Method: %s (%d%%)" % [root_label, String(player.cultivation.method_data().get("name", "?")), player.cultivation.method_insight_points(player.cultivation.method_id)], 12, MUTED)
-	y += 18.0
-	_text(Vector2(x, y), "Physique: %s (tier %d)" % [Physiques.name_of(player.physique_id), Physiques.tier_of(player.physique_id)], 12, Color("#c8b8e8"))
-	y += 20.0
-
-	_bar(Vector2(x, y), Vector2(196.0, 10.0), player.hp / maxf(1.0, player.hp_max), Color("#d05050"),
-		"HP %d/%d" % [int(player.hp), int(player.hp_max)])
-	y += 18.0
+	# The vitals, and nothing else: two orbs in the Diablo manner, top-left.
+	# Everything this panel used to recite — root, physique, derived stats,
+	# passives, meridians — lives on the character sheet now, where it has
+	# room to be read.
+	var hp_ratio := clampf(player.hp / maxf(1.0, player.hp_max), 0.0, 1.0)
+	if hp_ratio < 0.25 and player.hp > 0.0:
+		var pulse := 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) / 180.0)
+		draw_arc(Vector2(62.0, 62.0), 47.0, 0.0, TAU, 48, Color("#e0483c", 0.30 + 0.40 * pulse), 3.0)
+	_orb(Vector2(62.0, 62.0), 42.0, hp_ratio, Color("#d84a35"))
+	_text_centred(Vector2(62.0, 68.0), "%d" % int(player.hp), 17, Color("#ffe9e2"))
+	_text_centred(Vector2(62.0, 83.0), "/ %d" % int(player.hp_max), 9, Color("#e8b8ac"))
 	var qi_cap := player.cultivation.qi_max(player.stats)
-	_bar(Vector2(x, y), Vector2(196.0, 10.0), player.cultivation.qi / maxf(1.0, qi_cap), Color("#5fb0d0"),
-		"Qi %d/%d" % [int(player.cultivation.qi), int(qi_cap)])
-	y += 22.0
-	_text(Vector2(x, y), player.stats.summary(), 12, INK)
-	y += 18.0
-	var derived := player.stats.derived()
-	_text(Vector2(x, y), "DMG x%.2f  CRIT %d%%  ARM %d" % [
-		float(derived["physical_mult"]), int(float(derived["crit_chance"]) * 100.0), int(float(derived["armor"]))
-	], 12, MUTED)
-	y += 18.0
-	var evasion := player.stats.evasion_chance()
-	var lifespan := player.stats.lifespan_years()
-	_text(Vector2(x, y), "EVA %d%%   PEN %d%%   CDR %d%%   CRIT x%.2f" % [
-		int(evasion * 100.0), int(player.stats.penetration_fraction() * 100.0),
-		int(player.stats.cooldown_reduction() * 100.0), player.stats.crit_multiplier()
-	], 11, MUTED)
-	y += 16.0
-	_text(Vector2(x, y), "Regen %.1f/s   %s" % [
-		player.stats.health_regen(), Aging.age_text(Game.age_years(), lifespan)
-	], 11, MUTED)
-	y += 18.0
-	var passive_text := "Passives: none"
-	if not player.passives.is_empty():
-		var names: Array[String] = []
-		for id in player.active_passives():
-			names.append(String(DB.passive(String(id)).get("name", id)))
-		passive_text = "Passives: " + ", ".join(names) if not names.is_empty() else "Passives: all dormant"
-		var dormant := player.dormant_passives().size()
-		if dormant > 0:
-			passive_text += "   (%d dormant)" % dormant
-	_text(Vector2(x, y), passive_text, 11, Color("#b8a8d8"))
-	y += 18.0
-	_text(Vector2(x, y), "Meridians: %d/12   Contamination: %d%%" % [
-		player.cultivation.meridian_count(), int(player.cultivation.contamination)
-	], 11, Color("#8fd8e8"))
-	y += 18.0
-	_text(Vector2(x, y), _fit(Hierarchy.hud_line(player.cultivation.realm, Game.faction_standing,
-		Game.notoriety, Hierarchy.seat_available(Game.sect_seat_open)), 11, 408.0), 11, Color("#d8c898"))
-	y += 18.0
-	_text(Vector2(x, y), "Realm art: %s   Unlocks: %d" % [
-		String(player.cultivation.realm_ability().get("name", "—")), player.cultivation.unlock_ids().size()
-	], 11, Color("#d8c898"))
-	y += 18.0
-	var insight_text := "Comprehension: %d%%   Insights: %d/%d" % [
-		roundi(player.cultivation.enlightenment_meter), player.enlightenments.size(), Enlightenments.count_total()
-	]
-	var insight_names := Enlightenments.known_names(player.enlightenments)
-	if not insight_names.is_empty():
-		insight_text += " — " + ", ".join(insight_names)
-	_text(Vector2(x, y), insight_text, 11, Color("#c8d8a8"))
-	# The tribulation line only appears where an attempt is possible, so the HUD
-	# never advertises a roll the player cannot make.
-	if player.cultivation.is_peak() and player.cultivation.realm < Realms.count():
-		y += 18.0
-		var chance := player.breakthrough_chance_estimate()
-		var note := String(player.cultivation.method_breakthrough_profile(player.method_state()).get("note", ""))
-		_text(Vector2(x, y), "Tribulation %d%%   Prep %d/%d   %s" % [
-			roundi(chance * 100.0), player.cultivation.preparation, Cultivation.MAX_PREPARATION, note
-		], 11, Color("#e0c880"))
+	var qi_ratio := clampf(player.cultivation.qi / maxf(1.0, qi_cap), 0.0, 1.0)
+	_orb(Vector2(142.0, 70.0), 34.0, qi_ratio, Color("#3fa8dd"))
+	_text_centred(Vector2(142.0, 75.0), "%d" % int(player.cultivation.qi), 14, Color("#e2f2ff"))
+	_text_centred(Vector2(142.0, 89.0), "QI", 8, Color("#a8cfe8"))
 
 
-## A boss gets one wide bar at the top of the screen, with its phase name and a
-## mark at every health threshold, so the fight's shape is readable without
-## opening anything.
-func draw_boss() -> void:
-	var body: Node = null
-	for node in get_tree().get_nodes_in_group("boss"):
-		if node is Node2D and is_instance_valid(node):
-			body = node
-			break
-	if body == null or Game.player == null:
-		return
-	var entry_value: Variant = body.get("boss_entry")
-	if typeof(entry_value) != TYPE_DICTIONARY:
-		return
-	var entry: Dictionary = entry_value
-	if entry.is_empty():
-		return
-	var at := (body as Node2D).global_position
-	if at.distance_to((Game.player as Node2D).global_position) > 1600.0:
-		return
-	var ratio := clampf(float(body.get("hp")) / maxf(1.0, float(body.get("hp_max"))), 0.0, 1.0)
-	var width := minf(560.0, size.x - 120.0)
-	var x := size.x * 0.5 - width * 0.5
-	var y := 58.0
-	_panel(Rect2(x - 10.0, y - 22.0, width + 20.0, 58.0))
-	_text(Vector2(x, y - 3.0), String(body.get("display_name")), 15, Color("#d8c8ff"))
-	var phase_label := Boss.phase_name(entry, int(body.get("boss_phase")))
-	_text(Vector2(x + width - _text_width(phase_label, 12), y - 3.0), phase_label, 12, MUTED)
-	var bar_y := y + 8.0
-	draw_rect(Rect2(x, bar_y, width, 12.0), Color("#000000", 0.55))
-	draw_rect(Rect2(x, bar_y, width * ratio, 12.0), Boss.bar_color(entry))
-	draw_rect(Rect2(x, bar_y, width, 12.0), Color("#3b3350"), false, 1.0)
-	for threshold in Boss.thresholds(entry):
-		var mark_x := x + width * (1.0 - float(threshold))
-		draw_line(Vector2(mark_x, bar_y), Vector2(mark_x, bar_y + 12.0), Color("#f0e0ff", 0.7), 1.5)
-	_text(Vector2(x, bar_y + 27.0), "%d / %d" % [int(body.get("hp")), int(body.get("hp_max"))], 11, MUTED)
+## Text centred on a point (pos.y stays the baseline).
+func _text_centred(pos: Vector2, text: String, font_size: int, color: Color) -> void:
+	_text(pos - Vector2(_text_width(text, font_size) * 0.5, 0.0), text, font_size, color)
 
 
-## Live combat statuses, in their own colours, just above the skill bar. Kept out
-## of the vitals panel so a status can never push the stat lines off it.
+## One orb: dark glass, a liquid fill clipped by the circle, a gloss, and
+## the bronze ring of the frame language.
+func _orb(center: Vector2, radius: float, ratio: float, liquid: Color) -> void:
+	draw_circle(center, radius, Color("#07090b", 0.88))
+	var r := clampf(ratio, 0.0, 1.0)
+	if r >= 0.999:
+		draw_circle(center, radius - 1.5, liquid)
+	elif r > 0.001:
+		var fill_y := center.y + radius - 2.0 * radius * r
+		var dy := clampf(fill_y - center.y, -radius, radius)
+		var dx := sqrt(maxf(0.0, radius * radius - dy * dy))
+		var a_start := atan2(dy, -dx)
+		var a_end := atan2(dy, dx)
+		var sweep := fposmod(a_start - a_end, TAU)
+		var points := PackedVector2Array()
+		var steps := 28
+		for i in range(steps + 1):
+			var a := a_start - sweep * float(i) / float(steps)
+			points.append(center + Vector2(cos(a), sin(a)) * (radius - 1.5))
+		draw_colored_polygon(points, liquid)
+		draw_line(center + Vector2(-dx, dy) * 0.97, center + Vector2(dx, dy) * 0.97,
+			Color(liquid, 0.55), 1.5)
+	draw_circle(center + Vector2(-radius * 0.34, -radius * 0.40), radius * 0.16, Color(1, 1, 1, 0.10))
+	draw_arc(center, radius + 1.0, 0.0, TAU, 64, UiFrame.BRONZE_DIM, 2.0)
+	draw_arc(center, radius + 4.0, -2.2, -0.9, 16, UiFrame.BRONZE, 1.5)
+	for k in range(4):
+		var a := PI * 0.25 + float(k) * PI * 0.5
+		var dir := Vector2(cos(a), sin(a))
+		draw_line(center + dir * (radius + 2.0), center + dir * (radius + 6.0), UiFrame.BRONZE_DIM, 1.5)
+
 func draw_statuses(player: Player) -> void:
 	var labels := Status.labels(player.statuses)
 	if labels.is_empty():
@@ -2105,3 +2030,200 @@ func _attribute_note(key: String) -> String:
 		"char":
 			return "social · recruitment · party"
 	return ""
+
+
+const MM_RADIUS := 76.0
+const MM_RANGE := 950.0
+var _mm_colours: Dictionary = {}
+
+
+func _minimap_center() -> Vector2:
+	return Vector2(size.x - MM_RADIUS - 22.0, size.y - MM_RADIUS - 22.0)
+
+
+## The minimap, bottom-right: the streamed ground sampled tile by tile,
+## herbs and sites from the chunk payloads, the people of the world as
+## dots, and the chosen waypoint in gold. Everything on it is read live
+## from the same data the world itself is built from.
+func draw_minimap(player: Player) -> void:
+	if host == null:
+		return
+	var manager: Object = host.get("chunks")
+	if manager == null:
+		return
+	var chunks: Dictionary = manager.get("chunks")
+	var centre := _minimap_center()
+	draw_circle(centre, MM_RADIUS + 6.0, Color("#05070a", 0.60))
+	var step := 64.0
+	var px := step / MM_RANGE * MM_RADIUS + 0.6
+	for wy in range(-int(MM_RANGE), int(MM_RANGE) + 1, int(step)):
+		for wx in range(-int(MM_RANGE), int(MM_RANGE) + 1, int(step)):
+			var off := Vector2(float(wx), float(wy))
+			if off.length() > MM_RANGE - step * 0.5:
+				continue
+			var colour := _mm_ground_colour(chunks, player.global_position + off)
+			if colour.a <= 0.0:
+				continue
+			var at := centre + off / MM_RANGE * MM_RADIUS
+			draw_rect(Rect2(at - Vector2(px, px) * 0.5, Vector2(px, px)), colour)
+	for coord in chunks.keys():
+		var chunk := chunks[coord] as Node2D
+		if chunk == null:
+			continue
+		var origin := chunk.global_position
+		for herb in chunk.get("herbs"):
+			var at: Variant = _mm_point(centre, player.global_position,
+				origin + Vector2((herb as Dictionary).get("pos", Vector2.ZERO)))
+			if at != null:
+				draw_circle(at, 1.6, Color("#7fd8a0"))
+		for poi in chunk.get("pois"):
+			var at: Variant = _mm_point(centre, player.global_position,
+				origin + Vector2((poi as Dictionary).get("pos", Vector2.ZERO)))
+			if at != null:
+				_mm_diamond(at, 3.0, UiFrame.BRONZE)
+	var npcs: Array = host.get("npcs")
+	for npc in npcs:
+		var body := npc as Node2D
+		if body == null or not is_instance_valid(body):
+			continue
+		var at: Variant = _mm_point(centre, player.global_position, body.global_position)
+		if at != null:
+			draw_circle(at, 2.6, Color("#9fe0c0"))
+			draw_arc(at, 2.6, 0.0, TAU, 12, Color("#0c1410", 0.8), 1.0)
+	for body in get_tree().get_nodes_in_group("enemy"):
+		var node := body as Node2D
+		if node == null or not is_instance_valid(node):
+			continue
+		var at: Variant = _mm_point(centre, player.global_position, node.global_position)
+		if at != null:
+			draw_circle(at, 2.6, Color("#e0584c"))
+	var target: Vector2 = host.waypoint_position
+	if target != Vector2.ZERO:
+		var rel := target - player.global_position
+		if rel.length() > MM_RANGE:
+			rel = rel.normalized() * (MM_RANGE - 26.0)
+		_mm_diamond(centre + rel / MM_RANGE * MM_RADIUS, 3.6, Color("#ffd97f"))
+	var facing: Vector2 = player.facing_direction()
+	if facing == Vector2.ZERO:
+		facing = Vector2.DOWN
+	var dir := facing.normalized()
+	var side := dir.orthogonal()
+	var tri := PackedVector2Array([
+		centre + dir * 7.0, centre - dir * 5.0 + side * 4.0, centre - dir * 5.0 - side * 4.0])
+	draw_colored_polygon(tri, Color("#ffe9b0"))
+	draw_arc(centre, MM_RADIUS + 2.0, 0.0, TAU, 72, UiFrame.BRONZE_DIM, 2.0)
+	draw_arc(centre, MM_RADIUS + 5.0, -2.6, -1.2, 16, UiFrame.BRONZE, 1.5)
+	_text_centred(centre + Vector2(0.0, -MM_RADIUS - 9.0), "N", 9, MUTED)
+
+
+## A world position on the minimap, or null when it lies beyond the rim.
+func _mm_point(centre: Vector2, origin: Vector2, world_pos: Vector2) -> Variant:
+	var rel := world_pos - origin
+	if rel.length() > MM_RANGE:
+		return null
+	return centre + rel / MM_RANGE * MM_RADIUS
+
+
+func _mm_diamond(at: Vector2, r: float, colour: Color) -> void:
+	draw_colored_polygon(PackedVector2Array([
+		at + Vector2(0, -r), at + Vector2(r, 0), at + Vector2(0, r), at + Vector2(-r, 0)]), colour)
+
+
+## The ground colour under a world position: the average of the actual
+## tile painted there, cached per tileset source, with the chunk's own
+## palette as the fallback when tiles are off.
+func _mm_ground_colour(chunks: Dictionary, world_pos: Vector2) -> Color:
+	var coord := Vector2i(floori(world_pos.x / 1024.0), floori(world_pos.y / 1024.0))
+	var chunk := chunks.get(coord) as Node2D
+	if chunk == null:
+		return Color(0, 0, 0, 0)
+	var layer := chunk.get_node_or_null("GroundTiles") as TileMapLayer
+	if layer != null and layer.tile_set != null:
+		var cell := layer.local_to_map(layer.to_local(world_pos))
+		var source := layer.get_cell_source_id(cell)
+		if source >= 0:
+			return _mm_source_colour(layer.tile_set, source)
+	var palette: Array = chunk.get("palette")
+	if palette != null and not palette.is_empty():
+		return Color(palette[0], 0.9)
+	return Color("#22301f", 0.9)
+
+
+func _mm_source_colour(tile_set: TileSet, source_id: int) -> Color:
+	var key := "%d:%d" % [tile_set.get_instance_id(), source_id]
+	if _mm_colours.has(key):
+		return _mm_colours[key]
+	var colour := Color("#2c3a2a")
+	var source := tile_set.get_source(source_id) as TileSetAtlasSource
+	if source != null and source.texture != null:
+		var image := source.texture.get_image()
+		if image != null and image.get_width() > 0:
+			image = image.duplicate()
+			image.resize(8, 8, Image.INTERPOLATE_BILINEAR)
+			var sum := Vector3.ZERO
+			var n := 0
+			for yy in range(8):
+				for xx in range(8):
+					var pxl := image.get_pixel(xx, yy)
+					if pxl.a > 0.1:
+						sum += Vector3(pxl.r, pxl.g, pxl.b)
+						n += 1
+			if n > 0:
+				sum /= float(n)
+				colour = Color(sum.x * 0.92, sum.y * 0.92, sum.z * 0.92)
+	colour.a = 0.92
+	_mm_colours[key] = colour
+	return colour
+
+
+## The door, drawn beside the minimap: one plaque that opens the menu.
+func draw_menu_button() -> void:
+	var centre := _minimap_center()
+	var rect := Rect2(centre.x - MM_RADIUS - 98.0, size.y - 46.0, 86.0, 30.0)
+	var open := host != null and bool(host.get("menu_open"))
+	UiFrame.plaque(self, rect, Color(PANEL_BG, 0.92), UiFrame.BRONZE if open else UiFrame.BRONZE_DIM)
+	_text_centred(rect.get_center() + Vector2(0.0, 1.0), "MENU", 11, ACCENT if open else INK)
+	_text_centred(rect.get_center() + Vector2(0.0, 12.0), "Esc", 8, MUTED)
+
+
+## The menu itself: every system behind one door, grouped the way the
+## systems group themselves, each row carrying the key that also opens
+## it directly. The key help lives at its foot, where it is looked for.
+func draw_menu() -> void:
+	var view := size
+	draw_rect(Rect2(Vector2.ZERO, view), Color("#05080a", 0.9))
+	var w := 720.0
+	var h := 660.0
+	var x := (view.x - w) * 0.5
+	var y := (view.y - h) * 0.5
+	UiFrame.page(self, Rect2(x, y, w, h), Color("#0c1012", 0.98), Color("#9fe0c0", 0.42))
+	_text(Vector2(x + 28.0, y + 42.0), "MENU", 24, ACCENT)
+	_text(Vector2(x + 28.0, y + 64.0), "Every system behind one door.  Up / Down choose, Enter opens, Esc closes.", 12, MUTED)
+	_text(Vector2(x + w - 118.0, y + 42.0), "Esc — close", 11, MUTED)
+	var entries: Array = host.menu_entries()
+	var selected := int(host.get("menu_index"))
+	var ry := y + 88.0
+	var seen := -1
+	for entry in entries:
+		var row: Dictionary = entry
+		if row.has("header"):
+			_text(Vector2(x + 28.0, ry + 12.0), String(row["header"]), 11, Color("#c8a860"))
+			UiFrame.divider(self, x + 118.0, x + w - 28.0, ry + 8.0)
+			ry += 24.0
+			continue
+		seen += 1
+		var rect := Rect2(x + 24.0, ry, w - 48.0, 24.0)
+		if seen == selected:
+			UiFrame.plaque(self, rect, Color(ACCENT, 0.10), UiFrame.BRONZE)
+		_text(Vector2(x + 40.0, ry + 16.0), String(row.get("label", "")), 13,
+			INK if seen == selected else Color("#c3ced4"))
+		var key := String(row.get("key", ""))
+		var kw := _text_width(key, 10)
+		UiFrame.plaque(self, Rect2(x + w - 44.0 - kw - 14.0, ry + 3.0, kw + 14.0, 18.0),
+			Color("#10161a", 0.9), UiFrame.BRONZE_DIM)
+		_text(Vector2(x + w - 44.0 - kw - 7.0, ry + 16.0), key, 10, Color("#d8c070"))
+		ry += 24.0
+	_text(Vector2(x + 28.0, y + h - 38.0),
+		"F5 save · F9 load · F1 hide interface · F2 mute · E interact · Space dodge · Shift sprint · LMB art · RMB guard", 10, MUTED)
+	_text(Vector2(x + 28.0, y + h - 20.0),
+		"Merchants, forges, storage and roads open their own pages where you find them.", 10, MUTED)
