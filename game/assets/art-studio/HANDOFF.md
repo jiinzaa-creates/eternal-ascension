@@ -50,3 +50,6 @@ Jawanza reassigned the integration from Freebuff to the studio. The game now ren
 
 ## Props / buildings / herbs (2026-11-25, later)
 Prop, Building and chunk-herb rendering now use Art Studio textures the same way actors do (see VISUAL_BIBLE §76): props pick biome-graded variants, buildings are per-location sprites anchored to their footprints, herbs show their resource-node art and hide it when harvested. All keep primitive fallbacks under `art_studio/use_sprites`. The visual harness scans the live world and screenshots props, herbs and the settlement (stages 6-8).
+
+## Appearance overlays (2026-11-25, later)
+Hair and skin colourways are no longer idle-only: 288 overlay frames under `colourways/hair_{i}/overlay/` and `colourways/skin_{i}/overlay/` stack over any robe set at runtime (ActorSprite child layers; Player configures them from `appearance`). The full 180-combination appearance matrix renders in motion. See VISUAL_BIBLE §77 for method and measured mask accuracy.

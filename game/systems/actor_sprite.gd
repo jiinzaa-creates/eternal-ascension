@@ -26,6 +26,10 @@ var _scale_base := 1.0
 var _active := false
 var _warned := false
 var _facing := Vector2.DOWN
+var _hair_base := ""
+var _skin_base := ""
+var _hair_sprite: Sprite2D
+var _skin_sprite: Sprite2D
 
 
 static func sprites_enabled() -> bool:
@@ -35,15 +39,24 @@ static func sprites_enabled() -> bool:
 func _init() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	centered = true
+	_skin_sprite = Sprite2D.new()
+	_skin_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_skin_sprite.visible = false
+	add_child(_skin_sprite)
+	_hair_sprite = Sprite2D.new()
+	_hair_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_hair_sprite.visible = false
+	add_child(_hair_sprite)
 
 
 ## Points the component at a frame set. `base_path` is the shared stem, e.g.
 ## ".../player_founder" for player_founder_idle_s.png. Reconfiguring with
 ## the same effective key is a no-op, so callers may refresh freely.
 func configure(base_path: String, frame_size: float = 64.0, stride: Array = ["left", "right"],
-		scale_factor: float = 1.0, tint: Color = Color.WHITE, centre_anchored: bool = false) -> void:
-	var key := "%s|%f|%s|%f|%s|%s" % [base_path, frame_size, str(stride),
-		scale_factor, tint.to_html(), str(centre_anchored)]
+		scale_factor: float = 1.0, tint: Color = Color.WHITE, centre_anchored: bool = false,
+		hair_base: String = "", skin_base: String = "") -> void:
+	var key := "%s|%f|%s|%f|%s|%s|%s|%s" % [base_path, frame_size, str(stride),
+		scale_factor, tint.to_html(), str(centre_anchored), hair_base, skin_base]
 	if key == _key:
 		return
 	_key = key
@@ -53,7 +66,13 @@ func configure(base_path: String, frame_size: float = 64.0, stride: Array = ["le
 	_centre_anchored = centre_anchored
 	_scale_base = scale_factor
 	self_modulate = tint
+	_hair_base = hair_base
+	_skin_base = skin_base
 	offset = Vector2(0.0, 0.0) if centre_anchored else Vector2(0.0, -frame_size * 0.5)
+	_hair_sprite.offset = offset
+	_skin_sprite.offset = offset
+	_hair_sprite.self_modulate = tint
+	_skin_sprite.self_modulate = tint
 	_active = sprites_enabled() and base_path != "" \
 		and ResourceLoader.exists(base_path + "_idle_s.png")
 	if base_path != "" and sprites_enabled() and not _active and not _warned:
@@ -105,23 +124,40 @@ static func _dir_of(f: Vector2) -> String:
 func _apply(kind: String, dir: String, suffix: String) -> void:
 	var key := kind + "_" + dir + ("_" + suffix if suffix != "" else "")
 	if _cache.has(key):
-		texture = _cache[key]
+		_show(String(_cache[key]))
 		return
-	var tex: Texture2D = _frame(key)
-	if tex == null and kind != "idle":
-		tex = _frame("idle_" + dir)
-	if tex == null:
-		tex = _frame("idle_s")
-	_cache[key] = tex
-	texture = tex
+	var stem := key
+	if _frame(_base, stem) == null and kind != "idle":
+		stem = "idle_" + dir
+	if _frame(_base, stem) == null:
+		stem = "idle_s"
+	_cache[key] = stem
+	_show(stem)
 
 
-func _frame(stem: String) -> Texture2D:
-	if _cache.has("f:" + stem):
-		return _cache["f:" + stem]
+## Shows one resolved frame stem on the body and on both overlays.
+## An overlay without that frame simply hides for the frame.
+func _show(stem: String) -> void:
+	texture = _frame(_base, stem)
+	_set_overlay(_skin_sprite, _skin_base, stem)
+	_set_overlay(_hair_sprite, _hair_base, stem)
+
+
+func _set_overlay(spr: Sprite2D, base: String, stem: String) -> void:
+	if base == "":
+		spr.visible = false
+		return
+	spr.texture = _frame(base, stem)
+	spr.visible = spr.texture != null
+
+
+func _frame(base: String, stem: String) -> Texture2D:
+	var key := "f:" + base + "|" + stem
+	if _cache.has(key):
+		return _cache[key]
 	var tex: Texture2D = null
-	var path := _base + "_" + stem + ".png"
+	var path := base + "_" + stem + ".png"
 	if ResourceLoader.exists(path):
 		tex = load(path) as Texture2D
-	_cache["f:" + stem] = tex
+	_cache[key] = tex
 	return tex

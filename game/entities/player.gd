@@ -61,7 +61,7 @@ var spawn_point := Vector2.ZERO
 
 var animator := Animator.new()
 var _sprite: ActorSprite = null
-var _sprite_robe := -1
+var _sprite_key := ""
 
 var _attack_state := "idle"  # idle | startup | active | recovery
 var _attack_timer := 0.0
@@ -371,16 +371,23 @@ func _sync_animation(delta: float) -> void:
 ## Feeds the Art Studio sprite the same state the pose Animator just took.
 ## The robe colourway follows `appearance.robe`; robe 2 (jade) is the
 ## master set at the folder root, the rest are pre-baked colourways.
+## Hair and skin ride as recoloured overlay layers over any robe.
 func _present_sprite() -> void:
 	if _sprite == null:
 		_sprite = ActorSprite.new()
 		add_child(_sprite)
-	if appearance.robe != _sprite_robe:
-		_sprite_robe = appearance.robe
+	var key := "%d/%d/%d" % [appearance.robe, appearance.hair, appearance.skin]
+	if key != _sprite_key:
+		_sprite_key = key
 		var root := "res://assets/art-studio/assets/characters/player/"
-		var base := root + "player_founder" if _sprite_robe == 2 \
-			else root + "colourways/robe_%d/player_founder" % _sprite_robe
-		_sprite.configure(base)
+		var base := root + "player_founder" if appearance.robe == 2 \
+			else root + "colourways/robe_%d/player_founder" % appearance.robe
+		var hair_base := "" if appearance.hair == 0 else \
+			root + "colourways/hair_%d/overlay/player_founder" % appearance.hair
+		var skin_base := "" if appearance.skin == 0 else \
+			root + "colourways/skin_%d/overlay/player_founder" % appearance.skin
+		_sprite.configure(base, 64.0, ["left", "right"], 1.0, Color.WHITE,
+			false, hair_base, skin_base)
 	_sprite.present(_facing, animator, _move_ratio())
 
 

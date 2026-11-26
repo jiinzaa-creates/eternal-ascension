@@ -132,6 +132,11 @@ func _report(label: String, actor: Node) -> void:
 	var tex: Texture2D = spr.get("texture")
 	print("REPORT ", label, ": active=", spr.call("is_active"),
 		" tex=", tex.resource_path if tex != null else "none")
+	for layer_name in ["_skin_sprite", "_hair_sprite"]:
+		var layer: Object = spr.get(layer_name)
+		if layer != null and layer.get("texture") != null:
+			print("REPORT ", label, " ", layer_name, "=",
+				(layer.get("texture") as Texture2D).resource_path)
 
 
 func _visit_npc() -> void:
@@ -249,6 +254,11 @@ func _build_arena() -> void:
 	var player := Player.new()
 	player.position = Vector2(150, 300)
 	world.add_child(player)
+	# Non-default appearance: red hair + deep skin over the robe, to
+	# prove the overlay layers engage in the live renderer.
+	var app: Object = player.get("appearance")
+	app.set("hair", 4)
+	app.set("skin", 3)
 
 	var db := root.get_node("DB")
 
