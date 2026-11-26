@@ -67,6 +67,25 @@ static func meditation_multiplier(id: String, state: Dictionary) -> float:
 			return 1.5 if bool(state.get("partner", false)) else 0.35
 		"celestial":
 			return 1.8 if bool(state.get("night", false)) else 0.35
+		"beast_bond":
+			return clampf(0.5 + float(state.get("allies", 0)) * 0.35, 0.5, 1.9)
+		"pillfire":
+			return clampf(1.0 + float(state.get("potions", 0)) * 0.04, 1.0, 1.5)
+		"elemental_cycle":
+			var biome := String(state.get("biome", ""))
+			if (method.get("attuned_biomes", []) as Array).has(biome):
+				return 1.6
+			if (method.get("harsh_biomes", []) as Array).has(biome):
+				return 0.55
+			return 1.05
+		"stillness":
+			return clampf(0.5 + minf(float(state.get("still_seconds", 0.0)), 30.0) / 30.0 * 1.3, 0.5, 1.8)
+		"forbidden":
+			var frac := 0.0
+			var max_taint := float(state.get("contamination_max", 0.0))
+			if max_taint > 0.0:
+				frac = clampf(float(state.get("contamination", 0.0)) / max_taint, 0.0, 1.0)
+			return 0.7 + frac * 1.2
 		_:
 			return 1.0
 
@@ -120,6 +139,39 @@ static func breakthrough_profile(id: String, state: Dictionary) -> Dictionary:
 			else:
 				profile["chance"] = -0.05
 				profile["note"] = "the sky is closed"
+		"beast_bond":
+			var allies := int(state.get("allies", 0))
+			profile["chance"] = minf(0.03 * float(allies), 0.09)
+			profile["note"] = "the pack shares the storm" if allies > 0 else "no beast stands with you"
+		"pillfire":
+			var potions := int(state.get("potions", 0))
+			profile["chance"] = minf(0.02 * float(potions), 0.10)
+			profile["harm"] = 0.9
+			profile["note"] = "pills cushion the fall" if potions > 0 else "the furnace is empty"
+		"elemental_cycle":
+			var biome := String(state.get("biome", ""))
+			if (method.get("attuned_biomes", []) as Array).has(biome):
+				profile["chance"] = 0.07
+				profile["tribulation"] = 0.95
+				profile["note"] = "the land shields its own"
+			elif (method.get("harsh_biomes", []) as Array).has(biome):
+				profile["chance"] = -0.04
+				profile["note"] = "the phases starve here"
+			else:
+				profile["note"] = "the cycle turns, unhurried"
+		"stillness":
+			if float(state.get("still_seconds", 0.0)) >= 60.0:
+				profile["chance"] = 0.08
+				profile["harm"] = 0.85
+				profile["note"] = "the array holds"
+			else:
+				profile["chance"] = -0.03
+				profile["note"] = "the array is not yet set"
+		"forbidden":
+			profile["chance"] = 0.06
+			profile["tribulation"] = 1.25
+			profile["harm"] = 1.5
+			profile["note"] = "Heaven answers defiance"
 	return profile
 
 

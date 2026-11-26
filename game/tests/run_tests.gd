@@ -806,7 +806,7 @@ func _technique_mastery_tests() -> void:
 
 func _method_tests() -> void:
 	print("[methods] requirements, meditation fit, insight")
-	check(DB.methods.size() == 7, "all seven methods are defined (%d)" % DB.methods.size())
+	check(DB.methods.size() == 12, "all twelve methods are defined (%d)" % DB.methods.size())
 	for method in DB.methods:
 		var id := String(method.get("id", ""))
 		check(float(method.get("cult_mult", 0.0)) > 0.0, "%s has a cultivation multiplier" % id)
@@ -822,6 +822,11 @@ func _method_tests() -> void:
 	check(not bool(Methods.qualifies("method.slaughter", state)["ok"]), "the slaughter dao needs 50 kills")
 	check(not bool(Methods.qualifies("method.dual", state)["ok"]), "dual cultivation needs CHAR 20")
 	check(not bool(Methods.qualifies("method.heavenly", state)["ok"]), "heavenly absorption needs realm 2")
+	check(not bool(Methods.qualifies("method.beast", state)["ok"]), "the beast path needs CHAR 14")
+	check(not bool(Methods.qualifies("method.alchemy", state)["ok"]), "pillfire alchemy needs INT 16")
+	check(not bool(Methods.qualifies("method.elemental", state)["ok"]), "the five phases need realm 2")
+	check(not bool(Methods.qualifies("method.formation", state)["ok"]), "the stillness formation needs WIS 16")
+	check(not bool(Methods.qualifies("method.forbidden", state)["ok"]), "the forbidden scripture needs realm 2")
 	check(not bool(Methods.qualifies("method.nonexistent", state)["ok"]), "an unknown method is refused")
 
 	var strong := state.duplicate()
@@ -854,6 +859,31 @@ func _method_tests() -> void:
 	var night := state.duplicate()
 	night["night"] = true
 	check(Methods.meditation_multiplier("method.heavenly", night) > Methods.meditation_multiplier("method.heavenly", state), "heavenly absorption feeds on the night sky")
+	var pack := state.duplicate()
+	pack["allies"] = 3
+	check(Methods.meditation_multiplier("method.beast", pack) > Methods.meditation_multiplier("method.beast", state), "the beast path feeds on its pack")
+	check(is_equal_approx(Methods.meditation_multiplier("method.beast", state), 0.5), "a lone beast-cultivator sits at the floor")
+	var stocked := state.duplicate()
+	stocked["potions"] = 10
+	check(Methods.meditation_multiplier("method.alchemy", stocked) > Methods.meditation_multiplier("method.alchemy", state), "pillfire feeds on a stocked pouch")
+	var attuned := state.duplicate()
+	attuned["biome"] = "biome.volcanic"
+	var starved := state.duplicate()
+	starved["biome"] = "biome.desert"
+	check(Methods.meditation_multiplier("method.elemental", attuned) > Methods.meditation_multiplier("method.elemental", state), "the phases sing on attuned land")
+	check(Methods.meditation_multiplier("method.elemental", starved) < Methods.meditation_multiplier("method.elemental", state), "the phases starve on harsh land")
+	var still := state.duplicate()
+	still["still_seconds"] = 45.0
+	check(Methods.meditation_multiplier("method.formation", still) > Methods.meditation_multiplier("method.formation", state), "stillness deepens the formation")
+	var tainted := state.duplicate()
+	tainted["contamination"] = 50.0
+	tainted["contamination_max"] = 100.0
+	check(Methods.meditation_multiplier("method.forbidden", tainted) > Methods.meditation_multiplier("method.forbidden", state), "the scripture feeds on taint")
+	check(float(Methods.breakthrough_profile("method.forbidden", tainted)["harm"]) > 1.0, "Heaven answers defiance with heavier harm")
+	check(float(Methods.breakthrough_profile("method.beast", pack)["chance"]) > 0.0, "the pack shares the storm")
+	check(float(Methods.breakthrough_profile("method.formation", still)["chance"]) < 0.0, "an unset array hinders the crossing")
+	still["still_seconds"] = 90.0
+	check(float(Methods.breakthrough_profile("method.formation", still)["chance"]) > 0.0, "a held array steadies the crossing")
 
 	check(is_equal_approx(Methods.insight_bonus(0), 1.0), "no insight is no bonus")
 	check(is_equal_approx(Methods.insight_bonus(100), 1.2), "insight caps at a fifth")

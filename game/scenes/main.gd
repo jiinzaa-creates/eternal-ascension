@@ -1021,13 +1021,15 @@ func _update_biome_density() -> void:
 		return
 	if realm_instance != null:
 		Game.biome_density = 1.0
+		Game.current_biome = ""
 		_density_chunk = NO_CHUNK
 		return
 	var standing: Vector2i = chunks.world_to_chunk(player.global_position)
 	if standing == _density_chunk:
 		return
 	_density_chunk = standing
-	Game.biome_density = Biome.qi_density(DB.biome(Biome.for_chunk(standing, Game.world_seed)))
+	Game.current_biome = Biome.for_chunk(standing, Game.world_seed)
+	Game.biome_density = Biome.qi_density(DB.biome(Game.current_biome))
 	density_updates += 1
 
 

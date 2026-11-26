@@ -90,6 +90,7 @@ var _step_flash := 0.0
 var _meditating := false
 ## Seconds of "recent combat" left; the Sword Heart method feeds on it.
 var _combat_timer := 0.0
+var _still_seconds := 0.0
 var _facing := Vector2.RIGHT
 var _arc_flash := 0.0
 var _arc_radius := 70.0
@@ -551,6 +552,12 @@ func _aim_dir() -> Vector2:
 
 func _tick_timers(delta: float) -> void:
 	_combat_timer = maxf(0.0, _combat_timer - delta)
+	# Stillness is the formation method's fuel: unbroken quiet, out of combat
+	# and at rest, accrues; any movement or fight breaks the array.
+	if velocity.length() > 8.0 or _combat_timer > 0.0 or _attack_state != "idle":
+		_still_seconds = 0.0
+	else:
+		_still_seconds += delta
 	_cooldown = maxf(0.0, _cooldown - delta)
 	# Each art gathers on its own clock, so a bar can show one slot recovering
 	# while the next is ready.
@@ -1278,6 +1285,19 @@ func method_state() -> Dictionary:
 			if node != null and node.global_position.distance_to(global_position) < 110.0:
 				partner = true
 				break
+	var allies := 0
+	var potions := 0
+	if is_inside_tree():
+		allies += get_tree().get_nodes_in_group("summon").size()
+		for npc in get_tree().get_nodes_in_group("npc"):
+			var node := npc as Node2D
+			if node != null and Game.party_ids.has(String(node.get("npc_id"))) \
+					and node.global_position.distance_to(global_position) < 200.0:
+				allies += 1
+	for entry in inventory:
+		var item := Items.normalize_item(entry)
+		if String(item.get("slot", "")) == "consumable":
+			potions += maxi(0, int(item.get("count", 0)))
 	return {
 		"attrs": attrs,
 		"realm": cultivation.realm,
@@ -1287,6 +1307,12 @@ func method_state() -> Dictionary:
 		"blood_charge": cultivation.blood_charge,
 		"partner": partner,
 		"night": Clock.is_night(),
+		"allies": allies,
+		"potions": potions,
+		"biome": Game.current_biome,
+		"still_seconds": _still_seconds,
+		"contamination": cultivation.contamination,
+		"contamination_max": Meridians.MAX_CONTAMINATION,
 	}
 
 
@@ -1309,6 +1335,10 @@ func meditate_tick(delta: float) -> float:
 	if cultivation.method_id == "method.blood":
 		cultivation.consume_blood_charge(delta * 2.0)
 		cultivation.add_contamination(delta * Meridians.BLOOD_CONTAMINATION_PER_SECOND)
+	if cultivation.method_id == "method.forbidden":
+		# The scripture eats taint: sitting with it burns contamination as
+		# fuel, which is also the only way the path cleans its own meridians.
+		cultivation.cleanse(delta * 1.2)
 	return gained
 
 

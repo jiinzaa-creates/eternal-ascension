@@ -13,6 +13,9 @@ var karma: int = 0
 ## Ambient Qi density of the biome the player stands in. Derived from the world
 ## each frame, never saved.
 var biome_density: float = 1.0
+## The biome the player stands in, by id. Derived alongside biome_density,
+## never saved.
+var current_biome: String = ""
 ## Slot the title screen asked the run to resume. Consumed once on boot; never
 ## saved, because it is a hand-off between scenes rather than run state.
 var pending_load_slot: int = 0
