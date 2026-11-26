@@ -387,3 +387,6 @@ Corpse set filed (enemy_hungry_corpse_attack_{dir}.png + 8dir sheet): lunging tw
 
 ## 65. ATTACK SET — EMBER SPIRIT (2026-11-25)
 Ember set filed (enemy_ember_spirit_attack_{dir}.png + 8dir sheet): flame-burst flares spewing toward facing in all 8. QC note: the frames show a dark charred centre, but measured colour matches the idle set (hue 0.069–0.093 vs 0.070–0.073; value 0.57–0.70 vs 0.53–0.65; saturation slightly hotter, right for an attack) — identity holds. QC PASS (tests/ember_attack_test.png). Remaining attack sets: Crane, Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 66. ATTACK SET — STORM CRANE (2026-11-25)
+Crane set filed (enemy_storm_crane_attack_{dir}.png + 8dir sheet): neck-dart peck strikes toward facing in all 8, one wing flared. QC note: raw generations ran slightly deep-blue (sat 0.23–0.27 vs idle 0.18–0.21); graded sat ×0.85 / value ×1.05 to sit on the idle blue-grey. QC PASS (tests/crane_attack_test.png). Remaining attack sets: Carp, Mantis, Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
