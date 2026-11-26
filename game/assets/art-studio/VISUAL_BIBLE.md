@@ -405,3 +405,6 @@ Corrupted Wolf set filed (enemy_corrupted_spirit_wolf_attack_{dir}.png + 8dir sh
 
 ## 71. ATTACK SET — ANCIENT STONE GUARDIAN (2026-11-25)
 Guardian set filed at boss scale (boss_ancient_stone_guardian_attack_{dir}.png, 128x128 fit 120 + 8dir sheet): overhead stone-fist slams toward facing in all 8; small rubble at the striking fist is attached impact debris, kept as design. QC PASS (tests/guardian_attack_test.png). Remaining attack sets: Merchant, Farmer.
+
+## 72. ATTACK SET — MERCHANT (2026-11-25)
+Merchant set filed (npc_merchant_attack_{dir}.png + 8dir sheet): defensive abacus swings toward facing in all 8, round belly + pack match the idle/walk sets. QC PASS (tests/merchant_attack_test.png). Remaining attack sets: Farmer.
