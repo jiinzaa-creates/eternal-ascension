@@ -300,6 +300,28 @@ func signature_at(coord: Vector2i) -> int:
 	return ChunkGen.signature_for(coord, world_seed)
 
 
+## Is this world position standing in water? The player body carries
+## no collision shape in this game (buildings are walked behind, not
+## into), so shores are enforced by sampling the ground, not physics.
+## Ocean chunks are water everywhere; elsewhere the painted tile
+## decides. With tiles off, only the ocean counts.
+func is_water_at(world_position: Vector2) -> bool:
+	var coord := world_to_chunk(world_position)
+	if not chunks.has(coord):
+		return false
+	var chunk = chunks[coord]
+	if chunk.biome == Biome.OCEAN:
+		return true
+	if not TerrainTiles.tiles_enabled():
+		return false
+	var layer := chunk.get_node_or_null("GroundTiles") as TileMapLayer
+	if layer == null:
+		return false
+	var local := world_position - Vector2(coord) * CHUNK_SIZE
+	var cell := Vector2i(int(floor(local.x / 32.0)), int(floor(local.y / 32.0)))
+	return layer.get_cell_source_id(cell) == TerrainTiles.WATER
+
+
 ## A single streamed chunk. Terrain is drawn in code so the province can exist
 ## before an art pipeline does; the feature list is the data a tileset will
 ## eventually render instead.

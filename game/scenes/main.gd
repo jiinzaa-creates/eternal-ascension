@@ -37,6 +37,10 @@ var camera_rig: CameraRig
 var lighting: WorldLighting
 ## Continent geography, derived from the seed and never saved.
 var continent: Dictionary = {}
+var _last_dry := Vector2.ZERO
+var town_specs: Array = []
+var towns_active: Dictionary = {}
+var _town_tick := 0.0
 var world_map: WorldMap
 ## Settlement services: the merchant's stock and the shop overlay.
 var merchant := Merchant.new()
@@ -279,6 +283,7 @@ func _build_world() -> void:
 	# The first frame must show ground, not a hole: wait for the initial ring.
 	chunks.settle()
 
+	town_specs = Towns.specs(continent, Game.world_seed)
 	settlement = Settlement.new()
 	settlement.name = "AzureCloudMarket"
 	settlement.position = SPAWN
@@ -290,9 +295,127 @@ func _build_world() -> void:
 	_spawn_interactables()
 
 
+
+# ---------------------------------------------------------------- towns ----
+
+func _tick_towns() -> void:
+	if player == null:
+		return
+	for spec in town_specs:
+		var index := int(spec["region_index"])
+		var distance := player.global_position.distance_to(spec["centre"] as Vector2)
+		if distance < 2300.0 and not towns_active.has(index):
+			_spawn_town(spec)
+		elif distance > 3300.0 and towns_active.has(index):
+			_despawn_town(index)
+
+func _spawn_town(spec: Dictionary) -> void:
+	var index := int(spec["region_index"])
+	var node := Settlement.new()
+	node.configure(spec)
+	node.name = "Town_%d" % index
+	node.position = spec["centre"]
+	node.z_index = -15
+	world.add_child(node)
+	node.build_buildings(world)
+	var owned: Dictionary = {"node": node, "npcs": [], "items": []}
+	towns_active[index] = owned
+
+	# A door for every building, as at the market.
+	for building_spec in spec["buildings"]:
+		var location := String(building_spec["location"])
+		var building := node.building_for(location)
+		if building == null:
+			continue
+		var door := Interactable.new()
+		door.setup_door("door.town.%d.%s" % [index, location],
+			"%s door" % location.capitalize(), building)
+		door.position = building.global_position + Vector2(0, (building_spec["size"] as Vector2).y * 0.5 + 8.0)
+		world.add_child(door)
+		interactables.append(door)
+		(owned["items"] as Array).append(door)
+
+	if (spec["services"] as Array).has("forge"):
+		var forge := Interactable.new()
+		forge.setup(Interactable.Kind.FORGE, "forge.town.%d" % index,
+			"%s Forge — craft or refine" % String(spec["name"]))
+		forge.position = node.position_for("forge") + Vector2(0, 62)
+		world.add_child(forge)
+		interactables.append(forge)
+		(owned["items"] as Array).append(forge)
+	if (spec["services"] as Array).has("shrine"):
+		var shrine := Interactable.new()
+		shrine.setup(Interactable.Kind.SHRINE, "shrine.town.%d" % index,
+			"%s Shrine — attune" % String(spec["name"]))
+		shrine.position = node.position_for("shrine")
+		world.add_child(shrine)
+		interactables.append(shrine)
+		(owned["items"] as Array).append(shrine)
+
+	# Residents: the market's plan pattern, homed to this town. Ids are
+	# stable per (region, archetype, slot), so the same people return
+	# whenever the town streams back in.
+	var schedules: Dictionary = DB.schedules()
+	for entry in spec["residents"]:
+		var archetype := _archetype(String(entry[0]))
+		if archetype.is_empty():
+			continue
+		for i in int(entry[1]):
+			var offset := Vector2(_name_rng.randf_range(-140.0, 140.0),
+				_name_rng.randf_range(-100.0, 160.0))
+			var npc := _make_npc(
+				"npc.town.%d.%s.%d" % [index, String(entry[0]), i],
+				_random_name(),
+				String(archetype.get("role", "Wanderer")),
+				String(archetype.get("sect", "")),
+				int(archetype.get("realm", 1)),
+				schedules.get(String(archetype.get("schedule", "disciple")), []),
+				offset,
+				String(entry[0]),
+				node)
+			(owned["npcs"] as Array).append(npc)
+
+	# Discovery is recorded once and becomes a travel destination.
+	var key := "town.%d" % index
+	if Game.discover(key):
+		travel_sites[key] = {
+			"name": String(spec["name"]),
+			"x": (spec["centre"] as Vector2).x,
+			"y": (spec["centre"] as Vector2).y,
+		}
+		Bus.toast.emit("Discovered %s — %s." % [
+			String(spec["name"]), String(spec["region_name"])])
+
+
+func _despawn_town(index: int, force: bool = false) -> void:
+	if not towns_active.has(index):
+		return
+	var owned: Dictionary = towns_active[index]
+	# A resident travelling with the player keeps the town standing:
+	# their body and its home must not be freed from under them.
+	if not force:
+		for npc in owned["npcs"]:
+			if Game.party_ids.has(npc.npc_id):
+				return
+	for npc in owned["npcs"]:
+		npcs.erase(npc)
+		_npc_names.erase(npc.npc_id)
+		npc.queue_free()
+	for item in owned["items"]:
+		interactables.erase(item)
+		item.queue_free()
+	var node: Settlement = owned["node"]
+	for building in node.buildings:
+		if is_instance_valid(building):
+			building.queue_free()
+	node.queue_free()
+	towns_active.erase(index)
+
+
 func _spawn_player() -> void:
 	player = Player.new()
 	player.position = SPAWN + Vector2(0, 60)
+	_last_dry = player.position
 	world.add_child(player)
 	player.display_name = _random_name()
 	player.cultivation.root_tier = _roll_root()
@@ -383,18 +506,20 @@ func _archetype(id: String) -> Dictionary:
 ## person, and the node carries the result. `archetype_id` is kept explicit so
 ## an authored character can outrank or differ from its template.
 func _make_npc(id: String, display: String, role: String, sect: String, realm: int,
-		schedule: Array, offset: Vector2, archetype_id: String = "") -> Npc:
+		schedule: Array, offset: Vector2, archetype_id: String = "",
+		home: Settlement = null) -> Npc:
 	var archetype := _archetype(archetype_id)
 	if archetype.is_empty():
 		archetype = _archetype("outer_disciple")
+	var home_settlement: Settlement = home if home != null else settlement
 	var npc := Npc.new()
 	npc.name = "Npc_" + id
 	var sheet := NpcDb.sheet(archetype, id, realm)
-	npc.setup(id, display, role, sect, realm, schedule, settlement, sheet)
+	npc.setup(id, display, role, sect, realm, schedule, home_settlement, sheet)
 	npc.rest_schedule = DB.schedules().get(String(archetype.get("rest_schedule", "")), [])
 	npc.apply_ai(archetype.get("ai", {}))
 	world.add_child(npc)
-	npc.global_position = settlement.position_for("plaza") + offset
+	npc.global_position = home_settlement.position_for("plaza") + offset
 	npcs.append(npc)
 	_npc_names[id] = display
 	_npc_index += 1
@@ -795,6 +920,10 @@ func _process(delta: float) -> void:
 	chunks.today = Clock.day
 	if realm_instance == null:
 		chunks.stream_around(player.global_position)
+		_town_tick += delta
+		if _town_tick > 0.5:
+			_town_tick = 0.0
+			_tick_towns()
 	if phase == "creation":
 		return
 
@@ -802,6 +931,19 @@ func _process(delta: float) -> void:
 	# coasts, and this clamp closes the landward edges of rim regions.
 	var rim := ChunkManager.world_bounds().grow(-40.0)
 	player.global_position = player.global_position.clamp(rim.position, rim.end)
+
+	# Shores: the player has no collision shape, so water is kept out
+	# by sampling the ground — step into a water cell and the step is
+	# returned to the last dry ground, which still lets you walk the
+	# shoreline itself. Teleports re-baseline instead of snapping back.
+	if realm_instance == null and String(phase) == "play":
+		if player.global_position.distance_to(_last_dry) > 600.0:
+			if not chunks.is_water_at(player.global_position):
+				_last_dry = player.global_position
+		elif chunks.is_water_at(player.global_position):
+			player.global_position = _last_dry
+		else:
+			_last_dry = player.global_position
 
 	if phase == "realm":
 		if realm_instance != null:
@@ -5838,9 +5980,24 @@ func _load_game(slot: int) -> void:
 	# seed the save carries before the deltas are applied to it.
 	continent = Continent.generate(Game.world_seed)
 	chunks.configure(Game.world_seed)
+	for town_index in towns_active.keys():
+		_despawn_town(int(town_index), true)
+	town_specs = Towns.specs(continent, Game.world_seed)
 	# Rebuild the province so loaded deltas decide which resources exist.
 	chunks.today = Clock.day
 	chunks.resync(player.global_position)
+	_sync_party()
+	# A companion recruited in a distant town has no body until that
+	# town stands again: raise it now, wherever the player loaded.
+	for party_id in Game.party_ids:
+		if String(party_id).begins_with("npc.town."):
+			var parts := String(party_id).split(".")
+			if parts.size() >= 3:
+				var town_index := int(parts[2])
+				if not towns_active.has(town_index):
+					for spec in town_specs:
+						if int(spec["region_index"]) == town_index:
+							_spawn_town(spec)
 	_sync_party()
 	# Progression is derived from the saved day, so a loaded town is exactly as
 	# strong as the seed says it should be on that day.

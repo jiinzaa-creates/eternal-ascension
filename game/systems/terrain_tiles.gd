@@ -46,11 +46,14 @@ static func tileset_for(biome_id: String) -> TileSet:
 		src.texture = load(path) as Texture2D
 		src.texture_region_size = Vector2i(32, 32)
 		src.create_tile(Vector2i.ZERO)
+		ts.add_source(src, i)
 		if SOLID.has(NAMES[i]):
+			# Collision can only be recorded once the source belongs to
+			# the tileset: before that the tile data has no physics
+			# layers to write into, and the polygon is silently lost.
 			var data := src.get_tile_data(Vector2i.ZERO, 0)
 			data.add_collision_polygon(0)
 			data.set_collision_polygon_points(0, 0, PackedVector2Array([
 				Vector2(-16, -16), Vector2(16, -16), Vector2(16, 16), Vector2(-16, 16)]))
-		ts.add_source(src, i)
 	_cache[biome_id] = ts
 	return ts

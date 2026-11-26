@@ -33,15 +33,27 @@ const BUILDINGS := [
 
 
 var buildings: Array = []
+## Instance data: the market uses the constants above; towns are
+## configured from generated specs (see Towns). Configure before the
+## node enters the tree and before build_buildings().
+var display_name := SETTLEMENT_NAME
+var locations: Dictionary = LOCATIONS
+var buildings_spec: Array = BUILDINGS
+
+
+func configure(spec: Dictionary) -> void:
+	display_name = String(spec.get("name", SETTLEMENT_NAME))
+	locations = spec.get("locations", LOCATIONS)
+	buildings_spec = spec.get("buildings", BUILDINGS)
 
 
 func position_for(location: String) -> Vector2:
-	var offset: Vector2 = LOCATIONS.get(location, Vector2.ZERO)
+	var offset: Vector2 = locations.get(location, Vector2.ZERO)
 	return global_position + offset
 
 
 func has_location(location: String) -> bool:
-	return LOCATIONS.has(location)
+	return locations.has(location)
 
 
 ## Every path in the market radiates from the plaza, so a body walking from one
@@ -52,7 +64,7 @@ func route_from(from_location: String, to_location: String) -> Array:
 	if to_location == "":
 		return out
 	if from_location == "" or from_location == to_location or from_location == "plaza" \
-			or to_location == "plaza" or not LOCATIONS.has(from_location) or not LOCATIONS.has(to_location):
+			or to_location == "plaza" or not locations.has(from_location) or not locations.has(to_location):
 		out.append(to_location)
 		return out
 	out.append("plaza")
@@ -64,7 +76,7 @@ func route_from(from_location: String, to_location: String) -> Array:
 ## sort against the player and fade when he walks behind a roof. Call after the
 ## settlement is in the tree (it needs its world position).
 func build_buildings(parent: Node) -> void:
-	for spec in BUILDINGS:
+	for spec in buildings_spec:
 		var building := Building.new()
 		building.setup(
 			global_position + (LOCATIONS[String(spec["location"])] as Vector2),
@@ -96,8 +108,8 @@ func _draw() -> void:
 	draw_circle(Vector2.ZERO, 560.0, Color("#1d2a20", 0.55))
 
 	# Paths radiate from the plaza to every named location.
-	for key in LOCATIONS.keys():
-		var offset: Vector2 = LOCATIONS[key]
+	for key in locations.keys():
+		var offset: Vector2 = locations[key]
 		if offset == Vector2.ZERO:
 			continue
 		draw_line(Vector2.ZERO, offset, Color("#3a4536"), 24.0)
@@ -109,7 +121,7 @@ func _draw() -> void:
 
 	# Market stalls
 	for i in 4:
-		var pos: Vector2 = LOCATIONS["market"] + Vector2(-90 + i * 55, 62)
+		var pos: Vector2 = locations["market"] + Vector2(-90 + i * 55, 62)
 		draw_rect(Rect2(pos, Vector2(42, 12)), Color("#6a5436"))
 		draw_line(pos + Vector2(0, 0), pos + Vector2(0, -26), Color("#4a3a26"), 3.0)
 		draw_line(pos + Vector2(42, 0), pos + Vector2(42, -26), Color("#4a3a26"), 3.0)
@@ -117,13 +129,17 @@ func _draw() -> void:
 
 	# Herb garden beds
 	for i in 3:
-		var pos: Vector2 = LOCATIONS["herb_garden"] + Vector2(-60 + i * 60, 30)
+		if not locations.has("herb_garden"):
+			break
+		var pos: Vector2 = locations["herb_garden"] + Vector2(-60 + i * 60, 30)
 		draw_rect(Rect2(pos, Vector2(46, 30)), Color("#26331f"))
 		for j in 4:
 			draw_circle(pos + Vector2(8 + j * 10, 10 + (j % 2) * 8), 4.0, Color("#4f8a52"))
 
 	# Gate posts
-	var gate: Vector2 = LOCATIONS["gate"]
+	if not locations.has("gate"):
+		return
+	var gate: Vector2 = locations["gate"]
 	draw_rect(Rect2(gate + Vector2(-70, -14), Vector2(18, 46)), Color("#39412f"))
 	draw_rect(Rect2(gate + Vector2(52, -14), Vector2(18, 46)), Color("#39412f"))
 	draw_line(gate + Vector2(-70, -14), gate + Vector2(70, -14), Color("#39412f"), 8.0)
