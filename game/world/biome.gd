@@ -13,15 +13,71 @@ const HOME_CHUNK := Vector2i(5, 5)
 const HOME_RADIUS := 1
 ## Chunks per noise cell: larger means bigger, smoother biomes.
 const SCALE := 7.0
-const BANDS := ["biome.verdant", "biome.marsh", "biome.ashen", "biome.frost"]
+const BANDS := ["biome.verdant", "biome.marsh", "biome.ashen", "biome.frost",
+	"biome.forest", "biome.snow", "biome.desert", "biome.valley",
+	"biome.volcanic", "biome.sacred", "biome.corrupted", "biome.forbidden"]
+## Water cells of the continent are not a cultivation biome at all.
+const OCEAN := "biome.ocean"
+## Each continent terrain carries a trio of biomes: its base, a common
+## variation, and a rarer third face. The noise field walks the trio, so
+## a region reads as one land with moods rather than a patchwork.
+const TRIOS := {
+	"plains": ["biome.verdant", "biome.valley", "biome.forest"],
+	"forest": ["biome.forest", "biome.verdant", "biome.valley"],
+	"mountains": ["biome.snow", "biome.frost", "biome.ashen"],
+	"marsh": ["biome.marsh", "biome.corrupted", "biome.verdant"],
+	"desert": ["biome.desert", "biome.ashen", "biome.volcanic"],
+	"coast": ["biome.valley", "biome.verdant", "biome.sacred"],
+}
+## Sparse pockets that can surface in any land region far from home.
+const POCKETS := ["biome.volcanic", "biome.sacred", "biome.corrupted", "biome.forbidden"]
+
+
+## Continent data is a pure function of the seed, so it is computed
+## once per seed and shared. The cache is written ONLY through prime()
+## on the main thread before streaming starts: chunk payloads are built
+## on worker threads, and a Dictionary written mid-flight can be read
+## torn. After priming, every lookup is a read of a settled value.
+static var _continents := {}
+
+
+## Computes and caches a seed's continent. Main thread only.
+static func prime(seed_value: int) -> void:
+	if _continents.has(seed_value):
+		return
+	if _continents.size() > 4:
+		_continents.clear()
+	_continents[seed_value] = Continent.generate(seed_value)
+
+
+static func _continent(seed_value: int) -> Dictionary:
+	if _continents.has(seed_value):
+		return _continents[seed_value]
+	# Unprimed seeds happen only in single-threaded contexts (unit
+	# tests calling payload generation directly): compute pure.
+	return Continent.generate(seed_value)
 
 
 static func for_chunk(coord: Vector2i, seed_value: int) -> String:
 	if absi(coord.x - HOME_CHUNK.x) <= HOME_RADIUS and absi(coord.y - HOME_CHUNK.y) <= HOME_RADIUS:
 		return String(BANDS[0])
+	var continent := _continent(seed_value)
+	var cell := Continent.cell_for_chunk(coord)
+	if not Continent.is_land(continent, cell):
+		return OCEAN
+	# Special pockets first: a coarse second field, kept away from home.
+	var pocket := _noise(seed_value, float(coord.x) / (SCALE * 2.6) + 40.0, float(coord.y) / (SCALE * 2.6) - 17.0)
+	if pocket > 0.90 and absi(coord.x - HOME_CHUNK.x) + absi(coord.y - HOME_CHUNK.y) > 8:
+		var pick := Rng.stream_from(seed_value, "biome_pocket", coord.x * 31 + coord.y, 0)
+		return String(POCKETS[pick.randi_range(0, POCKETS.size() - 1)])
+	var terrain := Continent.terrain_for_cell(continent, cell)
+	var trio: Array = TRIOS.get(terrain, TRIOS["plains"])
 	var value := _noise(seed_value, float(coord.x) / SCALE, float(coord.y) / SCALE)
-	var index := clampi(int(value * float(BANDS.size())), 0, BANDS.size() - 1)
-	return String(BANDS[index])
+	if value < 0.55:
+		return String(trio[0])
+	if value < 0.85:
+		return String(trio[1])
+	return String(trio[2])
 
 
 ## Value noise with smoothstep interpolation: neighbouring chunks land in the

@@ -61,6 +61,7 @@ func _process(_delta: float) -> void:
 
 func configure(seed_value: int) -> void:
 	world_seed = seed_value
+	Biome.prime(seed_value)
 	clear_all()
 	_last_center = Vector2i(-9999, -9999)
 
@@ -267,8 +268,11 @@ func world_to_chunk(world_position: Vector2) -> Vector2i:
 	return Vector2i(int(floor(world_position.x / CHUNK_SIZE)), int(floor(world_position.y / CHUNK_SIZE)))
 
 
+## The streaming gate is the whole continent now: any chunk inside
+## the 5x4 lattice of regions may stream; beyond it, nothing exists.
 func in_province(coord: Vector2i) -> bool:
-	return coord.x >= 0 and coord.y >= 0 and coord.x < PROVINCE_CHUNKS and coord.y < PROVINCE_CHUNKS
+	var cell := Continent.cell_for_chunk(coord)
+	return cell.x >= 0 and cell.y >= 0 and cell.x < Continent.COLS and cell.y < Continent.ROWS
 
 
 func chunk_count() -> int:
@@ -283,10 +287,13 @@ func resource_count() -> int:
 	return total
 
 
-## The whole province in world coordinates, for camera bounds.
+## The whole continent in world coordinates, for camera bounds.
 static func world_bounds() -> Rect2:
-	var span := CHUNK_SIZE * PROVINCE_CHUNKS
-	return Rect2(Vector2.ZERO, Vector2(span, span))
+	var origin := Continent.chunk_origin(Vector2i.ZERO)
+	var span := Vector2(
+		Continent.COLS * Continent.REGION_CHUNKS,
+		Continent.ROWS * Continent.REGION_CHUNKS) * CHUNK_SIZE
+	return Rect2(Vector2(origin) * CHUNK_SIZE, span)
 
 
 func signature_at(coord: Vector2i) -> int:
@@ -343,6 +350,11 @@ class ProvinceChunk:
 			layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			add_child(layer)
 		layer.tile_set = TerrainTiles.tileset_for(biome)
+		if biome == Biome.OCEAN:
+			for cx in 32:
+				for cy in 32:
+					layer.set_cell(Vector2i(cx, cy), TerrainTiles.WATER, Vector2i.ZERO)
+			return
 		for cx in 32:
 			for cy in 32:
 				var h := absi((coord.x * 73856093) ^ (coord.y * 19349663) ^ (cx * 83492791) ^ (cy * 297121507) ^ signature)

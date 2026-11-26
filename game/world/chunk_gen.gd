@@ -42,8 +42,24 @@ static func herb_id(coord: Vector2i, index: int) -> String:
 
 
 ## Everything a chunk needs, as plain data. Safe to call off the main thread.
+const OCEAN_PALETTE: Array[Color] = [
+	Color("#0d2733"), Color("#0e2a38"), Color("#0c2430"), Color("#10303e"),
+]
+
+
 static func payload_for(coord: Vector2i, seed_value: int, biome_defs: Dictionary = {}) -> Dictionary:
 	var biome_id := Biome.for_chunk(coord, seed_value)
+	if biome_id == Biome.OCEAN:
+		# Open sea: water to every horizon, nothing to gather or fight.
+		return {
+			"coord": coord,
+			"signature": signature_for(coord, seed_value),
+			"features": [],
+			"herbs": [],
+			"pois": [],
+			"biome": biome_id,
+			"palette": OCEAN_PALETTE.duplicate(),
+		}
 	var def: Dictionary = biome_defs.get(biome_id, {})
 
 	var r := Rng.stream_from(seed_value, "chunk", coord.x * 31 + coord.y, 0)

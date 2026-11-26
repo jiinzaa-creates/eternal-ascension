@@ -60,6 +60,126 @@
 				{"id": "frost_wolf", "name": "Frost Wolf", "archetype": "skirmisher", "ilvl_bonus": 1, "hp_mult": 0.95, "damage_mult": 1.1, "speed": 78.0, "color": "#6a8aa8"},
 				{"id": "rime_stalker", "name": "Rime Stalker", "archetype": "archer", "ilvl_bonus": 3, "hp_mult": 1.25, "damage_mult": 1.25, "speed": 66.0, "color": "#8aa8c0"}
 			]
+		},
+		{
+			"id": "biome.forest",
+			"name": "Ancient Forest",
+			"qi_density": 1.1,
+			"palette": ["#0f2013", "#112416", "#0d1d10", "#132818"],
+			"features": {"tuft": 60, "bush": 14, "rock": 6, "tree": 20},
+			"resources": [
+				{"id": "spirit_herb", "name": "Spirit Herb", "weight": 4},
+				{"id": "ancient_moss", "name": "Ancient Moss", "weight": 3}
+			],
+			"enemies": [
+				{"id": "thornback_boar", "name": "Thornback Boar", "archetype": "brawler", "ilvl_bonus": 1, "hp_mult": 1.1, "damage_mult": 1.0, "speed": 60.0, "color": "#5a7a48"},
+				{"id": "canopy_stalker", "name": "Canopy Stalker", "archetype": "skirmisher", "ilvl_bonus": 2, "hp_mult": 0.95, "damage_mult": 1.15, "speed": 80.0, "color": "#3f6a4a"}
+			]
+		},
+		{
+			"id": "biome.snow",
+			"name": "Endless Snowfield",
+			"qi_density": 0.85,
+			"palette": ["#232e3a", "#26323f", "#202a36", "#2a3644"],
+			"features": {"tuft": 78, "bush": 3, "rock": 13, "tree": 6},
+			"resources": [
+				{"id": "frost_lily", "name": "Frost Lily", "weight": 4},
+				{"id": "silver_moss", "name": "Silver Moss", "weight": 4}
+			],
+			"enemies": [
+				{"id": "snow_wolf", "name": "Snow Wolf", "archetype": "skirmisher", "ilvl_bonus": 2, "hp_mult": 1.0, "damage_mult": 1.15, "speed": 82.0, "color": "#a8c4de"},
+				{"id": "glacier_ape", "name": "Glacier Ape", "archetype": "sentinel", "ilvl_bonus": 3, "hp_mult": 1.5, "damage_mult": 1.1, "speed": 52.0, "color": "#7a94b4"}
+			]
+		},
+		{
+			"id": "biome.desert",
+			"name": "Singing Dunes",
+			"qi_density": 0.75,
+			"palette": ["#2a2114", "#2e2416", "#261d11", "#332818"],
+			"features": {"tuft": 82, "bush": 5, "rock": 11, "tree": 2},
+			"resources": [
+				{"id": "cactus_flower", "name": "Cactus Flower", "weight": 4},
+				{"id": "ash_bloom", "name": "Ash Bloom", "weight": 3}
+			],
+			"enemies": [
+				{"id": "dune_hound", "name": "Dune Hound", "archetype": "skirmisher", "ilvl_bonus": 1, "hp_mult": 0.9, "damage_mult": 1.2, "speed": 88.0, "color": "#c4a05a"},
+				{"id": "sand_wraith", "name": "Sand Wraith", "archetype": "archer", "ilvl_bonus": 2, "hp_mult": 0.85, "damage_mult": 1.25, "speed": 70.0, "color": "#b49a6a"}
+			]
+		},
+		{
+			"id": "biome.valley",
+			"name": "Spiritual Valley",
+			"qi_density": 1.5,
+			"palette": ["#14261a", "#162a1c", "#122216", "#182e20"],
+			"features": {"tuft": 68, "bush": 12, "rock": 6, "tree": 14},
+			"resources": [
+				{"id": "moon_dew_fern", "name": "Moon Dew Fern", "weight": 4},
+				{"id": "jade_lotus", "name": "Jade Lotus", "weight": 3}
+			],
+			"enemies": [
+				{"id": "valley_crane", "name": "Valley Crane", "archetype": "archer", "ilvl_bonus": 2, "hp_mult": 0.9, "damage_mult": 1.2, "speed": 74.0, "color": "#9fc4a8"},
+				{"id": "mossback_boar", "name": "Mossback Boar", "archetype": "brawler", "ilvl_bonus": 1, "hp_mult": 1.2, "damage_mult": 1.0, "speed": 58.0, "color": "#6a8a5f"}
+			]
+		},
+		{
+			"id": "biome.volcanic",
+			"name": "Ember Caldera",
+			"qi_density": 1.2,
+			"palette": ["#26150f", "#2a1710", "#22120c", "#2e1a12"],
+			"features": {"tuft": 76, "bush": 2, "rock": 20, "tree": 2},
+			"resources": [
+				{"id": "ember_root", "name": "Ember Root", "weight": 5},
+				{"id": "magma_cap", "name": "Magma Cap", "weight": 3}
+			],
+			"enemies": [
+				{"id": "magma_hound", "name": "Magma Hound", "archetype": "skirmisher", "ilvl_bonus": 3, "hp_mult": 1.0, "damage_mult": 1.3, "speed": 86.0, "color": "#c45a30"},
+				{"id": "obsidian_ape", "name": "Obsidian Ape", "archetype": "sentinel", "ilvl_bonus": 4, "hp_mult": 1.6, "damage_mult": 1.2, "speed": 50.0, "color": "#4a3436"}
+			]
+		},
+		{
+			"id": "biome.sacred",
+			"name": "Hallowed Grounds",
+			"qi_density": 1.35,
+			"palette": ["#232417", "#27281a", "#201f14", "#2b2c1e"],
+			"features": {"tuft": 72, "bush": 10, "rock": 8, "tree": 10},
+			"resources": [
+				{"id": "spirit_herb", "name": "Spirit Herb", "weight": 4},
+				{"id": "golden_ginseng", "name": "Golden Ginseng", "weight": 3}
+			],
+			"enemies": [
+				{"id": "temple_guardian", "name": "Temple Guardian", "archetype": "sentinel", "ilvl_bonus": 3, "hp_mult": 1.4, "damage_mult": 1.1, "speed": 54.0, "color": "#c4b47a"},
+				{"id": "pilgrim_shade", "name": "Pilgrim Shade", "archetype": "archer", "ilvl_bonus": 2, "hp_mult": 0.9, "damage_mult": 1.2, "speed": 68.0, "color": "#a8a888"}
+			]
+		},
+		{
+			"id": "biome.corrupted",
+			"name": "Withered Blight",
+			"qi_density": 1.05,
+			"palette": ["#1d1420", "#201626", "#1a111c", "#241a2a"],
+			"features": {"tuft": 74, "bush": 8, "rock": 12, "tree": 6},
+			"resources": [
+				{"id": "bitter_reed", "name": "Bitter Reed", "weight": 4},
+				{"id": "void_cap", "name": "Void Cap", "weight": 3}
+			],
+			"enemies": [
+				{"id": "blight_wolf", "name": "Blight Wolf", "archetype": "skirmisher", "ilvl_bonus": 3, "hp_mult": 1.05, "damage_mult": 1.25, "speed": 84.0, "color": "#7a5a8a"},
+				{"id": "hollow_cultivator", "name": "Hollow Cultivator", "archetype": "brawler", "ilvl_bonus": 3, "hp_mult": 1.1, "damage_mult": 1.2, "speed": 64.0, "color": "#5f4a6e"}
+			]
+		},
+		{
+			"id": "biome.forbidden",
+			"name": "Forbidden Waste",
+			"qi_density": 0.6,
+			"palette": ["#1a1a1a", "#1e1e1e", "#161616", "#222222"],
+			"features": {"tuft": 84, "bush": 3, "rock": 11, "tree": 2},
+			"resources": [
+				{"id": "ash_bloom", "name": "Ash Bloom", "weight": 3},
+				{"id": "grave_orchid", "name": "Grave Orchid", "weight": 2}
+			],
+			"enemies": [
+				{"id": "grave_stalker", "name": "Grave Stalker", "archetype": "archer", "ilvl_bonus": 5, "hp_mult": 1.2, "damage_mult": 1.35, "speed": 72.0, "color": "#6e6e7a"},
+				{"id": "ash_revenant", "name": "Ash Revenant", "archetype": "brawler", "ilvl_bonus": 4, "hp_mult": 1.3, "damage_mult": 1.3, "speed": 62.0, "color": "#585860"}
+			]
 		}
 	]
 }

@@ -13,6 +13,11 @@ extends RefCounted
 const COLS := 5
 const ROWS := 4
 const CAPITAL := Vector2i(2, 1)
+## Chunks along one side of a region. The capital region occupies chunk
+## window (0..11, 0..11), so every coordinate a save already holds keeps
+## its meaning; the continent extends west and north into negatives.
+const REGION_CHUNKS := 12
+const CHUNK_PX := 1024.0
 const GROWTH_CHANCE := 0.66
 ## A continent smaller than this would not be worth mapping.
 const MIN_REGIONS := 7
@@ -30,10 +35,48 @@ static func coord_of(index: int) -> Vector2i:
 	return Vector2i(index % COLS, index / COLS)
 
 
-## The only playable province is the capital cell; other regions are geography
-## until travel exists.
-static func region_for_world_position(_world_position: Vector2) -> int:
-	return index_of(CAPITAL)
+## The region cell a chunk belongs to. Pure arithmetic: the capital
+## cell sits on chunk window (0..11, 0..11) by construction.
+static func cell_for_chunk(coord: Vector2i) -> Vector2i:
+	return CAPITAL + Vector2i(_floordiv(coord.x), _floordiv(coord.y))
+
+
+static func _floordiv(value: int) -> int:
+	return int(floor(float(value) / float(REGION_CHUNKS)))
+
+
+## The north-west chunk of a region cell.
+static func chunk_origin(cell: Vector2i) -> Vector2i:
+	return (cell - CAPITAL) * REGION_CHUNKS
+
+
+## The region a world position stands in, or -1 beyond the lattice.
+static func region_for_world_position(world_position: Vector2) -> int:
+	var chunk := Vector2i(
+		int(floor(world_position.x / CHUNK_PX)),
+		int(floor(world_position.y / CHUNK_PX)))
+	var cell := cell_for_chunk(chunk)
+	if cell.x < 0 or cell.y < 0 or cell.x >= COLS or cell.y >= ROWS:
+		return -1
+	return index_of(cell)
+
+
+static func is_land(data: Dictionary, cell: Vector2i) -> bool:
+	if cell.x < 0 or cell.y < 0 or cell.x >= COLS or cell.y >= ROWS:
+		return false
+	var cells: Array = data.get("cells", [])
+	if cells.size() != COLS * ROWS:
+		return false
+	return bool(cells[index_of(cell)].get("land", false))
+
+
+static func terrain_for_cell(data: Dictionary, cell: Vector2i) -> String:
+	if cell.x < 0 or cell.y < 0 or cell.x >= COLS or cell.y >= ROWS:
+		return ""
+	var cells: Array = data.get("cells", [])
+	if cells.size() != COLS * ROWS:
+		return ""
+	return String(cells[index_of(cell)].get("terrain", ""))
 
 
 ## Everything the map and later travel need. Pure: same seed, same continent.

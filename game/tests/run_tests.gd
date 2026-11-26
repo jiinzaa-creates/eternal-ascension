@@ -2515,7 +2515,9 @@ func _world_tests() -> void:
 	# and 10 stay resident: 25 + 15 = 40 total loads, never unbounded growth.
 	check(manager.streamed_chunks == 40, "only the newly exposed chunks load (%d)" % manager.streamed_chunks)
 	check(manager.world_to_chunk(Vector2(-1, -1)) == Vector2i(-1, -1), "negative coordinates are handled")
-	check(not manager.in_province(Vector2i(-1, 0)), "the province has hard edges")
+	check(manager.in_province(Vector2i(-1, 0)), "the continent reaches west of the old province")
+	check(not manager.in_province(Vector2i(-25, 0)), "the continent has hard edges")
+	check(not manager.in_province(Vector2i(36, 0)), "the continent ends in the east too")
 
 	manager.queue_free()
 	second.queue_free()

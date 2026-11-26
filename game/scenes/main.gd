@@ -798,11 +798,10 @@ func _process(delta: float) -> void:
 	if phase == "creation":
 		return
 
-	var limit := ChunkManager.CHUNK_SIZE * ChunkManager.PROVINCE_CHUNKS - 40.0
-	player.global_position = Vector2(
-		clampf(player.global_position.x, 40.0, limit),
-		clampf(player.global_position.y, 40.0, limit)
-	)
+	# The continent's rim is the end of the world: open sea blocks the
+	# coasts, and this clamp closes the landward edges of rim regions.
+	var rim := ChunkManager.world_bounds().grow(-40.0)
+	player.global_position = player.global_position.clamp(rim.position, rim.end)
 
 	if phase == "realm":
 		if realm_instance != null:
@@ -896,7 +895,11 @@ func _spawn_wild_dummy() -> void:
 	var r: RandomNumberGenerator = Rng.stream("wild_dummy", Game.kills + 1, _wild_dummy_count())
 	var angle := r.randf_range(0.0, TAU)
 	var distance := r.randf_range(420.0, 760.0)
-	var spawn := settlement.position_for("plaza") + Vector2(cos(angle), sin(angle)) * distance
+	var anchor := settlement.position_for("plaza")
+	if player != null and player.global_position.distance_to(anchor) > 1500.0:
+		# Far from home the wilds answer where the player actually is.
+		anchor = player.global_position
+	var spawn := anchor + Vector2(cos(angle), sin(angle)) * distance
 	var dummy := Dummy.new()
 	dummy.ilvl = maxi(1, player.cultivation.realm)
 	dummy.position = spawn
@@ -5830,6 +5833,11 @@ func _load_game(slot: int) -> void:
 	for node in interactables:
 		if used_interactables.has(node.id):
 			node.used = true
+	# The world itself belongs to the saved seed: _ready built it from a
+	# throwaway new-run roll, so rebuild continent and chunks from the
+	# seed the save carries before the deltas are applied to it.
+	continent = Continent.generate(Game.world_seed)
+	chunks.configure(Game.world_seed)
 	# Rebuild the province so loaded deltas decide which resources exist.
 	chunks.today = Clock.day
 	chunks.resync(player.global_position)

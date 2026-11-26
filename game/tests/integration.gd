@@ -699,10 +699,10 @@ func _run() -> void:
 	check(main.world_delta.is_spent(herb_coord, herb_id, Clock.day), "gathering records a chunk delta")
 
 	# Leave the ring entirely, then return: the chunk regenerates from the seed.
-	player.global_position = Vector2(12200, 12200)
+	player.global_position = Vector2(-24000, 5632)
 	await frames(2)
 	main.chunks.settle()
-	check(main.chunks.chunk_count() < 25, "the province edge streams fewer chunks (%d)" % main.chunks.chunk_count())
+	check(main.chunks.chunk_count() < 25, "the continent rim streams fewer chunks (%d)" % main.chunks.chunk_count())
 	player.global_position = home
 	await frames(2)
 	main.chunks.settle()
@@ -716,7 +716,7 @@ func _run() -> void:
 
 	var day_before_chunks: int = Clock.day
 	Clock.day = day_before_chunks + WorldDelta.HERB_REGROW_DAYS
-	player.global_position = Vector2(12200, 12200)
+	player.global_position = Vector2(-24000, 5632)
 	await frames(2)
 	main.chunks.settle()
 	player.global_position = home
@@ -791,7 +791,7 @@ func _run() -> void:
 		# clock for its sentinel value would age the run to death mid-suite.
 		var step: int = 0 if poi_window == WorldDelta.PERMANENT else mini(poi_window, 5000)
 		Clock.day += step
-		player.global_position = Vector2(12200, 12200)
+		player.global_position = Vector2(-24000, 5632)
 		# Give the streamer a stable window to unload the old chunk before it is
 		# asked to rebuild it. Two frames is a race, not a refill test.
 		await frames(6)
