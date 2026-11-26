@@ -9,10 +9,39 @@
       "economy": "Sword-forging and duels for hire",
       "fault_line": "Reformers want outside disciples; hardliners call it dilution.",
       "colour": "#c8d4e0",
-      "method": {"name": "Sword Heart Method", "id": "method.sword", "path": "Sword intent grows only in real combat; sitting feeds it almost nothing."},
-      "technique": {"name": "Heaven Splitting Slash", "id": "", "kind": "melee", "path": "One committed cut that opens a line of foes."},
+      "method": {
+        "name": "Sword Heart Method",
+        "id": "method.sword",
+        "path": "Sword intent grows only in real combat; sitting feeds it almost nothing."
+      },
+      "technique": {
+        "name": "Heaven Splitting Slash",
+        "id": "tech.sword.heaven_splitting_slash",
+        "kind": "melee",
+        "path": "One committed cut that opens a line of foes."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Lu Jianhong",
+      "deputy": "Han Yuesheng",
+      "relations": {
+        "allies": [
+          "sect.celestial_formation"
+        ],
+        "rivals": [
+          "sect.blood_moon",
+          "sect.shadow_veil"
+        ]
+      },
+      "population": "standard",
+      "affinity": [
+        "mountains",
+        "plains",
+        "coast",
+        "forest",
+        "marsh",
+        "desert"
+      ]
     },
     {
       "id": "sect.azure_cloud",
@@ -23,10 +52,34 @@
       "economy": "Pill farming",
       "fault_line": "Elders hoard a Heaven-grade vein.",
       "colour": "#7fd3e0",
-      "method": {"name": "Five Elements Cycle", "id": "", "path": "Each element feeds the next; a closed cycle turns patience into power."},
-      "technique": {"name": "Azure Cloud Palm", "id": "tech.palm.azure_cloud", "kind": "projectile", "path": "A palm of gathered cloud that chills what it passes through."},
+      "method": {
+        "name": "Five Elements Cycle",
+        "id": "method.elemental",
+        "path": "Each element feeds the next; a closed cycle turns patience into power."
+      },
+      "technique": {
+        "name": "Azure Cloud Palm",
+        "id": "tech.palm.azure_cloud",
+        "kind": "projectile",
+        "path": "A palm of gathered cloud that chills what it passes through."
+      },
       "local": true,
-      "faction": "faction.azure_cloud"
+      "faction": "faction.azure_cloud",
+      "master": "Feng Yunlan",
+      "deputy": "Shen Heqing",
+      "relations": {
+        "allies": [
+          "sect.eternal_medicine",
+          "sect.celestial_formation"
+        ],
+        "rivals": [
+          "sect.blood_moon"
+        ]
+      },
+      "population": "great",
+      "affinity": [
+        "capital"
+      ]
     },
     {
       "id": "sect.crimson_lotus",
@@ -37,10 +90,39 @@
       "economy": "Pleasure houses and the poison trade",
       "fault_line": "Two heirs, one poisoned.",
       "colour": "#e08fc0",
-      "method": {"name": "Lotus Ecstasy Art", "id": "", "path": "Feeling is fuel; the art blooms brightest when the heart is unguarded."},
-      "technique": {"name": "Thousand Petal Illusion", "id": "tech.palm.thousand_petals", "kind": "spell", "path": "A drift of petals that cuts only after the eye believes it is perfume."},
+      "method": {
+        "name": "Lotus Ecstasy Art",
+        "id": "method.dual",
+        "path": "Feeling is fuel; the art blooms brightest when the heart is unguarded."
+      },
+      "technique": {
+        "name": "Thousand Petal Illusion",
+        "id": "tech.palm.thousand_petals",
+        "kind": "spell",
+        "path": "A drift of petals that cuts only after the eye believes it is perfume."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Hong Lianxin",
+      "deputy": "Su Waner",
+      "relations": {
+        "allies": [
+          "sect.eternal_medicine",
+          "sect.thousand_beast"
+        ],
+        "rivals": [
+          "sect.frozen_heaven"
+        ]
+      },
+      "population": "standard",
+      "affinity": [
+        "marsh",
+        "coast",
+        "plains",
+        "forest",
+        "mountains",
+        "desert"
+      ]
     },
     {
       "id": "sect.thousand_beast",
@@ -51,10 +133,38 @@
       "economy": "Beast cores and mounts",
       "fault_line": "The slave-beast faction against the communion faction.",
       "colour": "#d0b060",
-      "method": {"name": "Beast Soul Communion", "id": "", "path": "A borrowed heartbeat lends strength; the beast remembers every debt."},
-      "technique": {"name": "Nine Beast Stampede", "id": "tech.beast.nine_stampede", "kind": "summon", "path": "Nine spirits answer the call and trample a path through the fight."},
+      "method": {
+        "name": "Beast Soul Communion",
+        "id": "method.beast",
+        "path": "A borrowed heartbeat lends strength; the beast remembers every debt."
+      },
+      "technique": {
+        "name": "Nine Beast Stampede",
+        "id": "tech.beast.nine_stampede",
+        "kind": "summon",
+        "path": "Nine spirits answer the call and trample a path through the fight."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Mu Tieren",
+      "deputy": "Ba Tu",
+      "relations": {
+        "allies": [
+          "sect.crimson_lotus"
+        ],
+        "rivals": [
+          "sect.golden_cauldron"
+        ]
+      },
+      "population": "great",
+      "affinity": [
+        "plains",
+        "forest",
+        "marsh",
+        "mountains",
+        "desert",
+        "coast"
+      ]
     },
     {
       "id": "sect.celestial_formation",
@@ -65,10 +175,39 @@
       "economy": "Formation contracts and ward-work",
       "fault_line": "The grand array is failing, and they are hiding it.",
       "colour": "#c0a0ff",
-      "method": {"name": "Array Heart Sutra", "id": "", "path": "The body is a formation; each breath closes another circuit."},
-      "technique": {"name": "Ninefold Sealing Array", "id": "tech.formation.sealing_array", "kind": "spell", "path": "A ring of seals closes and locks everything inside it in place."},
+      "method": {
+        "name": "Array Heart Sutra",
+        "id": "method.formation",
+        "path": "The body is a formation; each breath closes another circuit."
+      },
+      "technique": {
+        "name": "Ninefold Sealing Array",
+        "id": "tech.formation.sealing_array",
+        "kind": "spell",
+        "path": "A ring of seals closes and locks everything inside it in place."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Xuan Jizi",
+      "deputy": "Mo Xingchen",
+      "relations": {
+        "allies": [
+          "sect.heavenly_sword",
+          "sect.azure_cloud"
+        ],
+        "rivals": [
+          "sect.void_scripture"
+        ]
+      },
+      "population": "small",
+      "affinity": [
+        "mountains",
+        "desert",
+        "plains",
+        "forest",
+        "coast",
+        "marsh"
+      ]
     },
     {
       "id": "sect.blood_moon",
@@ -79,10 +218,39 @@
       "economy": "The blood essence market",
       "fault_line": "Succession by murder is doctrine, and it just happened.",
       "colour": "#d05060",
-      "method": {"name": "Blood Sea Scripture", "id": "method.blood", "path": "Absorb compatible blood essence; speed is bought with corruption."},
-      "technique": {"name": "Crimson Moon Devour", "id": "tech.blood.crimson_moon", "kind": "melee", "path": "A draining arc that drinks what it wounds."},
+      "method": {
+        "name": "Blood Sea Scripture",
+        "id": "method.blood",
+        "path": "Absorb compatible blood essence; speed is bought with corruption."
+      },
+      "technique": {
+        "name": "Crimson Moon Devour",
+        "id": "tech.blood.crimson_moon",
+        "kind": "melee",
+        "path": "A draining arc that drinks what it wounds."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Xue Hongyue",
+      "deputy": "Gui Lian",
+      "relations": {
+        "allies": [
+          "sect.shadow_veil"
+        ],
+        "rivals": [
+          "sect.heavenly_sword",
+          "sect.azure_cloud"
+        ]
+      },
+      "population": "standard",
+      "affinity": [
+        "marsh",
+        "forest",
+        "coast",
+        "plains",
+        "mountains",
+        "desert"
+      ]
     },
     {
       "id": "sect.eternal_medicine",
@@ -93,10 +261,39 @@
       "economy": "Medicine monopoly",
       "fault_line": "A cure for a plague they themselves spread.",
       "colour": "#8fd0a0",
-      "method": {"name": "Longevity Wood Canon", "id": "", "path": "Growth is cultivated like a garden: slow, tended, impossible to hurry."},
-      "technique": {"name": "Nine Reversal Needles", "id": "", "kind": "projectile", "path": "Nine needles fly to the body's own meridians, mending or severing."},
+      "method": {
+        "name": "Longevity Wood Canon",
+        "id": "method.traditional",
+        "path": "Growth is cultivated like a garden: slow, tended, impossible to hurry."
+      },
+      "technique": {
+        "name": "Nine Reversal Needles",
+        "id": "tech.medicine.nine_reversal_needles",
+        "kind": "projectile",
+        "path": "Nine needles fly to the body's own meridians, mending or severing."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Mu Qingnang",
+      "deputy": "Ye Zhiqiu",
+      "relations": {
+        "allies": [
+          "sect.azure_cloud",
+          "sect.crimson_lotus"
+        ],
+        "rivals": [
+          "sect.golden_cauldron"
+        ]
+      },
+      "population": "standard",
+      "affinity": [
+        "forest",
+        "plains",
+        "marsh",
+        "mountains",
+        "coast",
+        "desert"
+      ]
     },
     {
       "id": "sect.shadow_veil",
@@ -107,10 +304,34 @@
       "economy": "Espionage and secrets",
       "fault_line": "Someone is selling secrets to all twelve.",
       "colour": "#9a9ab0",
-      "method": {"name": "Phantom Trace Method", "id": "", "path": "Every secret learned is a step; the path is walked where no one looks."},
-      "technique": {"name": "Veil of Ten Thousand Faces", "id": "", "kind": "buff", "path": "For a breath the body is nobody, and every blow seeks the wrong person."},
+      "method": {
+        "name": "Phantom Trace Method",
+        "id": "method.slaughter",
+        "path": "Every secret learned is a step; the path is walked where no one looks."
+      },
+      "technique": {
+        "name": "Veil of Ten Thousand Faces",
+        "id": "tech.step.veil_of_faces",
+        "kind": "buff",
+        "path": "For a breath the body is nobody, and every blow seeks the wrong person."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Wu Mian",
+      "deputy": "Ying Shi",
+      "relations": {
+        "allies": [
+          "sect.blood_moon"
+        ],
+        "rivals": [
+          "sect.heavenly_sword",
+          "sect.thunder_sovereign"
+        ]
+      },
+      "population": "small",
+      "affinity": [
+        "capital"
+      ]
     },
     {
       "id": "sect.thunder_sovereign",
@@ -121,10 +342,39 @@
       "economy": "Tribulation guiding, rented by the hour",
       "fault_line": "They can induce tribulations, and they rent that power.",
       "colour": "#f0d070",
-      "method": {"name": "Nine Heavens Thunder Law", "id": "", "path": "Lightning is courted, not commanded; the law answers only the bold."},
-      "technique": {"name": "Sovereign Thunderfall", "id": "", "kind": "spell", "path": "A verdict called down from the sky, with the caster standing in it."},
+      "method": {
+        "name": "Nine Heavens Thunder Law",
+        "id": "method.heavenly",
+        "path": "Lightning is courted, not commanded; the law answers only the bold."
+      },
+      "technique": {
+        "name": "Sovereign Thunderfall",
+        "id": "tech.elemental.sovereign_thunderfall",
+        "kind": "spell",
+        "path": "A verdict called down from the sky, with the caster standing in it."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Lei Zhentian",
+      "deputy": "Dian Guang",
+      "relations": {
+        "allies": [
+          "sect.frozen_heaven"
+        ],
+        "rivals": [
+          "sect.shadow_veil",
+          "sect.void_scripture"
+        ]
+      },
+      "population": "standard",
+      "affinity": [
+        "mountains",
+        "plains",
+        "desert",
+        "coast",
+        "forest",
+        "marsh"
+      ]
     },
     {
       "id": "sect.frozen_heaven",
@@ -135,10 +385,38 @@
       "economy": "The preservation trade",
       "fault_line": "An elder is thawing, and remembers love.",
       "colour": "#a8d8f0",
-      "method": {"name": "Absolute Yin Scripture", "id": "", "path": "Stillness is the method; feeling is the impurity that slows the freeze."},
-      "technique": {"name": "Frost Soul Requiem", "id": "", "kind": "spell", "path": "A hymn that freezes the will before the body has time to shiver."},
+      "method": {
+        "name": "Absolute Yin Scripture",
+        "id": "method.body",
+        "path": "Stillness is the method; feeling is the impurity that slows the freeze."
+      },
+      "technique": {
+        "name": "Frost Soul Requiem",
+        "id": "tech.elemental.frost_soul_requiem",
+        "kind": "spell",
+        "path": "A hymn that freezes the will before the body has time to shiver."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Bing Xin",
+      "deputy": "Shuang Hua",
+      "relations": {
+        "allies": [
+          "sect.thunder_sovereign"
+        ],
+        "rivals": [
+          "sect.crimson_lotus"
+        ]
+      },
+      "population": "small",
+      "affinity": [
+        "mountains",
+        "coast",
+        "desert",
+        "plains",
+        "forest",
+        "marsh"
+      ]
     },
     {
       "id": "sect.golden_cauldron",
@@ -149,10 +427,39 @@
       "economy": "Artifact monopoly",
       "fault_line": "A commission for a weapon that can kill gods.",
       "colour": "#e0b060",
-      "method": {"name": "Cauldron Fire Canon", "id": "", "path": "The self is refined like metal: heat, hammer, fold, repeat."},
-      "technique": {"name": "Ten Thousand Refinements", "id": "", "kind": "buff", "path": "Every strike tempers the body that delivers it."},
+      "method": {
+        "name": "Cauldron Fire Canon",
+        "id": "method.alchemy",
+        "path": "The self is refined like metal: heat, hammer, fold, repeat."
+      },
+      "technique": {
+        "name": "Ten Thousand Refinements",
+        "id": "tech.body.ten_thousand_refinements",
+        "kind": "buff",
+        "path": "Every strike tempers the body that delivers it."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Jin Manlou",
+      "deputy": "Qian Heng",
+      "relations": {
+        "allies": [
+          "sect.void_scripture"
+        ],
+        "rivals": [
+          "sect.thousand_beast",
+          "sect.eternal_medicine"
+        ]
+      },
+      "population": "standard",
+      "affinity": [
+        "coast",
+        "desert",
+        "plains",
+        "forest",
+        "mountains",
+        "marsh"
+      ]
     },
     {
       "id": "sect.void_scripture",
@@ -163,10 +470,39 @@
       "economy": "Manual copying",
       "fault_line": "The archive holds a book that rewrites its readers.",
       "colour": "#b0c8e8",
-      "method": {"name": "Void Archive Method", "id": "", "path": "Understanding is stored, not spent; the page remembers what the mind forgets."},
-      "technique": {"name": "Page of Unmaking", "id": "", "kind": "spell", "path": "A sentence read aloud that edits the target out of the scene."},
+      "method": {
+        "name": "Void Archive Method",
+        "id": "method.forbidden",
+        "path": "Understanding is stored, not spent; the page remembers what the mind forgets."
+      },
+      "technique": {
+        "name": "Page of Unmaking",
+        "id": "tech.qi.page_of_unmaking",
+        "kind": "spell",
+        "path": "A sentence read aloud that edits the target out of the scene."
+      },
       "local": false,
-      "faction": ""
+      "faction": "",
+      "master": "Xu Wangchen",
+      "deputy": "Zhi Hui",
+      "relations": {
+        "allies": [
+          "sect.golden_cauldron"
+        ],
+        "rivals": [
+          "sect.celestial_formation",
+          "sect.thunder_sovereign"
+        ]
+      },
+      "population": "small",
+      "affinity": [
+        "mountains",
+        "desert",
+        "forest",
+        "plains",
+        "coast",
+        "marsh"
+      ]
     }
   ]
 }

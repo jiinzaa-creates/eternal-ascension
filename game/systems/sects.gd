@@ -3,11 +3,12 @@ extends RefCounted
 ## The twelve sects of the province, as identities rather than simulations.
 ##
 ## A sect owns a philosophy, a seat and territory, an economy and a fault line,
-## plus one signature method and one signature technique. At this stage they are
-## content and a codex: hierarchy, economy and politics arrive in later
-## milestones. The validator is what keeps the roster honest — twelve entries,
-## no duplicated name or signature, optional links to playable arts that really
-## exist, and exactly one sect the player can call their own gate.
+## a named master and deputy, allies and rivals, a population, a terrain
+## affinity for its seat, plus one signature method and one signature
+## technique — both linked to real, playable arts. The validator is what
+## keeps the roster honest: twelve entries, no duplicated name or signature,
+## every link resolving, every relationship mutual, and exactly one sect the
+## player can call their own gate.
 
 const EXPECTED := 12
 const TECHNIQUE_KINDS := ["melee", "projectile", "spell", "summon", "buff", "movement",
@@ -90,6 +91,11 @@ static func row(id: String) -> Dictionary:
 		"technique_kind": String(technique.get("kind", "")),
 		"local": bool(entry.get("local", false)),
 		"faction": String(entry.get("faction", "")),
+		"master": String(entry.get("master", "")),
+		"deputy": String(entry.get("deputy", "")),
+		"population": String(entry.get("population", "")),
+		"allies": (entry.get("relations", {}) as Dictionary).get("allies", []),
+		"rivals": (entry.get("relations", {}) as Dictionary).get("rivals", []),
 	}
 
 
@@ -165,7 +171,9 @@ static func validate(data: Dictionary) -> Array:
 			if String(method.get("path", "")).strip_edges() == "":
 				problems.append("sect %s signature method has no path" % id)
 			var method_id := String(method.get("id", ""))
-			if method_id != "":
+			if method_id == "":
+				problems.append("sect %s signature method is not linked to a playable method" % id)
+			else:
 				if Methods.find(method_id).is_empty():
 					problems.append("sect %s names unknown method %s" % [id, method_id])
 				if seen_method_ids.has(method_id):
@@ -189,7 +197,9 @@ static func validate(data: Dictionary) -> Array:
 			if not TECHNIQUE_KINDS.has(kind):
 				problems.append("sect %s signature technique has unknown kind %s" % [id, kind])
 			var technique_id := String(technique.get("id", ""))
-			if technique_id != "":
+			if technique_id == "":
+				problems.append("sect %s signature technique is not linked to a playable technique" % id)
+			else:
 				var known := DB.technique(technique_id)
 				if known.is_empty():
 					problems.append("sect %s names unknown technique %s" % [id, technique_id])
@@ -198,6 +208,26 @@ static func validate(data: Dictionary) -> Array:
 				if seen_technique_ids.has(technique_id):
 					problems.append("technique %s is claimed by two sects" % technique_id)
 				seen_technique_ids[technique_id] = true
+
+		# Leadership, relationships, population and seat affinity: the parts
+		# that make a sect an organization rather than a paragraph.
+		if String(entry.get("master", "")).strip_edges() == "":
+			problems.append("sect %s has no named master" % id)
+		if String(entry.get("deputy", "")).strip_edges() == "":
+			problems.append("sect %s has no named deputy" % id)
+		if not ["small", "standard", "great"].has(String(entry.get("population", ""))):
+			problems.append("sect %s has an unknown population tier" % id)
+		var affinity: Array = entry.get("affinity", [])
+		if affinity.is_empty():
+			problems.append("sect %s has no terrain affinity for its seat" % id)
+		for terrain in affinity:
+			if String(terrain) != "capital" and not Continent.TERRAINS.has(String(terrain)):
+				problems.append("sect %s wants a seat on unknown terrain %s" % [id, terrain])
+		var relations: Dictionary = entry.get("relations", {})
+		for side in ["allies", "rivals"]:
+			for other in relations.get(side, []):
+				if String(other) == id:
+					problems.append("sect %s counts itself among its %s" % [id, side])
 
 		var local := bool(entry.get("local", false))
 		var faction_id := String(entry.get("faction", ""))
@@ -212,6 +242,28 @@ static func validate(data: Dictionary) -> Array:
 
 	if local_count != 1:
 		problems.append("expected exactly one local sect, found %d" % local_count)
+
+	# Relationships are mutual or they are not relationships: an ally who does
+	# not claim you back, a rival who has never heard of you, are data errors.
+	var by_id: Dictionary = {}
+	for value in list:
+		if typeof(value) == TYPE_DICTIONARY:
+			by_id[String((value as Dictionary).get("id", ""))] = value
+	for value in list:
+		if typeof(value) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = value
+		var id := String(entry.get("id", ""))
+		var relations: Dictionary = entry.get("relations", {})
+		for side in ["allies", "rivals"]:
+			for other in relations.get(side, []):
+				if not by_id.has(String(other)):
+					problems.append("sect %s names unknown %s %s" % [id, side, other])
+					continue
+				var other_entry: Dictionary = by_id.get(String(other), {})
+				var back: Dictionary = other_entry.get("relations", {})
+				if not (back.get(side, []) as Array).has(id):
+					problems.append("sect %s claims %s as %s, unreturned" % [id, other, side])
 
 	return problems
 

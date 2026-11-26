@@ -1768,6 +1768,22 @@ func _technique_combat_tests() -> void:
 
 	check(DB.techniques.size() >= 30, "the roster carries real breadth (%d arts)" % DB.techniques.size())
 	check(Sects.TECHNIQUE_KINDS == TechniqueCombat.KINDS, "sect signature arts draw from the same kinds")
+
+	for value in Sects.sects():
+		var entry: Dictionary = value
+		var sid := String(entry.get("id", ""))
+		check(String(entry.get("master", "")) != "" and String(entry.get("deputy", "")) != "",
+			"%s is led by named people" % sid)
+		check(not Methods.find(String((entry.get("method", {}) as Dictionary).get("id", ""))).is_empty(),
+			"%s signature method is a real method" % sid)
+		check(not DB.technique(String((entry.get("technique", {}) as Dictionary).get("id", ""))).is_empty(),
+			"%s signature technique is a real technique" % sid)
+		var relations: Dictionary = entry.get("relations", {})
+		for side in ["allies", "rivals"]:
+			for other in relations.get(side, []):
+				var back: Dictionary = Sects.sect(String(other)).get("relations", {})
+				check((back.get(side, []) as Array).has(sid), "%s and %s are mutual %s" % [sid, other, side])
+	check(DB.techniques.size() == 46, "the roster holds 46 techniques after the signature arts (%d)" % DB.techniques.size())
 	check(not TechniqueCombat.is_castable("passive") and not TechniqueCombat.is_castable("cultivation"), "passive and cultivation arts are never cast")
 	check(TechniqueCombat.is_castable("heal") and TechniqueCombat.is_castable("ward"), "heals and wards are cast")
 
