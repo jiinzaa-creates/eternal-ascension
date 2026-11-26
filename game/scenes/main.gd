@@ -41,6 +41,7 @@ var _last_dry := Vector2.ZERO
 var _region_now := -1
 var town_specs: Array = []
 var towns_active: Dictionary = {}
+var _sacrifice_offer_day := -1
 var seat_specs: Array = []
 var seats_active: Dictionary = {}
 var founded_sites_active: Dictionary = {}
@@ -5616,6 +5617,14 @@ func _use_interactable(node: Interactable) -> void:
 					Bus.toast.emit("The shrine burns the impurity from your channels. (-%d stones)" % Meridians.CLEANSE_COST)
 				else:
 					Bus.toast.emit("The shrine could purge you, for %d stones." % Meridians.CLEANSE_COST)
+			# The rite of years: offered once, accepted by kneeling again
+			# the same day. Years for a steadier gate (M29 sacrifice).
+			if Game.sacrifice_day != Clock.day and not Game.sacrifice_boon:
+				if _sacrifice_offer_day == Clock.day:
+					_perform_sacrifice()
+				elif player.stats.lifespan_years() > 0:
+					_sacrifice_offer_day = Clock.day
+					Bus.toast.emit("The shrine offers the rite of years: burn five years so the next breakthrough stands steadier. Kneel again today to accept.")
 			cultivation_restore()
 		Interactable.Kind.PORTAL:
 			if node.id == "realm.exit":
@@ -5790,6 +5799,26 @@ func _loot(node: Interactable, ilvl: int, verb: String, table_id: String = "ches
 		Bus.item_dropped.emit(item, node.global_position)
 		names.append(String(item.get("name", "?")))
 	Bus.toast.emit("The %s holds %s." % [verb, ", ".join(names)])
+
+
+## Burns five years for a breakthrough boon. The shrine refuses when the
+## rite would spend the player's last years, and Heaven refuses the
+## endless-lived outright — they have nothing to burn.
+func _perform_sacrifice() -> void:
+	_sacrifice_offer_day = -1
+	var lifespan := player.stats.lifespan_years()
+	if lifespan <= 0:
+		Bus.toast.emit("Heaven already gave you endless years. The rite has nothing to burn.")
+		return
+	if Game.age_years() + 5.0 >= float(lifespan):
+		Bus.toast.emit("The rite would spend your last years. The shrine refuses.")
+		return
+	Game.born_day -= int(5.0 * Aging.DAYS_PER_YEAR)
+	Game.sacrifice_day = Clock.day
+	Game.sacrifice_boon = true
+	player.rebuild_stats()
+	Bus.toast.emit("Five years burn away on the shrine's stone. The next gate will stand steadier.")
+	Bus.player_stats_changed.emit()
 
 
 func cultivation_restore() -> void:

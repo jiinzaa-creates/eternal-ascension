@@ -1362,6 +1362,7 @@ func inheritance_state() -> Dictionary:
 ## What the method rules read right now. Pure data, no side effects.
 func method_state() -> Dictionary:
 	var partner := false
+	var sacrifice_boon := Game.sacrifice_boon
 	if is_inside_tree():
 		for npc in get_tree().get_nodes_in_group("npc"):
 			var node := npc as Node2D
@@ -1396,6 +1397,7 @@ func method_state() -> Dictionary:
 		"still_seconds": _still_seconds,
 		"contamination": cultivation.contamination,
 		"contamination_max": Meridians.MAX_CONTAMINATION,
+		"sacrifice_boon": sacrifice_boon,
 	}
 
 
@@ -1519,7 +1521,10 @@ func set_guard(held: bool) -> bool:
 ## Attempts the realm breakthrough. Returns the result dictionary for the HUD.
 func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 	var r: RandomNumberGenerator = Rng.stream("breakthrough", cultivation.realm, cultivation.breakthrough_attempts)
+	var had_boon := Game.sacrifice_boon
 	var result := cultivation.attempt_breakthrough(stats, r, Game.kills, Game.karma, method_state(), composure)
+	if had_boon and String(result.get("reason", "")) == "":
+		Game.sacrifice_boon = false
 	if result.get("reason", "") != "":
 		var reason := String(result["reason"])
 		if reason == "not_at_peak":

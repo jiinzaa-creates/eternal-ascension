@@ -45,6 +45,10 @@ const MAX_DEATH_WOUNDS := 5
 var deaths: int = 0
 var death_wounds: int = 0
 var death_wound_day: int = 0
+## The rite of years (M29): the last day years were burned at a shrine,
+## and whether the boon still waits for a breakthrough.
+var sacrifice_day: int = -1
+var sacrifice_boon: bool = false
 
 
 ## Records a combat death: the count, a fresh wound, and a tenth of the
@@ -152,6 +156,8 @@ func new_run(seed_value: int = 0) -> void:
 	deaths = 0
 	death_wounds = 0
 	death_wound_day = 0
+	sacrifice_day = -1
+	sacrifice_boon = false
 	crafts_made = 0
 	professions.clear()
 	npc_memory.clear()
@@ -223,6 +229,8 @@ func to_dict() -> Dictionary:
 		"deaths": deaths,
 		"death_wounds": death_wounds,
 		"death_wound_day": death_wound_day,
+		"sacrifice_day": sacrifice_day,
+		"sacrifice_boon": sacrifice_boon,
 		"crafts_made": crafts_made,
 		"professions": professions.duplicate(true),
 		"npc_memory": npc_memory.duplicate(true),
@@ -271,6 +279,8 @@ func from_dict(data: Dictionary) -> void:
 	deaths = maxi(0, int(data.get("deaths", 0)))
 	death_wounds = clampi(int(data.get("death_wounds", 0)), 0, MAX_DEATH_WOUNDS)
 	death_wound_day = maxi(0, int(data.get("death_wound_day", 0)))
+	sacrifice_day = int(data.get("sacrifice_day", -1))
+	sacrifice_boon = bool(data.get("sacrifice_boon", false))
 	crafts_made = int(data.get("crafts_made", 0))
 	professions = Professions.sanitize(data.get("professions", {}))
 	npc_memory = NpcDb.sanitize_memory(data.get("npc_memory", {}))

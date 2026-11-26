@@ -278,7 +278,8 @@ func failure_harm(method_state: Dictionary = {}) -> float:
 ## The chance the HUD shows and the attempt rolls, from one formula.
 func estimated_chance(stats: StatBlock, kills: int = 0, karma: int = 0, method_state: Dictionary = {}) -> float:
 	var profile := _affixed_profile(method_state)
-	var bonus := PREP_CHANCE * float(preparation) + float(profile.get("chance", 0.0))
+	var bonus := PREP_CHANCE * float(preparation) + float(profile.get("chance", 0.0)) \
+		+ (0.10 if bool(method_state.get("sacrifice_boon", false)) else 0.0)
 	return breakthrough_chance(stats, tribulation_with(kills, karma, method_state), bonus, 0.0)
 
 
@@ -334,14 +335,17 @@ func attempt_breakthrough(stats: StatBlock, generator: RandomNumberGenerator, ki
 		return {"success": false, "reason": "apex", "chance": 0.0, "roll": 0.0,
 			"realm": realm, "sublevel": sublevel, "consequences": []}
 
-	var profile := Methods.breakthrough_profile(method_id, method_state)
+	var profile := _affixed_profile(method_state)
+	if bool(method_state.get("sacrifice_boon", false)):
+		profile["note"] = String(profile.get("note", "")) + " The rite of years steadies the gate."
 	# Preparation is read first, then consumed by the attempt itself: a win does
 	# not refund it and a loss cannot be retried with the same bank.
 	var prep_used := preparation
 	var trib := tribulation_with(kills, karma, method_state)
 	var harm := failure_harm(method_state)
 	preparation = 0
-	var bonus := PREP_CHANCE * float(prep_used) + float(profile.get("chance", 0.0)) + clampf(composure, 0.0, 1.0)
+	var bonus := PREP_CHANCE * float(prep_used) + float(profile.get("chance", 0.0)) + clampf(composure, 0.0, 1.0) \
+		+ (0.10 if bool(method_state.get("sacrifice_boon", false)) else 0.0)
 	var chance := breakthrough_chance(stats, trib, bonus, 0.0)
 	var roll := generator.randf()
 	var success := roll < chance

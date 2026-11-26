@@ -4874,10 +4874,13 @@ func _death_tests() -> void:
 	Clock.day = 107
 	check(Game.fade_death_wounds() == 1 and Game.death_wounds == Game.MAX_DEATH_WOUNDS - 1,
 		"a week survived closes a wound")
+	Game.sacrifice_day = 42
+	Game.sacrifice_boon = true
 	var round := Game.to_dict()
 	Game.from_dict(round)
 	check(Game.deaths == 7 and Game.death_wounds == Game.MAX_DEATH_WOUNDS - 1,
 		"the death record survives the save")
+	check(Game.sacrifice_day == 42 and Game.sacrifice_boon, "the rite's mark survives the save")
 	Clock.day = saved_day
 	Game.from_dict(saved)
 
