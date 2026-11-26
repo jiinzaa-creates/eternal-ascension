@@ -444,7 +444,8 @@ func _spawn_seat(spec: Dictionary) -> void:
 			String(sect.get("name", sect_id)), String(sect.get("seat", "")),
 			String(sect.get("master", "")), String(sect.get("deputy", "")),
 			String(sect.get("philosophy", "")),
-			_sect_names(relations.get("allies", [])), _sect_names(relations.get("rivals", []))])
+			_sect_names(relations.get("allies", [])), _sect_names(relations.get("rivals", []))]
+		+ _gate_feud_line(sect_id))
 	gate.position = node.position_for("gate")
 	world.add_child(gate)
 	interactables.append(gate)
@@ -1019,6 +1020,7 @@ func _process(delta: float) -> void:
 		return
 	_check_captivity()
 	_check_sect_autonomy()
+	_check_sect_world()
 	_check_npc_progress()
 	_check_stories()
 	_tick_world_event()
@@ -3118,7 +3120,7 @@ func _sect_rank_id(sect_id: String) -> String:
 	if Game.player_sect_id != sect_id:
 		return ""
 	return String(Hierarchy.rank_for(int(Game.sect_standing.get(sect_id, 0)),
-		player.cultivation.realm).get("id", "rank.servant"))
+		player.cultivation.realm, bool(Game.sect_seat_won.get(sect_id, false))).get("id", "rank.servant"))
 
 
 func _sect_rank_level(sect_id: String) -> int:
@@ -3137,6 +3139,15 @@ func sect_seat_rows() -> Array:
 	rows.append({"kind": "info", "enabled": false,
 		"label": "%s — %s" % [name, String(sect.get("seat", ""))],
 		"detail": "%s %s" % [String(sect.get("philosophy", "")), String(sect.get("fault_line", ""))]})
+	var world_entry: Dictionary = (Game.sect_world.get("sects", {}) as Dictionary).get(current_sect_id, {})
+	if not world_entry.is_empty():
+		var feud_names := _sect_names(SectWorld.feuding_with(Game.sect_world, current_sect_id))
+		rows.append({"kind": "info", "enabled": false,
+			"label": "Strength %d · treasury %d · %d disciples on the rolls" % [
+				int(world_entry.get("strength", 0)), int(world_entry.get("treasury", 0)),
+				int(world_entry.get("members", 0))],
+			"detail": ("At feud with %s — the gates are watched." % feud_names) if feud_names != "none"
+				else "No open feud. The house keeps its own counsel."})
 	var member := Game.player_sect_id == current_sect_id
 	if member:
 		var rank := Hierarchy.rank(_sect_rank_id(current_sect_id))
@@ -3194,6 +3205,28 @@ func sect_seat_rows() -> Array:
 			"label": String(donation.get("label", "Donate")),
 			"detail": "Standing with the house rises by %d." % (int(donation.get("points", 0)) * 5),
 			"reason": "Not enough spirit stones."})
+	if current_sect_id == String(Sects.local_sect().get("id", "")):
+		rows.append({"kind": "info", "enabled": false, "label": "The council sits in the hub.",
+			"detail": "Azure Cloud's blocs are lobbied from the council page, not the gate."})
+	else:
+		var invested: Dictionary = Game.sect_lobbies.get(current_sect_id, {})
+		for bloc in SectPolitics.blocs_for(current_sect_id):
+			var bloc_id := String(bloc.get("id", ""))
+			var support := SectPolitics.support_for(bloc_id, invested)
+			var ceiling := SectPolitics.max_for(bloc_id)
+			var cost := int(bloc.get("cost", 0)) * 5
+			rows.append({"kind": "lobby", "enabled": Game.spirit_stones >= cost and support < ceiling,
+				"id": bloc_id,
+				"label": "Lobby the %s — %s" % [String(bloc.get("name", bloc_id)), String(bloc.get("speaker", ""))],
+				"detail": "Gifts and banquets: %d stones. Their support stands at %d of %d." % [cost, support, ceiling],
+				"reason": "Their support is already complete." if support >= ceiling else "Not enough spirit stones."})
+		var vote_check := SectPolitics.can_vote(invested, _sect_rank_id(current_sect_id),
+			bool(Game.sect_seat_won.get(current_sect_id, false)))
+		rows.append({"kind": "vote", "enabled": bool(vote_check.get("ok", false)),
+			"label": "Call the council vote",
+			"detail": "Support %d of %d. A passed vote opens the master's seat." % [
+				int(vote_check.get("support", 0)), int(vote_check.get("threshold", 150))],
+			"reason": String(vote_check.get("reason", ""))})
 	return rows
 
 
@@ -3239,6 +3272,26 @@ func _sect_seat_activate(index: int) -> void:
 				Bus.cultivation_changed.emit()
 			else:
 				Bus.toast.emit("The stele refuses: %s." % String(check.get("reason", "")))
+		"lobby":
+			var purse := Game.spirit_stones / 5
+			var result := SectPolitics.lobby(String(row.get("id", "")), purse,
+				Game.sect_lobbies.get(current_sect_id, {}))
+			if bool(result.get("ok", false)):
+				Game.spirit_stones -= (purse - int(result.get("contribution", purse))) * 5
+				Game.sect_lobbies[current_sect_id] = result.get("invested", {})
+				Bus.toast.emit("The bloc warms to you. (+%d support)" % int(result.get("gain", 0)))
+				Bus.cultivation_changed.emit()
+			else:
+				Bus.toast.emit("The bloc refuses: %s." % String(result.get("reason", "")))
+		"vote":
+			var verdict := SectPolitics.vote(Game.sect_lobbies.get(current_sect_id, {}),
+				_sect_rank_id(current_sect_id), bool(Game.sect_seat_won.get(current_sect_id, false)))
+			if bool(verdict.get("ok", false)):
+				Game.sect_seat_won[current_sect_id] = true
+				Bus.toast.emit("The council of the %s names the master's seat open. Win the standing, and it is yours." % name)
+				Bus.cultivation_changed.emit()
+			else:
+				Bus.toast.emit("The vote fails: %s." % String(verdict.get("reason", "")))
 		"donate":
 			var donation := SectEconomy.donation(String(row.get("id", "")))
 			var cost := int(donation.get("stones", 0))
@@ -3558,6 +3611,30 @@ func player_sect_steward() -> Dictionary:
 ## The hall runs itself one day at a time, including days skipped by rest or
 ## travel. A reload starts from the saved autonomy day, so it can never reroll a
 ## bad event; the same seed, hall and day always produce the same day.
+## The twelve houses settle their own days beside the founded sect's:
+## treasuries breathe, disciples are recruited, feuds ignite and cool.
+## The state is a pure function of seed and day, so a reload picks the
+## world up exactly where the calendar left it.
+func _check_sect_world() -> void:
+	if String(phase) != "play":
+		return
+	if Game.sect_world.is_empty():
+		Game.sect_world = SectWorld.initial(Clock.day)
+		return
+	var result := SectWorld.settle_days(Game.sect_world, Clock.day, Game.world_seed)
+	Game.sect_world = result["state"]
+	var events: Array = result.get("events", [])
+	for i in mini(2, events.size()):
+		Bus.toast.emit("Word from the jianghu — %s" % String(events[i]))
+
+
+func _gate_feud_line(sect_id: String) -> String:
+	var feuds := SectWorld.feuding_with(Game.sect_world, sect_id)
+	if feuds.is_empty():
+		return ""
+	return " At feud with %s." % _sect_names(feuds)
+
+
 func _check_sect_autonomy() -> void:
 	if String(phase) != "play" or Game.player_sect.is_empty():
 		return

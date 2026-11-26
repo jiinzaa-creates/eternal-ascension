@@ -85,6 +85,7 @@ func _ready() -> void:
 	_sects_tests()
 	_sect_seat_tests()
 	_sect_membership_tests()
+	_sect_world_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
@@ -4746,6 +4747,39 @@ func _sect_membership_tests() -> void:
 		and not game.sect_standing.has("sect.nope"), "standing survives, pruned of unknown houses")
 	game.player_sect_id = ""
 	game.sect_standing = {}
+
+
+func _sect_world_tests() -> void:
+	print("[sect world] twelve houses, breathing")
+	var start := SectWorld.initial(1)
+	check((start["sects"] as Dictionary).size() == 12, "the world state seats twelve houses")
+	var run_a := SectWorld.settle_days(start, 121, 4242)
+	var run_b := SectWorld.settle_days(SectWorld.initial(1), 121, 4242)
+	check(String(run_a["state"]["sects"]) == String(run_b["state"]["sects"]),
+		"the same seed and days settle to the same world")
+	check(int(run_a["state"]["day"]) == 121, "the world calendar advances")
+	var feuds_seen := 0
+	var probe := SectWorld.initial(1)
+	for horizon in range(12):
+		var step := SectWorld.settle_days(probe, 121 + horizon * 120, 4242)
+		probe = step["state"]
+		feuds_seen += (probe["feuds"] as Array).size()
+	check(feuds_seen > 0, "rivalries ignite into feuds over a long horizon")
+	var cleaned := SectWorld.sanitize({"sects": {"sect.heavenly_sword": {"strength": 999, "treasury": 5, "members": 3},
+		"sect.nope": {"strength": 1}}, "feuds": [["sect.heavenly_sword", "sect.blood_moon"], ["sect.nope", "sect.blood_moon"]]}, 7)
+	check(int((cleaned["sects"]["sect.heavenly_sword"] as Dictionary)["strength"]) == 130,
+		"saved strength clamps to the living range")
+	check(not cleaned["sects"].has("sect.nope") and (cleaned["feuds"] as Array).size() == 1,
+		"unknown houses and their feuds are pruned on load")
+	var blocs := SectPolitics.blocs_for("sect.heavenly_sword")
+	check(blocs.size() == 3, "a foreign council has three blocs")
+	check(String((blocs[0] as Dictionary).get("speaker", "")) == "Lu Jianhong",
+		"the traditionalists speak through the house's own master")
+	check(String((SectPolitics.blocs_for("sect.azure_cloud")[0] as Dictionary).get("speaker", "")) == "Elder Bai",
+		"Azure Cloud keeps its authored council")
+	check(String(Hierarchy.rank_for(95, 6, true).get("id", "")) == "rank.sect_master"
+		and String(Hierarchy.rank_for(95, 6, false).get("id", "")) != "rank.sect_master",
+		"the master's seat needs the council's word, not standing alone")
 
 
 func _sect_economy_tests() -> void:

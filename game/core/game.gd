@@ -75,6 +75,12 @@ var sect_contribution := 0
 ## shares.
 var player_sect_id := ""
 var sect_standing: Dictionary = {}
+## The living world of the twelve houses: strength, treasury, membership
+## and feuds, settled day by day; each house's council lobby; and the
+## houses whose master's seat a won vote has opened.
+var sect_world: Dictionary = {}
+var sect_lobbies: Dictionary = {}
+var sect_seat_won: Dictionary = {}
 ## Last world day the sect stipend was claimed; −1 means never.
 var sect_stipend_day := SectEconomy.DEFAULT_STIPEND_DAY
 ## How many quartermaster purchases this run, so every issued item gets a new
@@ -124,6 +130,9 @@ func new_run(seed_value: int = 0) -> void:
 	sect_contribution = 0
 	player_sect_id = ""
 	sect_standing = {}
+	sect_world = {}
+	sect_lobbies = {}
+	sect_seat_won = {}
 	sect_stipend_day = SectEconomy.DEFAULT_STIPEND_DAY
 	sect_purchases = 0
 	sect_lobby.clear()
@@ -188,6 +197,9 @@ func to_dict() -> Dictionary:
 		"sect_contribution": sect_contribution,
 		"player_sect_id": player_sect_id,
 		"sect_standing": sect_standing.duplicate(true),
+		"sect_world": sect_world.duplicate(true),
+		"sect_lobbies": sect_lobbies.duplicate(true),
+		"sect_seat_won": sect_seat_won.duplicate(true),
 		"sect_stipend_day": sect_stipend_day,
 		"sect_purchases": sect_purchases,
 		"sect_lobby": sect_lobby.duplicate(true),
@@ -235,6 +247,17 @@ func from_dict(data: Dictionary) -> void:
 	for key in raw_standing.keys():
 		if not Sects.sect(String(key)).is_empty():
 			sect_standing[String(key)] = clampi(int(raw_standing[key]), -100, 100)
+	sect_world = SectWorld.sanitize(data.get("sect_world", {}), Clock.day)
+	sect_lobbies = {}
+	var raw_lobbies: Dictionary = data.get("sect_lobbies", {})
+	for key in raw_lobbies.keys():
+		if not Sects.sect(String(key)).is_empty():
+			sect_lobbies[String(key)] = SectPolitics.sanitize_lobby(raw_lobbies[key])
+	sect_seat_won = {}
+	var raw_won: Dictionary = data.get("sect_seat_won", {})
+	for key in raw_won.keys():
+		if not Sects.sect(String(key)).is_empty() and bool(raw_won[key]):
+			sect_seat_won[String(key)] = true
 	sect_stipend_day = int(data.get("sect_stipend_day", SectEconomy.DEFAULT_STIPEND_DAY))
 	sect_purchases = maxi(0, int(data.get("sect_purchases", 0)))
 	sect_lobby = SectPolitics.sanitize_lobby(data.get("sect_lobby", {}))

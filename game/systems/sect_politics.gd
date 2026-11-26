@@ -24,6 +24,30 @@ static func blocs() -> Array:
 	return value if typeof(value) == TYPE_ARRAY else []
 
 
+## One council per house. Azure Cloud's is authored; every other sect's
+## council carries the same three blocs and the same numbers — only the
+## speakers and the grievance change, drawn from the house's own fault
+## line, so the lobby and vote math never forks.
+static func blocs_for(sect_id: String) -> Array:
+	if sect_id == String(Sects.local_sect().get("id", "")):
+		return blocs()
+	var sect := Sects.sect(sect_id)
+	if sect.is_empty():
+		return []
+	var speakers := {
+		"bloc.traditionalists": String(sect.get("master", "")),
+		"bloc.reformists": String(sect.get("deputy", "")),
+		"bloc.militants": "The senior guardian",
+	}
+	var out: Array = []
+	for value in blocs():
+		var entry: Dictionary = (value as Dictionary).duplicate()
+		entry["speaker"] = String(speakers.get(String(entry.get("id", "")), entry.get("speaker", "")))
+		entry["agenda"] = String(sect.get("fault_line", ""))
+		out.append(entry)
+	return out
+
+
 static func bloc(id: String) -> Dictionary:
 	for value in blocs():
 		if typeof(value) == TYPE_DICTIONARY and String((value as Dictionary).get("id", "")) == id:
