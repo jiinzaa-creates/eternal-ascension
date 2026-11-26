@@ -87,6 +87,7 @@ func _ready() -> void:
 	_sect_membership_tests()
 	_sect_world_tests()
 	_player_sect_v2_tests()
+	_lifespan_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
@@ -4832,6 +4833,28 @@ func _player_sect_v2_tests() -> void:
 	check(not petition_seen and open_seen, "secluded gates turn petitioners away; open gates receive them")
 
 
+func _lifespan_tests() -> void:
+	print("[lifespan] longevity pills and bought years")
+	var alchemy := Alchemy.new(DB)
+	var longevity_item := {"slot": "consumable", "base": "base.pill.longevity", "potency": 1.0}
+	var effect: Dictionary = alchemy.effect_for(longevity_item)
+	check(String(effect.get("id", "")) == "lifespan" and float(effect.get("amount", 0.0)) == 10.0,
+		"the longevity pill carries ten years")
+	var peach_item := {"slot": "consumable", "base": "base.pill.peach", "potency": 1.0}
+	check(float(alchemy.effect_for(peach_item).get("amount", 0.0)) == 40.0,
+		"the peach pill carries forty")
+	check(Alchemy.is_effect("lifespan") and Alchemy.is_effect("resurrect") and Alchemy.is_effect("vessel"),
+		"the death-family effects are registered")
+	check(not DB.base_item("base.pill.phoenix").is_empty() and not DB.base_item("base.soul_vessel").is_empty(),
+		"the phoenix pill and the soul vessel exist as items")
+	var saved := Game.to_dict()
+	Game.lifespan_years_bonus = 25
+	var round := Game.to_dict()
+	Game.from_dict(round)
+	check(Game.lifespan_years_bonus == 25, "bought years survive the save")
+	Game.from_dict(saved)
+
+
 func _sect_economy_tests() -> void:
 	print("[sect economy] contribution, stipend and the quartermaster")
 	check(SectEconomy.quest_award() == 40, "a completed sect quest pays contribution")
@@ -8184,13 +8207,13 @@ func _combat_polish_tests() -> void:
 
 
 
-## Alchemy: one station, three potions, every potion a consumable whose effect
+## Alchemy: one station, seven potions, every potion a consumable whose effect
 ## is known, a brew that is pure in its stream, and potency that carries quality.
 func _alchemy_tests() -> void:
 	var station: Dictionary = DB.alchemy_brewery()
 	check(String(station.get("id", "")) == Alchemy.STATION, "the cauldron is a real station")
 	check(Settlement.LOCATIONS.has(String(station.get("location", ""))), "the cauldron stands somewhere real")
-	check(DB.potions.size() == 3, "three potions are authored")
+	check(DB.potions.size() == 7, "seven potions are authored")
 	var rules := Alchemy.new(DB)
 	for entry in DB.potions:
 		var potion: Dictionary = entry

@@ -12,8 +12,9 @@ extends RefCounted
 ## none); it raises potency, which is why two pills of the same base can differ.
 
 const STATION := "station.alchemy"
-const EFFECTS: Array[String] = ["qi", "heal", "cleanse"]
-const EFFECT_LABELS := {"qi": "Qi", "heal": "health", "cleanse": "contamination"}
+const EFFECTS: Array[String] = ["qi", "heal", "cleanse", "lifespan", "resurrect", "vessel"]
+const EFFECT_LABELS := {"qi": "Qi", "heal": "health", "cleanse": "contamination",
+	"lifespan": "years of life", "resurrect": "a cheated death", "vessel": "a waiting body"}
 ## Potency gained per point of INT quality above an ordinary smith.
 const POTENCY_PER_QUALITY := 0.35
 ## Extra potency for an exceptional brew (the quality roll).

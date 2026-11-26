@@ -1081,7 +1081,9 @@ func _validate_alchemy(problems: Array) -> void:
 		else:
 			if not Alchemy.is_effect(String((effect as Dictionary).get("id", ""))):
 				problems.append("potion %s has an unknown effect" % potion_id)
-			if float((effect as Dictionary).get("amount", 0.0)) <= 0.0:
+			var effect_id := String((effect as Dictionary).get("id", ""))
+			if effect_id != "resurrect" and effect_id != "vessel" \
+					and float((effect as Dictionary).get("amount", 0.0)) <= 0.0:
 				problems.append("potion %s has a non-positive effect" % potion_id)
 		_validate_craft_cost(potion, "potion " + potion_id, problems, true)
 		_validate_recipe_gate(potion, "potion " + potion_id, problems)

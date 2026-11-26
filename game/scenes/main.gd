@@ -1707,6 +1707,9 @@ func use_selected_item() -> void:
 		return
 	var amount := Alchemy.effect_amount(effect, item)
 	var effect_id := String(effect.get("id", ""))
+	if effect_id == "resurrect" or effect_id == "vessel":
+		Bus.toast.emit("The %s is not drunk. It is carried, against the day your body fails." % Items.label(item))
+		return
 	match effect_id:
 		"qi":
 			player.cultivation.qi = minf(player.cultivation.qi_max(player.stats), player.cultivation.qi + amount)
@@ -1714,6 +1717,9 @@ func use_selected_item() -> void:
 			player.heal(amount)
 		"cleanse":
 			player.cultivation.cleanse(amount)
+		"lifespan":
+			Game.lifespan_years_bonus += int(amount)
+			player.rebuild_stats()
 	var item_id := String(item.get("id", ""))
 	for i in player.inventory.size():
 		var entry: Dictionary = player.inventory[i]
@@ -1729,7 +1735,8 @@ func use_selected_item() -> void:
 	gear_index = clampi(gear_index, 0, maxi(0, inventory_rows().size() - 1))
 	var label := String(Alchemy.EFFECT_LABELS.get(effect_id, effect_id))
 	var line := ("purged %.0f contamination" % amount) if effect_id == "cleanse" \
-		else ("restored %.0f %s" % [amount, label])
+		else (("gained %.0f %s — %d years in all" % [amount, label, player.stats.lifespan_years()]) if effect_id == "lifespan" \
+		else ("restored %.0f %s" % [amount, label]))
 	Bus.player_stats_changed.emit()
 	Bus.cultivation_changed.emit()
 	Bus.toast.emit("Used %s — %s." % [Items.label(item), line])

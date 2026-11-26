@@ -43,6 +43,58 @@
 			"failure_chance": 0.1,
 			"effect": {"id": "cleanse", "amount": 35},
 			"desc": "Marrow draws the impurity out; the herb carries it away."
+		},
+		{
+			"id": "potion.longevity",
+			"name": "Longevity Pill",
+			"profession": "profession.alchemist",
+			"level": 3,
+			"base": "base.pill.longevity",
+			"materials": [{"material": "herb", "count": 4}, {"material": "marrow", "count": 2}],
+			"stones": 200,
+			"realm": 3,
+			"failure_chance": 0.15,
+			"effect": {"id": "lifespan", "amount": 10},
+			"desc": "Years, steeped out of marrow and leaf. Swallow them before you need them."
+		},
+		{
+			"id": "potion.peach",
+			"name": "Immortal Peach Pill",
+			"profession": "profession.alchemist",
+			"level": 4,
+			"base": "base.pill.peach",
+			"materials": [{"material": "herb", "count": 6}, {"material": "core", "count": 3}, {"material": "marrow", "count": 2}],
+			"stones": 500,
+			"realm": 5,
+			"failure_chance": 0.2,
+			"effect": {"id": "lifespan", "amount": 40},
+			"desc": "The peach of the old stories, reduced to a pill. Forty years, if the brew holds."
+		},
+		{
+			"id": "potion.phoenix",
+			"name": "Phoenix Rebirth Pill",
+			"profession": "profession.alchemist",
+			"level": 4,
+			"base": "base.pill.phoenix",
+			"materials": [{"material": "core", "count": 3}, {"material": "marrow", "count": 2}],
+			"stones": 400,
+			"realm": 4,
+			"failure_chance": 0.2,
+			"effect": {"id": "resurrect", "amount": 0},
+			"desc": "Not drunk. Carried. When the body fails, the pill burns in its place."
+		},
+		{
+			"id": "potion.soul_vessel",
+			"name": "Soul Vessel",
+			"profession": "profession.alchemist",
+			"level": 4,
+			"base": "base.soul_vessel",
+			"materials": [{"material": "core", "count": 4}, {"material": "marrow", "count": 3}],
+			"stones": 800,
+			"realm": 6,
+			"failure_chance": 0.25,
+			"effect": {"id": "vessel", "amount": 0},
+			"desc": "A body prepared the slow way, emptied and waiting. A soul with somewhere to go does not have to leave."
 		}
 	]
 }

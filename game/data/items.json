@@ -11,7 +11,11 @@
     {"id": "base.talisman.wind_charm", "name": "Wind Charm", "slot": "talisman", "ilvl": 1, "weight": 15, "value": 14, "tags": ["wind"], "conflicts": ["heavy"], "implicit": "+4% movement speed"},
     {"id": "base.pill.qi_gathering", "name": "Qi Gathering Pill", "slot": "consumable", "ilvl": 1, "weight": 22, "value": 6, "implicit": "Restores Qi"},
     {"id": "base.pill.mending", "name": "Mending Pill", "slot": "consumable", "ilvl": 1, "weight": 14, "value": 7, "implicit": "Mends wounds"},
-    {"id": "base.pill.cleansing", "name": "Cleansing Pill", "slot": "consumable", "ilvl": 2, "weight": 10, "value": 9, "implicit": "Purges Qi contamination"}
+    {"id": "base.pill.cleansing", "name": "Cleansing Pill", "slot": "consumable", "ilvl": 2, "weight": 10, "value": 9, "implicit": "Purges Qi contamination"},
+    {"id": "base.pill.longevity", "name": "Longevity Pill", "slot": "consumable", "ilvl": 3, "weight": 4, "value": 120, "implicit": "Adds ten years of life"},
+    {"id": "base.pill.peach", "name": "Immortal Peach Pill", "slot": "consumable", "ilvl": 5, "weight": 1, "value": 400, "implicit": "Adds forty years of life"},
+    {"id": "base.pill.phoenix", "name": "Phoenix Rebirth Pill", "slot": "consumable", "ilvl": 5, "weight": 1, "value": 500, "implicit": "Cheats death once, if carried"},
+    {"id": "base.soul_vessel", "name": "Soul Vessel", "slot": "consumable", "ilvl": 6, "weight": 1, "value": 800, "implicit": "A prepared body, waiting for a soul"}
   ],
   "prefixes": [
     {"id": "prefix.sharpened", "name": "Sharpened", "kind": "prefix", "stat": "physical_damage_pct", "stat_label": "physical damage", "unit": "%", "ilvl": 1, "slots": ["weapon"], "weight": 14, "min": 8, "max": 22,

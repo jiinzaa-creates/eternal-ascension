@@ -165,7 +165,8 @@ func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
 		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()),
-		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs()))
+		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs())
+		+ ([{"stat": "lifespan", "value": Game.lifespan_years_bonus}] if Game.lifespan_years_bonus > 0 else []))
 	# Condition is applied after the pipeline has summed every source, so a
 	# rebuild can never compound it: a broken piece simply contributes nothing.
 	for slot in Items.DURABLE_SLOTS:
