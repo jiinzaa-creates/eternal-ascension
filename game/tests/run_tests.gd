@@ -83,6 +83,7 @@ func _ready() -> void:
 	_stories_tests()
 	_factions_tests()
 	_sects_tests()
+	_sect_seat_tests()
 	_hierarchy_tests()
 	_sect_economy_tests()
 	_sect_politics_tests()
@@ -4674,6 +4675,46 @@ func _hierarchy_tests() -> void:
 
 ## Sect economy: contribution is earned, donated and spent; the stipend is paid
 ## once a day by rank, with dues taken from the pay rather than the purse.
+func _sect_seat_tests() -> void:
+	print("[sect seats] twelve houses, twelve homes")
+	var continent := Continent.generate(20261126)
+	var seats := SectSeats.assignments(continent)
+	check(seats.size() == 12, "every sect is seated (%d)" % seats.size())
+	var claimed: Dictionary = {}
+	for value in Sects.sects():
+		var sect: Dictionary = value
+		var sid := String(sect.get("id", ""))
+		var region: Dictionary = seats.get(sid, {})
+		check(not region.is_empty(), "%s has a region" % sid)
+		if bool(region.get("capital", false)):
+			check(String((sect.get("affinity", []) as Array)[0]) == "capital",
+				"only capital-affinity sects seat at the capital (%s)" % sid)
+		else:
+			var index := int(region.get("index", -1))
+			check(not claimed.has(index), "no two land sects share a region (%s)" % sid)
+			claimed[index] = true
+	var specs := SectSeats.specs(continent, 20261126, Vector2.ZERO)
+	check(specs.size() == 12, "twelve seat specs are built (%d)" % specs.size())
+	for spec in specs:
+		var sect := Sects.sect(String(spec["sect_id"]))
+		var residents: Array = spec["residents"]
+		var roles: Dictionary = {}
+		var master_name := ""
+		for entry in residents:
+			roles[String(entry["role"])] = true
+			if String(entry["role"]) == "Sect Master":
+				master_name = String(entry["name"])
+		for role in ["Sect Master", "Deputy Sect Master", "Elder", "Instructor",
+				"Guardian", "Core Disciple", "Inner Disciple", "Outer Disciple", "Servant"]:
+			check(roles.has(role), "%s seat fields a %s" % [spec["sect_id"], role])
+		check(master_name == String(sect.get("master", "")),
+			"%s is led at its seat by its named master" % spec["sect_id"])
+		check(not (spec["buildings"] as Array).is_empty(), "%s seat has buildings" % spec["sect_id"])
+	var again := SectSeats.specs(continent, 20261126, Vector2.ZERO)
+	check(String((specs[3] as Dictionary)["centre"]) == String((again[3] as Dictionary)["centre"]),
+		"seat placement is deterministic")
+
+
 func _sect_economy_tests() -> void:
 	print("[sect economy] contribution, stipend and the quartermaster")
 	check(SectEconomy.quest_award() == 40, "a completed sect quest pays contribution")

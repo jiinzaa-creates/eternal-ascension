@@ -41,6 +41,8 @@ var _last_dry := Vector2.ZERO
 var _region_now := -1
 var town_specs: Array = []
 var towns_active: Dictionary = {}
+var seat_specs: Array = []
+var seats_active: Dictionary = {}
 var _town_tick := 0.0
 var world_map: WorldMap
 ## Settlement services: the merchant's stock and the shop overlay.
@@ -285,6 +287,7 @@ func _build_world() -> void:
 	chunks.settle()
 
 	town_specs = Towns.specs(continent, Game.world_seed)
+	seat_specs = SectSeats.specs(continent, Game.world_seed, SPAWN)
 	settlement = Settlement.new()
 	settlement.name = "AzureCloudMarket"
 	settlement.position = SPAWN
@@ -386,6 +389,121 @@ func _spawn_town(spec: Dictionary) -> void:
 		}
 		Bus.toast.emit("Discovered %s — %s." % [
 			String(spec["name"]), String(spec["region_name"])])
+
+
+# ---------------------------------------------------------------- seats ----
+
+func _tick_seats() -> void:
+	if player == null:
+		return
+	for spec in seat_specs:
+		var sect_id := String(spec["sect_id"])
+		var distance := player.global_position.distance_to(spec["centre"] as Vector2)
+		if distance < 2300.0 and not seats_active.has(sect_id):
+			_spawn_seat(spec)
+		elif distance > 3300.0 and seats_active.has(sect_id):
+			_despawn_seat(sect_id)
+
+
+func _spawn_seat(spec: Dictionary) -> void:
+	var sect_id := String(spec["sect_id"])
+	var sect := Sects.sect(sect_id)
+	var node := Settlement.new()
+	node.configure(spec)
+	node.name = "SectSeat_" + sect_id.trim_prefix("sect.")
+	node.position = spec["centre"]
+	node.z_index = -15
+	world.add_child(node)
+	node.build_buildings(world)
+	var owned: Dictionary = {"node": node, "npcs": [], "items": []}
+	seats_active[sect_id] = owned
+
+	for building_spec in spec["buildings"]:
+		var location := String(building_spec["location"])
+		var building := node.building_for(location)
+		if building == null:
+			continue
+		var door := Interactable.new()
+		door.setup_door("door.sect.%s.%s" % [sect_id.trim_prefix("sect."), location],
+			"%s door" % location.capitalize(), building)
+		door.position = building.global_position + Vector2(0, (building_spec["size"] as Vector2).y * 0.5 + 8.0)
+		world.add_child(door)
+		interactables.append(door)
+		(owned["items"] as Array).append(door)
+
+	# The gate board: who holds this seat, what they believe, who stands
+	# with them and who stands against.
+	var relations: Dictionary = sect.get("relations", {})
+	var gate := Interactable.new()
+	gate.setup_examine("sect.gate." + sect_id.trim_prefix("sect."),
+		"%s — gate board" % String(sect.get("name", sect_id)),
+		"%s · Seat: %s · Master %s, Deputy %s. %s Allies: %s. Rivals: %s." % [
+			String(sect.get("name", sect_id)), String(sect.get("seat", "")),
+			String(sect.get("master", "")), String(sect.get("deputy", "")),
+			String(sect.get("philosophy", "")),
+			_sect_names(relations.get("allies", [])), _sect_names(relations.get("rivals", []))])
+	gate.position = node.position_for("gate")
+	world.add_child(gate)
+	interactables.append(gate)
+	(owned["items"] as Array).append(gate)
+
+	# The population: the hierarchy made flesh, homed to this seat.
+	var schedules: Dictionary = DB.schedules()
+	for entry in spec["residents"]:
+		var archetype := _archetype(String(entry["archetype"]))
+		if archetype.is_empty():
+			continue
+		var offset := Vector2(_name_rng.randf_range(-150.0, 150.0),
+			_name_rng.randf_range(-110.0, 170.0))
+		var display := String(entry["name"])
+		if display == "":
+			display = _random_name()
+		var npc := _make_npc(
+			String(entry["npc_id"]), display, String(entry["role"]), sect_id,
+			int(entry["realm"]),
+			schedules.get(String(archetype.get("schedule", "disciple")), []),
+			offset, String(entry["archetype"]), node)
+		(owned["npcs"] as Array).append(npc)
+
+	var key := "sect." + sect_id.trim_prefix("sect.")
+	if Game.discover(key):
+		travel_sites[key] = {
+			"name": "%s — %s" % [String(sect.get("name", sect_id)), String(sect.get("seat", ""))],
+			"x": (spec["centre"] as Vector2).x,
+			"y": (spec["centre"] as Vector2).y,
+		}
+		Bus.toast.emit("Discovered %s — %s." % [
+			String(sect.get("name", sect_id)), String(spec["region_name"])])
+
+
+func _sect_names(ids: Array) -> String:
+	var names: Array = []
+	for id in ids:
+		names.append(String(Sects.sect(String(id)).get("name", String(id))))
+	return ", ".join(names) if not names.is_empty() else "none"
+
+
+func _despawn_seat(sect_id: String, force: bool = false) -> void:
+	if not seats_active.has(sect_id):
+		return
+	var owned: Dictionary = seats_active[sect_id]
+	if not force:
+		for npc in owned["npcs"]:
+			if Game.party_ids.has(npc.npc_id):
+				return
+	for npc in owned["npcs"]:
+		npcs.erase(npc)
+		_npc_names.erase(npc.npc_id)
+		npc.queue_free()
+	for item in owned["items"]:
+		interactables.erase(item)
+		item.queue_free()
+	var node: Settlement = owned["node"]
+	for building in node.buildings:
+		if is_instance_valid(building):
+			building.queue_free()
+	node.queue_free()
+	seats_active.erase(sect_id)
 
 
 func _despawn_town(index: int, force: bool = false) -> void:
@@ -930,6 +1048,7 @@ func _process(delta: float) -> void:
 		if _town_tick > 0.5:
 			_town_tick = 0.0
 			_tick_towns()
+			_tick_seats()
 			_tick_region()
 	if phase == "creation":
 		return
@@ -6097,6 +6216,7 @@ func _load_game(slot: int) -> void:
 	for town_index in towns_active.keys():
 		_despawn_town(int(town_index), true)
 	town_specs = Towns.specs(continent, Game.world_seed)
+	seat_specs = SectSeats.specs(continent, Game.world_seed, SPAWN)
 	# Rebuild the province so loaded deltas decide which resources exist.
 	chunks.today = Clock.day
 	chunks.resync(player.global_position)
