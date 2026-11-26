@@ -1609,7 +1609,7 @@ func draw_forge(player: Player) -> void:
 	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#e0a060", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "AZURE FORGE", 18, Color("#e8b070"))
-	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "ENCHANT", "DISASSEMBLE"]
+	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "ENCHANT", "FUSE", "DISASSEMBLE"]
 	var mode := int(host.forge_mode)
 	var tabs := ""
 	for i in modes.size():
@@ -1718,6 +1718,33 @@ func draw_forge(player: Player) -> void:
 			_text(Vector2(cx, cy), _fit("Needs %s." % String(en_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
 		else:
 			_text(Vector2(cx, cy), "ENTER lays this enchantment.", 12, ACCENT)
+		return
+	if mode == 4:
+		var chassis_id := String(host.forge_fuse_chassis)
+		var fu_check: Dictionary = Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(rules), 11, 360.0), 11, Color("#d8c070"))
+		cy += 20.0
+		if chassis_id == "":
+			_text(Vector2(cx, cy), _fit("Failure %d%% — the fed piece is lost either way." % int(round(float(rules.get("failure_chance", 0.0)) * 100.0)), 11, 360.0), 11, Color("#7f9098"))
+			cy += 32.0
+			if bool(chosen.get("unique", false)):
+				_text(Vector2(cx, cy), "An authored relic refuses a smith.", 11, Color("#e08f8f"))
+			else:
+				_text(Vector2(cx, cy), "ENTER chooses the piece that will take in another.", 12, ACCENT)
+			return
+		var chassis: Dictionary = {}
+		for candidate in host.gear_candidates():
+			if String((candidate as Dictionary).get("id", "")) == chassis_id:
+				chassis = candidate
+				break
+		_text(Vector2(cx, cy), _fit("Feeding into: %s. The chosen piece is consumed, win or lose." % String(chassis.get("name", "the piece")), 11, 360.0), 11, Color("#7f9098"))
+		cy += 32.0
+		if not bool(fu_check.get("ok", false)):
+			_text(Vector2(cx, cy), _fit("Needs %s." % String(fu_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
+		elif String(chosen.get("slot", "")) != String(chassis.get("slot", "")):
+			_text(Vector2(cx, cy), "The two pieces must share a slot.", 11, Color("#e08f8f"))
+		else:
+			_text(Vector2(cx, cy), "ENTER fuses the chosen piece into it.", 12, ACCENT)
 		return
 	var ore := Crafting.disassemble_ore(chosen)
 	_text(Vector2(cx, cy), "Yields: %d Spirit Ore" % ore, 12, Color("#d8c070"))

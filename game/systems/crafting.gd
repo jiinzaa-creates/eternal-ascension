@@ -373,3 +373,80 @@ func enchant(item: Dictionary, enchant_id: String, key: int, counter: int, failu
 	out["ok"] = true
 	out["item"] = worked
 	return out
+
+
+## How many rolled affixes a fused piece may hold: its rarity's natural count
+## (ItemGen rolls up to [0, 1, 2, 3] per side) plus two bought by the fusion.
+static func fuse_ceiling(rarity: int) -> int:
+	return [0, 2, 4, 6][clampi(rarity, 0, 3)] + 2
+
+
+## Feeds a donor piece into a chassis of the same slot (Directive 12.2: Fuse).
+## The donor is consumed by the attempt itself — main removes it on success
+## and failure alike; this function only judges the work. On success the
+## chassis takes in the donor's rolled affixes whose ids it lacks, up to the
+## fusion ceiling, and rises to the greater of the two levels and rarities.
+## Enchantments never transfer; the chassis's own enchantment survives.
+func fuse(chassis: Dictionary, donor: Dictionary, key: int, counter: int, failure_mult: float = 1.0) -> Dictionary:
+	var out := {"ok": false, "failed": false, "item": chassis, "reason": "", "transferred": 0}
+	if not Items.is_equipment(String(chassis.get("slot", ""))) or not Items.is_equipment(String(donor.get("slot", ""))):
+		out["reason"] = "only gear can be fused"
+		return out
+	if String(chassis.get("id", "")) == String(donor.get("id", "")):
+		out["reason"] = "a piece cannot be fused into itself"
+		return out
+	if bool(chassis.get("unique", false)) or bool(donor.get("unique", false)):
+		out["reason"] = "an authored relic refuses a smith"
+		return out
+	if String(chassis.get("slot", "")) != String(donor.get("slot", "")):
+		out["reason"] = "the two pieces must share a slot"
+		return out
+	var rules := action("fuse")
+	if rules.is_empty():
+		out["reason"] = "fusion is not offered here"
+		return out
+	var r := Rng.stream("craft.fuse", key, counter)
+	var chance := clampf(float(rules.get("failure_chance", 0.0)) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0)
+	if r.randf() < chance:
+		out["failed"] = true
+		out["reason"] = "the fusion collapses; the donor is lost"
+		return out
+	var worked: Dictionary = chassis.duplicate(true)
+	var new_rarity := maxi(int(chassis.get("rarity", 0)), int(donor.get("rarity", 0)))
+	var ceiling := fuse_ceiling(new_rarity)
+	var held: Dictionary = {}
+	var rolled := 0
+	for mod_value in (worked.get("mods", []) as Array):
+		var mod: Dictionary = mod_value
+		held[String(mod.get("id", ""))] = true
+		if not bool(mod.get("enchant", false)):
+			rolled += 1
+	var mods: Array = (worked.get("mods", []) as Array).duplicate()
+	var transferred := 0
+	for mod_value in (donor.get("mods", []) as Array):
+		var mod: Dictionary = mod_value
+		if bool(mod.get("enchant", false)):
+			continue
+		if held.has(String(mod.get("id", ""))):
+			continue
+		if rolled >= ceiling:
+			break
+		mods.append(mod.duplicate())
+		held[String(mod.get("id", ""))] = true
+		rolled += 1
+		transferred += 1
+	worked["mods"] = mods
+	worked["ilvl"] = maxi(int(chassis.get("ilvl", 1)), int(donor.get("ilvl", 1)))
+	if new_rarity != int(chassis.get("rarity", 0)):
+		worked["rarity"] = new_rarity
+		worked["rarity_name"] = ItemGen.RARITY_NAMES[new_rarity]
+		if not bool(worked.get("named", false)):
+			worked["name"] = "%s %s" % [ItemGen.RARITY_NAMES[new_rarity], String(worked.get("base_name", "piece"))]
+	var base: Dictionary = db.base_item(String(worked.get("base", "")))
+	if not base.is_empty():
+		worked["value"] = int(ceil(float(base.get("value", 0)) * ItemGen.RARITY_MULT[new_rarity]
+			* (1.0 + float(worked["ilvl"]) * 0.15)))
+	out["ok"] = true
+	out["item"] = worked
+	out["transferred"] = transferred
+	return out

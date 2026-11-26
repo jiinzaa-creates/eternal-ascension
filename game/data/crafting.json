@@ -181,6 +181,19 @@
    ],
    "failure_chance": 0.2,
    "desc": "Lay one lasting enchantment on a piece of gear. One per piece; a new one replaces the old. Failure spends the materials and leaves the piece as it was."
+  },
+  {
+   "id": "fuse",
+   "name": "Fuse",
+   "stones": 150,
+   "materials": [
+    {
+     "material": "core",
+     "count": 1
+    }
+   ],
+   "failure_chance": 0.25,
+   "desc": "Feed one piece into another of the same slot. The fed piece is gone either way; on success the survivor takes in the affixes it lacks, past its natural count. Enchantments never transfer."
   }
  ]
 }

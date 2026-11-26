@@ -2479,6 +2479,59 @@ func _crafting_tests() -> void:
 	var round_trip: Dictionary = Items.normalize_item(laid_item)
 	check(String((round_trip.get("enchant", {}) as Dictionary).get("id", "")) == "enchant.stormbrand",
 		"a saved piece keeps its enchantment")
+
+	# Fusion: a donor feeds its affixes into a chassis of the same slot.
+	check(Crafting.fuse_ceiling(3) == 8 and Crafting.fuse_ceiling(0) == 2, "the fusion ceiling is rarity's count plus two")
+	var chassis := gen.generate(6, 70011, 1, 3, "weapon")
+	var donor := gen.generate(4, 70012, 1, 3, "weapon")
+	var fused := rules.fuse(chassis, donor, 80001, 0, 0.0)
+	check(bool(fused.get("ok", false)), "a sure-handed fusion joins")
+	var fused_item: Dictionary = fused["item"]
+	var chassis_ids: Dictionary = {}
+	for mod_value in (chassis.get("mods", []) as Array):
+		chassis_ids[String((mod_value as Dictionary).get("id", ""))] = true
+	var rolled_count := 0
+	var ids_unique := true
+	var seen_ids: Dictionary = {}
+	for mod_value in (fused_item.get("mods", []) as Array):
+		var mod: Dictionary = mod_value
+		if seen_ids.has(String(mod.get("id", ""))):
+			ids_unique = false
+		seen_ids[String(mod.get("id", ""))] = true
+		if not bool(mod.get("enchant", false)):
+			rolled_count += 1
+	check(rolled_count <= Crafting.fuse_ceiling(3), "the fused piece respects the ceiling")
+	check(ids_unique, "no affix is carried twice after fusion")
+	var kept_all := true
+	for id in chassis_ids.keys():
+		if not seen_ids.has(id):
+			kept_all = false
+	check(kept_all, "the chassis keeps every affix it had")
+	check(int(fused_item.get("ilvl", 0)) == 6 and int(fused_item.get("rarity", 0)) == 3,
+		"the fused piece takes the greater level and rarity")
+	check(int(fused.get("transferred", 0)) > 0, "the donor gives up at least one affix")
+	var fu_failed: Dictionary = {}
+	for counter in range(0, 400):
+		var attempt := rules.fuse(chassis, donor, 80002, counter, 1.0)
+		if bool(attempt.get("failed", false)):
+			fu_failed = attempt
+			break
+	check(not fu_failed.is_empty() and (fu_failed["item"] as Dictionary).get("mods", []).size() == chassis.get("mods", []).size(),
+		"a collapsed fusion leaves the chassis untouched")
+	var armor_donor := gen.generate(4, 70013, 1, 2, "armor")
+	check(not bool(rules.fuse(chassis, armor_donor, 80003, 0, 0.0).get("ok", true)), "fusion refuses pieces of different slots")
+	check(not bool(rules.fuse(chassis, chassis, 80004, 0, 0.0).get("ok", true)), "a piece cannot be fused into itself")
+	var donor_enchanted := rules.enchant(donor, "enchant.stormbrand", 90011, 0, 0.0)
+	var chassis_enchanted := rules.enchant(chassis, "enchant.piercing", 90012, 0, 0.0)
+	var fused_ench := rules.fuse(chassis_enchanted["item"], donor_enchanted["item"], 80005, 0, 0.0)
+	var fused_ench_item: Dictionary = fused_ench["item"]
+	var ench_count := 0
+	for mod_value in (fused_ench_item.get("mods", []) as Array):
+		if bool((mod_value as Dictionary).get("enchant", false)):
+			ench_count += 1
+	check(bool(fused_ench.get("ok", false)) and ench_count == 1
+		and String((fused_ench_item.get("enchant", {}) as Dictionary).get("id", "")) == "enchant.piercing",
+		"fusion keeps the chassis enchantment and never takes the donor's")
 	check(not bool(Crafting.check(recipe, bag, 10, 1)["ok"]), "a recipe refuses an empty purse")
 	check(String(Crafting.check(recipe, bag, 10, 1)["reason"]).contains("spirit stones"), "the refusal names the missing stones")
 	check(bool(Crafting.check(recipe, bag, 100, 1)["ok"]), "a payable recipe passes")

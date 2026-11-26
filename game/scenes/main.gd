@@ -80,8 +80,9 @@ var crafting: Crafting
 var forge_open := false
 var forge_mode := 0
 var forge_enchant_item := ""
+var forge_fuse_chassis := ""
 var forge_index := 0
-const FORGE_MODES: Array[String] = ["forge", "refine", "upgrade", "enchant", "disassemble"]
+const FORGE_MODES: Array[String] = ["forge", "refine", "upgrade", "enchant", "fuse", "disassemble"]
 ## Alchemy: one cauldron, one list of potions, frozen play for the same reason.
 var alchemy: Alchemy
 var alchemy_open := false
@@ -1531,6 +1532,8 @@ func forge_cost(mode_index: int) -> Dictionary:
 			return crafting.action("upgrade")
 		"enchant":
 			return crafting.action("enchant")
+		"fuse":
+			return crafting.action("fuse")
 		"disassemble":
 			return crafting.action("disassemble")
 		_:
@@ -1561,6 +1564,19 @@ func forge_act() -> void:
 				forge_index = 0
 				if not target.is_empty():
 					_forge_enchant(target, chosen)
+		"fuse":
+			if forge_fuse_chassis == "":
+				forge_fuse_chassis = String(chosen.get("id", ""))
+				forge_index = 0
+				Bus.toast.emit("Choose the piece to feed into %s." % String(chosen.get("name", "the piece")))
+			elif String(chosen.get("id", "")) == forge_fuse_chassis:
+				Bus.toast.emit("Choose a different piece to feed into it.")
+			else:
+				var chassis := _inventory_item(forge_fuse_chassis)
+				forge_fuse_chassis = ""
+				forge_index = 0
+				if not chassis.is_empty():
+					_forge_fuse(chassis, chosen)
 		"disassemble":
 			_forge_disassemble(chosen)
 
@@ -1709,6 +1725,41 @@ func _forge_enchant(item: Dictionary, enchantment: Dictionary) -> void:
 			break
 	var record: Dictionary = worked.get("enchant", {})
 	Bus.toast.emit("Enchanted: %s — %s." % [String(worked.get("name", "the piece")), String(record.get("text", ""))])
+	var practice := Professions.award(Game.professions, "profession.smith")
+	if bool(practice.get("leveled", false)):
+		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
+
+
+func _forge_fuse(chassis: Dictionary, donor: Dictionary) -> void:
+	var rules: Dictionary = crafting.action("fuse")
+	var check := Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("Fusion needs %s." % String(check.get("reason", "more materials")))
+		return
+	var attempt := Game.crafts_made
+	Game.crafts_made += 1
+	var smith: Dictionary = DB.profession("profession.smith")
+	var rank := Professions.level_of(Game.professions, "profession.smith")
+	var result := crafting.fuse(chassis, donor, 80000 + attempt, 0,
+		Professions.failure_mult(smith, rank))
+	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
+		Bus.toast.emit(String(result.get("reason", "the pieces refuse the joining")).capitalize() + ".")
+		return
+	_spend_craft(rules)
+	for i in player.inventory.size():
+		if String((player.inventory[i] as Dictionary).get("id", "")) == String(donor.get("id", "")):
+			player.inventory.remove_at(i)
+			break
+	if bool(result.get("failed", false)):
+		Bus.toast.emit("The fusion collapses — %s is lost, and %s is unchanged." % [
+			String(donor.get("name", "the donor")), String(chassis.get("name", "the piece"))])
+		return
+	var worked: Dictionary = result["item"]
+	for i in player.inventory.size():
+		if String((player.inventory[i] as Dictionary).get("id", "")) == String(chassis.get("id", "")):
+			player.inventory[i] = worked
+			break
+	Bus.toast.emit("Fused: %s takes in %d new affix(es)." % [String(worked.get("name", "the piece")), int(result.get("transferred", 0))])
 	var practice := Professions.award(Game.professions, "profession.smith")
 	if bool(practice.get("leveled", false)):
 		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
@@ -2536,6 +2587,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			forge_mode = (forge_mode + 1) % FORGE_MODES.size()
 			forge_index = 0
 			forge_enchant_item = ""
+			forge_fuse_chassis = ""
 			return
 		var forge_list := forge_rows()
 		if event.is_action_pressed("ui_down"):
