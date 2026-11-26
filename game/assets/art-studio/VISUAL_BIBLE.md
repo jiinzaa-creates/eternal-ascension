@@ -408,3 +408,7 @@ Guardian set filed at boss scale (boss_ancient_stone_guardian_attack_{dir}.png, 
 
 ## 72. ATTACK SET — MERCHANT (2026-11-25)
 Merchant set filed (npc_merchant_attack_{dir}.png + 8dir sheet): defensive abacus swings toward facing in all 8, round belly + pack match the idle/walk sets. QC PASS (tests/merchant_attack_test.png). Remaining attack sets: Farmer.
+
+## 73. ATTACK SET — FARMER + ATTACK PROGRAMME COMPLETE (2026-11-25)
+Farmer set filed (npc_farmer_attack_{dir}.png + 8dir sheet): defensive hoe swings toward facing in all 8, straw hat + hemp match the idle/walk sets. QC PASS (tests/farmer_attack_test.png).
+**ATTACK PROGRAMME COMPLETE.** Every actor with an idle set now has an 8-direction attack set in the Founder format (one mid-action pose per direction; boss at 128px): Founder, Sword Cultivator, Elder, Brawler, Skirmisher, Sentinel, Qi Archer, Spirit Wolf, Iron-Tusk Boar, Hungry Corpse, Ember Spirit, Storm Crane, Abyss Jade Carp, Spirit Mantis, Gloom Serpent, Corrupted Spirit Wolf, Ancient Stone Guardian, Merchant, Farmer — 19 sets, 152 frames + 19 sheets. With idle + walk/gait + attack, every actor's core animation set is closed. Sole remaining hole in the whole library: the Ember Spirit drift NE phase-B frame (generation declined 2026-11-25, §49) — closing it needs a fresh go-ahead from Jawanza.
