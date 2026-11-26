@@ -1302,8 +1302,32 @@ func _has_carried(base_id: String) -> bool:
 
 
 ## The soul's way out, when a vessel was prepared (D5 fills this in).
+## The soul vessel's answer to a killing blow: possession. The prepared
+## body takes the soul in — realm and self kept, but the body is younger
+## (its age is set mid-span for the realm) and the deed is the kind the
+## jianghu remembers: notoriety +25. No death is recorded.
 func _soul_escape_death() -> bool:
-	return false
+	if not _consume_carried("base.soul_vessel"):
+		return false
+	var span := float(Realms.lifespan(cultivation.realm))
+	if span > 0.0:
+		var new_age := maxf(span * 0.45, float(Aging.START_AGE) + 1.0)
+		Game.born_day = Clock.day - int((new_age - float(Aging.START_AGE)) * Aging.DAYS_PER_YEAR)
+	Game.notoriety += 25
+	rebuild_stats()
+	statuses.clear()
+	Game.hitstop.clear()
+	active_buffs.clear()
+	cultivation.qi = cultivation.qi_max(stats) * 0.5
+	hp = hp_max
+	_iframes = 3.0
+	poise.reset()
+	_knock = Vector2.ZERO
+	_attack_state = "idle"
+	Bus.toast.emit("Your soul tears free and takes the prepared vessel. The jianghu will remember this. (+25 notoriety)")
+	Bus.cultivation_changed.emit()
+	Bus.player_stats_changed.emit()
+	return true
 
 
 func _die() -> void:

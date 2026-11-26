@@ -977,7 +977,30 @@ func _check_aging() -> void:
 		Bus.toast.emit("A death wound closes. %s" % ("The body is whole again." if Game.death_wounds == 0
 			else "%d still linger%s." % [Game.death_wounds, "s" if Game.death_wounds > 1 else ""]))
 	if Aging.is_dead(age, lifespan):
-		_end_run()
+		if not _vessel_rebirth():
+			_end_run()
+
+
+## Rebirth: a carried Soul Vessel turns death by age into a new body.
+## Eighteen again, one realm poorer — techniques, methods, sect and
+## stones all kept. Without a vessel the run ends as it always has.
+func _vessel_rebirth() -> bool:
+	if player == null or not player._has_carried("base.soul_vessel"):
+		return false
+	if not player._consume_carried("base.soul_vessel"):
+		return false
+	Game.born_day = Clock.day - int((18.0 - float(Aging.START_AGE)) * Aging.DAYS_PER_YEAR)
+	Game.age_warning_stage = 0
+	Game.notoriety += 25
+	player.cultivation.realm = maxi(1, player.cultivation.realm - 1)
+	player.cultivation.sublevel = 1
+	player.cultivation.qi = 0.0
+	player.rebuild_stats()
+	player.hp = player.hp_max
+	Bus.toast.emit("The vessel takes your soul. You wake eighteen again, one realm poorer — everything else, yours. The jianghu will remember this. (+25 notoriety)")
+	Bus.cultivation_changed.emit()
+	Bus.player_stats_changed.emit()
+	return true
 
 
 ## The body has outlived its years: the run ends and the end screen takes over.
@@ -4819,6 +4842,8 @@ func character_sections() -> Array:
 		String(player.display_name),
 		"Origin: " + String(DB.origin(Game.origin_id).get("name", "Wanderer")),
 		Aging.age_text(age, lifespan),
+		"Deaths %d · death wounds %d%s" % [Game.deaths, Game.death_wounds,
+			" · %d years bought" % Game.lifespan_years_bonus if Game.lifespan_years_bonus > 0 else ""],
 		"Karma %d · notoriety %d" % [Game.karma, Game.notoriety],
 		"%d spirit stones · %d contribution" % [Game.spirit_stones, Game.sect_contribution],
 		"HP %d / %d" % [int(player.hp), int(player.hp_max)],
