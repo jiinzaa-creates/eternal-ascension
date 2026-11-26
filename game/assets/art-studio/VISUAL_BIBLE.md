@@ -510,3 +510,9 @@ same frame). A CULTIVATING plaque under the orbs shows the way out
 while it lasts ("F to stop · step to rise"). Probe-verified through
 the real input pipeline: F on, F off, F on, step east off. Suite
 4330 PASS / 0 FAIL.
+
+## 82. World Scale pass — the continent is real (2026-11-26, Jawanza's direction: "make the world the masterpiece")
+
+Stages A–E, all remote-HEAD verified (82de311, 160b5d1, dedf661, e917ba4, c3eed6f). The world the art serves is now a 5×4-cell continent (60×48 chunks, ~245k×147k px): every land region walkable, each with its own biome heart (12 biomes, art by HSV grading of the locked tilesets — desert/volcanic hues tuned so grades never wrap magenta; volcanic water reads as lava), one town per region (village/town/city by distance tier, full NPC schedules), rivers with dry fords and lakes per region, three new POI kinds (cave, battlefield, cache), shores that actually stop the player at the waterline, and a continent map that tells the truth: biome colours, visited-region fog ("Uncharted"), capital in gold, discovered towns marked, region-entry banners. Travel prices up to 24 destinations / 24 hours in a two-column Routes panel.
+
+Two defects found by live probes during this pass and fixed: towns.gd silently failed to compile after the Stage D dry-anchor change (no town spawned; a unit check now pins one spec per non-capital region), and all four code-drawn full-screen panels (map, Routes, shop, skill bar) drew with size (0,0) — they now size from the viewport like the HUD. Verification: unit suite 4389/0; integration failures only in the known timing-flaky pool; every stage screenshot-verified in-game.
