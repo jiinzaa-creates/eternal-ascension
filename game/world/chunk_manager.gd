@@ -178,7 +178,7 @@ func _spawn_props(chunk) -> void:
 	var origin := Vector2(chunk.coord) * CHUNK_SIZE
 	for feature in chunk.features:
 		var prop := Prop.new()
-		prop.setup(String(feature["kind"]), float(feature["scale"]))
+		prop.setup(String(feature["kind"]), float(feature["scale"]), chunk.biome)
 		prop_parent.add_child(prop)
 		prop.global_position = origin + (feature["pos"] as Vector2)
 		prop.visible = props_visible

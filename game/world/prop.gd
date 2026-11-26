@@ -9,15 +9,44 @@ extends Node2D
 
 var kind := "tuft"
 var size_scale := 1.0
+var biome := ""
+var _sprite: Sprite2D = null
 
 
-func setup(kind_value: String, scale_value: float) -> void:
+func setup(kind_value: String, scale_value: float, biome_id: String = "") -> void:
 	kind = kind_value
 	size_scale = maxf(0.1, scale_value)
+	biome = biome_id
+	_attach_sprite()
 	queue_redraw()
 
 
+## Gives the prop its Art Studio texture (biome-graded when one is
+## filed) with the art's bottom on the ground contact point. Without
+## a texture the primitive drawing below stays.
+func _attach_sprite() -> void:
+	if not ActorSprite.sprites_enabled():
+		return
+	var folder := "res://assets/art-studio/assets/environments/props/"
+	if biome != "" and biome != "biome.verdant":
+		var sub := biome.trim_prefix("biome.")
+		if ResourceLoader.exists(folder + "biome_" + sub + "/prop_" + kind + ".png"):
+			folder += "biome_" + sub + "/"
+	var path := folder + "prop_" + kind + ".png"
+	if not ResourceLoader.exists(path):
+		return
+	_sprite = Sprite2D.new()
+	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var tex := load(path) as Texture2D
+	_sprite.texture = tex
+	_sprite.offset = Vector2(0.0, -tex.get_height() * 0.5)
+	_sprite.scale = Vector2.ONE * size_scale
+	add_child(_sprite)
+
+
 func _draw() -> void:
+	if _sprite != null:
+		return
 	var s := size_scale
 	match kind:
 		"tree":

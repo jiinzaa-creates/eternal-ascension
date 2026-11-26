@@ -16,6 +16,7 @@ var location := ""
 ## Set when a door on this building is open: the interior stays visible.
 var interior_open := false
 var _alpha := 1.0
+var _sprite: Sprite2D = null
 
 
 func setup(offset: Vector2, size: Vector2, wall: Color, roof: Color, location_id: String = "") -> void:
@@ -24,7 +25,27 @@ func setup(offset: Vector2, size: Vector2, wall: Color, roof: Color, location_id
 	wall_color = wall
 	roof_color = roof
 	location = location_id
+	_attach_sprite(location_id)
 	queue_redraw()
+
+
+## Gives the building its Art Studio texture when one is filed for
+## its location, bottom edge on the footprint's bottom edge. The
+## occlusion fade in _process modulates the sprite with the node.
+## Without a texture the primitive drawing below stays.
+func _attach_sprite(location_id: String) -> void:
+	if location_id == "" or not ActorSprite.sprites_enabled():
+		return
+	var path := "res://assets/art-studio/assets/environments/buildings/building_" \
+		+ location_id + ".png"
+	if not ResourceLoader.exists(path):
+		return
+	_sprite = Sprite2D.new()
+	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var tex := load(path) as Texture2D
+	_sprite.texture = tex
+	_sprite.offset = Vector2(0.0, footprint.size.y * 0.5 - tex.get_height() * 0.5)
+	add_child(_sprite)
 
 
 func roof_height() -> float:
@@ -64,6 +85,8 @@ func occlusion_target_for_player() -> float:
 
 
 func _draw() -> void:
+	if _sprite != null:
+		return
 	var size := footprint.size
 	draw_rect(footprint, wall_color)
 	var roof := PackedVector2Array([

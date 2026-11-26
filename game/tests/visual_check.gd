@@ -17,6 +17,9 @@ var _t := 0.0
 var _stage := 0
 var _stage_t := 0.0
 var _arena: Array = []
+var _props: Array = []
+var _herbs: Array = []
+var _buildings: Array = []
 
 
 func _initialize() -> void:
@@ -71,8 +74,31 @@ func _process(delta: float) -> bool:
 		5:  # standing beside a settlement NPC
 			if _stage_t > 1.5:
 				_shot("npc_closeup.png")
-				Input.action_press("move_right")
-				_stage = 2
+				_scan_world()
+				_stage = 6
+				_stage_t = 0.0
+		6:  # beside a textured prop
+			if _stage_t > 1.2:
+				_shot("props.png")
+				if _goto_herb():
+					_stage = 7
+				elif _goto_building():
+					_stage = 8
+				else:
+					_start_walk_east()
+				_stage_t = 0.0
+		7:  # beside a textured herb
+			if _stage_t > 1.2:
+				_shot("herbs.png")
+				if _goto_building():
+					_stage = 8
+				else:
+					_start_walk_east()
+				_stage_t = 0.0
+		8:  # in front of a textured building
+			if _stage_t > 1.2:
+				_shot("settlement.png")
+				_start_walk_east()
 				_stage_t = 0.0
 		2:  # walking east
 			if _stage_t > 0.9:
@@ -117,6 +143,68 @@ func _visit_npc() -> void:
 	print("REPORT npc: role=", npc.get("role"), " archetype=", npc.get("archetype_id"))
 	_report("npc", npc)
 	_player().set("global_position", npc.global_position + Vector2(46, 6))
+
+
+func _start_walk_east() -> void:
+	Input.action_press("move_right")
+	_stage = 2
+
+
+## Finds the textured props, herbs and buildings in the live world
+## and walks the player to a tree prop for its screenshot.
+func _scan_world() -> void:
+	_props.clear()
+	_herbs.clear()
+	_buildings.clear()
+	var stack: Array = [current_scene]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		for c in n.get_children():
+			stack.push_back(c)
+		if n is Prop and n.get("_sprite") != null:
+			_props.append(n)
+		elif n is Interactable and n.get("_sprite") != null:
+			_herbs.append(n)
+		elif n is Building and n.get("_sprite") != null:
+			_buildings.append(n)
+	print("SCAN textured props=", _props.size(), " herbs=", _herbs.size(),
+		" buildings=", _buildings.size())
+	for b in _buildings:
+		var t: Texture2D = (b.get("_sprite") as Sprite2D).texture
+		print("BUILDING ", b.get("location"), " tex=",
+			t.get_size() if t != null else Vector2i.ZERO)
+	var target: Node2D = null
+	for p in _props:
+		if String(p.get("kind")) == "tree":
+			target = p
+			break
+	if target == null and not _props.is_empty():
+		target = _props[0]
+	if target != null:
+		print("PROP VISIT kind=", target.get("kind"), " biome=", target.get("biome"))
+		_player().set("global_position", target.global_position + Vector2(52, 30))
+
+
+func _goto_herb() -> bool:
+	if _herbs.is_empty():
+		return false
+	var h: Node2D = _herbs[0]
+	print("HERB VISIT label=", h.get("label"))
+	_player().set("global_position", h.global_position + Vector2(34, 22))
+	return true
+
+
+func _goto_building() -> bool:
+	if _buildings.is_empty():
+		return false
+	var target: Node2D = _buildings[0]
+	for b in _buildings:
+		if String(b.get("location")) == "sect_hall":
+			target = b
+			break
+	print("BUILDING VISIT location=", target.get("location"))
+	_player().set("global_position", target.global_position + Vector2(0, 110))
+	return true
 
 
 func _build_arena() -> void:

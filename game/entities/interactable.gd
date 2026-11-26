@@ -13,6 +13,7 @@ enum Kind { HERB, SHRINE, PORTAL, CHEST, ALTAR, DOOR, CONTAINER, MANUAL, EXAMINE
 var kind: int = Kind.HERB
 var id: String = ""
 var label: String = ""
+var _sprite: Sprite2D = null
 var used: bool = false
 var item_seed: int = 0
 ## Doors only: whether the door is currently open, and the building it belongs to.
@@ -88,6 +89,23 @@ func setup_chunk_herb(id_value: String, label_value: String, coord: Vector2i) ->
 	chunk_owned = true
 	chunk_coord = coord
 	regrow_days = WorldDelta.HERB_REGROW_DAYS
+	_attach_herb_sprite(label_value)
+
+
+## Puts the Art Studio resource-node sprite on a chunk herb when one
+## exists for its plant; the drawn sprout stays as the fallback.
+func _attach_herb_sprite(label_value: String) -> void:
+	if not ActorSprite.sprites_enabled():
+		return
+	var path := "res://assets/art-studio/assets/environments/vegetation/resource_" \
+		+ label_value.to_snake_case() + ".png"
+	if not ResourceLoader.exists(path):
+		return
+	_sprite = Sprite2D.new()
+	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_sprite.texture = load(path) as Texture2D
+	_sprite.offset = Vector2(0.0, -32.0)
+	add_child(_sprite)
 
 
 ## Overworld sites: data kind name -> node kind, label and regrow window.
@@ -162,6 +180,8 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if _sprite != null:
+		_sprite.visible = kind == Kind.HERB and not used
 	if kind == Kind.HERB and used:
 		draw_circle(Vector2.ZERO, 4.0, Color("#3a423c"))
 		return
@@ -169,10 +189,11 @@ func _draw() -> void:
 	var pulse := 0.5 + 0.5 * sin(_pulse * 2.0)
 	match kind:
 		Kind.HERB:
-			draw_line(Vector2(0, 4), Vector2(0, -10), Color("#4f8a52"), 2.0)
-			draw_circle(Vector2(-5, -10), 4.5, Color("#7fc78a"))
-			draw_circle(Vector2(5, -12), 4.0, Color("#9fe0a0"))
-			draw_circle(Vector2(0, -16), 3.5, Color("#c0f0b0"))
+			if _sprite == null:
+				draw_line(Vector2(0, 4), Vector2(0, -10), Color("#4f8a52"), 2.0)
+				draw_circle(Vector2(-5, -10), 4.5, Color("#7fc78a"))
+				draw_circle(Vector2(5, -12), 4.0, Color("#9fe0a0"))
+				draw_circle(Vector2(0, -16), 3.5, Color("#c0f0b0"))
 		Kind.SHRINE:
 			draw_rect(Rect2(-16, -10, 32, 22), Color("#4a4540"))
 			draw_rect(Rect2(-12, -34, 24, 26), Color("#5c564e"))
