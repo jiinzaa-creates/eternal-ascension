@@ -2372,7 +2372,7 @@ func _inventory_tests() -> void:
 # ---------------------------------------------------------------- crafting ----
 
 func _crafting_tests() -> void:
-	print("[crafting] forge recipes, costs, quality and the three verbs")
+	print("[crafting] forge recipes, costs, quality and the forge verbs")
 	var rules := Crafting.new(DB)
 	check(not DB.station("station.forge").is_empty(), "the forge station is loaded")
 	check(DB.recipes.size() >= 5, "forge recipes are loaded")
@@ -2396,6 +2396,42 @@ func _crafting_tests() -> void:
 	bag = Items.add_to_inventory(bag, Items.normalize_item({"id": "item.herb.spirit.0", "slot": "material", "name": "Spirit Herb", "count": 1}))
 	check(int(Crafting.material_counts(bag)["ore"]) == 4, "material counts add stacks")
 	check(Crafting.requirement_text(recipe) == "3 Spirit Ore, 60 spirit stones", "the cost line reads")
+
+	# Upgrade (M44): level rises, values stay inside the new tier, failure strains.
+	var gen := ItemGen.new(DB, Rng)
+	var up_piece := gen.generate(3, 4242, 0, 2, "weapon", "")
+	check(not up_piece.is_empty() and int(up_piece.get("ilvl", 0)) == 3, "a level 3 test piece is generated")
+	var cheap := Crafting.upgrade_cost(up_piece)
+	var dear := Crafting.upgrade_cost({"ilvl": 9, "rarity": 2, "slot": "weapon"})
+	check(int(dear["stones"]) > int(cheap["stones"])
+		and float(dear["failure_chance"]) > float(cheap["failure_chance"]),
+		"upgrade cost and risk climb with level — there is no cap, only a price")
+	var raised := rules.upgrade(up_piece, 70000, 0, 0.0)
+	check(bool(raised.get("ok", false)) and int((raised["item"] as Dictionary).get("ilvl", 0)) == 4,
+		"a sure-handed upgrade raises the piece one level")
+	var in_tier := true
+	for mod_value in (raised["item"] as Dictionary).get("mods", []):
+		var mod: Dictionary = mod_value
+		var affix: Dictionary = DB.by_id("prefix", String(mod.get("id", "")))
+		if affix.is_empty():
+			affix = DB.by_id("suffix", String(mod.get("id", "")))
+		if affix.is_empty():
+			continue
+		var tier := ItemGen.tier_data(affix, ItemGen.tier_for(affix, 4))
+		if float(mod["value"]) < float(tier.get("min", 0.0)) - 0.11 or float(mod["value"]) > float(tier.get("max", 0.0)) + 0.11:
+			in_tier = false
+	check(in_tier, "upgraded affix values land inside the new level's tier")
+	var strained: Dictionary = {}
+	for counter in range(0, 400):
+		var attempt := rules.upgrade(up_piece, 70001, counter, 1.0)
+		if bool(attempt.get("failed", false)):
+			strained = attempt
+			break
+	check(not strained.is_empty() and int((strained["item"] as Dictionary).get("ilvl", 0)) == 3
+		and Items.durability_of(strained["item"]) < Items.durability_of(up_piece),
+		"a failed upgrade keeps the level and spends the piece's durability")
+	check(not bool(rules.upgrade({"slot": "consumable"}, 1, 0, 0.0).get("ok", false)),
+		"a consumable cannot be upgraded")
 	check(not bool(Crafting.check(recipe, bag, 10, 1)["ok"]), "a recipe refuses an empty purse")
 	check(String(Crafting.check(recipe, bag, 10, 1)["reason"]).contains("spirit stones"), "the refusal names the missing stones")
 	check(bool(Crafting.check(recipe, bag, 100, 1)["ok"]), "a payable recipe passes")

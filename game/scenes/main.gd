@@ -80,7 +80,7 @@ var crafting: Crafting
 var forge_open := false
 var forge_mode := 0
 var forge_index := 0
-const FORGE_MODES: Array[String] = ["forge", "refine", "disassemble"]
+const FORGE_MODES: Array[String] = ["forge", "refine", "upgrade", "disassemble"]
 ## Alchemy: one cauldron, one list of potions, frozen play for the same reason.
 var alchemy: Alchemy
 var alchemy_open := false
@@ -1522,6 +1522,8 @@ func forge_cost(mode_index: int) -> Dictionary:
 	match FORGE_MODES[mode_index]:
 		"refine":
 			return crafting.action("refine")
+		"upgrade":
+			return crafting.action("upgrade")
 		"disassemble":
 			return crafting.action("disassemble")
 		_:
@@ -1539,7 +1541,9 @@ func forge_act() -> void:
 			_forge_make(chosen)
 		"refine":
 			_forge_refine(chosen)
-		_:
+		"upgrade":
+			_forge_upgrade(chosen)
+		"disassemble":
 			_forge_disassemble(chosen)
 
 
@@ -1617,6 +1621,37 @@ func _forge_refine(item: Dictionary) -> void:
 			break
 	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Refined %s%s." % [String(refined.get("name", "a piece")), flourish])
+	var practice := Professions.award(Game.professions, "profession.smith")
+	if bool(practice.get("leveled", false)):
+		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
+
+
+func _forge_upgrade(item: Dictionary) -> void:
+	var cost := Crafting.upgrade_cost(item)
+	var check := Crafting.check(cost, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("Upgrading needs %s." % String(check.get("reason", "more materials")))
+		return
+	var attempt := Game.crafts_made
+	Game.crafts_made += 1
+	var smith: Dictionary = DB.profession("profession.smith")
+	var rank := Professions.level_of(Game.professions, "profession.smith")
+	var result := crafting.upgrade(item, 70000 + attempt, 0, Professions.failure_mult(smith, rank))
+	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
+		Bus.toast.emit(String(result.get("reason", "the piece refuses the hammer")).capitalize() + ".")
+		return
+	_spend_craft(cost)
+	var worked: Dictionary = result["item"]
+	for i in player.inventory.size():
+		if String((player.inventory[i] as Dictionary).get("id", "")) == String(item.get("id", "")):
+			player.inventory[i] = worked
+			break
+	if bool(result.get("failed", false)):
+		Bus.toast.emit("The upgrade fails; %s is strained." % String(item.get("name", "the piece")))
+		Bus.player_stats_changed.emit()
+		return
+	Bus.toast.emit("Upgraded %s — item level %d." % [String(worked.get("name", "a piece")), int(worked.get("ilvl", 1))])
+	Bus.player_stats_changed.emit()
 	var practice := Professions.award(Game.professions, "profession.smith")
 	if bool(practice.get("leveled", false)):
 		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))

@@ -220,6 +220,75 @@ func refine(item: Dictionary, key: int, counter: int, quality_mult: float = 1.0,
 	return out
 
 
+## What raising a piece one item level costs, and how likely the work is
+## to fail. There is no level cap: the price and the risk are the ceiling,
+## and both climb with every level already gained.
+static func upgrade_cost(item: Dictionary) -> Dictionary:
+	var ilvl := int(item.get("ilvl", 1))
+	var rarity := int(item.get("rarity", 0))
+	return {
+		"stones": 25 * (ilvl + 1) + 10 * rarity,
+		"materials": [{"material": "ore", "count": 2 + ilvl / 3}],
+		"failure_chance": clampf(0.05 + 0.03 * float(ilvl + 1), 0.0, 0.60),
+		"realm": 1,
+	}
+
+
+## Raises a piece one item level. The affixes it already carries stay —
+## each value is re-rolled inside its affix's tier at the new level, so
+## an upgrade can roll low as well as high. Failure keeps the piece but
+## strains it: a quarter of its durability is spent in the attempt.
+func upgrade(item: Dictionary, key: int, counter: int, failure_mult: float = 1.0) -> Dictionary:
+	var out := {"ok": false, "failed": false, "item": item, "reason": ""}
+	if not Items.is_equipment(String(item.get("slot", ""))):
+		out["reason"] = "only gear can be upgraded"
+		return out
+	if bool(item.get("unique", false)):
+		out["reason"] = "an authored relic refuses a smith"
+		return out
+	var cost := upgrade_cost(item)
+	var r: RandomNumberGenerator = Rng.stream("craft.upgrade", key, counter)
+	if r.randf() < clampf(float(cost["failure_chance"]) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0):
+		var strained: Dictionary = item.duplicate(true)
+		var maximum := Items.max_durability(String(item.get("slot", "")))
+		strained["durability"] = maxf(0.0, Items.durability_of(item) - maximum * 0.25)
+		out["failed"] = true
+		out["item"] = strained
+		out["reason"] = "the work fails; the piece is strained"
+		return out
+	var upgraded: Dictionary = item.duplicate(true)
+	var new_ilvl := int(item.get("ilvl", 1)) + 1
+	upgraded["ilvl"] = new_ilvl
+	var mods: Array = []
+	for mod_value in item.get("mods", []):
+		var mod: Dictionary = (mod_value as Dictionary).duplicate()
+		if not bool(mod.get("enchant", false)):
+			var affix: Dictionary = db.by_id("prefix", String(mod.get("id", "")))
+			if affix.is_empty():
+				affix = db.by_id("suffix", String(mod.get("id", "")))
+			if not affix.is_empty():
+				var tier_index := ItemGen.tier_for(affix, new_ilvl)
+				var tier := ItemGen.tier_data(affix, tier_index)
+				var lo := float(tier.get("min", affix.get("min", 1.0)))
+				var hi := float(tier.get("max", lo))
+				var value := lo + (hi - lo) * r.randf()
+				if value >= 10.0:
+					value = round(value)
+				else:
+					value = snappedf(value, 0.1)
+				mod["value"] = value
+				mod["tier"] = tier_index + 1
+				mod["text"] = ItemGen.affix_text(affix, value)
+		mods.append(mod)
+	upgraded["mods"] = mods
+	var base: Dictionary = db.base_item(String(item.get("base", "")))
+	upgraded["value"] = int(ceil(float(base.get("value", 5))
+		* ItemGen.RARITY_MULT[int(item.get("rarity", 0))] * (1.0 + float(new_ilvl) * 0.15)))
+	out["ok"] = true
+	out["item"] = upgraded
+	return out
+
+
 ## Ore returned for breaking a piece down. Rarer and higher pieces give more; a
 ## relic or a non-gear item gives none.
 static func disassemble_ore(item: Dictionary) -> int:

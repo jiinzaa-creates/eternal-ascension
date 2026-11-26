@@ -178,6 +178,11 @@ func _pick_affixes(r: RandomNumberGenerator, slot: String, kind: String, count: 
 
 
 func _affix_text(affix: Dictionary, value: float) -> String:
+	return affix_text(affix, value)
+
+
+## The one affix line format, shared with the forge's re-rolls.
+static func affix_text(affix: Dictionary, value: float) -> String:
 	var unit := String(affix.get("unit", ""))
 	var label := String(affix.get("stat_label", String(affix.get("stat", ""))))
 	if value < 10.0:

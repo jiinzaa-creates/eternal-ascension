@@ -1609,7 +1609,7 @@ func draw_forge(player: Player) -> void:
 	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#e0a060", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "AZURE FORGE", 18, Color("#e8b070"))
-	var modes: Array[String] = ["FORGE", "REFINE", "DISASSEMBLE"]
+	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "DISASSEMBLE"]
 	var mode := int(host.forge_mode)
 	var tabs := ""
 	for i in modes.size():
@@ -1673,6 +1673,22 @@ func draw_forge(player: Player) -> void:
 			_text(Vector2(cx, cy), _fit("Needs %s." % String(refine_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
 		else:
 			_text(Vector2(cx, cy), "ENTER rerolls every affix.", 12, ACCENT)
+		return
+	if mode == 2:
+		var up_cost := Crafting.upgrade_cost(chosen)
+		var up_check: Dictionary = Crafting.check(up_cost, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(up_cost), 11, 360.0), 11, Color("#d8c070"))
+		cy += 20.0
+		_text(Vector2(cx, cy), _fit("Item level %d → %d · failure %d%%, and failure strains the piece." % [
+			int(chosen.get("ilvl", 1)), int(chosen.get("ilvl", 1)) + 1,
+			int(round(float(up_cost.get("failure_chance", 0.0)) * 100.0))], 11, 360.0), 11, Color("#7f9098"))
+		cy += 32.0
+		if bool(chosen.get("unique", false)):
+			_text(Vector2(cx, cy), "An authored relic refuses a smith.", 11, Color("#e08f8f"))
+		elif not bool(up_check.get("ok", false)):
+			_text(Vector2(cx, cy), _fit("Needs %s." % String(up_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
+		else:
+			_text(Vector2(cx, cy), "ENTER raises it one level.", 12, ACCENT)
 		return
 	var ore := Crafting.disassemble_ore(chosen)
 	_text(Vector2(cx, cy), "Yields: %d Spirit Ore" % ore, 12, Color("#d8c070"))
