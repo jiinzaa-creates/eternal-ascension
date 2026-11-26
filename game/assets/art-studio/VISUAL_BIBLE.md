@@ -396,3 +396,6 @@ Carp set filed (enemy_abyss_jade_carp_attack_{dir}.png + 8dir sheet): S-curve sn
 
 ## 68. ATTACK SET — SPIRIT MANTIS (2026-11-25)
 Mantis set filed (enemy_spirit_mantis_attack_{dir}.png + 8dir sheet): reared scythe-slash strikes toward facing in all 8. QC PASS (tests/mantis_attack_test.png). Remaining attack sets: Serpent, Corrupted Wolf, Guardian, Merchant, Farmer.
+
+## 69. ATTACK SET — GLOOM SERPENT (2026-11-25)
+Serpent set filed (enemy_gloom_serpent_attack_{dir}.png + 8dir sheet): coiled strike poses, head lunged and jaws open toward facing in all 8, centre-anchored like its swim set. QC PASS (tests/serpent_attack_test.png). Remaining attack sets: Corrupted Wolf, Guardian, Merchant, Farmer.
