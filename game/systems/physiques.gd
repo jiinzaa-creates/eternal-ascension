@@ -129,11 +129,11 @@ static func next_stage_realm(id: String, stage: int) -> int:
 
 ## The body's full mod list at a stage: gifts and weakness together, every
 ## value scaled — the tradeoff deepens exactly as the gift does.
-static func mods_for(id: String, stage: int) -> Array:
+static func mods_for(id: String, stage: int, realm_number: int = 1) -> Array:
 	var physique := find(id)
 	if physique.is_empty():
 		return []
-	var scale := stage_scale(id, stage)
+	var scale := stage_scale(id, stage) * Realms.growth_factor(realm_number)
 	var out: Array = []
 	for mod_value in physique.get("mods", []):
 		var mod: Dictionary = (mod_value as Dictionary).duplicate()

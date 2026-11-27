@@ -73,7 +73,8 @@ static func stage_map(progress: Dictionary) -> Dictionary:
 
 
 ## Every walked path's stage mods, summed for the stat pipeline.
-static func mods(progress: Dictionary) -> Array:
+static func mods(progress: Dictionary, realm_number: int = 1) -> Array:
+	var factor := Realms.growth_factor(realm_number)
 	var out: Array = []
 	for entry in all():
 		var id := String(entry.get("id", ""))
@@ -82,7 +83,10 @@ static func mods(progress: Dictionary) -> Array:
 			continue
 		var stages: Array = entry.get("stages", [])
 		for i in mini(stage, stages.size()):
-			out.append_array((stages[i] as Dictionary).get("mods", []))
+			for mod_value in (stages[i] as Dictionary).get("mods", []):
+				var mod: Dictionary = (mod_value as Dictionary).duplicate()
+				mod["value"] = float(mod.get("value", 0.0)) * factor
+				out.append(mod)
 	return out
 
 

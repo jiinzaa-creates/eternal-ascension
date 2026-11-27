@@ -88,7 +88,7 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 		if not physique.is_empty():
 			# Gifts and weakness together, scaled by the awakening stage —
 			# still the one mods path, never a physique-specific stat rule.
-			apply_mods(Physiques.mods_for(physique_id, physique_stage), String(physique.get("name", "physique")))
+			apply_mods(Physiques.mods_for(physique_id, physique_stage, realm), String(physique.get("name", "physique")))
 
 	for id in passive_ids:
 		var passive: Dictionary = DB.by_id("passive", String(id))

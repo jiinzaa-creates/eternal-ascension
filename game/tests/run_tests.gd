@@ -1415,6 +1415,18 @@ func _realm_tests() -> void:
 	check(silver.social_score(0, 0) > plain.social_score(0, 0)
 		and Economy.social_multiplier(silver.social_score(0, 0)) < 1.0,
 		"CHAR finally moves a price somewhere in the world")
+	check(approx(Realms.growth_factor(1), 1.0) and approx(Realms.growth_factor(12), 2.1),
+		"walked roads and awakened bodies grow ten percent per realm")
+	var road_low := Daos.mods({"dao.sword": 60.0}, 1)
+	var road_high := Daos.mods({"dao.sword": 60.0}, 11)
+	check(approx(float((road_high[0] as Dictionary).get("value", 0.0)),
+		float((road_low[0] as Dictionary).get("value", 0.0)) * 2.0),
+		"a dao walked early still matters at realm eleven")
+	var body_low := Physiques.mods_for("physique.iron_bone", 0, 1)
+	var body_high := Physiques.mods_for("physique.iron_bone", 0, 11)
+	check(approx(float((body_high[0] as Dictionary).get("value", 0.0)),
+		float((body_low[0] as Dictionary).get("value", 0.0)) * 2.0),
+		"physique mods scale with realm beside their awakening stage")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

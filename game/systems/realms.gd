@@ -241,6 +241,13 @@ static func domain_payloads(number: int) -> Array:
 	]
 
 
+## How much walked roads and awakened bodies grow with the
+## character (R6): ten percent per realm past the first, so what
+## was earned early is not outclassed by item level late.
+static func growth_factor(realm_number: int) -> float:
+	return 1.0 + 0.1 * float(maxi(0, realm_number - 1))
+
+
 static func travel_hours(distance: float, number: int) -> float:
 	if can_manipulate_planes(number):
 		return 0.0
