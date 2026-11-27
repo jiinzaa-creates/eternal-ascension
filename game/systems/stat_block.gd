@@ -82,6 +82,9 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 		var physique: Dictionary = DB.physique(physique_id)
 		if not physique.is_empty():
 			apply_mods(physique.get("mods", []), String(physique.get("name", "physique")))
+			# A weakness is not a special rule: the same mods path, negative.
+			var weakness: Dictionary = physique.get("weakness", {})
+			apply_mods(weakness.get("mods", []), String(physique.get("name", "physique")) + " (weakness)")
 
 	for id in passive_ids:
 		var passive: Dictionary = DB.by_id("passive", String(id))

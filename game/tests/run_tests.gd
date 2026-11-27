@@ -578,12 +578,26 @@ func _physique_tests() -> void:
 	check(Physiques.best_of("physique.sword_bone", "physique.iron_bone") == "physique.sword_bone", "a worse body is rejected")
 	check(Physiques.best_of("physique.iron_bone", "physique.iron_bone") == "physique.iron_bone", "a tie keeps the current body")
 	check(not Physiques.describe("physique.iron_bone").is_empty(), "physiques describe themselves")
+	for entry in DB.physiques:
+		var pid := String(entry.get("id", ""))
+		if int(entry.get("tier", 0)) < 2:
+			continue
+		var weakness: Dictionary = entry.get("weakness", {})
+		check(String(weakness.get("text", "")) != "", "%s names its weakness" % pid)
+		var negative := false
+		for mod in weakness.get("mods", []):
+			check(known_stats.has(String(mod.get("stat", ""))), "%s weakness uses a known stat" % pid)
+			if float((mod as Dictionary).get("value", 0.0)) < 0.0:
+				negative = true
+		check(negative, "%s weakness is a real tradeoff" % pid)
+	check(Physiques.weakness_text("physique.mortal_frame") == "", "the mortal frame carries no weakness")
 
 	var bare := StatBlock.new(Attributes.new())
 	bare.rebuild({}, [], 1, 1.0)
 	var iron := StatBlock.new(Attributes.new())
 	iron.rebuild({}, [], 1, 1.0, "physique.iron_bone")
 	check(iron.armor() > bare.armor(), "a physique adds armour")
+	check(iron.pct("move_speed_pct") < bare.pct("move_speed_pct"), "a physique's weakness also applies")
 	check(iron.get_attr("str") == bare.get_attr("str") + 2, "a physique adds attributes")
 	var unknown := StatBlock.new(Attributes.new())
 	unknown.rebuild({}, [], 1, 1.0, "physique.nonexistent")

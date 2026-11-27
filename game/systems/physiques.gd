@@ -47,6 +47,12 @@ static func name_of(id: String) -> String:
 	return String(physique.get("name", DEFAULT_ID))
 
 
+## The tradeoff's own words, or "" for a body that carries none.
+static func weakness_text(id: String) -> String:
+	var weakness: Dictionary = find(id).get("weakness", {})
+	return String(weakness.get("text", ""))
+
+
 static func describe(id: String) -> String:
 	var physique := find(id)
 	if physique.is_empty():

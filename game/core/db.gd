@@ -916,6 +916,19 @@ func validate() -> Array:
 		for mod in p.get("mods", []):
 			if String(mod.get("stat", "")) == "":
 				problems.append("physique %s has a mod without a stat" % id)
+		# Directive 5: no straightforward upgrades — every real physique
+		# (tier 2 and up; the Mortal Frame is the baseline) carries a
+		# weakness with at least one genuinely negative mod.
+		if int(p.get("tier", 0)) >= 2:
+			var weakness: Dictionary = p.get("weakness", {})
+			if String(weakness.get("text", "")) == "":
+				problems.append("physique %s names no weakness" % id)
+			var has_negative := false
+			for mod in weakness.get("mods", []):
+				if float((mod as Dictionary).get("value", 0.0)) < 0.0:
+					has_negative = true
+			if not has_negative:
+				problems.append("physique %s has no negative weakness mod" % id)
 
 	if spirit_beasts.size() < 4:
 		problems.append("expected at least 4 spirit beast species, found %d" % spirit_beasts.size())

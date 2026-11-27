@@ -5133,6 +5133,8 @@ func character_sections() -> Array:
 		"Meridians %d / %d · enlightenments %d" % [
 			Meridians.count(player.cultivation.meridians), Meridians.all().size(), player.enlightenments.size()],
 	]
+	if Physiques.weakness_text(player.physique_id) != "":
+		cultivation.append("Weakness: " + Physiques.weakness_text(player.physique_id))
 
 	var attributes: Array[String] = [
 		"Attributes: " + player.attrs.summary(),
