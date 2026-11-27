@@ -1352,6 +1352,25 @@ func _realm_tests() -> void:
 		"dao progress and focus survive the save round-trip, unknowns dropped")
 	walker.free()
 	walker_rt.free()
+	check(Methods.growth_pair("method.body") == ["str", "agi"]
+		and Methods.growth_pair("method.alchemy") == ["int", "dex"],
+		"every method grows its own two attributes")
+	check(Affixes.growth_attr("affix.method.defiant") == "str" and Affixes.growth_attr("") == "",
+		"a method affix bends growth toward its character")
+	var grower := Player.new()
+	grower.attrs = Attributes.new()
+	grower.stats = StatBlock.new(grower.attrs)
+	grower.cultivation = Cultivation.new()
+	grower.cultivation.method_id = "method.body"
+	grower._grow_from_sublevel()
+	check(grower.attrs.get_attr("str") == 11 and grower.attrs.get_attr("agi") == 11,
+		"a body-method sublevel grows STR and AGI")
+	grower.cultivation.method_affixes["method.body"] = "affix.method.stillwater"
+	grower._grow_from_sublevel()
+	check(grower.attrs.get_attr("str") == 12 and grower.attrs.get_attr("wis") == 11
+		and grower.attrs.get_attr("agi") == 11,
+		"a drawn affix bends the second growth to its own attribute")
+	grower.free()
 	var student := Player.new()
 	student.attrs = Attributes.new()
 	student.stats = StatBlock.new(student.attrs)

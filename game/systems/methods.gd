@@ -214,6 +214,15 @@ static func combined_profile(primary: String, secondary: String, state: Dictiona
 
 
 ## Insight is a long, slow bonus: at most +20% to the method's own multiplier.
+## The two attributes practising this method grows at a sublevel
+## (R1): the road shapes the body that walks it.
+static func growth_pair(id: String) -> Array:
+	var growth: Array = find(id).get("growth", [])
+	if growth.size() == 2:
+		return [String(growth[0]), String(growth[1])]
+	return ["wis", "int"]
+
+
 static func insight_bonus(insight: int) -> float:
 	return 1.0 + clampf(float(insight), 0.0, 100.0) * 0.002
 

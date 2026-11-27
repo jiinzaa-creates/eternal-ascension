@@ -609,6 +609,14 @@ func validate() -> Array:
 			problems.append("enlightenment %s requires unknown dao %s" % [e_id, req_dao])
 		if req_dao != "" and (int(req.get("stage", 0)) < 1 or int(req.get("stage", 0)) > 4):
 			problems.append("enlightenment %s requires an invalid dao stage" % e_id)
+	for m_entry in methods:
+		var m_growth: Array = m_entry.get("growth", [])
+		if m_growth.size() != 2 or not Attributes.KEYS.has(String(m_growth[0])) or not Attributes.KEYS.has(String(m_growth[1])):
+			problems.append("method %s has an invalid growth pair" % String(m_entry.get("id", "")))
+	for a_entry in method_affixes:
+		var a_growth := String(a_entry.get("growth_attr", ""))
+		if a_growth == "" or not Attributes.KEYS.has(a_growth):
+			problems.append("method affix %s has an invalid growth attribute" % String(a_entry.get("id", "")))
 
 	if roots.size() != 12:
 		problems.append("expected 12 spiritual roots, found %d" % roots.size())

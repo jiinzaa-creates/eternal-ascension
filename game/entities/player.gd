@@ -579,7 +579,8 @@ func _physics_process(delta: float) -> void:
 						_peak_notified = true
 						Bus.toast.emit("Peak of %s. Press G to face your tribulation." % cultivation.realm_name())
 				else:
-					cultivation.advance_sublevel(stats)
+					if cultivation.advance_sublevel(stats):
+						_grow_from_sublevel()
 					_peak_notified = false
 					Bus.toast.emit("Advanced to %s." % cultivation.stage_label())
 		move_and_slide()
@@ -1670,6 +1671,25 @@ func set_guard(held: bool) -> bool:
 
 
 ## Attempts the realm breakthrough. Returns the result dictionary for the HUD.
+## A sublevel is a small remaking (R1): the method being practised
+## grows its two attributes by one each, and a drawn method affix
+## bends the second growth toward its own character. This is the
+## "small attribute growth" the cultivation design always promised.
+func _grow_from_sublevel() -> void:
+	var pair := Methods.growth_pair(cultivation.method_id)
+	var primary := String(pair[0])
+	var secondary := String(pair[1])
+	var bent := Affixes.growth_attr(cultivation.method_affix())
+	if bent != "":
+		secondary = bent
+	attrs.add(primary, 1)
+	attrs.add(secondary, 1)
+	rebuild_stats()
+	Bus.player_stats_changed.emit()
+	Bus.toast.emit("The sitting settles into the body — %s +1, %s +1." % [
+		Attributes.LABELS.get(primary, primary), Attributes.LABELS.get(secondary, secondary)])
+
+
 func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 	var r: RandomNumberGenerator = Rng.stream("breakthrough", cultivation.realm, cultivation.breakthrough_attempts)
 	var had_boon := Game.sacrifice_boon

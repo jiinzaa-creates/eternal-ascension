@@ -166,6 +166,14 @@ static func roll_pair(primary: Dictionary, secondary: Dictionary, seed_value: in
 
 
 ## The meditation multiplier a method affix contributes (1.0 when none).
+## The attribute a method affix bends growth toward (R1/R3): the
+## affix is the method's character, and character shapes the body.
+static func growth_attr(affix_id: String) -> String:
+	if affix_id == "":
+		return ""
+	return String(method_affix(affix_id).get("growth_attr", ""))
+
+
 static func method_meditation_factor(affix_id: String) -> float:
 	if affix_id == "":
 		return 1.0
