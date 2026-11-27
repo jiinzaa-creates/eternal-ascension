@@ -27,6 +27,7 @@ var display_name := "Wanderer"
 var appearance := Appearance.new()
 ## Innate body. Its mods enter the stat pipeline like equipment or a passive.
 var physique_id := Physiques.DEFAULT_ID
+var physique_stage := 0
 var attrs: Attributes
 var stats: StatBlock
 var cultivation: Cultivation
@@ -167,7 +168,7 @@ func rebuild_stats() -> void:
 		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()),
 		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs())
 		+ ([{"stat": "lifespan", "value": Game.lifespan_years_bonus}] if Game.lifespan_years_bonus > 0 else [])
-		+ ([{"stat": "qi_max_pct", "value": -5.0 * float(Game.death_wounds)}] if Game.death_wounds > 0 else []))
+		+ ([{"stat": "qi_max_pct", "value": -5.0 * float(Game.death_wounds)}] if Game.death_wounds > 0 else []), physique_stage)
 	# Condition is applied after the pipeline has summed every source, so a
 	# rebuild can never compound it: a broken piece simply contributes nothing.
 	for slot in Items.DURABLE_SLOTS:
@@ -199,6 +200,7 @@ func inherit_physique(id: String) -> bool:
 	if Physiques.tier_of(id) <= Physiques.tier_of(physique_id):
 		return false
 	physique_id = id
+	physique_stage = 0
 	rebuild_stats()
 	Bus.player_stats_changed.emit()
 	return true
@@ -1569,6 +1571,9 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 			Bus.toast.emit("Realm art awakened: %s." % ability_name)
 		# A realm change is the largest single dose of understanding in the game.
 		gain_comprehension(30.0)
+		var developed := develop_physique()
+		if String(developed.get("kind", "")) == "awakened":
+			Bus.toast.emit("Your physique awakens — %s: %s." % [Physiques.name_of(physique_id), String(developed.get("stage_name", ""))])
 	else:
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("The tribulation breaks you. Qi deviation. (%s)" % note)
@@ -1577,6 +1582,19 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 	rebuild_stats()
 	Bus.player_stats_changed.emit()
 	return result
+
+
+## One development step for the body, judged when a breakthrough remakes it.
+## Returns what happened ({"kind": "awakened", ...}) or {} for nothing.
+func develop_physique() -> Dictionary:
+	if physique_id == Physiques.DEFAULT_ID:
+		return {}
+	var gate := Physiques.next_stage_realm(physique_id, physique_stage)
+	if gate >= 0 and cultivation.realm >= gate:
+		physique_stage += 1
+		return {"kind": "awakened", "stage": physique_stage,
+			"stage_name": Physiques.stage_name(physique_id, physique_stage)}
+	return {}
 
 
 ## The tribulation encounter was lost: real wounds, real corruption, no roll.
@@ -1804,6 +1822,7 @@ func to_dict() -> Dictionary:
 		"display_name": display_name,
 		"appearance": appearance.to_dict(),
 		"physique": physique_id,
+		"physique_stage": physique_stage,
 		"position": [global_position.x, global_position.y],
 		"hp": hp,
 		"hp_max": hp_max,
@@ -1830,6 +1849,7 @@ func from_dict(data: Dictionary) -> void:
 	physique_id = String(data.get("physique", Physiques.DEFAULT_ID))
 	if Physiques.find(physique_id).is_empty():
 		physique_id = Physiques.DEFAULT_ID
+	physique_stage = clampi(int(data.get("physique_stage", 0)), 0, maxi(0, Physiques.stage_count(physique_id) - 1))
 	var pos: Array = data.get("position", [global_position.x, global_position.y])
 	global_position = Vector2(float(pos[0]), float(pos[1]))
 	attrs.from_dict(data.get("attrs", {}))

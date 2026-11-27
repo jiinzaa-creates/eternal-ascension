@@ -32,7 +32,24 @@
       "value": -5
      }
     ]
-   }
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Tempered",
+     "realm": 2,
+     "scale": 1.5
+    },
+    {
+     "name": "Adamant",
+     "realm": 5,
+     "scale": 2.0
+    }
+   ]
   },
   {
    "id": "physique.pure_yang",
@@ -58,7 +75,24 @@
       "value": -4
      }
     ]
-   }
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Kindled",
+     "realm": 2,
+     "scale": 1.5
+    },
+    {
+     "name": "Blazing",
+     "realm": 5,
+     "scale": 2.0
+    }
+   ]
   },
   {
    "id": "physique.wind_stepping",
@@ -88,7 +122,24 @@
       "value": -6
      }
     ]
-   }
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Stirred",
+     "realm": 3,
+     "scale": 1.5
+    },
+    {
+     "name": "Unbound",
+     "realm": 6,
+     "scale": 2.0
+    }
+   ]
   },
   {
    "id": "physique.nine_yin",
@@ -118,7 +169,24 @@
       "value": -2
      }
     ]
-   }
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Deepened",
+     "realm": 3,
+     "scale": 1.5
+    },
+    {
+     "name": "Absolute",
+     "realm": 6,
+     "scale": 2.0
+    }
+   ]
   },
   {
    "id": "physique.sword_bone",
@@ -148,7 +216,24 @@
       "value": -6
      }
     ]
-   }
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Honed",
+     "realm": 4,
+     "scale": 1.5
+    },
+    {
+     "name": "Transcendent",
+     "realm": 7,
+     "scale": 2.0
+    }
+   ]
   },
   {
    "id": "physique.chaotic_embryo",
@@ -182,7 +267,24 @@
       "value": -6
      }
     ]
-   }
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Quickened",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Primordial",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ]
   }
  ]
 }

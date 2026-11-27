@@ -929,6 +929,15 @@ func validate() -> Array:
 					has_negative = true
 			if not has_negative:
 				problems.append("physique %s has no negative weakness mod" % id)
+			var stages: Array = p.get("stages", [])
+			if stages.size() != 3:
+				problems.append("physique %s must carry three awakening stages" % id)
+			else:
+				if float((stages[0] as Dictionary).get("scale", 0.0)) != 1.0:
+					problems.append("physique %s must start dormant at full base strength" % id)
+				if not (float((stages[1] as Dictionary).get("scale", 0.0)) > 1.0
+						and float((stages[2] as Dictionary).get("scale", 0.0)) > float((stages[1] as Dictionary).get("scale", 0.0))):
+					problems.append("physique %s awakening scales must deepen" % id)
 
 	if spirit_beasts.size() < 4:
 		problems.append("expected at least 4 spirit beast species, found %d" % spirit_beasts.size())

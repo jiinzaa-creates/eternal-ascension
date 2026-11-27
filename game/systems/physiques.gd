@@ -60,6 +60,56 @@ static func describe(id: String) -> String:
 	return "%s (tier %d) — %s" % [String(physique.get("name", "?")), int(physique.get("tier", 1)), String(physique.get("blurb", ""))]
 
 
+static func stages(id: String) -> Array:
+	return find(id).get("stages", [])
+
+
+static func stage_count(id: String) -> int:
+	return stages(id).size()
+
+
+static func stage_name(id: String, stage: int) -> String:
+	var list := stages(id)
+	if stage < 0 or stage >= list.size():
+		return ""
+	return String((list[stage] as Dictionary).get("name", ""))
+
+
+static func stage_scale(id: String, stage: int) -> float:
+	var list := stages(id)
+	if stage < 0 or stage >= list.size():
+		return 1.0
+	return float((list[stage] as Dictionary).get("scale", 1.0))
+
+
+## Realm required to enter the stage after `stage`, or -1 when there is none.
+static func next_stage_realm(id: String, stage: int) -> int:
+	var list := stages(id)
+	if stage + 1 >= list.size():
+		return -1
+	return int((list[stage + 1] as Dictionary).get("realm", 0))
+
+
+## The body's full mod list at a stage: gifts and weakness together, every
+## value scaled — the tradeoff deepens exactly as the gift does.
+static func mods_for(id: String, stage: int) -> Array:
+	var physique := find(id)
+	if physique.is_empty():
+		return []
+	var scale := stage_scale(id, stage)
+	var out: Array = []
+	for mod_value in physique.get("mods", []):
+		var mod: Dictionary = (mod_value as Dictionary).duplicate()
+		mod["value"] = float(mod.get("value", 0.0)) * scale
+		out.append(mod)
+	var weakness: Dictionary = physique.get("weakness", {})
+	for mod_value in weakness.get("mods", []):
+		var mod: Dictionary = (mod_value as Dictionary).duplicate()
+		mod["value"] = float(mod.get("value", 0.0)) * scale
+		out.append(mod)
+	return out
+
+
 ## Higher tier wins; ties keep the current body, so an inheritance can never be a
 ## downgrade dressed up as a reward.
 static func best_of(current_id: String, candidate_id: String) -> String:

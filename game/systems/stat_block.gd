@@ -64,7 +64,7 @@ func reset() -> void:
 ## player equips something, gains a passive, or advances a realm.
 func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm_attribute_mult: float,
 		physique_id: String = "", meridian_mods: Array = [], realm_ability_mods: Array = [],
-		enlightenment_mods: Array = [], aging: float = 0.0, transient_mods: Array = []) -> void:
+		enlightenment_mods: Array = [], aging: float = 0.0, transient_mods: Array = [], physique_stage: int = 0) -> void:
 	reset()
 	aging_penalty = clampf(aging, 0.0, 0.9)
 	realm = realm_number
@@ -81,10 +81,9 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 	if physique_id != "":
 		var physique: Dictionary = DB.physique(physique_id)
 		if not physique.is_empty():
-			apply_mods(physique.get("mods", []), String(physique.get("name", "physique")))
-			# A weakness is not a special rule: the same mods path, negative.
-			var weakness: Dictionary = physique.get("weakness", {})
-			apply_mods(weakness.get("mods", []), String(physique.get("name", "physique")) + " (weakness)")
+			# Gifts and weakness together, scaled by the awakening stage —
+			# still the one mods path, never a physique-specific stat rule.
+			apply_mods(Physiques.mods_for(physique_id, physique_stage), String(physique.get("name", "physique")))
 
 	for id in passive_ids:
 		var passive: Dictionary = DB.by_id("passive", String(id))

@@ -565,6 +565,7 @@ func _spawn_player() -> void:
 	player.cultivation.purity_bonus = _roll_purity()
 	player.cultivation.identified = false
 	player.physique_id = Physiques.roll(_physique_rolls)
+	player.physique_stage = 0
 	player.spawn_point = player.position
 
 	camera_rig = CameraRig.new()
@@ -2441,6 +2442,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("creation_physique"):
 			_physique_rolls += 1
 			player.physique_id = Physiques.roll(_physique_rolls)
+			player.physique_stage = 0
 			player.rebuild_stats()
 			Bus.player_stats_changed.emit()
 			Bus.toast.emit("Your body reshapes — %s." % Physiques.name_of(player.physique_id))

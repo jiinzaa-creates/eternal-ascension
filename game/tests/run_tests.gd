@@ -591,6 +591,29 @@ func _physique_tests() -> void:
 				negative = true
 		check(negative, "%s weakness is a real tradeoff" % pid)
 	check(Physiques.weakness_text("physique.mortal_frame") == "", "the mortal frame carries no weakness")
+	for entry in DB.physiques:
+		if int(entry.get("tier", 0)) < 2:
+			continue
+		var pid := String(entry.get("id", ""))
+		check(Physiques.stage_count(pid) == 3, "%s carries three awakening stages" % pid)
+		check(Physiques.stage_scale(pid, 0) == 1.0 and Physiques.stage_scale(pid, 2) > Physiques.stage_scale(pid, 1),
+			"%s awakening deepens from a dormant base" % pid)
+	var scaled := Physiques.mods_for("physique.iron_bone", 2)
+	var scaled_armor := 0.0
+	var scaled_speed := 0.0
+	for mod_value in scaled:
+		var mod: Dictionary = mod_value
+		if String(mod.get("stat", "")) == "armor":
+			scaled_armor = float(mod.get("value", 0.0))
+		if String(mod.get("stat", "")) == "move_speed_pct":
+			scaled_speed = float(mod.get("value", 0.0))
+	check(scaled_armor == 16.0 and scaled_speed == -10.0, "a perfected body doubles gift and weakness alike")
+	var base_block := StatBlock.new(Attributes.new())
+	base_block.rebuild({}, [], 1, 1.0)
+	var perfected := StatBlock.new(Attributes.new())
+	perfected.rebuild({}, [], 1, 1.0, "physique.iron_bone", [], [], [], 0.0, [], 2)
+	check(perfected.armor() == base_block.armor() + 16.0 and perfected.pct("move_speed_pct") == -10.0,
+		"the pipeline applies the perfected scale")
 
 	var bare := StatBlock.new(Attributes.new())
 	bare.rebuild({}, [], 1, 1.0)
@@ -612,6 +635,20 @@ func _physique_tests() -> void:
 	check(not body.inherit_physique("physique.mortal_frame"), "an equal body is not inherited")
 	check(not body.inherit_physique("physique.nonexistent"), "an unknown body is not inherited")
 	check(body.inherit_physique("physique.sword_bone"), "a better body is inherited")
+	body.physique_id = "physique.iron_bone"
+	body.physique_stage = 0
+	body.cultivation.realm = 5
+	var step1 := body.develop_physique()
+	check(String(step1.get("kind", "")) == "awakened" and body.physique_stage == 1, "a breakthrough awakens the body at its gate")
+	var step2 := body.develop_physique()
+	check(String(step2.get("kind", "")) == "awakened" and body.physique_stage == 2, "the second gate awakens it again")
+	check(body.develop_physique().is_empty(), "a perfected body develops no further here")
+	var saved_body: Dictionary = body.to_dict()
+	check(int(saved_body.get("physique_stage", -1)) == 2, "the awakening stage is saved")
+	var loaded_body := Player.new()
+	loaded_body.from_dict(saved_body)
+	check(loaded_body.physique_id == "physique.iron_bone" and loaded_body.physique_stage == 2, "the awakening stage is loaded")
+	check(body.inherit_physique("physique.sword_bone") and body.physique_stage == 0, "a new body starts dormant")
 	check(body.physique_id == "physique.sword_bone", "the inherited body is kept")
 	check(not body.inherit_physique("physique.iron_bone"), "inheritance cannot downgrade")
 	body.free()
