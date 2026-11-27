@@ -168,10 +168,18 @@ func _passive_techs() -> Array:
 	return out
 
 
+## The immortal body (True Immortal+) does not decay: past realm 10
+## the calendar still turns, but it takes nothing from the flesh.
+func _aging_decline() -> float:
+	if Realms.is_immortal_body(cultivation.realm):
+		return 0.0
+	return Aging.decline(Game.age_years(), _lifespan_years())
+
+
 func rebuild_stats() -> void:
 	stats.rebuild(equipment, active_passives(), cultivation.realm, cultivation.attr_mult(), physique_id,
 		Meridians.bonus_mods(cultivation.meridians), Realms.ability_mods(cultivation.realm),
-		Enlightenments.mods(enlightenments), Aging.decline(Game.age_years(), _lifespan_years()),
+		Enlightenments.mods(enlightenments), _aging_decline(),
 		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs())
 		+ ([{"stat": "lifespan", "value": Game.lifespan_years_bonus}] if Game.lifespan_years_bonus > 0 else [])
 		+ ([{"stat": "qi_max_pct", "value": -5.0 * float(Game.death_wounds)}] if Game.death_wounds > 0 else []), physique_stage)
@@ -255,6 +263,10 @@ func enlightenment_state() -> Dictionary:
 ## Every source of understanding funnels here so one place decides when an
 ## insight is due. Returns true only when an insight was actually learned.
 func gain_comprehension(amount: float) -> bool:
+	# Dao comprehension (Primordial Dao): every source of understanding
+	# arrives twice as deep.
+	if Realms.dao_deepens(cultivation.realm):
+		amount *= 2.0
 	if not cultivation.add_comprehension(amount):
 		return false
 	if not cultivation.is_enlightenment_ready():

@@ -1308,6 +1308,30 @@ func _realm_tests() -> void:
 	check(is_equal_approx(float(plain_split["physical"]) + float(plain_split["lightning"]), 100.0),
 		"an unbuilt conversion conserves the total")
 	check(not Realms.can_project_domain(7) and Realms.can_project_domain(8), "domain projection follows its unlock")
+	check(not Realms.is_immortal_body(9) and Realms.is_immortal_body(10), "the immortal body follows its unlock")
+	check(not Realms.can_manipulate_planes(10) and Realms.can_manipulate_planes(11), "plane manipulation follows its unlock")
+	check(is_equal_approx(Realms.travel_hours(10000.0, 11), 0.0), "travel through the planes costs no hours")
+	check(not Realms.dao_deepens(11) and Realms.dao_deepens(12), "dao comprehension follows its unlock")
+	var elder := Player.new()
+	elder.attrs = Attributes.new()
+	elder.stats = StatBlock.new(elder.attrs)
+	elder.cultivation = Cultivation.new()
+	var saved_born := Game.born_day
+	Game.born_day = Clock.day - int(9000.0 * Aging.DAYS_PER_YEAR)
+	elder.cultivation.realm = 9
+	check(elder._aging_decline() > 0.0, "a transcendent body still decays with age")
+	elder.cultivation.realm = 10
+	check(elder._aging_decline() == 0.0, "the immortal body does not decay")
+	Game.born_day = saved_born
+	elder.cultivation.realm = 11
+	var before_dao: float = elder.cultivation.enlightenment_meter
+	elder.gain_comprehension(10.0)
+	check(is_equal_approx(elder.cultivation.enlightenment_meter - before_dao, 10.0), "comprehension is single before the dao")
+	elder.cultivation.realm = 12
+	before_dao = elder.cultivation.enlightenment_meter
+	elder.gain_comprehension(10.0)
+	check(is_equal_approx(elder.cultivation.enlightenment_meter - before_dao, 20.0), "dao comprehension doubles every gain")
+	elder.free()
 	check(is_equal_approx(Realms.domain_dps(8), 6.0) and is_equal_approx(Realms.domain_dps(12), 14.0),
 		"domain pressure grows with realm")
 	var domain_payloads := Realms.domain_payloads(8)

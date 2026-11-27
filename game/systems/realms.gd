@@ -12,8 +12,13 @@ extends RefCounted
 ## twelve sets of mods never stack into nonsense.
 ##
 ## Flags that a system reads today: `dash_cancel` (Player), `technique_weaving`
-## (Player). The rest are declared capabilities that later milestones consume
-## (flight, hidden realms, domains). They are data, not promises of behaviour.
+## (Player), `elemental_conversion` (Damage/Player), `spirit_scan` (scene/HUD),
+## `flight` (Player/scene), `space_folding` (travel), `physique_awakening`
+## (Player, via the physique stages), `domain_projection` (Player),
+## `immortal_body` (Player aging), `plane_manipulation` (travel) and
+## `dao_comprehension` (Player). Two remain declared-only by design:
+## `ascension_attempt` belongs to the endgame's Blank Page (M70), and
+## hidden-realm creation is a content system of its own.
 
 const SUBLEVELS := 10
 const EARLY_MAX := 3
@@ -237,5 +242,26 @@ static func domain_payloads(number: int) -> Array:
 
 
 static func travel_hours(distance: float, number: int) -> float:
+	if can_manipulate_planes(number):
+		return 0.0
 	var hours := Travel.hours_for(distance)
 	return hours * FOLD_TRAVEL_MULT if can_fold(number) else hours
+
+
+## Immortal body: True Immortal and above — age stops costing the body
+## anything (the R10/R11 lifespan caps still stand; only the Primordial
+## Dao is unbounded).
+static func is_immortal_body(number: int) -> bool:
+	return has_unlock(number, "immortal_body")
+
+
+## Plane manipulation: Mystic Sovereign and above — travel folds
+## through the planes and costs no hours at all.
+static func can_manipulate_planes(number: int) -> bool:
+	return has_unlock(number, "plane_manipulation")
+
+
+## Dao comprehension: at the Primordial Dao, understanding arrives
+## twice as deep from every source.
+static func dao_deepens(number: int) -> bool:
+	return has_unlock(number, "dao_comprehension")
