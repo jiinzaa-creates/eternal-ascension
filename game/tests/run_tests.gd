@@ -397,8 +397,10 @@ func _extreme_tests() -> void:
 
 	var realm_two := StatBlock.new(Attributes.new())
 	realm_two.rebuild({}, [], 1, 2.0)
-	check(approx(realm_two.physical_mult(), stats.physical_mult() * 2.0), "realm multiplier applies once, multiplicatively")
-	check(realm_two.crit_chance() == stats.crit_chance(), "realm does not change crit chance")
+	# R4 (Jawanza's directive): the realm multiplier still applies once,
+	# and the realm body (+2 at mult 2.0) raises STR inside the curve too.
+	check(approx(realm_two.physical_mult(), (1.0 + Attributes.soft(12.0, 22.0) / 22.0) * 2.0), "realm multiplier applies once, multiplicatively, over a remade body")
+	check(realm_two.crit_chance() > stats.crit_chance(), "the realm body raises DEX, so realm now feeds crit chance")
 
 
 # -------------------------------------------------------------- secondary ----
@@ -1393,6 +1395,15 @@ func _realm_tests() -> void:
 	check(loaded_tempered.attr_points == 4, "attribute points survive a save round-trip")
 	tempered.free()
 	loaded_tempered.free()
+	var realm_body := StatBlock.new(Attributes.new())
+	realm_body.rebuild({}, [], 6, 4.6)
+	check(realm_body.realm_body_bonus == 7 and realm_body.get_attr("str") == 17,
+		"a realm-six multiplier remakes the body: +7 to every attribute")
+	realm_body.rebuild({}, [], 1, 1.0)
+	check(realm_body.realm_body_bonus == 0 and realm_body.get_attr("str") == 10,
+		"the first realm carries no body bonus")
+	realm_body.rebuild({}, [], 12, 27.0)
+	check(realm_body.get_attr("wis") == 62, "the last realm's body bonus is +52")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

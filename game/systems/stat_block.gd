@@ -34,6 +34,10 @@ const CRIT_DAMAGE_FLOOR := 1.2
 var base: Attributes
 var realm: int = 1
 var realm_mult: float = 1.0
+## The realm body (R4): a flat bonus to every attribute, derived
+## from the realm multiplier at rebuild. A higher realm is a
+## remade body, not only a bigger damage scalar.
+var realm_body_bonus := 0
 
 var flat_attrs: Dictionary = {}
 var add_pct: Dictionary = {}
@@ -69,6 +73,7 @@ func rebuild(equipment: Dictionary, passive_ids: Array, realm_number: int, realm
 	aging_penalty = clampf(aging, 0.0, 0.9)
 	realm = realm_number
 	realm_mult = realm_attribute_mult
+	realm_body_bonus = int(round(maxf(0.0, realm_attribute_mult - 1.0) * 2.0))
 
 	for slot in equipment.keys():
 		var item: Dictionary = equipment[slot]
@@ -144,14 +149,14 @@ static func factor(percent: float) -> float:
 
 
 func get_attr(key: String) -> int:
-	var raw := maxi(0, base.get_attr(key) + int(flat_attrs.get(key, 0)))
+	var raw := maxi(0, base.get_attr(key) + int(flat_attrs.get(key, 0)) + realm_body_bonus)
 	if aging_penalty > 0.0 and Aging.AGING_KEYS.has(key):
 		return int(round(float(raw) * (1.0 - aging_penalty)))
 	return raw
 
 
 func attr_bonus(key: String) -> int:
-	return int(flat_attrs.get(key, 0))
+	return int(flat_attrs.get(key, 0)) + realm_body_bonus
 
 
 func pct(key: String) -> float:
