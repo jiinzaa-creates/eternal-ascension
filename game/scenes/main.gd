@@ -2235,7 +2235,12 @@ func _travel_landmarks() -> Array:
 
 
 func travel_destinations() -> Array:
-	return Travel.destinations(_travel_landmarks(), travel_sites, Travel.MAX_ROWS)
+	var out := Travel.destinations(_travel_landmarks(), travel_sites, Travel.MAX_ROWS)
+	# Space folding (Void Refinement+): the anchor you wake at is always
+	# one fold away, listed first among the roads.
+	if player != null and Realms.can_fold(player.cultivation.realm):
+		out.push_front({"id": "recall", "name": "Recall — your anchor", "position": player.spawn_point})
+	return out
 
 
 ## Region entries: the first observation after a load is silent; after
@@ -2306,7 +2311,7 @@ func _show_travel() -> void:
 		var distance := target.distance_to(player.global_position)
 		rows.append({
 			"name": String(destination["name"]),
-			"detail": "%s · %.1f h" % [Travel.distance_label(distance), Travel.hours_for(distance)],
+			"detail": "%s · %.1f h" % [Travel.distance_label(distance), Realms.travel_hours(distance, player.cultivation.realm)],
 			"color": "#9fe0c0" if waypoint_name == String(destination["name"]) else "#e6eef2",
 		})
 	travel_panel.setup(rows, travel_index)
@@ -2320,9 +2325,10 @@ func _travel_to(index: int) -> void:
 		return
 	var destination: Dictionary = destinations[index]
 	var target: Vector2 = destination["position"]
-	var hours := Travel.hours_for(target.distance_to(player.global_position))
+	var hours := Realms.travel_hours(target.distance_to(player.global_position), player.cultivation.realm)
 	player.global_position = target + Vector2(0, 44)
-	player.spawn_point = player.global_position
+	if String(destination.get("id", "")) != "recall":
+		player.spawn_point = player.global_position
 	Clock.advance(hours)
 	chunks.today = Clock.day
 	chunks.stream_around(player.global_position)

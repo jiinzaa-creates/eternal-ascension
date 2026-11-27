@@ -187,3 +187,16 @@ const FLIGHT_QI_PER_SEC := 2.0
 
 static func can_fly(number: int) -> bool:
 	return has_unlock(number, "flight")
+
+
+## Space folding: Void Refinement and above. The road costs a quarter
+## of its hours, and the cultivator's anchor joins the travel list.
+const FOLD_TRAVEL_MULT := 0.25
+
+static func can_fold(number: int) -> bool:
+	return has_unlock(number, "space_folding")
+
+
+static func travel_hours(distance: float, number: int) -> float:
+	var hours := Travel.hours_for(distance)
+	return hours * FOLD_TRAVEL_MULT if can_fold(number) else hours
