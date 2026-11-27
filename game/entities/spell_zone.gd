@@ -9,6 +9,7 @@ extends Node2D
 
 var radius := 90.0
 var amount := 0.0
+var lightning := 0.0
 var power := 1.0
 var poise_damage := 0.0
 var knock_force := 0.0
@@ -30,6 +31,7 @@ func setup(spec: Dictionary, strike: Dictionary, tint: Color) -> void:
 	_delay = maxf(0.0, float(spec.get("delay", 0.35)))
 	_delay_total = maxf(0.01, _delay)
 	amount = float(strike.get("amount", 0.0))
+	lightning = float(strike.get("lightning", 0.0))
 	power = float(strike.get("power", 1.0))
 	poise_damage = float(strike.get("poise", 0.0))
 	knock_force = float(strike.get("knock", 0.0))
@@ -76,6 +78,8 @@ func _explode() -> void:
 		if enemy.has_method("take_hit"):
 			var push := global_position.direction_to(enemy.global_position) * knock_force
 			dealt = float(enemy.take_hit(final, push, poise_damage, penetration, status))
+			if lightning > 0.0:
+				dealt += float(enemy.take_hit(Damage.resolve(lightning, 0.0, power), Vector2.ZERO, 0.0, 0.9, {}))
 		if dealt <= 0.0:
 			continue
 		Bus.damage_dealt.emit(dealt, enemy)

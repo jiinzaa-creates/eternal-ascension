@@ -17,6 +17,19 @@ static func resolve(raw: float, resist: float = 0.0, attacker_power: float = 0.0
 	return maxf(MIN_HIT, raw * (1.0 - effective_resist(resist, attacker_power)))
 
 
+## Elemental conversion (Core Formation+): split a strike's raw force
+## into its physical remainder and its lightning share. The lightning
+## share is scaled by the attacker's lightning_damage_pct, so with no
+## lightning built the split conserves the total exactly, and every
+## point of lightning investment is pure gain on the converted share.
+static func convert_split(raw: float, lightning_pct: float, realm: int) -> Dictionary:
+	if not Realms.can_convert(realm) or raw <= 0.0:
+		return {"physical": raw, "lightning": 0.0}
+	var share := raw * Realms.CONVERSION_SHARE
+	return {"physical": raw - share,
+		"lightning": share * (1.0 + maxf(0.0, lightning_pct) / 100.0)}
+
+
 ## Attribute + technique scaling, before resistances. Matches the combat spec.
 static func technique_damage(technique: Dictionary, stats: StatBlock, weapon_damage: float = 0.0,
 		mastery_mult: float = 1.0) -> float:

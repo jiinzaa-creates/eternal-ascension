@@ -11,6 +11,7 @@ var direction := Vector2.RIGHT
 var speed := 560.0
 var radius := 9.0
 var amount := 0.0
+var lightning := 0.0
 var power := 1.0
 var poise_damage := 0.0
 var knock_force := 0.0
@@ -41,6 +42,7 @@ func setup(dir: Vector2, spec: Dictionary, strike: Dictionary, tint: Color) -> v
 	var travel := maxf(0.0, float(spec.get("range", 440.0)))
 	_life = travel / speed
 	amount = float(strike.get("amount", 0.0))
+	lightning = float(strike.get("lightning", 0.0))
 	power = float(strike.get("power", 1.0))
 	poise_damage = float(strike.get("poise", 0.0))
 	knock_force = float(strike.get("knock", 0.0))
@@ -109,6 +111,8 @@ func _land(target: Node2D) -> void:
 			dealt = float(target.take_hit(final, origin, true, poise_damage, knock_force, null, status))
 		else:
 			dealt = float(target.take_hit(final, direction * knock_force, poise_damage, penetration, status))
+			if lightning > 0.0:
+				dealt += float(target.take_hit(Damage.resolve(lightning, 0.0, power), Vector2.ZERO, 0.0, 0.9, {}))
 	if dealt <= 0.0:
 		return
 	Bus.damage_dealt.emit(dealt, target)

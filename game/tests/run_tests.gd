@@ -1298,6 +1298,17 @@ func _realm_tests() -> void:
 	check(not Realms.can_fly(4) and Realms.can_fly(5) and Realms.can_fly(12), "flight follows its unlock")
 	check(not Realms.can_fold(5) and Realms.can_fold(6), "space folding follows its unlock")
 	check(not Realms.can_spirit_scan(3) and Realms.can_spirit_scan(4), "spirit scan follows its unlock")
+	check(not Realms.can_convert(2) and Realms.can_convert(3), "elemental conversion follows its unlock")
+	var unconverted := Damage.convert_split(100.0, 12.0, 2)
+	check(is_equal_approx(float(unconverted["physical"]), 100.0) and is_equal_approx(float(unconverted["lightning"]), 0.0),
+		"below core formation nothing converts")
+	var plain_split := Damage.convert_split(100.0, 0.0, 3)
+	check(is_equal_approx(float(plain_split["physical"]), 75.0) and is_equal_approx(float(plain_split["lightning"]), 25.0),
+		"conversion moves a quarter of the force to lightning")
+	check(is_equal_approx(float(plain_split["physical"]) + float(plain_split["lightning"]), 100.0),
+		"an unbuilt conversion conserves the total")
+	var built_split := Damage.convert_split(100.0, 12.0, 3)
+	check(is_equal_approx(float(built_split["lightning"]), 28.0), "lightning investment scales the converted share")
 	check(is_equal_approx(Realms.travel_hours(10000.0, 5), Travel.hours_for(10000.0)), "the unfolded road costs full hours")
 	check(is_equal_approx(Realms.travel_hours(10000.0, 6), Travel.hours_for(10000.0) * 0.25), "the folded road costs a quarter")
 	var flyer := Player.new()

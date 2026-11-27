@@ -203,6 +203,15 @@ static func can_spirit_scan(number: int) -> bool:
 	return has_unlock(number, "spirit_scan")
 
 
+## Elemental conversion: Core Formation and above. A quarter of every
+## strike's force leaves the physical road and travels as lightning,
+## scaled by the lightning_damage_pct stat.
+const CONVERSION_SHARE := 0.25
+
+static func can_convert(number: int) -> bool:
+	return has_unlock(number, "elemental_conversion")
+
+
 static func travel_hours(distance: float, number: int) -> float:
 	var hours := Travel.hours_for(distance)
 	return hours * FOLD_TRAVEL_MULT if can_fold(number) else hours

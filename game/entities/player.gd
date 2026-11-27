@@ -969,8 +969,10 @@ func _resolve_strike(attack: Dictionary) -> Dictionary:
 			Mastery.damage_mult(mastery_tier(tech_id)))
 	if is_crit:
 		raw *= stats.crit_multiplier()
+	var split := Damage.convert_split(raw, stats.pct("lightning_damage_pct"), cultivation.realm)
 	return {
-		"amount": raw,
+		"amount": float(split["physical"]),
+		"lightning": float(split["lightning"]),
 		"crit": is_crit,
 		"power": float(cultivation.realm),
 		"poise": Damage.poise_damage(attack, stats),
@@ -1060,6 +1062,12 @@ func _resolve_melee(attack: Dictionary, strike: Dictionary) -> void:
 		if enemy.has_method("take_hit"):
 			dealt = float(enemy.take_hit(final, _facing.normalized() * float(strike["knock"]),
 				float(strike["poise"]), float(strike["penetration"]), status_payload))
+			# The converted share lands as lightning: no knock, no poise,
+			# and nine-tenths of the armour simply is not there for it.
+			var bolt := float(strike.get("lightning", 0.0))
+			if bolt > 0.0:
+				dealt += float(enemy.take_hit(Damage.resolve(bolt, 0.0, float(strike["power"])),
+					Vector2.ZERO, 0.0, 0.9, {}))
 		if dealt <= 0.0:
 			continue
 		Bus.damage_dealt.emit(dealt, enemy)

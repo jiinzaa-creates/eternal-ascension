@@ -10,6 +10,7 @@ const RADIUS := 10.0
 const SEEK_RANGE := 420.0
 
 var amount := 0.0
+var lightning := 0.0
 var power := 1.0
 var poise_damage := 0.0
 var knock_force := 0.0
@@ -33,6 +34,7 @@ var _target: Node2D = null
 func setup(spec: Dictionary, strike: Dictionary, tint: Color, title: String) -> void:
 	var mult := maxf(0.0, float(spec.get("damage_mult", 0.4)))
 	amount = float(strike.get("amount", 0.0)) * mult
+	lightning = float(strike.get("lightning", 0.0)) * mult
 	power = float(strike.get("power", 1.0))
 	poise_damage = float(strike.get("poise", 0.0)) * mult
 	knock_force = float(strike.get("knock", 0.0))
@@ -98,6 +100,8 @@ func _strike(dir: Vector2) -> void:
 	var dealt := 0.0
 	if _target.has_method("take_hit"):
 		dealt = float(_target.take_hit(final, push, poise_damage, penetration, status))
+		if lightning > 0.0:
+			dealt += float(_target.take_hit(Damage.resolve(lightning, 0.0, power), Vector2.ZERO, 0.0, 0.9, {}))
 	if dealt <= 0.0:
 		return
 	Bus.damage_dealt.emit(dealt, _target)
