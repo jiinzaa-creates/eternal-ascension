@@ -1321,6 +1321,16 @@ func _realm_tests() -> void:
 		and Daos.route("combat", {"weapon_school": "saber"}) == "dao.blade"
 		and Daos.route("practice", {}) == "dao.space",
 		"comprehension routes by its channel")
+	check(Daos.route("teachers", {"method_id": "method.alchemy"}) == "dao.alchemy"
+		and Daos.route("manuals", {"method_id": "method.formation"}) == "dao.formation"
+		and Daos.route("observation", {}) == "dao.elemental" and Daos.route("event", {}) == "dao.time",
+		"teachers, manuals, observation and events route to their roads")
+	var sig_state := {"realm": 12, "method": "", "attrs": null, "dao_stages": {}}
+	check(not bool(Enlightenments.eligible("enl.dao_sword", sig_state)["ok"]),
+		"a signature insight sleeps before its road is walked")
+	sig_state["dao_stages"] = {"dao.sword": 2}
+	check(bool(Enlightenments.eligible("enl.dao_sword", sig_state)["ok"]),
+		"deepening a road wakes its signature insight")
 	check(Daos.route("meditation", {"method_id": "method.sword", "biome": "biome.verdant"}) == "dao.sword"
 		and Daos.route("meditation", {"method_id": "method.sword", "biome": "biome.volcanic"}) == "dao.elemental"
 		and Daos.route("meditation", {"method_id": "method.sword", "focus": "dao.time"}) == "dao.time",

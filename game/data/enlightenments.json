@@ -1,17 +1,435 @@
 {
   "enlightenments": [
-    {"id": "enl.still_water", "name": "Still Water Clarity", "weight": 12, "requires": {"realm": 1}, "desc": "The surface settles and the bottom becomes visible. Qi regeneration +6%.", "mods": [{"stat": "qi_regen_pct", "value": 6}]},
-    {"id": "enl.bone_truth", "name": "Bone Truth", "weight": 8, "requires": {"method": "method.body"}, "desc": "Bone is not a cage but an argument. Physical resistance +6%, armour +4.", "mods": [{"stat": "physical_resist", "value": 6}, {"stat": "armor", "value": 4}]},
-    {"id": "enl.rain_of_swords", "name": "Rain of Swords", "weight": 8, "requires": {"method": "method.sword"}, "desc": "Every drop is a cut waiting for permission. Attack speed +5%, physical damage +4%.", "mods": [{"stat": "attack_speed_pct", "value": 5}, {"stat": "physical_damage_pct", "value": 4}]},
-    {"id": "enl.blood_moon", "name": "Blood Moon Clarity", "weight": 6, "requires": {"method": "method.blood"}, "desc": "The sea reflects a moon that is not there. Lifesteal +3%, maximum Qi +4%.", "mods": [{"stat": "lifesteal", "value": 3}, {"stat": "qi_max_pct", "value": 4}]},
-    {"id": "enl.red_road", "name": "Truth of the Red Road", "weight": 6, "requires": {"method": "method.slaughter"}, "desc": "The road was always this short. Physical damage +6%, critical chance +2%.", "mods": [{"stat": "physical_damage_pct", "value": 6}, {"stat": "crit_chance", "value": 2}]},
-    {"id": "enl.shared_circulation", "name": "Shared Circulation", "weight": 6, "requires": {"method": "method.dual"}, "desc": "Two currents learn one rhythm. Qi regeneration +8%, maximum Qi +4%.", "mods": [{"stat": "qi_regen_pct", "value": 8}, {"stat": "qi_max_pct", "value": 4}]},
-    {"id": "enl.starfall", "name": "Starfall Understanding", "weight": 6, "requires": {"method": "method.heavenly"}, "desc": "The sky is a diagram you finally read. Cultivation speed +8%.", "mods": [{"stat": "cult_speed_pct", "value": 8}]},
-    {"id": "enl.empty_mind", "name": "Empty Mind", "weight": 10, "requires": {"realm": 2}, "desc": "Nothing is held, so nothing is lost. Maximum Qi +8%.", "mods": [{"stat": "qi_max_pct", "value": 8}]},
-    {"id": "enl.core_truth", "name": "Core Truth", "weight": 8, "requires": {"realm": 3}, "desc": "A core is a promise kept under pressure. Critical damage +10%.", "mods": [{"stat": "crit_damage", "value": 10}]},
-    {"id": "enl.one_step", "name": "One Step Between", "weight": 7, "requires": {"realm": 5}, "desc": "The gap between two places is a habit. Movement +5%, evasion +3%.", "mods": [{"stat": "move_speed_pct", "value": 5}, {"stat": "evasion", "value": 3}]},
-    {"id": "enl.formless_law", "name": "Formless Law", "weight": 6, "requires": {"realm": 6}, "desc": "A technique is only a shape law tolerates. Cooldown reduction +5%, penetration +4%.", "mods": [{"stat": "cooldown_reduction", "value": 5}, {"stat": "penetration", "value": 4}]},
-    {"id": "enl.dao_seed", "name": "Dao Seed", "weight": 4, "requires": {"realm": 8}, "desc": "Something in you has begun to grow its own law. Cultivation speed +10%, maximum Qi +10%.", "mods": [{"stat": "cult_speed_pct", "value": 10}, {"stat": "qi_max_pct", "value": 10}]},
-    {"id": "enl.primordial_glimpse", "name": "Primordial Glimpse", "weight": 3, "requires": {"realm": 10}, "desc": "For one breath, the first sky is visible again. Physical damage +10%, Qi regeneration +15%.", "mods": [{"stat": "physical_damage_pct", "value": 10}, {"stat": "qi_regen_pct", "value": 15}]}
+    {
+      "id": "enl.still_water",
+      "name": "Still Water Clarity",
+      "weight": 12,
+      "requires": {
+        "realm": 1
+      },
+      "desc": "The surface settles and the bottom becomes visible. Qi regeneration +6%.",
+      "mods": [
+        {
+          "stat": "qi_regen_pct",
+          "value": 6
+        }
+      ]
+    },
+    {
+      "id": "enl.bone_truth",
+      "name": "Bone Truth",
+      "weight": 8,
+      "requires": {
+        "method": "method.body"
+      },
+      "desc": "Bone is not a cage but an argument. Physical resistance +6%, armour +4.",
+      "mods": [
+        {
+          "stat": "physical_resist",
+          "value": 6
+        },
+        {
+          "stat": "armor",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.rain_of_swords",
+      "name": "Rain of Swords",
+      "weight": 8,
+      "requires": {
+        "method": "method.sword"
+      },
+      "desc": "Every drop is a cut waiting for permission. Attack speed +5%, physical damage +4%.",
+      "mods": [
+        {
+          "stat": "attack_speed_pct",
+          "value": 5
+        },
+        {
+          "stat": "physical_damage_pct",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.blood_moon",
+      "name": "Blood Moon Clarity",
+      "weight": 6,
+      "requires": {
+        "method": "method.blood"
+      },
+      "desc": "The sea reflects a moon that is not there. Lifesteal +3%, maximum Qi +4%.",
+      "mods": [
+        {
+          "stat": "lifesteal",
+          "value": 3
+        },
+        {
+          "stat": "qi_max_pct",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.red_road",
+      "name": "Truth of the Red Road",
+      "weight": 6,
+      "requires": {
+        "method": "method.slaughter"
+      },
+      "desc": "The road was always this short. Physical damage +6%, critical chance +2%.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 6
+        },
+        {
+          "stat": "crit_chance",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "enl.shared_circulation",
+      "name": "Shared Circulation",
+      "weight": 6,
+      "requires": {
+        "method": "method.dual"
+      },
+      "desc": "Two currents learn one rhythm. Qi regeneration +8%, maximum Qi +4%.",
+      "mods": [
+        {
+          "stat": "qi_regen_pct",
+          "value": 8
+        },
+        {
+          "stat": "qi_max_pct",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.starfall",
+      "name": "Starfall Understanding",
+      "weight": 6,
+      "requires": {
+        "method": "method.heavenly"
+      },
+      "desc": "The sky is a diagram you finally read. Cultivation speed +8%.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "id": "enl.empty_mind",
+      "name": "Empty Mind",
+      "weight": 10,
+      "requires": {
+        "realm": 2
+      },
+      "desc": "Nothing is held, so nothing is lost. Maximum Qi +8%.",
+      "mods": [
+        {
+          "stat": "qi_max_pct",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "id": "enl.core_truth",
+      "name": "Core Truth",
+      "weight": 8,
+      "requires": {
+        "realm": 3
+      },
+      "desc": "A core is a promise kept under pressure. Critical damage +10%.",
+      "mods": [
+        {
+          "stat": "crit_damage",
+          "value": 10
+        }
+      ]
+    },
+    {
+      "id": "enl.one_step",
+      "name": "One Step Between",
+      "weight": 7,
+      "requires": {
+        "realm": 5
+      },
+      "desc": "The gap between two places is a habit. Movement +5%, evasion +3%.",
+      "mods": [
+        {
+          "stat": "move_speed_pct",
+          "value": 5
+        },
+        {
+          "stat": "evasion",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "enl.formless_law",
+      "name": "Formless Law",
+      "weight": 6,
+      "requires": {
+        "realm": 6
+      },
+      "desc": "A technique is only a shape law tolerates. Cooldown reduction +5%, penetration +4%.",
+      "mods": [
+        {
+          "stat": "cooldown_reduction",
+          "value": 5
+        },
+        {
+          "stat": "penetration",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_seed",
+      "name": "Dao Seed",
+      "weight": 4,
+      "requires": {
+        "realm": 8
+      },
+      "desc": "Something in you has begun to grow its own law. Cultivation speed +10%, maximum Qi +10%.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 10
+        },
+        {
+          "stat": "qi_max_pct",
+          "value": 10
+        }
+      ]
+    },
+    {
+      "id": "enl.primordial_glimpse",
+      "name": "Primordial Glimpse",
+      "weight": 3,
+      "requires": {
+        "realm": 10
+      },
+      "desc": "For one breath, the first sky is visible again. Physical damage +10%, Qi regeneration +15%.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 10
+        },
+        {
+          "stat": "qi_regen_pct",
+          "value": 15
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_sword",
+      "name": "Ten Thousand Swords Return",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.sword",
+        "stage": 2
+      },
+      "desc": "When every sword you have ever swung arrives at once, the argument is over. Attack speed +6%, physical damage +5%.",
+      "mods": [
+        {
+          "stat": "attack_speed_pct",
+          "value": 6
+        },
+        {
+          "stat": "physical_damage_pct",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_blade",
+      "name": "The Final Argument",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.blade",
+        "stage": 2
+      },
+      "desc": "One cut, made with the whole life behind it. Critical damage +15%, physical damage +4%.",
+      "mods": [
+        {
+          "stat": "crit_damage",
+          "value": 15
+        },
+        {
+          "stat": "physical_damage_pct",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_alchemy",
+      "name": "The Golden Elixir, Glimpsed",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.alchemy",
+        "stage": 2
+      },
+      "desc": "For one breath the crucible shows you gold. Cultivation speed +8%, Qi regeneration +1.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 8
+        },
+        {
+          "stat": "qi_regen_flat",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_formation",
+      "name": "The Land Is a Formation",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.formation",
+        "stage": 2
+      },
+      "desc": "Once you see it, every hill is a flag and every river a line. Armour +6, physical resistance +4%.",
+      "mods": [
+        {
+          "stat": "armor",
+          "value": 6
+        },
+        {
+          "stat": "physical_resist",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_body",
+      "name": "Flesh Is the First Scripture",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.body",
+        "stage": 2
+      },
+      "desc": "Read closely enough, the body explains itself. Health regeneration +0.5, armour +4.",
+      "mods": [
+        {
+          "stat": "health_regen",
+          "value": 0.5
+        },
+        {
+          "stat": "armor",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_beast",
+      "name": "The Pack Remembers",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.beast",
+        "stage": 2
+      },
+      "desc": "Run long enough with the wild and it runs with you. Movement speed +5%, lifesteal +2%.",
+      "mods": [
+        {
+          "stat": "move_speed_pct",
+          "value": 5
+        },
+        {
+          "stat": "lifesteal",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_weapon",
+      "name": "No Tool Is Foreign",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.weapon",
+        "stage": 2
+      },
+      "desc": "The hand stops asking what it holds. Weapon damage +3, attack speed +4%.",
+      "mods": [
+        {
+          "stat": "weapon_damage",
+          "value": 3
+        },
+        {
+          "stat": "attack_speed_pct",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_space",
+      "name": "Here Is Also There",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.space",
+        "stage": 2
+      },
+      "desc": "The fold stops being a trick and becomes a fact. Cooldowns -5%, evasion +3.",
+      "mods": [
+        {
+          "stat": "cooldown_reduction",
+          "value": 5
+        },
+        {
+          "stat": "evasion",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_time",
+      "name": "The River's Other Bank",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.time",
+        "stage": 2
+      },
+      "desc": "You stop swimming against it. Cultivation speed +8%, cooldowns -3%.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 8
+        },
+        {
+          "stat": "cooldown_reduction",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "enl.dao_elemental",
+      "name": "One Thing, Turning",
+      "weight": 5,
+      "requires": {
+        "dao": "dao.elemental",
+        "stage": 2
+      },
+      "desc": "The phases were never five. Lightning damage +12%, maximum Qi +5%.",
+      "mods": [
+        {
+          "stat": "lightning_damage_pct",
+          "value": 12
+        },
+        {
+          "stat": "qi_max_pct",
+          "value": 5
+        }
+      ]
+    }
   ]
 }

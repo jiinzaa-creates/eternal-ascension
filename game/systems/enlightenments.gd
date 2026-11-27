@@ -33,6 +33,11 @@ static func eligible(id: String, state: Dictionary) -> Dictionary:
 	var method := String(req.get("method", ""))
 	if method != "" and String(state.get("method", "")) != method:
 		return {"ok": false, "reason": "%s path" % method}
+	var dao_req := String(req.get("dao", ""))
+	if dao_req != "":
+		var dao_stages: Dictionary = state.get("dao_stages", {})
+		if int(dao_stages.get(dao_req, 0)) < int(req.get("stage", 1)):
+			return {"ok": false, "reason": "%s stage %d" % [dao_req, int(req.get("stage", 1))]}
 	var min_int := int(req.get("min_int", 0))
 	if min_int > 0:
 		var attrs: Variant = state.get("attrs", null)

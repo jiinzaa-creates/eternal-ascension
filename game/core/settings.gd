@@ -32,6 +32,7 @@ const KEY_BINDINGS := {
 	"open_settings": [KEY_X],
 	"breakthrough": [KEY_G],
 	"toggle_flight": [KEY_F],
+	"cycle_dao_focus": [KEY_BRACKETLEFT],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],
 	"skill_3": [KEY_3],

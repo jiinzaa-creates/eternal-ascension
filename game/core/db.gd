@@ -604,6 +604,11 @@ func validate() -> Array:
 		var req_method := String(req.get("method", ""))
 		if req_method != "" and not has("method", req_method):
 			problems.append("enlightenment %s requires unknown method %s" % [e_id, req_method])
+		var req_dao := String(req.get("dao", ""))
+		if req_dao != "" and dao(req_dao).is_empty():
+			problems.append("enlightenment %s requires unknown dao %s" % [e_id, req_dao])
+		if req_dao != "" and (int(req.get("stage", 0)) < 1 or int(req.get("stage", 0)) > 4):
+			problems.append("enlightenment %s requires an invalid dao stage" % e_id)
 
 	if roots.size() != 12:
 		problems.append("expected 12 spiritual roots, found %d" % roots.size())

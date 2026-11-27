@@ -262,7 +262,8 @@ func try_learn_passive(id: String) -> Dictionary:
 
 ## What an epiphany roll reads: realm, practised method, attributes.
 func enlightenment_state() -> Dictionary:
-	return {"realm": cultivation.realm, "method": cultivation.method_id, "attrs": attrs}
+	return {"realm": cultivation.realm, "method": cultivation.method_id, "attrs": attrs,
+		"dao_stages": Daos.stage_map(dao_progress)}
 
 
 ## Every source of understanding funnels here so one place decides when an
@@ -607,6 +608,8 @@ func _physics_process(delta: float) -> void:
 		toggle_meditation()
 	if Input.is_action_just_pressed("toggle_flight"):
 		toggle_flight()
+	if Input.is_action_just_pressed("cycle_dao_focus"):
+		cycle_dao_focus()
 
 	if _dodge_timer > 0.0:
 		move_and_slide()
@@ -1575,6 +1578,21 @@ func toggle_meditation() -> void:
 
 ## Flight is a realm art, not a vehicle: below Spirit Transformation the
 ## body simply has no answer for the sky.
+## Walk the roads in turn: no focus (the method's own road), then each
+## of the ten, then back to none. The choice is saved with the body.
+func cycle_dao_focus() -> void:
+	var ring: Array[String] = [""]
+	for entry in Daos.all():
+		ring.append(String(entry.get("id", "")))
+	var index := ring.find(dao_focus)
+	dao_focus = ring[(index + 1) % ring.size()]
+	if dao_focus == "":
+		Bus.toast.emit("Your meditation follows your method's road.")
+	else:
+		Bus.toast.emit("Your meditation turns to the %s." % Daos.name_of(dao_focus))
+	Bus.cultivation_changed.emit()
+
+
 func toggle_flight() -> void:
 	if flying:
 		flying = false
