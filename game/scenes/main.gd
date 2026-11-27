@@ -2260,6 +2260,8 @@ func _tick_region() -> void:
 		var revealed := _spirit_scan_region(index)
 		if revealed > 0 and not first:
 			Bus.toast.emit("Your spirit sense sweeps the region — %d places are known to you now." % revealed)
+			# Seeing the land whole is itself a lesson (M28, observation).
+			player.gain_comprehension(3.0, "observation")
 
 
 ## Spirit scan (Nascent Soul+): entering a region lays its towns and
@@ -3645,6 +3647,7 @@ func _sect_seat_activate(index: int) -> void:
 			if bool(learned.get("ok", false)):
 				Bus.toast.emit("The house masters teach you %s." % String(DB.technique(tech_id).get("name", tech_id)))
 				Bus.cultivation_changed.emit()
+				player.gain_comprehension(10.0, "teachers")
 			else:
 				Bus.toast.emit("The masters refuse: %s." % String(learned.get("reason", "")))
 		"method":
@@ -3653,6 +3656,8 @@ func _sect_seat_activate(index: int) -> void:
 			if bool(check.get("ok", false)):
 				player.cultivation.method_id = method_id
 				_note_method_practiced(method_id)
+				# A stele is a manual that outlives its author (M28).
+				player.gain_comprehension(10.0, "manuals")
 				Bus.toast.emit("The stele reshapes your circulation: %s." % String(Methods.find(method_id).get("name", method_id)))
 				Bus.cultivation_changed.emit()
 			else:
@@ -5191,6 +5196,20 @@ func character_sections() -> Array:
 	]
 	if Physiques.weakness_text(player.physique_id) != "":
 		cultivation.append("Weakness: " + Physiques.weakness_text(player.physique_id))
+	if player.dao_focus != "":
+		cultivation.append("Dao focus: " + Daos.name_of(player.dao_focus))
+	for dao_entry in Daos.all():
+		var dao_id := String(dao_entry.get("id", ""))
+		var dao_points := float(player.dao_progress.get(dao_id, 0.0))
+		var dao_stage := Daos.stage_for(dao_points)
+		if dao_stage <= 0 and dao_points <= 0.0:
+			continue
+		var dao_line := "%s — %s · %d insight" % [Daos.name_of(dao_id),
+			Daos.stage_name(dao_stage) if dao_stage > 0 else "Unwalked", int(dao_points)]
+		var dao_next := Daos.points_to_next(dao_points)
+		if dao_next > 0.0:
+			dao_line += " · next stage in %d" % int(ceili(dao_next))
+		cultivation.append(dao_line)
 	var evolution_target := Physiques.evolves_to(player.physique_id)
 	if evolution_target != "":
 		cultivation.append("Evolution: %s (realm %d, once perfected)" % [Physiques.name_of(evolution_target), Physiques.evolve_realm(player.physique_id)])
@@ -6051,6 +6070,8 @@ func _cycle_secondary() -> void:
 		Game.spirit_stones -= Methods.SWITCH_COST
 	player.cultivation.secondary_method_id = next_id
 	_note_method_practiced(next_id)
+	# Studying the pairing stele is study of a manual (M28).
+	player.gain_comprehension(10.0, "manuals")
 	if next_id == "":
 		Bus.toast.emit("The pairing dissolves; one circulation remains.")
 	else:
@@ -6081,6 +6102,8 @@ func _teach_technique() -> void:
 	Game.spirit_stones -= price
 	Bus.toast.emit("Instructor Rui teaches %s. (-%d stones)" % [String(tech.get("name", tech_id)), price])
 	Bus.cultivation_changed.emit()
+	# A teacher's lesson is comprehension with a face (M28).
+	player.gain_comprehension(10.0, "teachers")
 
 
 func _talk(npc: Npc) -> void:
@@ -6224,12 +6247,15 @@ func _use_interactable(node: Interactable) -> void:
 				node.used = true
 				var passive: Dictionary = DB.passive(node.manual_passive)
 				Bus.toast.emit("You study the manual. Passive learned: %s." % String(passive.get("name", node.manual_passive)))
+				# Study is comprehension through the page (M28).
+				player.gain_comprehension(10.0, "manuals")
 				Bus.player_stats_changed.emit()
 				return
 			if player.learn_technique(node.manual_technique):
 				node.used = true
 				var tech: Dictionary = DB.technique(node.manual_technique)
 				Bus.toast.emit("You study the manual. Technique learned: %s." % String(tech.get("name", node.manual_technique)))
+				player.gain_comprehension(10.0, "manuals")
 				Bus.cultivation_changed.emit()
 			else:
 				Bus.toast.emit("You already know what this manual teaches.")
@@ -7218,6 +7244,9 @@ func _refresh_world_event(announce: bool, saved: Variant = null) -> void:
 	var current_id := String(world_event.get("id", ""))
 	if current_id != "" and current_id != previous_id:
 		Bus.toast.emit("A tiding sweeps the market: %s." % String(world_event.get("name", "a strange day")))
+		# A rare day teaches what quiet days cannot (M28).
+		if player != null:
+			player.gain_comprehension(5.0, "event")
 	elif current_id == "" and previous_id != "":
 		Bus.toast.emit("The %s passes." % previous_name)
 
