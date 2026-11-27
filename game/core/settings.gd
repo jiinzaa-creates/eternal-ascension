@@ -31,6 +31,7 @@ const KEY_BINDINGS := {
 	"open_endgame": [KEY_Z],
 	"open_settings": [KEY_X],
 	"breakthrough": [KEY_G],
+	"toggle_flight": [KEY_F],
 	"skill_1": [KEY_1],
 	"skill_2": [KEY_2],
 	"skill_3": [KEY_3],

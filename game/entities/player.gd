@@ -103,6 +103,9 @@ var _peak_notified := false
 var _attack_counter := 0
 var _evade_counter := 0
 var _sprinting := false
+## Flight (Spirit Transformation+): momentary, never saved — a run always
+## starts on the ground.
+var flying := false
 ## Last passive-condition state, so a threshold crossing rebuilds once rather
 ## than every frame.
 var _was_wounded := false
@@ -561,6 +564,8 @@ func _physics_process(delta: float) -> void:
 		try_dodge(input_dir)
 	if Input.is_action_just_pressed("meditate") and not rose_from_cultivation:
 		toggle_meditation()
+	if Input.is_action_just_pressed("toggle_flight"):
+		toggle_flight()
 
 	if _dodge_timer > 0.0:
 		move_and_slide()
@@ -569,6 +574,8 @@ func _physics_process(delta: float) -> void:
 	# Chill is a movement rule, not a stat: the stat pipeline is untouched and
 	# the slow ends with the status.
 	var speed := stats.move_speed() * Status.speed_multiplier(statuses)
+	if flying:
+		speed *= Realms.FLIGHT_SPEED_MULT
 	_sprinting = Input.is_action_pressed("sprint") and input_dir != Vector2.ZERO \
 		and _attack_state == "idle" and not is_guarding()
 	speed = Motion.sprint_speed(speed, _sprinting)
@@ -596,6 +603,13 @@ func _aim_dir() -> Vector2:
 
 func _tick_timers(delta: float) -> void:
 	_combat_timer = maxf(0.0, _combat_timer - delta)
+	# The sky is paid for by the second; an empty dantian ends the flight
+	# wherever the body happens to be.
+	if flying:
+		cultivation.qi = maxf(0.0, cultivation.qi - Realms.FLIGHT_QI_PER_SEC * delta)
+		if cultivation.qi <= 0.0:
+			flying = false
+			Bus.toast.emit("Your qi gives out; you drop from the sky.")
 	# Stillness is the formation method's fuel: unbroken quiet, out of combat
 	# and at rest, accrues; any movement or fight breaks the array.
 	if velocity.length() > 8.0 or _combat_timer > 0.0 or _attack_state != "idle":
@@ -1487,8 +1501,24 @@ func toggle_meditation() -> void:
 		return
 	_meditating = not _meditating
 	if _meditating:
+		flying = false
 		_peak_notified = false
 	Bus.meditation_toggled.emit(_meditating)
+
+
+## Flight is a realm art, not a vehicle: below Spirit Transformation the
+## body simply has no answer for the sky.
+func toggle_flight() -> void:
+	if flying:
+		flying = false
+		return
+	if not Realms.can_fly(cultivation.realm):
+		Bus.toast.emit("Your realm cannot yet leave the ground.")
+		return
+	if _meditating:
+		toggle_meditation()
+	flying = true
+	Bus.toast.emit("You rise into the sky.")
 
 
 func is_meditating() -> bool:

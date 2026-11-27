@@ -1131,6 +1131,11 @@ func _process(delta: float) -> void:
 		if player.global_position.distance_to(_last_dry) > 600.0:
 			if not chunks.is_water_at(player.global_position):
 				_last_dry = player.global_position
+		elif player.flying:
+			# The sky is not the shore: no snap back, and dry ground is
+			# only re-baselined underfoot, so a flight that ends over
+			# water still falls back to the last true shore.
+			pass
 		elif chunks.is_water_at(player.global_position):
 			player.global_position = _last_dry
 		else:

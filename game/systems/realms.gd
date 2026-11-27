@@ -177,3 +177,13 @@ static func can_dash_cancel(number: int) -> bool:
 ## Technique weaving: Qi cost and cooldown of every technique, multiplied.
 static func technique_mult(number: int) -> float:
 	return WEAVING_MULT if has_unlock(number, "technique_weaving") else 1.0
+
+
+## Flight: Spirit Transformation and above. The sky costs qi by the second
+## and pays back a quarter more speed; the water leash in the scene reads
+## the player's flying state, not this gate.
+const FLIGHT_SPEED_MULT := 1.25
+const FLIGHT_QI_PER_SEC := 2.0
+
+static func can_fly(number: int) -> bool:
+	return has_unlock(number, "flight")

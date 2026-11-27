@@ -1295,6 +1295,24 @@ func _realm_tests() -> void:
 	check(is_equal_approx(Realms.technique_mult(4), 1.0), "low realms weave nothing")
 	check(is_equal_approx(Realms.technique_mult(5), Realms.WEAVING_MULT), "spirit transformation weaves techniques")
 	check(is_equal_approx(Realms.technique_mult(12), Realms.WEAVING_MULT), "weaving persists once learned")
+	check(not Realms.can_fly(4) and Realms.can_fly(5) and Realms.can_fly(12), "flight follows its unlock")
+	var flyer := Player.new()
+	flyer.attrs = Attributes.new()
+	flyer.stats = StatBlock.new(flyer.attrs)
+	flyer.cultivation = Cultivation.new()
+	flyer.cultivation.realm = 4
+	flyer.toggle_flight()
+	check(not flyer.flying, "a nascent soul cannot leave the ground")
+	flyer.cultivation.realm = 5
+	flyer.cultivation.qi = 10.0
+	flyer.toggle_flight()
+	check(flyer.flying, "spirit transformation takes flight")
+	flyer._tick_timers(1.0)
+	check(flyer.flying and is_equal_approx(flyer.cultivation.qi, 10.0 - Realms.FLIGHT_QI_PER_SEC),
+		"flight drinks qi by the second")
+	flyer._tick_timers(60.0)
+	check(not flyer.flying and flyer.cultivation.qi == 0.0, "an empty dantian ends the flight")
+	flyer.free()
 	check(Realms.unlock_ids(1).size() == Realms.unlocks_at(1).size(), "realm one owns exactly its own unlocks")
 	check(Realms.unlock_ids(2).size() == Realms.unlocks_at(1).size() + Realms.unlocks_at(2).size(), "cumulative unlocks add up")
 	check(Realms.new_unlocks(1, 2).size() == Realms.unlocks_at(2).size(), "a breakthrough reports only what is new")
