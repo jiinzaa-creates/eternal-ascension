@@ -1342,6 +1342,26 @@ func _realm_tests() -> void:
 		"dao progress and focus survive the save round-trip, unknowns dropped")
 	walker.free()
 	walker_rt.free()
+	var student := Player.new()
+	student.attrs = Attributes.new()
+	student.stats = StatBlock.new(student.attrs)
+	student.cultivation = Cultivation.new()
+	student.cultivation.method_id = "method.sword"
+	student.gain_comprehension(30.0, "practice")
+	check(is_equal_approx(float(student.dao_progress.get("dao.space", 0.0)), 30.0),
+		"a breakthrough's lesson walks the Space road")
+	student.gain_comprehension(40.0, "meditation")
+	check(is_equal_approx(float(student.dao_progress.get("dao.sword", 0.0)), 40.0),
+		"meditation walks the method's road")
+	student.dao_focus = "dao.time"
+	student.gain_comprehension(25.0, "meditation")
+	check(is_equal_approx(float(student.dao_progress.get("dao.time", 0.0)), 25.0)
+		and Daos.stage_for(float(student.dao_progress.get("dao.sword", 0.0))) == 0,
+		"a chosen focus redirects the sitting, below the first threshold")
+	student.gain_comprehension(40.0, "meditation")
+	check(Daos.stage_for(float(student.dao_progress.get("dao.time", 0.0))) == 1,
+		"enough focused sitting glimpses the road")
+	student.free()
 	check(not Realms.can_project_domain(7) and Realms.can_project_domain(8), "domain projection follows its unlock")
 	check(not Realms.is_immortal_body(9) and Realms.is_immortal_body(10), "the immortal body follows its unlock")
 	check(not Realms.can_manipulate_planes(10) and Realms.can_manipulate_planes(11), "plane manipulation follows its unlock")

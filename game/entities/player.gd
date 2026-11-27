@@ -267,11 +267,32 @@ func enlightenment_state() -> Dictionary:
 
 ## Every source of understanding funnels here so one place decides when an
 ## insight is due. Returns true only when an insight was actually learned.
-func gain_comprehension(amount: float) -> bool:
+## The state comprehension routing reads: the chosen focus, the road
+## the method walks, the school of the weapon in hand, the land underfoot.
+func dao_state() -> Dictionary:
+	return {"focus": dao_focus, "method_id": cultivation.method_id,
+		"weapon_school": String(weapon_type().get("school", "")),
+		"biome": Game.current_biome}
+
+
+func gain_comprehension(amount: float, channel: String = "") -> bool:
 	# Dao comprehension (Primordial Dao): every source of understanding
 	# arrives twice as deep.
 	if Realms.dao_deepens(cultivation.realm):
 		amount *= 2.0
+	# A channeled gain also walks its road (M28): the insight accrues to
+	# the path the channel belongs to, and crossing a stage threshold is
+	# announced and rebuilt like any other growth.
+	if channel != "" and amount > 0.0:
+		var road := Daos.route(channel, dao_state())
+		if road != "":
+			var before := Daos.stage_for(float(dao_progress.get(road, 0.0)))
+			dao_progress[road] = float(dao_progress.get(road, 0.0)) + amount
+			var after := Daos.stage_for(float(dao_progress[road]))
+			if after > before:
+				Bus.toast.emit("Your %s deepens — %s." % [Daos.name_of(road), Daos.stage_name(after)])
+				rebuild_stats()
+				Bus.player_stats_changed.emit()
 	if not cultivation.add_comprehension(amount):
 		return false
 	if not cultivation.is_enlightenment_ready():
@@ -1514,7 +1535,7 @@ func meditate_tick(delta: float) -> float:
 	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
 	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
 	# Sitting with a method is the slow, reliable road to understanding.
-	gain_comprehension(delta * clampf(factor, 0.0, 2.0))
+	gain_comprehension(delta * clampf(factor, 0.0, 2.0), "meditation")
 	if cultivation.method_id == "method.blood":
 		cultivation.consume_blood_charge(delta * 2.0)
 		cultivation.add_contamination(delta * Meridians.BLOOD_CONTAMINATION_PER_SECOND)
@@ -1531,7 +1552,7 @@ func on_kill(ilvl: int = 1) -> void:
 	if cultivation.method_id == "method.blood":
 		cultivation.add_blood_charge(3.0 + float(maxi(1, ilvl)) * 2.0)
 	# Every death is a lesson, whether or not the character wanted it.
-	gain_comprehension(2.0)
+	gain_comprehension(2.0, "combat")
 	var relic := Uniques.kill_effects(equipment, DB)
 	var healed := float(relic.get("hp", 0.0))
 	if healed > 0.0 and hp > 0.0:
@@ -1656,7 +1677,7 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 		if ability_name != "":
 			Bus.toast.emit("Realm art awakened: %s." % ability_name)
 		# A realm change is the largest single dose of understanding in the game.
-		gain_comprehension(30.0)
+		gain_comprehension(30.0, "practice")
 		var developed := develop_physique()
 		if String(developed.get("kind", "")) == "awakened":
 			Bus.toast.emit("Your physique awakens — %s: %s." % [Physiques.name_of(physique_id), String(developed.get("stage_name", ""))])

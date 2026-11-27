@@ -5992,7 +5992,7 @@ func _on_tribulation_finished(result: Dictionary) -> void:
 			int(result.get("waves_survived", 0)), int(result.get("waves_total", 0)),
 			int(result.get("hits", 0)), "" if int(result.get("hits", 0)) == 1 else "s"])
 		# Facing heaven and walking away is itself a lesson.
-		player.gain_comprehension(20.0)
+		player.gain_comprehension(20.0, "event")
 		player.attempt_breakthrough(float(result.get("composure", 0.0)))
 	elif outcome == "broken":
 		player.fail_breakthrough()
