@@ -6390,6 +6390,11 @@ func _use_root_pavilion() -> void:
 	Bus.player_stats_changed.emit()
 	Bus.cultivation_changed.emit()
 	Bus.toast.emit("Your root evolves — %s." % Roots.describe(cultivation.root_data(), cultivation.effective_purity()))
+	# A root is also a passive source (Directive 3): the new root wakes what
+	# sleeps in its affinities, once.
+	var root_passive := String(cultivation.root_data().get("passive", ""))
+	if root_passive != "" and player.add_passive(root_passive):
+		Bus.toast.emit("The new root wakes something in you — %s." % String(DB.by_id("passive", root_passive).get("name", "a new passive")))
 
 
 func _make_marrow(count: int = 1) -> Dictionary:
