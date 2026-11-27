@@ -197,6 +197,12 @@ static func can_fold(number: int) -> bool:
 	return has_unlock(number, "space_folding")
 
 
+## Spirit scan: Nascent Soul and above — the spirit leaves the body and
+## reads the region and the foe.
+static func can_spirit_scan(number: int) -> bool:
+	return has_unlock(number, "spirit_scan")
+
+
 static func travel_hours(distance: float, number: int) -> float:
 	var hours := Travel.hours_for(distance)
 	return hours * FOLD_TRAVEL_MULT if can_fold(number) else hours

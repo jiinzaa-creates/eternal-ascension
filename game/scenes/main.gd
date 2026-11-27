@@ -2256,6 +2256,39 @@ func _tick_region() -> void:
 	if Game.visit_region(index) and not first:
 		var region: Dictionary = Continent.region_by_index(continent, index)
 		Bus.toast.emit("Entering %s — %s." % [String(region.get("name", "the wilds")), current_biome_name()])
+	if Realms.can_spirit_scan(player.cultivation.realm):
+		var revealed := _spirit_scan_region(index)
+		if revealed > 0 and not first:
+			Bus.toast.emit("Your spirit sense sweeps the region — %d places are known to you now." % revealed)
+
+
+## Spirit scan (Nascent Soul+): entering a region lays its towns and
+## sect seats on the map without the walk. The registrations written
+## here are the same ones walking in would write — same keys, same
+## travel-site entries — so a scanned place and a visited place are
+## indistinguishable afterwards, which is the point of a sense.
+func _spirit_scan_region(index: int) -> int:
+	var revealed := 0
+	for i in town_specs.size():
+		var spec: Dictionary = town_specs[i]
+		if int(spec.get("region_index", -1)) != index:
+			continue
+		var key := "town.%d" % i
+		if Game.discover(key):
+			travel_sites[key] = {"name": String(spec["name"]),
+				"x": (spec["centre"] as Vector2).x, "y": (spec["centre"] as Vector2).y}
+			revealed += 1
+	for spec in seat_specs:
+		if int(spec.get("region_index", -1)) != index:
+			continue
+		var sect_id := String(spec["sect_id"])
+		var key := "sect." + sect_id.trim_prefix("sect.")
+		if Game.discover(key):
+			var sect := Sects.sect(sect_id)
+			travel_sites[key] = {"name": "%s — %s" % [String(sect.get("name", sect_id)), String(spec["name"])],
+				"x": (spec["centre"] as Vector2).x, "y": (spec["centre"] as Vector2).y}
+			revealed += 1
+	return revealed
 
 
 ## What the continent map needs beyond geography: discovered towns,

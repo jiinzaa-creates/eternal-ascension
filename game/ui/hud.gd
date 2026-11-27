@@ -316,6 +316,11 @@ func draw_world_panel(player: Player) -> void:
 	_text(Vector2(x, y), _fit("%s   %s   Kills %d   Karma %d" % [
 		player.display_name, host.current_biome_name(), Game.kills, Game.karma], 11, 292.0), 11, MUTED)
 	y += 18.0
+	if Realms.can_spirit_scan(player.cultivation.realm):
+		var sensed := _sensed_foe_line(player)
+		if sensed != "":
+			_text(Vector2(x, y), _fit(sensed, 11, 292.0), 11, Color("#9fd8e0"))
+			y += 18.0
 	UiFrame.divider(self, x, x + 292.0, y - 9.0)
 	_text(Vector2(x, y), "Spirit stones: %d" % Game.spirit_stones, 13, Color("#d8c070"))
 	y += 18.0
@@ -372,6 +377,27 @@ func draw_world_panel(player: Player) -> void:
 
 
 ## Compass to the chosen waypoint, with the distance to it.
+## Spirit scan (Nascent Soul+): the nearest living foe within sense
+## range, read plainly — name and the state of its body.
+func _sensed_foe_line(player: Player) -> String:
+	var best: Dummy = null
+	var best_distance := 900.0
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var body := node as Dummy
+		if body == null or body.state == "dead":
+			continue
+		var distance := player.global_position.distance_to(body.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = body
+	if best == null:
+		return ""
+	var label := "Sense: %s · HP %d%%" % [best.display_name, roundi(100.0 * best.hp / maxf(1.0, best.hp_max))]
+	if best.is_boss:
+		label += " · BOSS"
+	return label
+
+
 func draw_waypoint(player: Player) -> void:
 	var target: Vector2 = host.waypoint_position
 	if target == Vector2.ZERO or String(host.phase) == "realm":

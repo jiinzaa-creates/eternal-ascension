@@ -1297,6 +1297,7 @@ func _realm_tests() -> void:
 	check(is_equal_approx(Realms.technique_mult(12), Realms.WEAVING_MULT), "weaving persists once learned")
 	check(not Realms.can_fly(4) and Realms.can_fly(5) and Realms.can_fly(12), "flight follows its unlock")
 	check(not Realms.can_fold(5) and Realms.can_fold(6), "space folding follows its unlock")
+	check(not Realms.can_spirit_scan(3) and Realms.can_spirit_scan(4), "spirit scan follows its unlock")
 	check(is_equal_approx(Realms.travel_hours(10000.0, 5), Travel.hours_for(10000.0)), "the unfolded road costs full hours")
 	check(is_equal_approx(Realms.travel_hours(10000.0, 6), Travel.hours_for(10000.0) * 0.25), "the folded road costs a quarter")
 	var flyer := Player.new()
