@@ -573,6 +573,13 @@ func _physique_tests() -> void:
 		tiers[Physiques.tier_of(Physiques.roll(key))] = true
 	check(tiers.size() >= 3, "rolls reach several tiers (%d)" % tiers.size())
 
+	check(DB.physiques.size() == 15, "the collection holds fifteen physiques (%d)" % DB.physiques.size())
+	check(Physiques.evolves_to("physique.iron_bone") == "physique.immortal_bone", "iron bone evolves into the immortal bone constitution")
+	check(Physiques.evolves_to("physique.verdant_meridian") == "physique.eternal_wood", "the verdant body evolves into the eternal wood body")
+	check(Physiques.evolves_to("physique.immortal_bone") == "", "an evolution form is an end of the line")
+	for key in 200:
+		var dealt := Physiques.roll(key)
+		check(int(Physiques.find(dealt).get("weight", 0)) > 0, "rolls never deal an earned body (%s)" % dealt)
 	check(Physiques.tier_of("physique.chaotic_embryo") > Physiques.tier_of("physique.iron_bone"), "tiers are ordered")
 	check(Physiques.best_of("physique.iron_bone", "physique.sword_bone") == "physique.sword_bone", "a better body wins")
 	check(Physiques.best_of("physique.sword_bone", "physique.iron_bone") == "physique.sword_bone", "a worse body is rejected")
@@ -649,6 +656,16 @@ func _physique_tests() -> void:
 	loaded_body.from_dict(saved_body)
 	check(loaded_body.physique_id == "physique.iron_bone" and loaded_body.physique_stage == 2, "the awakening stage is loaded")
 	check(body.inherit_physique("physique.sword_bone") and body.physique_stage == 0, "a new body starts dormant")
+	body.physique_id = "physique.iron_bone"
+	body.physique_stage = 2
+	body.cultivation.realm = 6
+	check(body.develop_physique().is_empty(), "a perfected body below its evolution gate waits")
+	body.cultivation.realm = 7
+	var evolved := body.develop_physique()
+	check(String(evolved.get("kind", "")) == "evolved" and body.physique_id == "physique.immortal_bone" and body.physique_stage == 0,
+		"a perfected body at its gate evolves and starts dormant in the new form")
+	body.physique_id = "physique.sword_bone"
+	body.physique_stage = 0
 	check(body.physique_id == "physique.sword_bone", "the inherited body is kept")
 	check(not body.inherit_physique("physique.iron_bone"), "inheritance cannot downgrade")
 	body.free()

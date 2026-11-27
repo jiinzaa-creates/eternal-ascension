@@ -1574,6 +1574,8 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 		var developed := develop_physique()
 		if String(developed.get("kind", "")) == "awakened":
 			Bus.toast.emit("Your physique awakens — %s: %s." % [Physiques.name_of(physique_id), String(developed.get("stage_name", ""))])
+		elif String(developed.get("kind", "")) == "evolved":
+			Bus.toast.emit("Your body transcends its form — %s." % Physiques.name_of(physique_id))
 	else:
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("The tribulation breaks you. Qi deviation. (%s)" % note)
@@ -1589,6 +1591,15 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 func develop_physique() -> Dictionary:
 	if physique_id == Physiques.DEFAULT_ID:
 		return {}
+	# A perfected body at its realm gate stops deepening and changes form:
+	# evolution is a breakthrough's other harvest.
+	var target := Physiques.evolves_to(physique_id)
+	if target != "" and Physiques.next_stage_realm(physique_id, physique_stage) < 0 \
+			and cultivation.realm >= Physiques.evolve_realm(physique_id):
+		var from := physique_id
+		physique_id = target
+		physique_stage = 0
+		return {"kind": "evolved", "from": from, "to": target}
 	var gate := Physiques.next_stage_realm(physique_id, physique_stage)
 	if gate >= 0 and cultivation.realm >= gate:
 		physique_stage += 1

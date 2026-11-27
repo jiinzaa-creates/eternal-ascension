@@ -19,12 +19,17 @@ static func all() -> Array:
 ## Weighted roll. `key` is the roll counter, and `Rng` mixes the world seed, so
 ## two runs with different seeds roll differently but a given run is repeatable.
 static func roll(key: int) -> String:
-	var defs: Array = DB.physiques
+	# Weight 0 marks an earned body — an evolution form. Rolls (creation,
+	# inheritance) never deal one; it is reached, not dealt.
+	var defs: Array = []
+	for entry in DB.physiques:
+		if int((entry as Dictionary).get("weight", 1)) > 0:
+			defs.append(entry)
 	if defs.is_empty():
 		return ""
 	var weights: Array = []
 	for entry in defs:
-		weights.append(maxi(1, int((entry as Dictionary).get("weight", 1))))
+		weights.append(int((entry as Dictionary).get("weight", 1)))
 	var rng: RandomNumberGenerator = Rng.stream("physique", key, 0)
 	var index: int = int(Rng.pick_weighted(weights, rng))
 	if index < 0 or index >= defs.size():
@@ -48,6 +53,14 @@ static func name_of(id: String) -> String:
 
 
 ## The tradeoff's own words, or "" for a body that carries none.
+static func evolves_to(id: String) -> String:
+	return String(find(id).get("evolves_to", ""))
+
+
+static func evolve_realm(id: String) -> int:
+	return int(find(id).get("evolve_realm", 0))
+
+
 static func weakness_text(id: String) -> String:
 	var weakness: Dictionary = find(id).get("weakness", {})
 	return String(weakness.get("text", ""))

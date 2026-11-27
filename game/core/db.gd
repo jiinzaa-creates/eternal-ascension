@@ -938,6 +938,18 @@ func validate() -> Array:
 				if not (float((stages[1] as Dictionary).get("scale", 0.0)) > 1.0
 						and float((stages[2] as Dictionary).get("scale", 0.0)) > float((stages[1] as Dictionary).get("scale", 0.0))):
 					problems.append("physique %s awakening scales must deepen" % id)
+		var evolves_to := String(p.get("evolves_to", ""))
+		if evolves_to != "":
+			var target: Dictionary = {}
+			for candidate in physiques:
+				if String(candidate.get("id", "")) == evolves_to:
+					target = candidate
+			if target.is_empty():
+				problems.append("physique %s evolves into unknown %s" % [id, evolves_to])
+			elif int(target.get("weight", 1)) != 0:
+				problems.append("evolution form %s must be earned (weight 0), never rolled" % evolves_to)
+			if int(p.get("evolve_realm", 0)) < 1:
+				problems.append("physique %s names an evolution but no realm gate" % id)
 
 	if spirit_beasts.size() < 4:
 		problems.append("expected at least 4 spirit beast species, found %d" % spirit_beasts.size())

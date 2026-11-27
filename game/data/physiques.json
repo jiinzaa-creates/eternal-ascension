@@ -49,7 +49,9 @@
      "realm": 5,
      "scale": 2.0
     }
-   ]
+   ],
+   "evolves_to": "physique.immortal_bone",
+   "evolve_realm": 7
   },
   {
    "id": "physique.pure_yang",
@@ -92,7 +94,9 @@
      "realm": 5,
      "scale": 2.0
     }
-   ]
+   ],
+   "evolves_to": "physique.nine_yang",
+   "evolve_realm": 7
   },
   {
    "id": "physique.wind_stepping",
@@ -139,7 +143,9 @@
      "realm": 6,
      "scale": 2.0
     }
-   ]
+   ],
+   "evolves_to": "physique.void_spirit",
+   "evolve_realm": 8
   },
   {
    "id": "physique.nine_yin",
@@ -186,7 +192,9 @@
      "realm": 6,
      "scale": 2.0
     }
-   ]
+   ],
+   "evolves_to": "physique.taiyin",
+   "evolve_realm": 8
   },
   {
    "id": "physique.sword_bone",
@@ -233,7 +241,9 @@
      "realm": 7,
      "scale": 2.0
     }
-   ]
+   ],
+   "evolves_to": "physique.heavenly_sword",
+   "evolve_realm": 8
   },
   {
    "id": "physique.chaotic_embryo",
@@ -281,6 +291,394 @@
     },
     {
      "name": "Primordial",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ],
+   "evolves_to": "physique.chaotic_origin",
+   "evolve_realm": 10
+  },
+  {
+   "id": "physique.verdant_meridian",
+   "name": "Verdant Meridian Body",
+   "blurb": "Channels like root systems: slow, patient, and very hard to kill.",
+   "tier": 3,
+   "weight": 520,
+   "mods": [
+    {
+     "stat": "health_regen",
+     "value": 0.5
+    },
+    {
+     "stat": "lifespan",
+     "value": 10
+    },
+    {
+     "stat": "qi_regen_flat",
+     "value": 1
+    }
+   ],
+   "weakness": {
+    "text": "The body's slow seasons resist haste.",
+    "mods": [
+     {
+      "stat": "move_speed_pct",
+      "value": -5
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Rooted",
+     "realm": 3,
+     "scale": 1.5
+    },
+    {
+     "name": "Flourishing",
+     "realm": 6,
+     "scale": 2.0
+    }
+   ],
+   "evolves_to": "physique.eternal_wood",
+   "evolve_realm": 8
+  },
+  {
+   "id": "physique.immortal_bone",
+   "name": "Immortal Bone Constitution",
+   "blurb": "Bone that has forgotten how to break, and nearly how to move.",
+   "tier": 5,
+   "weight": 0,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 16
+    },
+    {
+     "stat": "str",
+     "value": 4
+    },
+    {
+     "stat": "physical_resist",
+     "value": 6
+    }
+   ],
+   "weakness": {
+    "text": "Stone does not hurry.",
+    "mods": [
+     {
+      "stat": "move_speed_pct",
+      "value": -7
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Petrified",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Eternal",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ]
+  },
+  {
+   "id": "physique.nine_yang",
+   "name": "Nine Yang Divine Body",
+   "blurb": "Nine suns banked in one chest; the night keeps its distance.",
+   "tier": 5,
+   "weight": 0,
+   "mods": [
+    {
+     "stat": "qi_max_pct",
+     "value": 16
+    },
+    {
+     "stat": "health_regen",
+     "value": 0.8
+    },
+    {
+     "stat": "qi_regen_flat",
+     "value": 2
+    }
+   ],
+   "weakness": {
+    "text": "Nine suns cannot hide.",
+    "mods": [
+     {
+      "stat": "evasion",
+      "value": -6
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Radiant",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Ascendant",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ]
+  },
+  {
+   "id": "physique.heavenly_sword",
+   "name": "Heavenly Sword Constitution",
+   "blurb": "The body completes its argument: there is only the edge.",
+   "tier": 5,
+   "weight": 0,
+   "mods": [
+    {
+     "stat": "physical_damage_pct",
+     "value": 18
+    },
+    {
+     "stat": "crit_damage",
+     "value": 20
+    },
+    {
+     "stat": "dex",
+     "value": 5
+    }
+   ],
+   "weakness": {
+    "text": "A sword holds no water.",
+    "mods": [
+     {
+      "stat": "qi_max_pct",
+      "value": -8
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Drawn",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Severing",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ]
+  },
+  {
+   "id": "physique.void_spirit",
+   "name": "Void Spirit Physique",
+   "blurb": "Half of the cultivator is always somewhere else.",
+   "tier": 5,
+   "weight": 0,
+   "mods": [
+    {
+     "stat": "move_speed_pct",
+     "value": 14
+    },
+    {
+     "stat": "evasion",
+     "value": 9
+    },
+    {
+     "stat": "agi",
+     "value": 4
+    },
+    {
+     "stat": "cooldown_reduction",
+     "value": 5
+    }
+   ],
+   "weakness": {
+    "text": "Half elsewhere, half unarmoured.",
+    "mods": [
+     {
+      "stat": "armor",
+      "value": -8
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Flickering",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Unmoored",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ]
+  },
+  {
+   "id": "physique.taiyin",
+   "name": "Taiyin Moon Body",
+   "blurb": "Yin perfected into moonlight: cold, exact, and patient.",
+   "tier": 5,
+   "weight": 0,
+   "mods": [
+    {
+     "stat": "crit_chance",
+     "value": 7
+    },
+    {
+     "stat": "qi_max_pct",
+     "value": 16
+    },
+    {
+     "stat": "int",
+     "value": 4
+    }
+   ],
+   "weakness": {
+    "text": "Moon flesh shuns the forge of war.",
+    "mods": [
+     {
+      "stat": "str",
+      "value": -3
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Waxing",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Full",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ]
+  },
+  {
+   "id": "physique.chaotic_origin",
+   "name": "Chaotic Origin Physique",
+   "blurb": "The embryo remembers the time before the world had rules.",
+   "tier": 5,
+   "weight": 0,
+   "mods": [
+    {
+     "stat": "physical_damage_pct",
+     "value": 20
+    },
+    {
+     "stat": "qi_max_pct",
+     "value": 20
+    },
+    {
+     "stat": "lifespan",
+     "value": 30
+    },
+    {
+     "stat": "wis",
+     "value": 5
+    }
+   ],
+   "weakness": {
+    "text": "The origin remembers no order.",
+    "mods": [
+     {
+      "stat": "cult_speed_pct",
+      "value": -8
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Stirring",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Formless",
+     "realm": 9,
+     "scale": 2.0
+    }
+   ]
+  },
+  {
+   "id": "physique.eternal_wood",
+   "name": "Eternal Wood Body",
+   "blurb": "Rooted in every season at once; the years pass around it.",
+   "tier": 5,
+   "weight": 0,
+   "mods": [
+    {
+     "stat": "health_regen",
+     "value": 1.2
+    },
+    {
+     "stat": "lifespan",
+     "value": 40
+    },
+    {
+     "stat": "qi_regen_flat",
+     "value": 2
+    }
+   ],
+   "weakness": {
+    "text": "Old growth does not hurry.",
+    "mods": [
+     {
+      "stat": "move_speed_pct",
+      "value": -6
+     }
+    ]
+   },
+   "stages": [
+    {
+     "name": "Dormant",
+     "realm": 0,
+     "scale": 1.0
+    },
+    {
+     "name": "Heartwood",
+     "realm": 5,
+     "scale": 1.5
+    },
+    {
+     "name": "Evergreen",
      "realm": 9,
      "scale": 2.0
     }
