@@ -2551,6 +2551,33 @@ func _crafting_tests() -> void:
 	check(bool(named_fused.get("ok", false)) and int((named_fused["item"] as Dictionary).get("rarity", 0)) == 3
 		and String((named_fused["item"] as Dictionary).get("name", "")) == "Dawncaller",
 		"fusion raises the rarity but never renames a named piece")
+
+	# Reforging: one affix is struck out and rolled anew, the rest stand.
+	var rf_piece := gen.generate(6, 70031, 1, 3, "weapon")
+	check((rf_piece.get("mods", []) as Array).size() >= 2, "the reforge subject carries affixes")
+	var first_id := String(((rf_piece.get("mods", []) as Array)[0] as Dictionary).get("id", ""))
+	var second_id := String(((rf_piece.get("mods", []) as Array)[1] as Dictionary).get("id", ""))
+	var reforged := rules.reforge_affix(rf_piece, first_id, 100001, 0, 0.0)
+	check(bool(reforged.get("ok", false)), "a sure-handed reforging lands")
+	var reforged_item: Dictionary = reforged["item"]
+	var new_first := String(((reforged_item.get("mods", []) as Array)[0] as Dictionary).get("id", ""))
+	check(new_first != first_id and new_first != second_id, "the reforged affix is new to the piece")
+	check(String(((reforged_item.get("mods", []) as Array)[1] as Dictionary).get("id", "")) == second_id,
+		"the other affixes stand untouched")
+	var rf_failed: Dictionary = {}
+	for counter in range(0, 400):
+		var attempt := rules.reforge_affix(rf_piece, first_id, 100002, counter, 1.0)
+		if bool(attempt.get("failed", false)):
+			rf_failed = attempt
+			break
+	check(not rf_failed.is_empty()
+		and String((((rf_failed["item"] as Dictionary).get("mods", []) as Array)[0] as Dictionary).get("id", "")) == first_id,
+		"a failed reforging leaves the affix standing")
+	var rf_enchanted := rules.enchant(rf_piece, "enchant.stormbrand", 90021, 0, 0.0)
+	check(not bool(rules.reforge_affix(rf_enchanted["item"], "enchant.stormbrand", 100003, 0, 0.0).get("ok", true)),
+		"an enchantment cannot be reforged")
+	check(not bool(rules.reforge_affix(rf_piece, "prefix.nope", 100004, 0, 0.0).get("ok", true)),
+		"an affix the piece does not carry cannot be reforged")
 	check(not bool(Crafting.check(recipe, bag, 10, 1)["ok"]), "a recipe refuses an empty purse")
 	check(String(Crafting.check(recipe, bag, 10, 1)["reason"]).contains("spirit stones"), "the refusal names the missing stones")
 	check(bool(Crafting.check(recipe, bag, 100, 1)["ok"]), "a payable recipe passes")

@@ -454,3 +454,98 @@ func fuse(chassis: Dictionary, donor: Dictionary, key: int, counter: int, failur
 	out["item"] = worked
 	out["transferred"] = transferred
 	return out
+
+
+## Reforges ONE rolled affix on a piece (Directive 12.2's item manipulation,
+## the surgical sibling of Refine): the named affix is struck out and a new
+## one of the same kind — prefix for prefix, suffix for suffix — is rolled in
+## its place at the piece's level, never duplicating an affix the piece
+## already carries. The enchantment is not a rolled affix and refuses.
+## Failure spends the materials and changes nothing.
+func reforge_affix(item: Dictionary, affix_id: String, key: int, counter: int, failure_mult: float = 1.0) -> Dictionary:
+	var out := {"ok": false, "failed": false, "item": item, "reason": "", "mod_text": ""}
+	if not Items.is_equipment(String(item.get("slot", ""))):
+		out["reason"] = "only gear can be reforged"
+		return out
+	if bool(item.get("unique", false)):
+		out["reason"] = "an authored relic refuses a smith"
+		return out
+	var mods: Array = item.get("mods", [])
+	var target := -1
+	for i in mods.size():
+		var mod: Dictionary = mods[i]
+		if String(mod.get("id", "")) == affix_id:
+			if bool(mod.get("enchant", false)):
+				out["reason"] = "an enchantment is not a rolled affix"
+				return out
+			target = i
+	if target < 0:
+		out["reason"] = "the piece does not carry that affix"
+		return out
+	var kind := ""
+	if not db.by_id("prefix", affix_id).is_empty():
+		kind = "prefix"
+	elif not db.by_id("suffix", affix_id).is_empty():
+		kind = "suffix"
+	if kind == "":
+		out["reason"] = "that affix is not in the smith's books"
+		return out
+	var held: Dictionary = {}
+	for mod_value in mods:
+		held[String((mod_value as Dictionary).get("id", ""))] = true
+	var pool: Array = []
+	for affix_value in db.affixes_for(String(item.get("slot", "")), kind):
+		var affix: Dictionary = affix_value
+		if held.has(String(affix.get("id", ""))):
+			continue
+		if int(affix.get("weight", 10)) <= 0:
+			continue
+		pool.append(affix)
+	if pool.is_empty():
+		out["reason"] = "no other affix of its kind will take"
+		return out
+	var rules := action("reforge")
+	if rules.is_empty():
+		out["reason"] = "reforging is not offered here"
+		return out
+	var r := Rng.stream("craft.reforge", key, counter)
+	var chance := clampf(float(rules.get("failure_chance", 0.0)) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0)
+	if r.randf() < chance:
+		out["failed"] = true
+		out["reason"] = "the reforging fails; the affix stands"
+		return out
+	var total_weight := 0
+	for affix in pool:
+		total_weight += int((affix as Dictionary).get("weight", 10))
+	var roll := r.randf() * float(total_weight)
+	var picked: Dictionary = pool[0]
+	var acc := 0.0
+	for affix_value in pool:
+		var affix: Dictionary = affix_value
+		acc += float(int(affix.get("weight", 10)))
+		if roll <= acc:
+			picked = affix
+			break
+	var tier_index := ItemGen.tier_for(picked, int(item.get("ilvl", 1)))
+	var tier := ItemGen.tier_data(picked, tier_index)
+	var lo := float(tier.get("min", picked.get("min", 0.0)))
+	var hi := float(tier.get("max", picked.get("max", lo)))
+	var value := lo + r.randf() * maxf(0.0, hi - lo)
+	if String(picked.get("unit", "")) == "%" or hi >= 10.0:
+		value = snappedf(value, 0.1)
+	else:
+		value = maxf(1.0, roundf(value))
+	var worked: Dictionary = item.duplicate(true)
+	var new_mods: Array = (worked.get("mods", []) as Array).duplicate()
+	new_mods[target] = {
+		"id": String(picked.get("id", "")),
+		"stat": String(picked.get("stat", "")),
+		"value": value,
+		"tier": tier_index + 1,
+		"text": ItemGen.affix_text(picked, value),
+	}
+	worked["mods"] = new_mods
+	out["ok"] = true
+	out["item"] = worked
+	out["mod_text"] = String(new_mods[target].get("text", ""))
+	return out

@@ -81,9 +81,10 @@ var forge_open := false
 var forge_mode := 0
 var forge_enchant_item := ""
 var forge_fuse_chassis := ""
+var forge_reforge_item := ""
 var _personalize_item := ""
 var forge_index := 0
-const FORGE_MODES: Array[String] = ["forge", "refine", "upgrade", "enchant", "fuse", "personalize", "disassemble"]
+const FORGE_MODES: Array[String] = ["forge", "refine", "upgrade", "enchant", "fuse", "personalize", "reforge", "disassemble"]
 ## Alchemy: one cauldron, one list of potions, frozen play for the same reason.
 var alchemy: Alchemy
 var alchemy_open := false
@@ -1511,6 +1512,15 @@ func forge_rows() -> Array:
 		var marked := _inventory_item(forge_enchant_item)
 		if not marked.is_empty():
 			return DB.enchants_for(String(marked.get("slot", "")))
+	if FORGE_MODES[forge_mode] == "reforge" and forge_reforge_item != "":
+		var host_item := _inventory_item(forge_reforge_item)
+		if not host_item.is_empty():
+			var rolled: Array = []
+			for mod_value in (host_item.get("mods", []) as Array):
+				var mod: Dictionary = mod_value
+				if not bool(mod.get("enchant", false)):
+					rolled.append(mod)
+			return rolled
 	return gear_candidates()
 
 
@@ -1537,6 +1547,8 @@ func forge_cost(mode_index: int) -> Dictionary:
 			return crafting.action("fuse")
 		"personalize":
 			return crafting.action("personalize")
+		"reforge":
+			return crafting.action("reforge")
 		"disassemble":
 			return crafting.action("disassemble")
 		_:
@@ -1582,6 +1594,26 @@ func forge_act() -> void:
 					_forge_fuse(chassis, chosen)
 		"personalize":
 			_begin_personalize(chosen)
+		"reforge":
+			if forge_reforge_item == "":
+				var has_rolled := false
+				for mod_value in (chosen.get("mods", []) as Array):
+					if not bool((mod_value as Dictionary).get("enchant", false)):
+						has_rolled = true
+				if bool(chosen.get("unique", false)):
+					Bus.toast.emit("An authored relic refuses a smith.")
+				elif not has_rolled:
+					Bus.toast.emit("Nothing on it can be reforged.")
+				else:
+					forge_reforge_item = String(chosen.get("id", ""))
+					forge_index = 0
+					Bus.toast.emit("Choose the affix to reforge on %s." % String(chosen.get("name", "the piece")))
+			else:
+				var target_item := _inventory_item(forge_reforge_item)
+				forge_reforge_item = ""
+				forge_index = 0
+				if not target_item.is_empty():
+					_forge_reforge(target_item, chosen)
 		"disassemble":
 			_forge_disassemble(chosen)
 
@@ -1826,6 +1858,37 @@ func _on_personalize_name_submitted(text: String) -> void:
 			player.inventory[i] = renamed
 			break
 	Bus.toast.emit("The smith sets the name in the steel: %s." % cleaned)
+
+
+func _forge_reforge(item: Dictionary, mod_row: Dictionary) -> void:
+	var rules: Dictionary = crafting.action("reforge")
+	var check := Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("Reforging needs %s." % String(check.get("reason", "more materials")))
+		return
+	var attempt := Game.crafts_made
+	Game.crafts_made += 1
+	var smith: Dictionary = DB.profession("profession.smith")
+	var rank := Professions.level_of(Game.professions, "profession.smith")
+	var result := crafting.reforge_affix(item, String(mod_row.get("id", "")), 100000 + attempt, 0,
+		Professions.failure_mult(smith, rank))
+	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
+		Bus.toast.emit(String(result.get("reason", "the affix refuses the hammer")).capitalize() + ".")
+		return
+	_spend_craft(rules)
+	if bool(result.get("failed", false)):
+		Bus.toast.emit("The reforging fails — the affix stands, the materials are spent.")
+		return
+	var worked: Dictionary = result["item"]
+	for i in player.inventory.size():
+		if String((player.inventory[i] as Dictionary).get("id", "")) == String(item.get("id", "")):
+			player.inventory[i] = worked
+			break
+	Bus.toast.emit("Reforged %s: %s becomes %s." % [String(worked.get("name", "the piece")),
+		String(mod_row.get("text", "the affix")), String(result.get("mod_text", ""))])
+	var practice := Professions.award(Game.professions, "profession.smith")
+	if bool(practice.get("leveled", false)):
+		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
 
 
 func _forge_disassemble(item: Dictionary) -> void:
@@ -2651,6 +2714,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			forge_index = 0
 			forge_enchant_item = ""
 			forge_fuse_chassis = ""
+			forge_reforge_item = ""
 			return
 		var forge_list := forge_rows()
 		if event.is_action_pressed("ui_down"):

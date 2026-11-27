@@ -202,6 +202,19 @@
    "materials": [],
    "failure_chance": 0.0,
    "desc": "Give a piece a name of your own. The name endures: refinement, upgrading and fusion all keep it."
+  },
+  {
+   "id": "reforge",
+   "name": "Reforge",
+   "stones": 60,
+   "materials": [
+    {
+     "material": "ore",
+     "count": 1
+    }
+   ],
+   "failure_chance": 0.15,
+   "desc": "Reforge a single affix on a piece: that one line is struck out and rolled anew from its own kind. The rest of the piece is untouched. An enchantment is not a rolled affix and cannot be reforged."
   }
  ]
 }

@@ -1609,7 +1609,7 @@ func draw_forge(player: Player) -> void:
 	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#e0a060", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "AZURE FORGE", 18, Color("#e8b070"))
-	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "ENCHANT", "FUSE", "PERSONALIZE", "DISASSEMBLE"]
+	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "ENCHANT", "FUSE", "PERSONALIZE", "REFORGE", "DISASSEMBLE"]
 	var mode := int(host.forge_mode)
 	var tabs := ""
 	for i in modes.size():
@@ -1626,7 +1626,7 @@ func draw_forge(player: Player) -> void:
 		_text(Vector2(origin.x + 22.0, list_y), "Nothing to work here.", 12, MUTED)
 	for i in range(first, mini(rows.size(), first + 12)):
 		var entry: Dictionary = rows[i]
-		var label := String(entry.get("name", "?")) if mode == 0 else Items.label(entry)
+		var label := String(entry.get("text", "?")) if (mode == 6 and String(host.forge_reforge_item) != "") else (String(entry.get("name", "?")) if mode == 0 else Items.label(entry))
 		if mode == 0 and not bool(Professions.gate(entry, Game.professions, DB).get("ok", false)):
 			label += "  (locked)"
 		var line := "%s %s" % [">" if i == selected else " ", _fit(label, 12, 330.0)]
@@ -1755,6 +1755,31 @@ func draw_forge(player: Player) -> void:
 			_text(Vector2(cx, cy), "An authored relic already carries its name.", 11, Color("#e08f8f"))
 		else:
 			_text(Vector2(cx, cy), "ENTER names this piece.", 12, ACCENT)
+		return
+	if mode == 6:
+		var reforge_id := String(host.forge_reforge_item)
+		var rf_check: Dictionary = Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(rules), 11, 360.0), 11, Color("#d8c070"))
+		cy += 20.0
+		if reforge_id == "":
+			_text(Vector2(cx, cy), _fit("Failure %d%% — the affix stands." % int(round(float(rules.get("failure_chance", 0.0)) * 100.0)), 11, 360.0), 11, Color("#7f9098"))
+			cy += 32.0
+			if bool(chosen.get("unique", false)):
+				_text(Vector2(cx, cy), "An authored relic refuses a smith.", 11, Color("#e08f8f"))
+			else:
+				_text(Vector2(cx, cy), "ENTER chooses this piece, then the affix.", 12, ACCENT)
+			return
+		var reforge_host: Dictionary = {}
+		for candidate in host.gear_candidates():
+			if String((candidate as Dictionary).get("id", "")) == reforge_id:
+				reforge_host = candidate
+				break
+		_text(Vector2(cx, cy), _fit("On %s: this one affix is struck out and rolled anew." % String(reforge_host.get("name", "the piece")), 11, 360.0), 11, Color("#7f9098"))
+		cy += 32.0
+		if not bool(rf_check.get("ok", false)):
+			_text(Vector2(cx, cy), _fit("Needs %s." % String(rf_check.get("reason", "more")), 11, 360.0), 11, Color("#e08f8f"))
+		else:
+			_text(Vector2(cx, cy), "ENTER reforges this affix.", 12, ACCENT)
 		return
 	var ore := Crafting.disassemble_ore(chosen)
 	_text(Vector2(cx, cy), "Yields: %d Spirit Ore" % ore, 12, Color("#d8c070"))
