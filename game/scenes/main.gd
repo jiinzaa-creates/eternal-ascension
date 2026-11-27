@@ -2650,6 +2650,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if character_open:
+		if player != null and player.attr_points > 0:
+			for i in Attributes.KEYS.size():
+				if event.is_action_pressed("skill_%d" % (i + 1)):
+					if player.spend_attr_point(i):
+						Bus.toast.emit("%s grows to %d. %d point%s remain." % [
+							Attributes.LABELS[Attributes.KEYS[i]], player.attrs.get_attr(Attributes.KEYS[i]),
+							player.attr_points, "" if player.attr_points == 1 else "s"])
+					return
 		if event.is_action_pressed("open_character") or event.is_action_pressed("interact") \
 				or event.is_action_pressed("ui_cancel"):
 			_close_character()
@@ -5218,6 +5226,8 @@ func character_sections() -> Array:
 		"Attributes: " + player.attrs.summary(),
 		"Derived: " + player.stats.summary(),
 	]
+	if player.attr_points > 0:
+		attributes.append("Attribute points: %d - keys 1-6 grow STR / DEX / AGI / INT / WIS / CHA" % player.attr_points)
 
 	var arts: Array[String] = []
 	for id_value in player.technique_ids:

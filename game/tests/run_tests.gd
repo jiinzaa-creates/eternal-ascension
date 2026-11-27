@@ -1371,6 +1371,28 @@ func _realm_tests() -> void:
 		and grower.attrs.get_attr("agi") == 11,
 		"a drawn affix bends the second growth to its own attribute")
 	grower.free()
+	var tempered := Player.new()
+	tempered.attrs = Attributes.new()
+	tempered.stats = StatBlock.new(tempered.attrs)
+	tempered.cultivation = Cultivation.new()
+	tempered.appearance = Appearance.new()
+	tempered.attr_points = 6
+	check(tempered.spend_attr_point(0) and tempered.attrs.get_attr("str") == 11
+		and tempered.attr_points == 5, "a banked point grows the chosen attribute")
+	check(not tempered.spend_attr_point(9), "an out-of-range spend is refused")
+	tempered.attr_points = 0
+	check(not tempered.spend_attr_point(0), "an empty pool refuses to spend")
+	var saved_tempered: Dictionary = tempered.to_dict()
+	saved_tempered["attr_points"] = 4
+	var loaded_tempered := Player.new()
+	loaded_tempered.attrs = Attributes.new()
+	loaded_tempered.stats = StatBlock.new(loaded_tempered.attrs)
+	loaded_tempered.cultivation = Cultivation.new()
+	loaded_tempered.appearance = Appearance.new()
+	loaded_tempered.from_dict(saved_tempered)
+	check(loaded_tempered.attr_points == 4, "attribute points survive a save round-trip")
+	tempered.free()
+	loaded_tempered.free()
 	var student := Player.new()
 	student.attrs = Attributes.new()
 	student.stats = StatBlock.new(student.attrs)

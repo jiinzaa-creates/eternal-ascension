@@ -28,6 +28,10 @@ var appearance := Appearance.new()
 ## Innate body. Its mods enter the stat pipeline like equipment or a passive.
 var physique_id := Physiques.DEFAULT_ID
 var physique_stage := 0
+## Attribute points (R2): granted by major breakthroughs, spent
+## from the character sheet with the same 1-6 keys creation used.
+var attr_points := 0
+
 ## Dao paths (M28): insight points per walked road, and the road the
 ## meditator has chosen to walk ("" = the method's own road).
 var dao_progress: Dictionary = {}
@@ -1675,6 +1679,18 @@ func set_guard(held: bool) -> bool:
 ## grows its two attributes by one each, and a drawn method affix
 ## bends the second growth toward its own character. This is the
 ## "small attribute growth" the cultivation design always promised.
+## Spend one banked attribute point (R2). The sheet drives this
+## with the creation screen's own skill_1..skill_6 actions.
+func spend_attr_point(index: int) -> bool:
+	if attr_points <= 0 or index < 0 or index >= Attributes.KEYS.size():
+		return false
+	attr_points -= 1
+	attrs.add(Attributes.KEYS[index], 1)
+	rebuild_stats()
+	Bus.player_stats_changed.emit()
+	return true
+
+
 func _grow_from_sublevel() -> void:
 	var pair := Methods.growth_pair(cultivation.method_id)
 	var primary := String(pair[0])
@@ -1711,6 +1727,10 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 	if bool(result.get("success", false)):
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("Breakthrough! You are now %s." % cultivation.stage_label())
+		for key in Attributes.KEYS:
+			attrs.add(key, 2)
+		attr_points += 6
+		Bus.toast.emit("The breakthrough reforges the body - every attribute +2. Six points await your choosing on the character sheet.")
 		var ability_name := String(result.get("ability", ""))
 		if ability_name != "":
 			Bus.toast.emit("Realm art awakened: %s." % ability_name)
@@ -2031,6 +2051,7 @@ func to_dict() -> Dictionary:
 		"appearance": appearance.to_dict(),
 		"physique": physique_id,
 		"physique_stage": physique_stage,
+		"attr_points": attr_points,
 		"position": [global_position.x, global_position.y],
 		"hp": hp,
 		"hp_max": hp_max,
@@ -2060,6 +2081,7 @@ func from_dict(data: Dictionary) -> void:
 	if Physiques.find(physique_id).is_empty():
 		physique_id = Physiques.DEFAULT_ID
 	physique_stage = clampi(int(data.get("physique_stage", 0)), 0, maxi(0, Physiques.stage_count(physique_id) - 1))
+	attr_points = maxi(0, int(data.get("attr_points", 0)))
 	var pos: Array = data.get("position", [global_position.x, global_position.y])
 	global_position = Vector2(float(pos[0]), float(pos[1]))
 	attrs.from_dict(data.get("attrs", {}))
