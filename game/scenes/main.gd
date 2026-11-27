@@ -1042,6 +1042,13 @@ func selected_origin() -> Dictionary:
 
 ## Starting circumstances: a purse, a starting method and at most one passive.
 ## Applied once when the run begins; a loaded save already contains the result.
+## A method practised for the first time teaches its passive (Directive 3).
+func _note_method_practiced(method_id: String) -> void:
+	var granted := player.practice_method(method_id)
+	if granted != "":
+		Bus.toast.emit("The method leaves its mark — %s." % String(DB.by_id("passive", granted).get("name", "a new passive")))
+
+
 func _apply_origin() -> void:
 	var origin: Dictionary = DB.origin(Game.origin_id)
 	if origin.is_empty():
@@ -1051,6 +1058,7 @@ func _apply_origin() -> void:
 	var method_id := String(fx["method_id"])
 	if method_id != "" and DB.has("method", method_id):
 		player.cultivation.method_id = method_id
+		_note_method_practiced(method_id)
 	var passive := String(fx["passive"])
 	if passive != "":
 		player.add_passive(passive)
@@ -3600,6 +3608,7 @@ func _sect_seat_activate(index: int) -> void:
 			var check := Methods.qualifies(method_id, player.method_state())
 			if bool(check.get("ok", false)):
 				player.cultivation.method_id = method_id
+				_note_method_practiced(method_id)
 				Bus.toast.emit("The stele reshapes your circulation: %s." % String(Methods.find(method_id).get("name", method_id)))
 				Bus.cultivation_changed.emit()
 			else:
@@ -5961,6 +5970,7 @@ func _cycle_method() -> void:
 		return
 	Game.spirit_stones -= Methods.SWITCH_COST
 	player.cultivation.method_id = next_id
+	_note_method_practiced(next_id)
 	# A pairing survives only while the two methods still agree: if the new
 	# primary cannot walk with the old companion, the pairing dissolves.
 	if player.cultivation.secondary_method_id != "" \
@@ -5996,6 +6006,7 @@ func _cycle_secondary() -> void:
 	if next_id != "":
 		Game.spirit_stones -= Methods.SWITCH_COST
 	player.cultivation.secondary_method_id = next_id
+	_note_method_practiced(next_id)
 	if next_id == "":
 		Bus.toast.emit("The pairing dissolves; one circulation remains.")
 	else:

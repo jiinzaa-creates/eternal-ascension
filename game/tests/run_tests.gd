@@ -820,6 +820,15 @@ func _passive_system_tests() -> void:
 	var fallen := state.duplicate()
 	fallen["karma"] = -5
 	check(bool(Passives.condition_met(defiant, fallen)["ok"]), "the defiant soul wakes below heaven's favour")
+	var practitioner := Player.new()
+	practitioner.attrs = Attributes.new()
+	practitioner.stats = StatBlock.new(practitioner.attrs)
+	practitioner.cultivation = Cultivation.new()
+	check(practitioner.practice_method("method.body") == "passive.iron_will"
+		and practitioner.passives.has("passive.iron_will"), "practising a method teaches its passive")
+	check(practitioner.practice_method("method.body") == "", "a method's mark is left once")
+	check(practitioner.practice_method("method.nonexistent") == "", "an unknown method teaches nothing")
+	practitioner.free()
 	var attuned := Passives.synergy_mods(["passive.five_phases_attunement", "passive.storm_soul"])
 	check(attuned.size() == 1 and String(attuned[0]["stat"]) == "lightning_damage_pct",
 		"the five phases feed the storm")

@@ -216,6 +216,16 @@ func add_passive(id: String) -> bool:
 	return true
 
 
+## Cultivating by a method for the first time leaves its mark: the passive
+## the method teaches (Directive 3 names methods as a passive source).
+## Returns the passive id when one was newly granted, else "".
+func practice_method(method_id: String) -> String:
+	var passive_id := String(DB.by_id("method", method_id).get("passive", ""))
+	if passive_id != "" and add_passive(passive_id):
+		return passive_id
+	return ""
+
+
 ## Voluntary learning (manuals, teachers): refuses what the body cannot use yet.
 func try_learn_passive(id: String) -> Dictionary:
 	if id == "" or Passives.find(id).is_empty():
