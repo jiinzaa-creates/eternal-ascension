@@ -585,6 +585,9 @@ func validate() -> Array:
 	for i in roots.size():
 		if int(roots[i].get("tier", 0)) != i + 1:
 			problems.append("root at index %d has wrong tier" % i)
+		var root_passive := String(roots[i].get("passive", ""))
+		if root_passive != "" and DB.by_id("passive", root_passive).is_empty():
+			problems.append("root %s grants unknown passive %s" % [String(roots[i].get("id", "?")), root_passive])
 
 	if methods.is_empty():
 		problems.append("no cultivation methods defined")
@@ -606,6 +609,9 @@ func validate() -> Array:
 			problems.append("method %s has no cultivation multiplier" % method_id)
 		if String(m.get("mechanic", "")) == "":
 			problems.append("method %s has no mechanic" % method_id)
+		var method_passive := String(m.get("passive", ""))
+		if method_passive != "" and DB.by_id("passive", method_passive).is_empty():
+			problems.append("method %s teaches unknown passive %s" % [method_id, method_passive])
 		var method_attrs: Dictionary = (m.get("requires", {}) as Dictionary).get("attrs", {})
 		for key in method_attrs.keys():
 			if not Attributes.KEYS.has(String(key)):

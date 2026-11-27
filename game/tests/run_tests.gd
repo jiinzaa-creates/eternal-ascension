@@ -798,6 +798,31 @@ func _passive_system_tests() -> void:
 	var together := StatBlock.new(Attributes.new())
 	together.rebuild({}, ["passive.flowing_water", "passive.swift_steps"], 1, 1.0)
 	check(together.attack_speed() > solo.attack_speed(), "a synergy reaches the stat pipeline")
+	var categories := {}
+	var sources := {}
+	for entry in DB.passives:
+		categories[String(entry.get("category", ""))] = true
+		sources[String(entry.get("source", ""))] = true
+	for wanted in ["Physical", "Spiritual", "Elemental", "Combat", "Cultivation", "Mental", "Social", "Crafting", "Exploration", "Special"]:
+		check(categories.has(wanted), "the %s category is populated" % wanted)
+	check(sources.has("Root") and sources.has("Method"), "roots and methods stand among the sources")
+	for method in DB.methods:
+		var mp := String(method.get("passive", ""))
+		check(mp != "" and not Passives.find(mp).is_empty(), "%s teaches a real passive" % String(method.get("id", "?")))
+	check(String(DB.by_id("root", "root.primordial").get("passive", "")) == "passive.primordial_awareness",
+		"the primordial root wakes primordial awareness")
+	check(Passives.resolve(["passive.iron_will", "passive.battle_trance"], hurt) == ["passive.iron_will"],
+		"iron will holds its ground against the trance")
+	check(Passives.resolve(["passive.battle_trance", "passive.iron_will"], hurt) == ["passive.battle_trance"],
+		"the trance, taken first, is equally stubborn")
+	var defiant := Passives.find("passive.defiant_soul")
+	check(not bool(Passives.condition_met(defiant, state)["ok"]), "the defiant soul sleeps at neutral karma")
+	var fallen := state.duplicate()
+	fallen["karma"] = -5
+	check(bool(Passives.condition_met(defiant, fallen)["ok"]), "the defiant soul wakes below heaven's favour")
+	var attuned := Passives.synergy_mods(["passive.five_phases_attunement", "passive.storm_soul"])
+	check(attuned.size() == 1 and String(attuned[0]["stat"]) == "lightning_damage_pct",
+		"the five phases feed the storm")
 
 	for entry in DB.passives:
 		var id := String(entry.get("id", ""))

@@ -1,16 +1,249 @@
 {
-  "methods": [
-    {"id": "method.traditional", "combines_with": ["method.body", "method.sword", "method.beast", "method.alchemy", "method.elemental", "method.formation", "method.dual", "method.heavenly"], "name": "Traditional Qi Refinement", "cult_mult": 1.0, "mechanic": "qi_accumulation", "requirement": "none", "risk": "slow, bottleneck-prone", "desc": "Meditate, accumulate Qi, force bottlenecks. The baseline every other path is measured against."},
-    {"id": "method.body", "combines_with": ["method.traditional", "method.slaughter", "method.beast", "method.formation"], "name": "Body Tempering Art", "cult_mult": 0.75, "mechanic": "physical_conditioning", "requires": {"attrs": {"str": 18}}, "requirement": "STR 18", "risk": "permanent injury on overreach", "desc": "Cultivation comes from surviving conditioning, not sitting. Gains scale with STR and pain."},
-    {"id": "method.sword", "combines_with": ["method.traditional", "method.slaughter", "method.elemental", "method.dual"], "name": "Sword Heart Method", "cult_mult": 0.9, "mechanic": "sword_intent", "requires": {"attrs": {"dex": 16, "wis": 14}}, "requirement": "DEX 16, WIS 14", "risk": "stagnates without real combat", "desc": "Sword intent accrued through duels and practice. Meditation alone does almost nothing."},
-    {"id": "method.blood", "combines_with": ["method.slaughter", "method.beast", "method.forbidden"], "name": "Blood Sea Scripture", "cult_mult": 1.4, "mechanic": "blood_essence", "requires": {"physique_tier": 2}, "requirement": "Physique or corrupted meridian", "risk": "corruption is permanent", "desc": "Absorb compatible blood essence from supernatural creatures. Fast, and it changes you."},
-    {"id": "method.slaughter", "combines_with": ["method.body", "method.sword", "method.blood"], "name": "Slaughter Dao", "cult_mult": 1.25, "mechanic": "kills", "requires": {"kills": 50}, "requirement": "kill count 50", "risk": "karmic backlash, heart demons", "desc": "Every kill feeds the dao. Tribulations grow heavier with every corpse behind you."},
-    {"id": "method.dual", "combines_with": ["method.traditional", "method.sword", "method.beast", "method.heavenly"], "name": "Dual Cultivation", "cult_mult": 1.15, "mechanic": "partner", "requires": {"attrs": {"char": 20}}, "requirement": "compatible partner, CHAR 20", "risk": "dependency, trust", "desc": "Progress through mutual circulation with a compatible partner. Relationships are the resource."},
-    {"id": "method.heavenly", "combines_with": ["method.traditional", "method.dual", "method.elemental", "method.formation"], "name": "Heavenly Star Absorption", "cult_mult": 1.6, "mechanic": "celestial", "requires": {"realm": 2}, "requirement": "Night sky, rare materials", "risk": "celestial tribulations", "desc": "Draw on stellar alignments and rare celestial materials during specific windows."},
-    {"id": "method.beast", "combines_with": ["method.traditional", "method.body", "method.blood", "method.dual"], "name": "Beast Companion Path", "cult_mult": 1.2, "mechanic": "beast_bond", "requires": {"attrs": {"char": 14}}, "requirement": "CHAR 14", "risk": "your beasts' hunger becomes yours", "desc": "Cultivation shared with bonded beasts and summoned spirits. Sitting alone is half a path; sitting among your pack is the whole of it."},
-    {"id": "method.alchemy", "combines_with": ["method.traditional", "method.elemental", "method.formation"], "name": "Pillfire Alchemy", "cult_mult": 1.1, "mechanic": "pillfire", "requires": {"attrs": {"int": 16}}, "requirement": "INT 16", "risk": "a furnace fed on pills starves without them", "desc": "The furnace is stocked, not stoked: meditation draws on the pills you carry, and a full pouch steadies even a tribulation."},
-    {"id": "method.elemental", "combines_with": ["method.traditional", "method.sword", "method.heavenly", "method.alchemy"], "name": "Five Phases Cycle", "cult_mult": 1.15, "mechanic": "elemental_cycle", "requires": {"realm": 2}, "requirement": "Realm 2", "risk": "barren land starves the cycle", "desc": "Wood feeds fire, fire feeds earth: the cycle turns with the land itself. Phase-rich ground sings; ash and sand silence it.", "attuned_biomes": ["biome.volcanic", "biome.forest", "biome.sacred"], "harsh_biomes": ["biome.desert", "biome.ashen"]},
-    {"id": "method.formation", "combines_with": ["method.traditional", "method.body", "method.heavenly", "method.alchemy"], "name": "Stillness Formation", "cult_mult": 1.05, "mechanic": "stillness", "requires": {"attrs": {"wis": 16}}, "requirement": "WIS 16", "risk": "a broken array is worse than none", "desc": "The body becomes the array: breath, posture and patience laid out like flags. The longer the stillness holds unbroken, the deeper it draws."},
-    {"id": "method.forbidden", "combines_with": ["method.blood"], "name": "Heaven-Defying Scripture", "cult_mult": 1.5, "mechanic": "forbidden", "requires": {"realm": 2}, "requirement": "Realm 2", "risk": "Heaven answers defiance in kind", "desc": "Taint is fuel. The scripture burns contamination for progress and cleans the meridians as it feeds - but Heaven keeps the ledger, and tribulations come heavier."}
-  ]
+ "methods": [
+  {
+   "id": "method.traditional",
+   "combines_with": [
+    "method.body",
+    "method.sword",
+    "method.beast",
+    "method.alchemy",
+    "method.elemental",
+    "method.formation",
+    "method.dual",
+    "method.heavenly"
+   ],
+   "name": "Traditional Qi Refinement",
+   "cult_mult": 1.0,
+   "mechanic": "qi_accumulation",
+   "requirement": "none",
+   "risk": "slow, bottleneck-prone",
+   "desc": "Meditate, accumulate Qi, force bottlenecks. The baseline every other path is measured against.",
+   "passive": "passive.steady_breath"
+  },
+  {
+   "id": "method.body",
+   "combines_with": [
+    "method.traditional",
+    "method.slaughter",
+    "method.beast",
+    "method.formation"
+   ],
+   "name": "Body Tempering Art",
+   "cult_mult": 0.75,
+   "mechanic": "physical_conditioning",
+   "requires": {
+    "attrs": {
+     "str": 18
+    }
+   },
+   "requirement": "STR 18",
+   "risk": "permanent injury on overreach",
+   "desc": "Cultivation comes from surviving conditioning, not sitting. Gains scale with STR and pain.",
+   "passive": "passive.iron_will"
+  },
+  {
+   "id": "method.sword",
+   "combines_with": [
+    "method.traditional",
+    "method.slaughter",
+    "method.elemental",
+    "method.dual"
+   ],
+   "name": "Sword Heart Method",
+   "cult_mult": 0.9,
+   "mechanic": "sword_intent",
+   "requires": {
+    "attrs": {
+     "dex": 16,
+     "wis": 14
+    }
+   },
+   "requirement": "DEX 16, WIS 14",
+   "risk": "stagnates without real combat",
+   "desc": "Sword intent accrued through duels and practice. Meditation alone does almost nothing.",
+   "passive": "passive.keen_awareness"
+  },
+  {
+   "id": "method.blood",
+   "combines_with": [
+    "method.slaughter",
+    "method.beast",
+    "method.forbidden"
+   ],
+   "name": "Blood Sea Scripture",
+   "cult_mult": 1.4,
+   "mechanic": "blood_essence",
+   "requires": {
+    "physique_tier": 2
+   },
+   "requirement": "Physique or corrupted meridian",
+   "risk": "corruption is permanent",
+   "desc": "Absorb compatible blood essence from supernatural creatures. Fast, and it changes you.",
+   "passive": "passive.sanguine_vigor"
+  },
+  {
+   "id": "method.slaughter",
+   "combines_with": [
+    "method.body",
+    "method.sword",
+    "method.blood"
+   ],
+   "name": "Slaughter Dao",
+   "cult_mult": 1.25,
+   "mechanic": "kills",
+   "requires": {
+    "kills": 50
+   },
+   "requirement": "kill count 50",
+   "risk": "karmic backlash, heart demons",
+   "desc": "Every kill feeds the dao. Tribulations grow heavier with every corpse behind you.",
+   "passive": "passive.killing_intent"
+  },
+  {
+   "id": "method.dual",
+   "combines_with": [
+    "method.traditional",
+    "method.sword",
+    "method.beast",
+    "method.heavenly"
+   ],
+   "name": "Dual Cultivation",
+   "cult_mult": 1.15,
+   "mechanic": "partner",
+   "requires": {
+    "attrs": {
+     "char": 20
+    }
+   },
+   "requirement": "compatible partner, CHAR 20",
+   "risk": "dependency, trust",
+   "desc": "Progress through mutual circulation with a compatible partner. Relationships are the resource.",
+   "passive": "passive.harmonious_union"
+  },
+  {
+   "id": "method.heavenly",
+   "combines_with": [
+    "method.traditional",
+    "method.dual",
+    "method.elemental",
+    "method.formation"
+   ],
+   "name": "Heavenly Star Absorption",
+   "cult_mult": 1.6,
+   "mechanic": "celestial",
+   "requires": {
+    "realm": 2
+   },
+   "requirement": "Night sky, rare materials",
+   "risk": "celestial tribulations",
+   "desc": "Draw on stellar alignments and rare celestial materials during specific windows.",
+   "passive": "passive.star_drinker"
+  },
+  {
+   "id": "method.beast",
+   "combines_with": [
+    "method.traditional",
+    "method.body",
+    "method.blood",
+    "method.dual"
+   ],
+   "name": "Beast Companion Path",
+   "cult_mult": 1.2,
+   "mechanic": "beast_bond",
+   "requires": {
+    "attrs": {
+     "char": 14
+    }
+   },
+   "requirement": "CHAR 14",
+   "risk": "your beasts' hunger becomes yours",
+   "desc": "Cultivation shared with bonded beasts and summoned spirits. Sitting alone is half a path; sitting among your pack is the whole of it.",
+   "passive": "passive.pack_sense"
+  },
+  {
+   "id": "method.alchemy",
+   "combines_with": [
+    "method.traditional",
+    "method.elemental",
+    "method.formation"
+   ],
+   "name": "Pillfire Alchemy",
+   "cult_mult": 1.1,
+   "mechanic": "pillfire",
+   "requires": {
+    "attrs": {
+     "int": 16
+    }
+   },
+   "requirement": "INT 16",
+   "risk": "a furnace fed on pills starves without them",
+   "desc": "The furnace is stocked, not stoked: meditation draws on the pills you carry, and a full pouch steadies even a tribulation.",
+   "passive": "passive.pill_sense"
+  },
+  {
+   "id": "method.elemental",
+   "combines_with": [
+    "method.traditional",
+    "method.sword",
+    "method.heavenly",
+    "method.alchemy"
+   ],
+   "name": "Five Phases Cycle",
+   "cult_mult": 1.15,
+   "mechanic": "elemental_cycle",
+   "requires": {
+    "realm": 2
+   },
+   "requirement": "Realm 2",
+   "risk": "barren land starves the cycle",
+   "desc": "Wood feeds fire, fire feeds earth: the cycle turns with the land itself. Phase-rich ground sings; ash and sand silence it.",
+   "attuned_biomes": [
+    "biome.volcanic",
+    "biome.forest",
+    "biome.sacred"
+   ],
+   "harsh_biomes": [
+    "biome.desert",
+    "biome.ashen"
+   ],
+   "passive": "passive.five_phases_attunement"
+  },
+  {
+   "id": "method.formation",
+   "combines_with": [
+    "method.traditional",
+    "method.body",
+    "method.heavenly",
+    "method.alchemy"
+   ],
+   "name": "Stillness Formation",
+   "cult_mult": 1.05,
+   "mechanic": "stillness",
+   "requires": {
+    "attrs": {
+     "wis": 16
+    }
+   },
+   "requirement": "WIS 16",
+   "risk": "a broken array is worse than none",
+   "desc": "The body becomes the array: breath, posture and patience laid out like flags. The longer the stillness holds unbroken, the deeper it draws.",
+   "passive": "passive.still_mind"
+  },
+  {
+   "id": "method.forbidden",
+   "combines_with": [
+    "method.blood"
+   ],
+   "name": "Heaven-Defying Scripture",
+   "cult_mult": 1.5,
+   "mechanic": "forbidden",
+   "requires": {
+    "realm": 2
+   },
+   "requirement": "Realm 2",
+   "risk": "Heaven answers defiance in kind",
+   "desc": "Taint is fuel. The scripture burns contamination for progress and cleans the meridians as it feeds - but Heaven keeps the ledger, and tribulations come heavier.",
+   "passive": "passive.defiant_soul"
+  }
+ ]
 }

@@ -332,6 +332,277 @@
      "value": 0.4
     }
    ]
+  },
+  {
+   "id": "passive.ember_heart",
+   "name": "Ember Heart",
+   "category": "Elemental",
+   "source": "Root",
+   "desc": "A coal that answers yang with fire.",
+   "mods": [
+    {
+     "stat": "cult_speed_pct",
+     "value": 6
+    },
+    {
+     "stat": "qi_regen_pct",
+     "value": 10
+    }
+   ]
+  },
+  {
+   "id": "passive.storm_soul",
+   "name": "Storm Soul",
+   "category": "Elemental",
+   "source": "Root",
+   "desc": "The thunder keeps a room in this chest.",
+   "mods": [
+    {
+     "stat": "lightning_damage_pct",
+     "value": 12
+    }
+   ]
+  },
+  {
+   "id": "passive.tide_affinity",
+   "name": "Tide Affinity",
+   "category": "Elemental",
+   "source": "Root",
+   "desc": "Qi comes and goes like water, and is never lost.",
+   "mods": [
+    {
+     "stat": "qi_max_pct",
+     "value": 8
+    },
+    {
+     "stat": "health_regen",
+     "value": 0.3
+    }
+   ]
+  },
+  {
+   "id": "passive.five_phases_attunement",
+   "name": "Five Phases Attunement",
+   "category": "Elemental",
+   "source": "Method",
+   "desc": "Each element hands its strength to the next.",
+   "mods": [
+    {
+     "stat": "lightning_damage_pct",
+     "value": 6
+    },
+    {
+     "stat": "qi_max_pct",
+     "value": 6
+    }
+   ],
+   "synergy": {
+    "with": "passive.storm_soul",
+    "mods": [
+     {
+      "stat": "lightning_damage_pct",
+      "value": 6
+     }
+    ]
+   }
+  },
+  {
+   "id": "passive.iron_will",
+   "name": "Iron Will",
+   "category": "Mental",
+   "source": "Method",
+   "desc": "The mind is a held position.",
+   "mods": [
+    {
+     "stat": "int",
+     "value": 2
+    },
+    {
+     "stat": "qi_max_pct",
+     "value": 6
+    }
+   ],
+   "conflicts": [
+    "passive.battle_trance"
+   ]
+  },
+  {
+   "id": "passive.keen_awareness",
+   "name": "Keen Awareness",
+   "category": "Mental",
+   "source": "Method",
+   "desc": "Attention is a blade that never leaves the hand.",
+   "mods": [
+    {
+     "stat": "crit_chance",
+     "value": 2
+    },
+    {
+     "stat": "wis",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "passive.still_mind",
+   "name": "Still Mind",
+   "category": "Mental",
+   "source": "Method",
+   "desc": "A formation drawn inside the skull.",
+   "mods": [
+    {
+     "stat": "wis",
+     "value": 3
+    },
+    {
+     "stat": "cult_speed_pct",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "passive.primordial_awareness",
+   "name": "Primordial Awareness",
+   "category": "Mental",
+   "source": "Root",
+   "desc": "Something in the blood remembers before names.",
+   "mods": [
+    {
+     "stat": "wis",
+     "value": 4
+    },
+    {
+     "stat": "int",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "passive.steady_breath",
+   "name": "Steady Breath",
+   "category": "Cultivation",
+   "source": "Method",
+   "desc": "The first method's gift is rhythm.",
+   "mods": [
+    {
+     "stat": "qi_regen_pct",
+     "value": 10
+    }
+   ]
+  },
+  {
+   "id": "passive.sanguine_vigor",
+   "name": "Sanguine Vigor",
+   "category": "Physical",
+   "source": "Method",
+   "desc": "Blood spent is blood invested.",
+   "mods": [
+    {
+     "stat": "health_regen",
+     "value": 0.3
+    },
+    {
+     "stat": "lifesteal",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "passive.killing_intent",
+   "name": "Killing Intent",
+   "category": "Combat",
+   "source": "Method",
+   "desc": "The decision lands before the blow.",
+   "mods": [
+    {
+     "stat": "physical_damage_pct",
+     "value": 6
+    },
+    {
+     "stat": "crit_damage",
+     "value": 8
+    }
+   ]
+  },
+  {
+   "id": "passive.harmonious_union",
+   "name": "Harmonious Union",
+   "category": "Social",
+   "source": "Method",
+   "desc": "Two circulations, one conversation.",
+   "mods": [
+    {
+     "stat": "char",
+     "value": 4
+    },
+    {
+     "stat": "cult_speed_pct",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "passive.star_drinker",
+   "name": "Star Drinker",
+   "category": "Cultivation",
+   "source": "Method",
+   "desc": "The night sky is a slow river, and it flows downhill.",
+   "mods": [
+    {
+     "stat": "cult_speed_pct",
+     "value": 8
+    }
+   ]
+  },
+  {
+   "id": "passive.pack_sense",
+   "name": "Pack Sense",
+   "category": "Exploration",
+   "source": "Method",
+   "desc": "You move as the pack moves: together, and warned.",
+   "mods": [
+    {
+     "stat": "move_speed_pct",
+     "value": 4
+    },
+    {
+     "stat": "evasion",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "passive.pill_sense",
+   "name": "Pill Sense",
+   "category": "Crafting",
+   "source": "Method",
+   "desc": "The nose learns what the furnace knows.",
+   "mods": [
+    {
+     "stat": "int",
+     "value": 3
+    },
+    {
+     "stat": "qi_regen_flat",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "passive.defiant_soul",
+   "name": "Defiant Soul",
+   "category": "Special",
+   "source": "Method",
+   "desc": "Heaven's disapproval, worn as a cloak.",
+   "mods": [
+    {
+     "stat": "cult_speed_pct",
+     "value": 10
+    }
+   ],
+   "condition": {
+    "karma_below": -1
+   }
   }
  ]
 }
