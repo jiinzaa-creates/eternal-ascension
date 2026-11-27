@@ -50,6 +50,10 @@ const KEY_BINDINGS := {
 	"quick_save": [KEY_8],
 	"quick_load": [KEY_9],
 	"toggle_help": [KEY_SLASH],
+	## The developer panel. Not in `Options.REBINDABLE`: it is a tool, not a
+	## control the player is expected to remap. F11 is the only key main leaves
+	## free; the backquote belongs to `mute_audio`.
+	"open_debug": [KEY_F11],
 	"mute_audio": [KEY_QUOTELEFT],
 	"map": [KEY_M],
 	"shop_mode": [KEY_TAB],

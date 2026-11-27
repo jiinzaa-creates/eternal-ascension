@@ -2071,6 +2071,21 @@ Anything generated — items, chunks, rooms, NPCs, loot — must be a pure funct
   record of the verified state, not a checkpoint of unfinished work.
 - Release tags: `vMAJOR.MINOR.PATCH` on a verified, playable build with release notes.
 
+## Debug menu
+
+`F11` (or the backquote key) opens the developer panel over any screen. It is a tool, not a
+game screen: it freezes the body, owns the keyboard, and closes with the same key.
+
+- Actions are data in `game/debug/debug_actions.gd`; each one calls a public entry point the
+game itself uses, so nothing here is a second rules layer.
+- `R` writes a report to `user://debug-reports/` (`latest.txt` is the newest), `C` copies it,
+  and `P` POSTs it to `EA_DEBUG_SINK` when that environment variable is set. A report carries
+  the run's state as JSON plus the last 200 `Log` lines.
+- Engine-level failures (`SCRIPT ERROR`, leaks) are not in a report: GDScript cannot read
+  stderr, so attach the console or `.qa-logs/` output with it.
+- The catalogue and the report are checked headlessly in `run_tests.gd` (`_debug_tests`); the
+  integration suite opens the panel, runs an action and writes a report from a live scene.
+
 ## Backup policy
 
 - Git is the source of truth and must contain every accepted milestone.

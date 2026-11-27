@@ -4981,6 +4981,27 @@ func _run() -> void:
 	check(player.inventory_sort == "value", "the satchel order survives a save")
 	Save.delete_slot(98)
 
+	# The debug menu is a tool over the same run: opening it freezes the body, an
+	# action reaches the world, a report leaves the process, and play resumes.
+	var debug_day := Clock.day
+	main._open_debug()
+	check(main.debug_open, "the debug menu opens")
+	check(main.debug_menu.visible, "the debug panel is on screen")
+	check(not player.is_physics_processing(), "the debug menu freezes the body")
+	var debug_status: String = main.debug_menu.activate("clock.day")
+	check(debug_status != "", "a debug action reports what it did (%s)" % debug_status)
+	check(not main.debug_open, "running an action closes the panel")
+	await frames(2)
+	check(Clock.day == debug_day + 1, "a debug action reaches the run")
+	check(player.is_physics_processing() == (not main._overlay_visible()),
+		"play resumes unless another reading screen is still open")
+	var debug_report := DebugReport.write(main, "integration check")
+	check(debug_report != "" and FileAccess.file_exists(debug_report), "a live run writes a report")
+	if debug_report != "":
+		check(FileAccess.get_file_as_string(debug_report).contains("\"world_seed\""),
+			"the report carries the run's seed")
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(debug_report))
+
 	main.queue_free()
 	await get_tree().process_frame
 

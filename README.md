@@ -62,6 +62,7 @@ limits are in [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md).
 | The blank page (four resolutions, one choice) | F8, then ↑/↓, ENTER twice |
 | Character sheet (body, cultivation, gear, house) | C |
 | Settings & accessibility (display, controls) | F10, then TAB, arrows, ENTER |
+| Debug menu (log tail, report export, every system's verbs) | F11 (or `), then arrows, ENTER |
 | Satchel grid (wear, sort) | I, then arrows, R, ENTER |
 | Forge: recipes / refine / disassemble | E at the forge, then TAB, arrows, ENTER |
 | Brew a pill / drink a pill | E at the cauldron then arrows + ENTER; I, select, U |

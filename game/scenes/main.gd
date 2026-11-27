@@ -22,6 +22,10 @@ var phase := "creation"  # creation | play | realm
 var creation_stage := 0
 var player: Player
 var hud: Hud
+## The in-game debug menu. It runs the same entry points play does, so it is a
+## shortcut to the systems rather than a second rules layer.
+var debug_menu: DebugMenu
+var debug_open := false
 ## Floating damage numbers live in the world layer so they sit over bodies.
 var damage_numbers: DamageNumbers
 ## Combat sound. Streams are synthesized; the pool is played from bus signals.
@@ -574,6 +578,46 @@ func _spawn_player() -> void:
 	player.add_child(camera_rig)
 
 
+## True while a reading screen owns the view. The world clock keeps running, but
+## nothing underneath an opaque panel simulates.
+func _overlay_visible() -> bool:
+	return (world_map != null and world_map.visible) or shop_open or travel_open or bars_open \
+			or gear_open or alchemy_open or captives_open or chronicle_open or factions_open \
+			or sects_open or hierarchy_open or sect_ledger_open or council_open or player_sect_open \
+			or storylines_open or narrative_open or sect_seat_open or _name_edit != null \
+			or endgame_open or character_open or settings_open or menu_open
+
+
+func _toggle_debug() -> void:
+	if debug_open:
+		_close_debug()
+	else:
+		_open_debug()
+
+
+## Freezes the body like every other reading screen, so the panel cannot be used
+## to play while claiming to be inspecting play.
+func _open_debug() -> void:
+	if String(phase) != "play" or debug_menu == null:
+		return
+	debug_open = true
+	debug_menu.open()
+	player.set_physics_process(false)
+	player.set_process(false)
+
+
+func _close_debug() -> void:
+	if not debug_open:
+		return
+	debug_open = false
+	if debug_menu != null:
+		debug_menu.close()
+	if String(phase) == "play":
+		var awake := not _overlay_visible()
+		player.set_physics_process(awake)
+		player.set_process(awake)
+
+
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	layer.name = "HudLayer"
@@ -590,6 +634,9 @@ func _build_hud() -> void:
 	layer.add_child(travel_panel)
 	skill_bar_panel = SkillBarPanel.new()
 	layer.add_child(skill_bar_panel)
+	debug_menu = DebugMenu.new()
+	debug_menu.host = self
+	layer.add_child(debug_menu)
 
 
 ## Combat feedback nodes. Both listen on the bus, so no combat code knows they
@@ -1086,11 +1133,7 @@ func _process(delta: float) -> void:
 	_update_biome_density()
 	# The continent map is a reading screen: it freezes play instead of letting
 	# the player walk blind behind an opaque overlay.
-	if (world_map != null and world_map.visible) or shop_open or travel_open or bars_open or gear_open \
-			or alchemy_open or captives_open or chronicle_open or factions_open or sects_open or hierarchy_open \
-			or sect_ledger_open or council_open or player_sect_open or storylines_open or narrative_open \
-			or sect_seat_open or _name_edit != null \
-			or endgame_open or character_open or settings_open or menu_open:
+	if _overlay_visible() or debug_open:
 		return
 
 	_tick_inheritance_trial(delta)
@@ -2449,6 +2492,16 @@ func toggle_map() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# The debug menu is a tool, not a screen: it opens over anything, closes with
+	# the same key, and while it is open it owns the keyboard so no gameplay
+	# binding fires underneath it.
+	if event.is_action_pressed("open_debug"):
+		_toggle_debug()
+		return
+	if debug_open:
+		if debug_menu != null:
+			debug_menu.handle_key(event)
+		return
 	# Muting is a reading preference, not a game action: it works on every screen.
 	if event.is_action_pressed("mute_audio"):
 		_toggle_audio()
@@ -7387,6 +7440,7 @@ func _toggle_audio() -> void:
 
 
 func _load_game(slot: int) -> void:
+	_close_debug()
 	Game.hitstop.clear()
 	var data: Dictionary = Save.load_game(slot)
 	if data.is_empty():

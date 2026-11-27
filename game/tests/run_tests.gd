@@ -75,6 +75,7 @@ func _ready() -> void:
 	_npc_tests()
 	_npcdb_tests()
 	_schedules_tests()
+	_debug_tests()
 	_npcai_tests()
 	_relationships_tests()
 	_party_tests()
@@ -3897,6 +3898,53 @@ func _npcdb_tests() -> void:
 
 ## The week, the rest routines, the path graph and the hours a service is open
 ## are all pure, so every rule can be checked without moving a body.
+## The debug catalogue and the report are plain data, so they can be checked
+## without a window: unique ids, every promised group, and a report that carries
+## the run's state rather than only prose.
+func _debug_tests() -> void:
+	print("[debug] the action catalogue and the report")
+	var actions: Array = DebugActions.build(null)
+	check(actions.size() >= 30, "the debug menu offers the run's verbs (%d)" % actions.size())
+	var ids := {}
+	var groups := {}
+	for value in actions:
+		var action: Dictionary = value
+		var id := String(action.get("id", ""))
+		check(id != "" and not ids.has(id), "every debug action has a unique id (%s)" % id)
+		ids[id] = true
+		groups[String(action.get("group", ""))] = true
+		check(String(action.get("label", "")) != "", "every debug action is labelled (%s)" % id)
+		check(typeof(action.get("run")) == TYPE_CALLABLE, "every debug action can run (%s)" % id)
+	for name in DebugActions.GROUPS:
+		check(groups.has(name), "the debug menu covers '%s'" % name)
+
+	var saved_day := Clock.day
+	var saved_hour := Clock.hour
+	var advance := {}
+	for value in actions:
+		if String((value as Dictionary).get("id", "")) == "clock.hour":
+			advance = value
+	check(not advance.is_empty(), "the clock action is in the catalogue")
+	if not advance.is_empty():
+		(advance["run"] as Callable).call()
+		check(float(Clock.day) * 24.0 + Clock.hour > float(saved_day) * 24.0 + saved_hour,
+			"a debug action reaches the clock")
+	Clock.day = saved_day
+	Clock.hour = saved_hour
+
+	var body := DebugReport.text(null, "unit check")
+	check(body.contains("Eternal Ascension") and body.contains("--- state (json) ---"),
+		"a report carries a header and a machine-readable state")
+	check(body.contains("unit check"), "a report carries the note")
+	check(body.contains("\"world_seed\"") and body.contains("\"day\""), "the state names the run")
+	var path: String = DebugReport.write(null, "unit check")
+	check(path.begins_with("user://debug-reports/"), "a report is written under user://debug-reports")
+	var written := FileAccess.get_file_as_string(path) if path != "" else ""
+	check(written.contains("unit check"), "the written report holds the note")
+	if path != "":
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
 func _schedules_tests() -> void:
 	print("[schedules] the week, rest routines and service hours")
 	check(Clock.WEEK_DAYS.size() == Schedules.WEEK_LENGTH, "one week has seven named days")
