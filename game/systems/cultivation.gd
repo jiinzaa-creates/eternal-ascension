@@ -33,6 +33,9 @@ var secondary_method_id: String = ""
 var pair_affixes: Dictionary = {}
 ## Method id -> insight 0..100, earned by meditating well with that method.
 var method_insight: Dictionary = {}
+## Insight tiers already converted into attribute growth (R3), per
+## method: sitting reshapes the body slowly, and only once per tier.
+var insight_growth_claimed: Dictionary = {}
 ## Blood Sea resource: gained by kills, burned while meditating.
 var blood_charge: float = 0.0
 ## Opened meridians, in the order they were opened.
@@ -456,6 +459,7 @@ func to_dict() -> Dictionary:
 		"purity_bonus": purity_bonus,
 		"method_id": method_id,
 		"method_insight": method_insight.duplicate(),
+		"insight_growth_claimed": insight_growth_claimed.duplicate(),
 		"method_affixes": method_affixes.duplicate(),
 		"secondary_method_id": secondary_method_id,
 		"pair_affixes": pair_affixes.duplicate(),
@@ -482,6 +486,7 @@ func from_dict(data: Dictionary) -> void:
 	purity_bonus = clampf(float(data.get("purity_bonus", 0.0)), 0.0, Roots.PURITY_BONUS_MAX)
 	method_id = String(data.get("method_id", "method.traditional"))
 	method_insight = data.get("method_insight", {}).duplicate()
+	insight_growth_claimed = data.get("insight_growth_claimed", {}).duplicate()
 	method_affixes = data.get("method_affixes", {}).duplicate()
 	secondary_method_id = String(data.get("secondary_method_id", ""))
 	if not Methods.compatible(method_id, secondary_method_id):

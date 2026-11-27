@@ -1542,6 +1542,7 @@ func meditate_tick(delta: float) -> float:
 	factor *= Affixes.method_meditation_factor(cultivation.pair_affix())
 	var gained := cultivation.cultivate(stats, delta, environment_bonus(), factor)
 	cultivation.add_method_insight(cultivation.method_id, delta * clampf(factor, 0.0, 2.0))
+	_claim_insight_growth()
 	# Sitting with a method is the slow, reliable road to understanding.
 	gain_comprehension(delta * clampf(factor, 0.0, 2.0), "meditation")
 	if cultivation.method_id == "method.blood":
@@ -1681,6 +1682,40 @@ func set_guard(held: bool) -> bool:
 ## "small attribute growth" the cultivation design always promised.
 ## Spend one banked attribute point (R2). The sheet drives this
 ## with the creation screen's own skill_1..skill_6 actions.
+## Sitting itself reshapes the body, slowly (R3): method insight
+## is capped at 100 per method, and each 25-point tier converts -
+## once - into +1 of the method's primary attribute; tiers two and
+## four add +1 more, bent by a drawn affix or the method's own
+## secondary. At most six points per method across a whole life.
+func _claim_insight_growth() -> void:
+	var method := cultivation.method_id
+	var tiers := clampi(cultivation.method_insight_points(method) / 25, 0, 4)
+	var claimed := int(cultivation.insight_growth_claimed.get(method, 0))
+	if tiers <= claimed:
+		return
+	var pair := Methods.growth_pair(method)
+	var primary := String(pair[0])
+	var bent := Affixes.growth_attr(cultivation.method_affix())
+	var secondary := bent if bent != "" else String(pair[1])
+	var gained: Array[String] = []
+	for tier in range(claimed + 1, tiers + 1):
+		attrs.add(primary, 1)
+		gained.append(Attributes.LABELS.get(primary, primary))
+		if tier == 2 or tier == 4:
+			attrs.add(secondary, 1)
+			gained.append(Attributes.LABELS.get(secondary, secondary))
+	cultivation.insight_growth_claimed[method] = tiers
+	rebuild_stats()
+	Bus.player_stats_changed.emit()
+	var parts: Array[String] = []
+	var seen: Dictionary = {}
+	for label in gained:
+		seen[label] = int(seen.get(label, 0)) + 1
+	for label in seen.keys():
+		parts.append("%s +%d" % [label, int(seen[label])])
+	Bus.toast.emit("Long sitting reshapes you - %s." % ", ".join(parts))
+
+
 func spend_attr_point(index: int) -> bool:
 	if attr_points <= 0 or index < 0 or index >= Attributes.KEYS.size():
 		return false
