@@ -1307,6 +1307,13 @@ func _realm_tests() -> void:
 		"conversion moves a quarter of the force to lightning")
 	check(is_equal_approx(float(plain_split["physical"]) + float(plain_split["lightning"]), 100.0),
 		"an unbuilt conversion conserves the total")
+	check(not Realms.can_project_domain(7) and Realms.can_project_domain(8), "domain projection follows its unlock")
+	check(is_equal_approx(Realms.domain_dps(8), 6.0) and is_equal_approx(Realms.domain_dps(12), 14.0),
+		"domain pressure grows with realm")
+	var domain_payloads := Realms.domain_payloads(8)
+	check(domain_payloads.size() == 2 and String((domain_payloads[0] as Dictionary).get("id", "")) == "burn"
+		and is_equal_approx(float((domain_payloads[0] as Dictionary).get("magnitude", 0.0)), 6.0),
+		"the domain burns at its realm's pressure")
 	var built_split := Damage.convert_split(100.0, 12.0, 3)
 	check(is_equal_approx(float(built_split["lightning"]), 28.0), "lightning investment scales the converted share")
 	check(is_equal_approx(Realms.travel_hours(10000.0, 5), Travel.hours_for(10000.0)), "the unfolded road costs full hours")

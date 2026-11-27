@@ -106,6 +106,9 @@ var _sprinting := false
 ## Flight (Spirit Transformation+): momentary, never saved — a run always
 ## starts on the ground.
 var flying := false
+## Domain projection (Mahayana+): true while the domain is manifested.
+var domain_active := false
+var _domain_accum := 0.0
 ## Last passive-condition state, so a threshold crossing rebuilds once rather
 ## than every frame.
 var _was_wounded := false
@@ -610,6 +613,24 @@ func _tick_timers(delta: float) -> void:
 		if cultivation.qi <= 0.0:
 			flying = false
 			Bus.toast.emit("Your qi gives out; you drop from the sky.")
+	# The domain (Mahayana+) manifests in combat and presses on every
+	# foe within reach — burn and chill through the status machinery —
+	# for a qi tithe. An empty dantian collapses it like the flight.
+	domain_active = Realms.can_project_domain(cultivation.realm) \
+		and _combat_timer > 0.0 and cultivation.qi > 0.0 and is_inside_tree()
+	if domain_active:
+		cultivation.qi = maxf(0.0, cultivation.qi - Realms.DOMAIN_QI_PER_SEC * delta)
+		_domain_accum += delta
+		if _domain_accum >= Realms.DOMAIN_TICK:
+			_domain_accum = 0.0
+			for node in get_tree().get_nodes_in_group("enemy"):
+				var body := node as Dummy
+				if body == null or body.state == "dead":
+					continue
+				if global_position.distance_to(body.global_position) > Realms.DOMAIN_RADIUS:
+					continue
+				for payload in Realms.domain_payloads(cultivation.realm):
+					body.statuses = Status.apply(body.statuses, payload)
 	# Stillness is the formation method's fuel: unbroken quiet, out of combat
 	# and at rest, accrues; any movement or fight breaks the array.
 	if velocity.length() > 8.0 or _combat_timer > 0.0 or _attack_state != "idle":

@@ -212,6 +212,30 @@ static func can_convert(number: int) -> bool:
 	return has_unlock(number, "elemental_conversion")
 
 
+## Domain projection: Mahayana and above. In combat the cultivator's
+## domain presses on every foe within reach — burning and slowing
+## through the ordinary status machinery — for a qi tithe per second.
+const DOMAIN_RADIUS := 260.0
+const DOMAIN_QI_PER_SEC := 1.0
+const DOMAIN_TICK := 0.5
+
+static func can_project_domain(number: int) -> bool:
+	return has_unlock(number, "domain_projection")
+
+
+## Burn pressure inside the domain, damage per second, growing with
+## every realm above the unlock.
+static func domain_dps(number: int) -> float:
+	return 6.0 + 2.0 * float(maxi(0, number - 8))
+
+
+static func domain_payloads(number: int) -> Array:
+	return [
+		{"id": "burn", "duration": 1.2, "magnitude": domain_dps(number)},
+		{"id": "chill", "duration": 1.2, "magnitude": 0.25},
+	]
+
+
 static func travel_hours(distance: float, number: int) -> float:
 	var hours := Travel.hours_for(distance)
 	return hours * FOLD_TRAVEL_MULT if can_fold(number) else hours
