@@ -1404,6 +1404,17 @@ func _realm_tests() -> void:
 		"the first realm carries no body bonus")
 	realm_body.rebuild({}, [], 12, 27.0)
 	check(realm_body.get_attr("wis") == 62, "the last realm's body bonus is +52")
+	check(Economy.social_multiplier(0.0) == 1.0 and approx(Economy.social_multiplier(25.0), 0.9)
+		and Economy.social_multiplier(500.0) == 0.75,
+		"presence buys at most a quarter off at the stall")
+	var silver := StatBlock.new(Attributes.new())
+	silver.base.add("char", 40)
+	silver.rebuild({}, [], 1, 1.0)
+	var plain := StatBlock.new(Attributes.new())
+	plain.rebuild({}, [], 1, 1.0)
+	check(silver.social_score(0, 0) > plain.social_score(0, 0)
+		and Economy.social_multiplier(silver.social_score(0, 0)) < 1.0,
+		"CHAR finally moves a price somewhere in the world")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

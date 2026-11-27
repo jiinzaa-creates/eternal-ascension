@@ -1328,6 +1328,19 @@ func _shop_price(item: Dictionary) -> int:
 	var mult := Factions.price_multiplier("faction.market_league", Game.faction_standing, Game.notoriety)
 	# A market tiding moves the same price the faction memory does.
 	mult *= _world_event_mult("shop_buy")
+	# And presence moves it too (R5): CHAR's social score - the
+	# player's Azure rank standing in for the rank term - finally
+	# has a consumer. Reputation tier has no source system yet, so
+	# it honestly contributes nothing.
+	if player != null:
+		var rank_entry := Hierarchy.player_rank(player.cultivation.realm, Game.faction_standing,
+			Game.notoriety, bool(Game.sect_seat_won.get("sect.azure_cloud", false)))
+		var rank_index := 0
+		var rungs := Hierarchy.ladder()
+		for i in rungs.size():
+			if String((rungs[i] as Dictionary).get("id", "")) == String(rank_entry.get("id", "")):
+				rank_index = i
+		mult *= Economy.social_multiplier(player.stats.social_score(0, rank_index))
 	return maxi(1, int(ceil(float(Economy.buy_price(item)) * mult)))
 
 

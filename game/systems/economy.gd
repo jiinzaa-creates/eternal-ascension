@@ -27,6 +27,15 @@ static func sell_value(item: Dictionary) -> int:
 	return sell_price(item) * maxi(1, int(item.get("count", 1)))
 
 
+## Presence at the stall (R5): CHAR's social score, which nothing
+## read before, now buys a discount - a quarter off at the very
+## most. Buy side only, like the faction multiplier beside it:
+## selling stays on the one value curve, so a silver tongue can
+## never become a money loop.
+static func social_multiplier(score: float) -> float:
+	return 1.0 - clampf(score * 0.004, 0.0, 0.25)
+
+
 static func rest_cost() -> int:
 	return REST_COST
 
