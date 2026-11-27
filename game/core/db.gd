@@ -16,6 +16,7 @@ var methods: Array = []
 var meridians: Array = []
 var tribulations: Array = []
 var enlightenments: Array = []
+var daos: Array = []
 var techniques: Array = []
 var technique_affixes: Array = []
 var method_affixes: Array = []
@@ -101,6 +102,7 @@ func load_all() -> void:
 	meridians = _read("meridians.json").get("meridians", [])
 	tribulations = _read("tribulations.json").get("tribulations", [])
 	enlightenments = _read("enlightenments.json").get("enlightenments", [])
+	daos = _read("daos.json").get("daos", [])
 	techniques = _read("techniques.json").get("techniques", [])
 	var affix_doc := _read("affixes.json")
 	technique_affixes = affix_doc.get("technique_affixes", [])
@@ -161,6 +163,7 @@ func load_all() -> void:
 	_index("meridian", meridians)
 	_index("tribulation", tribulations)
 	_index("enlightenment", enlightenments)
+	_index("dao", daos)
 	_index("technique", techniques)
 	_index("technique_affix", technique_affixes)
 	_index("method_affix", method_affixes)
@@ -282,6 +285,10 @@ func technique(id: String) -> Dictionary:
 
 func tribulation(id: String) -> Dictionary:
 	return by_id("tribulation", id)
+
+
+func dao(id: String) -> Dictionary:
+	return _by_id.get("dao:" + id, {})
 
 
 func enlightenment(id: String) -> Dictionary:
@@ -546,6 +553,24 @@ func validate() -> Array:
 		var declared := String(realm(n).get("tribulation", ""))
 		if not tribulation_ids.has(declared):
 			problems.append("realm %d names unknown tribulation %s" % [n, declared])
+
+	if daos.size() != 10:
+		problems.append("expected exactly 10 dao paths, found %d" % daos.size())
+	for d in daos:
+		var d_id := String(d.get("id", ""))
+		if String(d.get("name", "")) == "" or String(d.get("desc", "")) == "":
+			problems.append("dao %s has no name or description" % d_id)
+		var d_stages: Array = d.get("stages", [])
+		if d_stages.size() != 4:
+			problems.append("dao %s must have exactly 4 stages" % d_id)
+		for stage_entry in d_stages:
+			for mod in (stage_entry as Dictionary).get("mods", []):
+				if typeof(mod) != TYPE_DICTIONARY:
+					problems.append("dao %s has a malformed mod" % d_id)
+					continue
+				var d_stat := String((mod as Dictionary).get("stat", ""))
+				if not (Attributes.KEYS.has(d_stat) or StatBlock.PERCENT_STATS.has(d_stat) or StatBlock.FLAT_STATS.has(d_stat)):
+					problems.append("dao %s uses unknown stat %s" % [d_id, d_stat])
 
 	if enlightenments.size() < 10:
 		problems.append("expected at least 10 enlightenments, found %d" % enlightenments.size())

@@ -28,6 +28,10 @@ var appearance := Appearance.new()
 ## Innate body. Its mods enter the stat pipeline like equipment or a passive.
 var physique_id := Physiques.DEFAULT_ID
 var physique_stage := 0
+## Dao paths (M28): insight points per walked road, and the road the
+## meditator has chosen to walk ("" = the method's own road).
+var dao_progress: Dictionary = {}
+var dao_focus := ""
 var attrs: Attributes
 var stats: StatBlock
 var cultivation: Cultivation
@@ -182,7 +186,8 @@ func rebuild_stats() -> void:
 		Enlightenments.mods(enlightenments), _aging_decline(),
 		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs())
 		+ ([{"stat": "lifespan", "value": Game.lifespan_years_bonus}] if Game.lifespan_years_bonus > 0 else [])
-		+ ([{"stat": "qi_max_pct", "value": -5.0 * float(Game.death_wounds)}] if Game.death_wounds > 0 else []), physique_stage)
+		+ ([{"stat": "qi_max_pct", "value": -5.0 * float(Game.death_wounds)}] if Game.death_wounds > 0 else [])
+		+ Daos.mods(dao_progress), physique_stage)
 	# Condition is applied after the pipeline has summed every source, so a
 	# rebuild can never compound it: a broken piece simply contributes nothing.
 	for slot in Items.DURABLE_SLOTS:
@@ -1974,6 +1979,8 @@ func to_dict() -> Dictionary:
 		"cultivation": cultivation.to_dict(),
 		"passives": passives.duplicate(),
 		"enlightenments": enlightenments.duplicate(),
+		"dao_progress": dao_progress.duplicate(),
+		"dao_focus": dao_focus,
 		"inventory": Items.inventory_to_save(inventory),
 		"inventory_sort": inventory_sort,
 		"equipment": Items.equipment_to_save(equipment),
@@ -2001,6 +2008,13 @@ func from_dict(data: Dictionary) -> void:
 	passives = data.get("passives", []).duplicate()
 	# Saves only reference IDs; an unknown or duplicated insight is dropped rather
 	# than allowed to add phantom mods.
+	dao_progress = {}
+	for dao_id in data.get("dao_progress", {}):
+		if not Daos.find(String(dao_id)).is_empty():
+			dao_progress[dao_id] = maxf(0.0, float(data["dao_progress"][dao_id]))
+	dao_focus = String(data.get("dao_focus", ""))
+	if Daos.find(dao_focus).is_empty():
+		dao_focus = ""
 	enlightenments = []
 	for id_value in data.get("enlightenments", []):
 		var insight_id := String(id_value)

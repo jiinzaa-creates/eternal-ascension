@@ -1307,6 +1307,41 @@ func _realm_tests() -> void:
 		"conversion moves a quarter of the force to lightning")
 	check(is_equal_approx(float(plain_split["physical"]) + float(plain_split["lightning"]), 100.0),
 		"an unbuilt conversion conserves the total")
+	check(DB.daos.size() == 10, "ten dao paths are authored")
+	var dao_shape_ok := true
+	for d in DB.daos:
+		if (d.get("stages", []) as Array).size() != 4:
+			dao_shape_ok = false
+	check(dao_shape_ok, "every dao walks four stages")
+	check(Daos.stage_for(0.0) == 0 and Daos.stage_for(60.0) == 1 and Daos.stage_for(900.0) == 4,
+		"dao stages follow their thresholds")
+	check(Daos.mods({}).is_empty() and not Daos.mods({"dao.sword": 60.0}).is_empty(),
+		"a walked dao feeds the stat pipeline")
+	check(Daos.route("combat", {"weapon_school": "sword"}) == "dao.sword"
+		and Daos.route("combat", {"weapon_school": "saber"}) == "dao.blade"
+		and Daos.route("practice", {}) == "dao.space",
+		"comprehension routes by its channel")
+	check(Daos.route("meditation", {"method_id": "method.sword", "biome": "biome.verdant"}) == "dao.sword"
+		and Daos.route("meditation", {"method_id": "method.sword", "biome": "biome.volcanic"}) == "dao.elemental"
+		and Daos.route("meditation", {"method_id": "method.sword", "focus": "dao.time"}) == "dao.time",
+		"meditation follows focus, then phenomena, then the method's road")
+	var walker := Player.new()
+	walker.attrs = Attributes.new()
+	walker.stats = StatBlock.new(walker.attrs)
+	walker.cultivation = Cultivation.new()
+	walker.dao_progress = {"dao.sword": 200.0, "dao.bogus": 50.0}
+	walker.dao_focus = "dao.time"
+	var walker_rt := Player.new()
+	walker_rt.attrs = Attributes.new()
+	walker_rt.stats = StatBlock.new(walker_rt.attrs)
+	walker_rt.cultivation = Cultivation.new()
+	walker_rt.appearance = Appearance.new()
+	walker_rt.from_dict(walker.to_dict())
+	check(is_equal_approx(float(walker_rt.dao_progress.get("dao.sword", 0.0)), 200.0)
+		and not walker_rt.dao_progress.has("dao.bogus") and walker_rt.dao_focus == "dao.time",
+		"dao progress and focus survive the save round-trip, unknowns dropped")
+	walker.free()
+	walker_rt.free()
 	check(not Realms.can_project_domain(7) and Realms.can_project_domain(8), "domain projection follows its unlock")
 	check(not Realms.is_immortal_body(9) and Realms.is_immortal_body(10), "the immortal body follows its unlock")
 	check(not Realms.can_manipulate_planes(10) and Realms.can_manipulate_planes(11), "plane manipulation follows its unlock")

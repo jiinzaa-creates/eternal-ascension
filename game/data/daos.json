@@ -1,0 +1,432 @@
+{
+  "stage_names": [
+    "Glimpsed",
+    "Walked",
+    "Deepened",
+    "Embodied"
+  ],
+  "daos": [
+    {
+      "id": "dao.sword",
+      "name": "Sword Dao",
+      "desc": "The edge is a question asked at speed.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "physical_damage_pct",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "crit_chance",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "attack_speed_pct",
+              "value": 3
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "physical_damage_pct",
+              "value": 4
+            },
+            {
+              "stat": "penetration",
+              "value": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.blade",
+      "name": "Blade Dao",
+      "desc": "A heavier answer: weight, commitment, the cut that ends arguments.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "crit_damage",
+              "value": 5
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "physical_damage_pct",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "crit_damage",
+              "value": 8
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "crit_chance",
+              "value": 2
+            },
+            {
+              "stat": "crit_damage",
+              "value": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.alchemy",
+      "name": "Alchemy Dao",
+      "desc": "Matter is patient. Learn its tempers and it works for you.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "int",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "qi_regen_flat",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "cult_speed_pct",
+              "value": 4
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "int",
+              "value": 3
+            },
+            {
+              "stat": "qi_regen_pct",
+              "value": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.formation",
+      "name": "Formation Dao",
+      "desc": "Ground, once understood, fights beside you.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "armor",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "qi_max_pct",
+              "value": 3
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "physical_resist",
+              "value": 3
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "armor",
+              "value": 4
+            },
+            {
+              "stat": "qi_max_pct",
+              "value": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.body",
+      "name": "Body Dao",
+      "desc": "The first temple is the flesh; the last one too.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "health_regen",
+              "value": 0.2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "armor",
+              "value": 3
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "str",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "physical_resist",
+              "value": 4
+            },
+            {
+              "stat": "health_regen",
+              "value": 0.3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.beast",
+      "name": "Beast Dao",
+      "desc": "Run with the pack long enough and the wild answers back.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "move_speed_pct",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "evasion",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "lifesteal",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "move_speed_pct",
+              "value": 3
+            },
+            {
+              "stat": "evasion",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.weapon",
+      "name": "Weapon Dao",
+      "desc": "Any tool, truly known, becomes a limb.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "weapon_damage",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "attack_speed_pct",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "weapon_damage",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "physical_damage_pct",
+              "value": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.space",
+      "name": "Space Dao",
+      "desc": "Distance is a habit the world can be talked out of.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "cooldown_reduction",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "move_speed_pct",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "evasion",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "cooldown_reduction",
+              "value": 3
+            },
+            {
+              "stat": "qi_max_pct",
+              "value": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.time",
+      "name": "Time Dao",
+      "desc": "The river does not hurry, and arrives everywhere first.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "cult_speed_pct",
+              "value": 3
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "cooldown_reduction",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "attack_speed_pct",
+              "value": 3
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "cult_speed_pct",
+              "value": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dao.elemental",
+      "name": "Elemental Dao",
+      "desc": "The phases are not five things. They are one thing, turning.",
+      "stages": [
+        {
+          "mods": [
+            {
+              "stat": "lightning_damage_pct",
+              "value": 4
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "qi_regen_pct",
+              "value": 5
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "lightning_damage_pct",
+              "value": 6
+            }
+          ]
+        },
+        {
+          "mods": [
+            {
+              "stat": "qi_max_pct",
+              "value": 5
+            },
+            {
+              "stat": "lightning_damage_pct",
+              "value": 6
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
