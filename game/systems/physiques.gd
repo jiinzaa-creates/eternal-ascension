@@ -37,6 +37,25 @@ static func roll(key: int) -> String:
 	return String((defs[index] as Dictionary).get("id", DEFAULT_ID))
 
 
+## A latent bloodline, drawn from the lesser bodies only: a tribulation can
+## wake what sleeps in the blood, but it does not hand out apex physiques.
+static func latent_roll(key: int) -> String:
+	var defs: Array = []
+	var weights: Array = []
+	for entry in DB.physiques:
+		if int(entry.get("weight", 1)) > 0 and int(entry.get("tier", 0)) <= 3 \
+				and String(entry.get("id", "")) != DEFAULT_ID:
+			defs.append(entry)
+			weights.append(int(entry.get("weight", 1)))
+	if defs.is_empty():
+		return ""
+	var rng: RandomNumberGenerator = Rng.stream("physique_latent", key, 0)
+	var index: int = int(Rng.pick_weighted(weights, rng))
+	if index < 0 or index >= defs.size():
+		return ""
+	return String((defs[index] as Dictionary).get("id", ""))
+
+
 static func find(id: String) -> Dictionary:
 	return DB.physique(id)
 

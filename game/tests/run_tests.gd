@@ -666,6 +666,38 @@ func _physique_tests() -> void:
 		"a perfected body at its gate evolves and starts dormant in the new form")
 	body.physique_id = "physique.sword_bone"
 	body.physique_stage = 0
+	var trainee := Player.new()
+	trainee.attrs = Attributes.new()
+	trainee.stats = StatBlock.new(trainee.attrs)
+	trainee.cultivation = Cultivation.new()
+	trainee.physique_id = "physique.mortal_frame"
+	trainee.attrs.add("str", 100)
+	var forged := trainee.develop_physique()
+	check(String(forged.get("kind", "")) == "forged" and String(forged.get("via", "")) == "training"
+		and trainee.physique_id == "physique.iron_bone", "extreme training forges its kindred body")
+	trainee.free()
+	for key in 60:
+		var latent := Physiques.latent_roll(key)
+		check(latent != "" and Physiques.tier_of(latent) <= 3 and latent != "physique.mortal_frame",
+			"a latent bloodline is always a lesser real body (%s)" % latent)
+	var landed := false
+	for realm_try in range(1, 13):
+		var wanderer := Player.new()
+		wanderer.attrs = Attributes.new()
+		wanderer.stats = StatBlock.new(wanderer.attrs)
+		wanderer.cultivation = Cultivation.new()
+		wanderer.cultivation.realm = realm_try
+		wanderer.physique_id = "physique.mortal_frame"
+		Game.current_biome = "biome.volcanic"
+		var marked := wanderer.develop_physique()
+		if String(marked.get("kind", "")) == "forged" and String(marked.get("via", "")) == "environment":
+			check(wanderer.physique_id == "physique.pure_yang", "the caldera marks its kindred body")
+			landed = true
+		wanderer.free()
+		if landed:
+			break
+	Game.current_biome = ""
+	check(landed, "breaking through in an extreme land can forge a body")
 	check(body.physique_id == "physique.sword_bone", "the inherited body is kept")
 	check(not body.inherit_physique("physique.iron_bone"), "inheritance cannot downgrade")
 	body.free()

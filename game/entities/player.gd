@@ -1576,6 +1576,14 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 			Bus.toast.emit("Your physique awakens — %s: %s." % [Physiques.name_of(physique_id), String(developed.get("stage_name", ""))])
 		elif String(developed.get("kind", "")) == "evolved":
 			Bus.toast.emit("Your body transcends its form — %s." % Physiques.name_of(physique_id))
+		elif String(developed.get("kind", "")) == "forged":
+			match String(developed.get("via", "")):
+				"training":
+					Bus.toast.emit("A lifetime of training takes its shape — %s." % Physiques.name_of(physique_id))
+				"environment":
+					Bus.toast.emit("The land marks your body — %s." % Physiques.name_of(physique_id))
+				_:
+					Bus.toast.emit("Beneath the tribulation, a latent body wakes — %s." % Physiques.name_of(physique_id))
 	else:
 		hp = maxf(1.0, hp - hp_max * float(result.get("hp_cost_ratio", 0.0)))
 		Bus.toast.emit("The tribulation breaks you. Qi deviation. (%s)" % note)
@@ -1588,9 +1596,19 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 
 ## One development step for the body, judged when a breakthrough remakes it.
 ## Returns what happened ({"kind": "awakened", ...}) or {} for nothing.
+## Directive 5's forging paths, judged for a Mortal Frame on a breakthrough:
+## the training that shaped the body, the land it broke through in, and the
+## tribulation itself. Charisma forges nothing — presence is not a body.
+const TRAINING_BODIES := {"str": "physique.iron_bone", "agi": "physique.wind_stepping",
+	"int": "physique.nine_yin", "wis": "physique.verdant_meridian", "dex": "physique.sword_bone"}
+const BIOME_BODIES := {"biome.volcanic": "physique.pure_yang", "biome.frost": "physique.nine_yin",
+	"biome.snow": "physique.nine_yin", "biome.forest": "physique.verdant_meridian",
+	"biome.corrupted": "physique.chaotic_embryo", "biome.forbidden": "physique.chaotic_embryo"}
+
+
 func develop_physique() -> Dictionary:
 	if physique_id == Physiques.DEFAULT_ID:
-		return {}
+		return _forge_physique()
 	# A perfected body at its realm gate stops deepening and changes form:
 	# evolution is a breakthrough's other harvest.
 	var target := Physiques.evolves_to(physique_id)
@@ -1606,6 +1624,32 @@ func develop_physique() -> Dictionary:
 		return {"kind": "awakened", "stage": physique_stage,
 			"stage_name": Physiques.stage_name(physique_id, physique_stage)}
 	return {}
+
+
+## One body per cultivator: forging is judged only for the Mortal Frame,
+## in order — what you trained, where you stand, what the lightning writes.
+func _forge_physique() -> Dictionary:
+	for attr in TRAINING_BODIES:
+		if attrs.get_attr(attr) >= 60:
+			return _take_body(String(TRAINING_BODIES[attr]), "training")
+	var kindred := String(BIOME_BODIES.get(Game.current_biome, ""))
+	if kindred != "":
+		var land_rng: RandomNumberGenerator = Rng.stream("physique_forge", cultivation.realm, Clock.day)
+		if land_rng.randf() < 0.5:
+			return _take_body(kindred, "environment")
+	var chance := 0.10 + 0.02 * float(cultivation.realm)
+	var storm_rng: RandomNumberGenerator = Rng.stream("physique_forge", cultivation.realm, Clock.day + 7919)
+	if storm_rng.randf() < chance:
+		var latent := Physiques.latent_roll(cultivation.realm * 31 + Clock.day)
+		if latent != "":
+			return _take_body(latent, "tribulation")
+	return {}
+
+
+func _take_body(id: String, via: String) -> Dictionary:
+	physique_id = id
+	physique_stage = 0
+	return {"kind": "forged", "to": id, "via": via}
 
 
 ## The tribulation encounter was lost: real wounds, real corruption, no roll.
