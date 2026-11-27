@@ -1609,7 +1609,7 @@ func draw_forge(player: Player) -> void:
 	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#e0a060", 0.45))
 	var origin := panel.position
 	_text(origin + Vector2(22.0, 32.0), "AZURE FORGE", 18, Color("#e8b070"))
-	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "ENCHANT", "FUSE", "DISASSEMBLE"]
+	var modes: Array[String] = ["FORGE", "REFINE", "UPGRADE", "ENCHANT", "FUSE", "PERSONALIZE", "DISASSEMBLE"]
 	var mode := int(host.forge_mode)
 	var tabs := ""
 	for i in modes.size():
@@ -1745,6 +1745,16 @@ func draw_forge(player: Player) -> void:
 			_text(Vector2(cx, cy), "The two pieces must share a slot.", 11, Color("#e08f8f"))
 		else:
 			_text(Vector2(cx, cy), "ENTER fuses the chosen piece into it.", 12, ACCENT)
+		return
+	if mode == 5:
+		_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(rules), 11, 360.0), 11, Color("#d8c070"))
+		cy += 20.0
+		_text(Vector2(cx, cy), _fit(String(rules.get("desc", "")), 11, 360.0), 11, Color("#7f9098"))
+		cy += 32.0
+		if bool(chosen.get("unique", false)):
+			_text(Vector2(cx, cy), "An authored relic already carries its name.", 11, Color("#e08f8f"))
+		else:
+			_text(Vector2(cx, cy), "ENTER names this piece.", 12, ACCENT)
 		return
 	var ore := Crafting.disassemble_ore(chosen)
 	_text(Vector2(cx, cy), "Yields: %d Spirit Ore" % ore, 12, Color("#d8c070"))

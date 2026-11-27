@@ -81,8 +81,9 @@ var forge_open := false
 var forge_mode := 0
 var forge_enchant_item := ""
 var forge_fuse_chassis := ""
+var _personalize_item := ""
 var forge_index := 0
-const FORGE_MODES: Array[String] = ["forge", "refine", "upgrade", "enchant", "fuse", "disassemble"]
+const FORGE_MODES: Array[String] = ["forge", "refine", "upgrade", "enchant", "fuse", "personalize", "disassemble"]
 ## Alchemy: one cauldron, one list of potions, frozen play for the same reason.
 var alchemy: Alchemy
 var alchemy_open := false
@@ -1534,6 +1535,8 @@ func forge_cost(mode_index: int) -> Dictionary:
 			return crafting.action("enchant")
 		"fuse":
 			return crafting.action("fuse")
+		"personalize":
+			return crafting.action("personalize")
 		"disassemble":
 			return crafting.action("disassemble")
 		_:
@@ -1577,6 +1580,8 @@ func forge_act() -> void:
 				forge_index = 0
 				if not chassis.is_empty():
 					_forge_fuse(chassis, chosen)
+		"personalize":
+			_begin_personalize(chosen)
 		"disassemble":
 			_forge_disassemble(chosen)
 
@@ -1763,6 +1768,64 @@ func _forge_fuse(chassis: Dictionary, donor: Dictionary) -> void:
 	var practice := Professions.award(Game.professions, "profession.smith")
 	if bool(practice.get("leveled", false)):
 		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
+
+
+func _begin_personalize(item: Dictionary) -> void:
+	if bool(item.get("unique", false)):
+		Bus.toast.emit("An authored relic already carries its name.")
+		return
+	var rules: Dictionary = crafting.action("personalize")
+	var check := Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("Naming needs %s." % String(check.get("reason", "more materials")))
+		return
+	_cancel_founding()
+	_personalize_item = String(item.get("id", ""))
+	_name_edit = LineEdit.new()
+	_name_edit.placeholder_text = "Name the piece"
+	_name_edit.text = String(item.get("name", ""))
+	_name_edit.max_length = 40
+	_name_edit.custom_minimum_size = Vector2(460, 46)
+	_name_edit.position = Vector2(410, 300)
+	_name_edit.add_theme_font_size_override("font_size", 20)
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color("#10161b", 0.97)
+	box.border_color = Color("#c8b070")
+	box.set_border_width_all(2)
+	box.set_corner_radius_all(4)
+	_name_edit.add_theme_stylebox_override("normal", box)
+	_name_edit.add_theme_stylebox_override("focus", box)
+	hud.add_child(_name_edit)
+	_name_edit.grab_focus()
+	_name_edit.select_all()
+	_name_edit.text_submitted.connect(_on_personalize_name_submitted)
+	Bus.toast.emit("Name the piece — Enter sets it in the steel, Esc withdraws.")
+
+
+func _on_personalize_name_submitted(text: String) -> void:
+	var item_id := _personalize_item
+	_cancel_founding()
+	var cleaned := text.strip_edges()
+	if cleaned == "" or item_id == "":
+		Bus.toast.emit("The piece keeps its name.")
+		return
+	var item := _inventory_item(item_id)
+	if item.is_empty():
+		return
+	var rules: Dictionary = crafting.action("personalize")
+	var check := Crafting.check(rules, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("Naming needs %s." % String(check.get("reason", "more materials")))
+		return
+	_spend_craft(rules)
+	for i in player.inventory.size():
+		if String((player.inventory[i] as Dictionary).get("id", "")) == item_id:
+			var renamed: Dictionary = (player.inventory[i] as Dictionary).duplicate()
+			renamed["name"] = cleaned
+			renamed["named"] = true
+			player.inventory[i] = renamed
+			break
+	Bus.toast.emit("The smith sets the name in the steel: %s." % cleaned)
 
 
 func _forge_disassemble(item: Dictionary) -> void:
@@ -4494,6 +4557,7 @@ func _cancel_founding() -> void:
 		_name_edit.queue_free()
 		_name_edit = null
 	_founding_doctrine = ""
+	_personalize_item = ""
 
 
 ## A dry standing-place near a point: the same ring step the seats use.

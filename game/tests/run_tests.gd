@@ -2532,6 +2532,25 @@ func _crafting_tests() -> void:
 	check(bool(fused_ench.get("ok", false)) and ench_count == 1
 		and String((fused_ench_item.get("enchant", {}) as Dictionary).get("id", "")) == "enchant.piercing",
 		"fusion keeps the chassis enchantment and never takes the donor's")
+
+	# Personalization: the player's name endures through the other verbs.
+	var named_piece := gen.generate(5, 70021, 1, 1, "weapon")
+	named_piece["name"] = "Dawncaller"
+	named_piece["named"] = true
+	var named_round_trip: Dictionary = Items.normalize_item(named_piece)
+	check(bool(named_round_trip.get("named", false)) and String(named_round_trip.get("name", "")) == "Dawncaller",
+		"a saved piece keeps the name its owner gave it")
+	var named_refined := rules.refine(named_piece, 60021, 0, 0.0, 0.0)
+	check(bool(named_refined.get("ok", false)) and String((named_refined["item"] as Dictionary).get("name", "")) == "Dawncaller",
+		"refinement keeps the player's name")
+	var named_upgraded := rules.upgrade(named_piece, 70021, 0, 0.0)
+	check(bool(named_upgraded.get("ok", false)) and String((named_upgraded["item"] as Dictionary).get("name", "")) == "Dawncaller",
+		"upgrading keeps the player's name")
+	var grand_donor := gen.generate(5, 70022, 1, 3, "weapon")
+	var named_fused := rules.fuse(named_piece, grand_donor, 80021, 0, 0.0)
+	check(bool(named_fused.get("ok", false)) and int((named_fused["item"] as Dictionary).get("rarity", 0)) == 3
+		and String((named_fused["item"] as Dictionary).get("name", "")) == "Dawncaller",
+		"fusion raises the rarity but never renames a named piece")
 	check(not bool(Crafting.check(recipe, bag, 10, 1)["ok"]), "a recipe refuses an empty purse")
 	check(String(Crafting.check(recipe, bag, 10, 1)["reason"]).contains("spirit stones"), "the refusal names the missing stones")
 	check(bool(Crafting.check(recipe, bag, 100, 1)["ok"]), "a payable recipe passes")

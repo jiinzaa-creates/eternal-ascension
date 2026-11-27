@@ -214,6 +214,10 @@ func refine(item: Dictionary, key: int, counter: int, quality_mult: float = 1.0,
 		out["reason"] = "the piece cannot be reforged"
 		return out
 	refined["durability"] = Items.durability_of(item)
+	# A name the player gave the piece is theirs, not the roll's.
+	if bool(item.get("named", false)):
+		refined["named"] = true
+		refined["name"] = String(item.get("name", ""))
 	# An enchantment is not a rolled affix: it survives the reroll whole.
 	var kept_enchant: Dictionary = item.get("enchant", {})
 	if not kept_enchant.is_empty():

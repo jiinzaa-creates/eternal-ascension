@@ -194,6 +194,14 @@
    ],
    "failure_chance": 0.25,
    "desc": "Feed one piece into another of the same slot. The fed piece is gone either way; on success the survivor takes in the affixes it lacks, past its natural count. Enchantments never transfer."
+  },
+  {
+   "id": "personalize",
+   "name": "Personalize",
+   "stones": 50,
+   "materials": [],
+   "failure_chance": 0.0,
+   "desc": "Give a piece a name of your own. The name endures: refinement, upgrading and fusion all keep it."
   }
  ]
 }

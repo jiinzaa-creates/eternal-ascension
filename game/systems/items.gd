@@ -34,7 +34,7 @@ const REPAIR_RATE := 0.18
 const FIELDS: Array[String] = [
 	"id", "seed", "base", "base_name", "slot", "weapon_type", "ilvl", "rarity",
 	"rarity_name", "name", "implicit", "base_damage", "armor", "mods", "value",
-	"unique", "lore", "material", "potency", "count", "durability", "enchant",
+	"unique", "lore", "material", "potency", "count", "durability", "enchant", "named",
 ]
 
 
@@ -164,6 +164,7 @@ static func normalize_item(value: Variant) -> Dictionary:
 	out["mods"] = _normalize_mods(data.get("mods", []))
 	out["value"] = maxi(0, int(data.get("value", 0)))
 	out["unique"] = bool(data.get("unique", false))
+	out["named"] = bool(data.get("named", false))
 	out["lore"] = String(data.get("lore", ""))
 	out["material"] = String(data.get("material", ""))
 	out["potency"] = clampf(float(data.get("potency", 1.0)), 0.1, 5.0)
