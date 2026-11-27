@@ -698,6 +698,24 @@ func _physique_tests() -> void:
 			break
 	Game.current_biome = ""
 	check(landed, "breaking through in an extreme land can forge a body")
+	for entry in DB.physiques:
+		var pid := String(entry.get("id", ""))
+		var pref := Physiques.passive_of(pid)
+		if pref != "":
+			var pdef: Dictionary = DB.by_id("passive", pref)
+			check(not pdef.is_empty() and String(pdef.get("source", "")) == "Physique",
+				"%s grants a real physique passive" % pid)
+	var sleeper := Player.new()
+	sleeper.attrs = Attributes.new()
+	sleeper.stats = StatBlock.new(sleeper.attrs)
+	sleeper.cultivation = Cultivation.new()
+	sleeper.physique_id = "physique.iron_bone"
+	sleeper.physique_stage = 0
+	sleeper.cultivation.realm = 2
+	var woke := sleeper.develop_physique()
+	check(String(woke.get("kind", "")) == "awakened" and String(woke.get("passive", "")) == "passive.bone_tempering"
+		and sleeper.passives.has("passive.bone_tempering"), "the first awakening grants the body's passive")
+	sleeper.free()
 	check(body.physique_id == "physique.sword_bone", "the inherited body is kept")
 	check(not body.inherit_physique("physique.iron_bone"), "inheritance cannot downgrade")
 	body.free()

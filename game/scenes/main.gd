@@ -5130,13 +5130,17 @@ func character_sections() -> Array:
 		"Realm %d — %s" % [player.cultivation.realm, Realms.name_of(player.cultivation.realm)],
 		"Method: " + String(method.get("name", "?")),
 		root_line,
-		"Physique: %s (tier %d)" % [Physiques.name_of(player.physique_id), Physiques.tier_of(player.physique_id)],
+		"Physique: %s (tier %d)%s" % [Physiques.name_of(player.physique_id), Physiques.tier_of(player.physique_id),
+			(" — " + Physiques.stage_name(player.physique_id, player.physique_stage)) if Physiques.stage_name(player.physique_id, player.physique_stage) != "" else ""],
 		"Qi %d / %d" % [int(player.cultivation.qi), int(player.cultivation.qi_max(player.stats))],
 		"Meridians %d / %d · enlightenments %d" % [
 			Meridians.count(player.cultivation.meridians), Meridians.all().size(), player.enlightenments.size()],
 	]
 	if Physiques.weakness_text(player.physique_id) != "":
 		cultivation.append("Weakness: " + Physiques.weakness_text(player.physique_id))
+	var evolution_target := Physiques.evolves_to(player.physique_id)
+	if evolution_target != "":
+		cultivation.append("Evolution: %s (realm %d, once perfected)" % [Physiques.name_of(evolution_target), Physiques.evolve_realm(player.physique_id)])
 
 	var attributes: Array[String] = [
 		"Attributes: " + player.attrs.summary(),

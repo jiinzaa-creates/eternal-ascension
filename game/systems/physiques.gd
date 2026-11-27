@@ -80,6 +80,11 @@ static func evolve_realm(id: String) -> int:
 	return int(find(id).get("evolve_realm", 0))
 
 
+## The passive the body's first awakening grants, or "" for none.
+static func passive_of(id: String) -> String:
+	return String(find(id).get("passive", ""))
+
+
 static func weakness_text(id: String) -> String:
 	var weakness: Dictionary = find(id).get("weakness", {})
 	return String(weakness.get("text", ""))

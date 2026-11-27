@@ -1574,6 +1574,8 @@ func attempt_breakthrough(composure: float = 0.0) -> Dictionary:
 		var developed := develop_physique()
 		if String(developed.get("kind", "")) == "awakened":
 			Bus.toast.emit("Your physique awakens — %s: %s." % [Physiques.name_of(physique_id), String(developed.get("stage_name", ""))])
+			if String(developed.get("passive", "")) != "":
+				Bus.toast.emit("The awakening leaves its mark — %s." % String(DB.by_id("passive", String(developed["passive"])).get("name", "a new passive")))
 		elif String(developed.get("kind", "")) == "evolved":
 			Bus.toast.emit("Your body transcends its form — %s." % Physiques.name_of(physique_id))
 		elif String(developed.get("kind", "")) == "forged":
@@ -1621,8 +1623,14 @@ func develop_physique() -> Dictionary:
 	var gate := Physiques.next_stage_realm(physique_id, physique_stage)
 	if gate >= 0 and cultivation.realm >= gate:
 		physique_stage += 1
-		return {"kind": "awakened", "stage": physique_stage,
+		var result := {"kind": "awakened", "stage": physique_stage,
 			"stage_name": Physiques.stage_name(physique_id, physique_stage)}
+		# The first awakening leaves a permanent mark: the body's own passive.
+		if physique_stage == 1:
+			var passive_id := Physiques.passive_of(physique_id)
+			if passive_id != "" and add_passive(passive_id):
+				result["passive"] = passive_id
+		return result
 	return {}
 
 

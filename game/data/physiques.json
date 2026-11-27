@@ -51,7 +51,8 @@
     }
    ],
    "evolves_to": "physique.immortal_bone",
-   "evolve_realm": 7
+   "evolve_realm": 7,
+   "passive": "passive.bone_tempering"
   },
   {
    "id": "physique.pure_yang",
@@ -96,7 +97,8 @@
     }
    ],
    "evolves_to": "physique.nine_yang",
-   "evolve_realm": 7
+   "evolve_realm": 7,
+   "passive": "passive.yang_wellspring"
   },
   {
    "id": "physique.wind_stepping",
@@ -145,7 +147,8 @@
     }
    ],
    "evolves_to": "physique.void_spirit",
-   "evolve_realm": 8
+   "evolve_realm": 8,
+   "passive": "passive.gale_tread"
   },
   {
    "id": "physique.nine_yin",
@@ -194,7 +197,8 @@
     }
    ],
    "evolves_to": "physique.taiyin",
-   "evolve_realm": 8
+   "evolve_realm": 8,
+   "passive": "passive.yin_sight"
   },
   {
    "id": "physique.sword_bone",
@@ -243,7 +247,8 @@
     }
    ],
    "evolves_to": "physique.heavenly_sword",
-   "evolve_realm": 8
+   "evolve_realm": 8,
+   "passive": "passive.sword_resonance"
   },
   {
    "id": "physique.chaotic_embryo",
@@ -296,7 +301,8 @@
     }
    ],
    "evolves_to": "physique.chaotic_origin",
-   "evolve_realm": 10
+   "evolve_realm": 10,
+   "passive": "passive.chaos_heart"
   },
   {
    "id": "physique.verdant_meridian",
@@ -345,7 +351,8 @@
     }
    ],
    "evolves_to": "physique.eternal_wood",
-   "evolve_realm": 8
+   "evolve_realm": 8,
+   "passive": "passive.verdant_renewal"
   },
   {
    "id": "physique.immortal_bone",
@@ -392,7 +399,8 @@
      "realm": 9,
      "scale": 2.0
     }
-   ]
+   ],
+   "passive": "passive.bone_tempering"
   },
   {
    "id": "physique.nine_yang",
@@ -439,7 +447,8 @@
      "realm": 9,
      "scale": 2.0
     }
-   ]
+   ],
+   "passive": "passive.yang_wellspring"
   },
   {
    "id": "physique.heavenly_sword",
@@ -486,7 +495,8 @@
      "realm": 9,
      "scale": 2.0
     }
-   ]
+   ],
+   "passive": "passive.sword_resonance"
   },
   {
    "id": "physique.void_spirit",
@@ -537,7 +547,8 @@
      "realm": 9,
      "scale": 2.0
     }
-   ]
+   ],
+   "passive": "passive.gale_tread"
   },
   {
    "id": "physique.taiyin",
@@ -584,7 +595,8 @@
      "realm": 9,
      "scale": 2.0
     }
-   ]
+   ],
+   "passive": "passive.yin_sight"
   },
   {
    "id": "physique.chaotic_origin",
@@ -635,7 +647,8 @@
      "realm": 9,
      "scale": 2.0
     }
-   ]
+   ],
+   "passive": "passive.chaos_heart"
   },
   {
    "id": "physique.eternal_wood",
@@ -682,7 +695,8 @@
      "realm": 9,
      "scale": 2.0
     }
-   ]
+   ],
+   "passive": "passive.verdant_renewal"
   }
  ]
 }

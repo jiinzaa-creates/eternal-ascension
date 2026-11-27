@@ -1,17 +1,337 @@
 {
-  "passives": [
-    {"id": "passive.heavenly_qi_absorption", "name": "Heavenly Qi Absorption", "category": "Cultivation", "source": "Manual", "desc": "Your meridians pull at the world's Qi without being asked.", "mods": [{"stat": "cult_speed_pct", "value": 15}, {"stat": "qi_regen_flat", "value": 0.8}]},
-    {"id": "passive.iron_bone", "name": "Iron Bone Constitution", "category": "Physical", "source": "Training", "desc": "Bones like poured iron. Blows land softer.", "mods": [{"stat": "physical_resist", "value": 8}, {"stat": "str", "value": 3}]},
-    {"id": "passive.spiritual_perception", "name": "Spiritual Perception", "category": "Spiritual", "source": "Enlightenment", "desc": "You see the shape of Qi before it moves.", "mods": [{"stat": "crit_chance", "value": 4}, {"stat": "wis", "value": 2}]},
-    {"id": "passive.sword_heart", "name": "Sword Heart", "category": "Combat", "source": "Inheritance", "desc": "The blade is an extension of intent, not of the arm.", "mods": [{"stat": "physical_damage_pct", "value": 12}, {"stat": "attack_speed_pct", "value": 5}]},
-    {"id": "passive.regenerative_meridian", "name": "Regenerative Meridian", "category": "Cultivation", "source": "Physique", "desc": "Torn channels knit themselves shut.", "mods": [{"stat": "qi_max_pct", "value": 10}, {"stat": "qi_regen_pct", "value": 20}]},
-    {"id": "passive.natural_formation_affinity", "name": "Natural Formation Affinity", "category": "Crafting", "source": "Bloodline", "desc": "Lines of force arrange themselves to your convenience.", "mods": [{"stat": "int", "value": 4}, {"stat": "cult_speed_pct", "value": 5}]},
-    {"id": "passive.beast_taming_instinct", "name": "Beast Taming Instinct", "category": "Social", "source": "Rare encounter", "desc": "Beasts read your intent and choose not to test it.", "mods": [{"stat": "char", "value": 5}, {"stat": "move_speed_pct", "value": 4}]},
-    {"id": "passive.swift_steps", "name": "Swift Steps", "category": "Exploration", "source": "Training", "desc": "Years on mountain paths, never once slipping.", "mods": [{"stat": "move_speed_pct", "value": 10}, {"stat": "agi", "value": 3}]},
-    {"id": "passive.void_affinity", "name": "Void Affinity", "category": "Special", "source": "Hidden realm", "desc": "Distance is a suggestion you have learned to decline.", "mods": [{"stat": "attack_speed_pct", "value": 8}, {"stat": "qi_regen_pct", "value": 15}]},
-    {"id": "passive.bloodline_suppression", "name": "Bloodline Suppression", "category": "Spiritual", "source": "Bloodline", "desc": "Lesser bloodlines lower their eyes before yours.", "mods": [{"stat": "physical_damage_pct", "value": 8}, {"stat": "mental_resist", "value": 0}]},
-    {"id": "passive.jade_skin", "name": "Jade Skin", "category": "Physical", "source": "Manual", "desc": "Qi hardens under the skin until steel slides rather than cuts.", "requires": {"min_attr": {"str": 14}}, "conflicts": ["passive.iron_bone"], "mods": [{"stat": "armor", "value": 14}, {"stat": "physical_resist", "value": 6}]},
-    {"id": "passive.battle_trance", "name": "Battle Trance", "category": "Combat", "source": "Manual", "desc": "Pain narrows the world to the next strike, and the next.", "condition": {"wounded": true}, "mods": [{"stat": "physical_damage_pct", "value": 10}, {"stat": "attack_speed_pct", "value": 5}]},
-    {"id": "passive.flowing_water", "name": "Flowing Water", "category": "Movement", "source": "Manual", "desc": "Step where the ground is not; the body follows the water's argument.", "requires": {"min_attr": {"agi": 12}}, "synergy": {"with": "passive.swift_steps", "mods": [{"stat": "attack_speed_pct", "value": 4}]}, "mods": [{"stat": "move_speed_pct", "value": 5}]}
-  ]
+ "passives": [
+  {
+   "id": "passive.heavenly_qi_absorption",
+   "name": "Heavenly Qi Absorption",
+   "category": "Cultivation",
+   "source": "Manual",
+   "desc": "Your meridians pull at the world's Qi without being asked.",
+   "mods": [
+    {
+     "stat": "cult_speed_pct",
+     "value": 15
+    },
+    {
+     "stat": "qi_regen_flat",
+     "value": 0.8
+    }
+   ]
+  },
+  {
+   "id": "passive.iron_bone",
+   "name": "Iron Bone Constitution",
+   "category": "Physical",
+   "source": "Training",
+   "desc": "Bones like poured iron. Blows land softer.",
+   "mods": [
+    {
+     "stat": "physical_resist",
+     "value": 8
+    },
+    {
+     "stat": "str",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "passive.spiritual_perception",
+   "name": "Spiritual Perception",
+   "category": "Spiritual",
+   "source": "Enlightenment",
+   "desc": "You see the shape of Qi before it moves.",
+   "mods": [
+    {
+     "stat": "crit_chance",
+     "value": 4
+    },
+    {
+     "stat": "wis",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "passive.sword_heart",
+   "name": "Sword Heart",
+   "category": "Combat",
+   "source": "Inheritance",
+   "desc": "The blade is an extension of intent, not of the arm.",
+   "mods": [
+    {
+     "stat": "physical_damage_pct",
+     "value": 12
+    },
+    {
+     "stat": "attack_speed_pct",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "passive.regenerative_meridian",
+   "name": "Regenerative Meridian",
+   "category": "Cultivation",
+   "source": "Physique",
+   "desc": "Torn channels knit themselves shut.",
+   "mods": [
+    {
+     "stat": "qi_max_pct",
+     "value": 10
+    },
+    {
+     "stat": "qi_regen_pct",
+     "value": 20
+    }
+   ]
+  },
+  {
+   "id": "passive.natural_formation_affinity",
+   "name": "Natural Formation Affinity",
+   "category": "Crafting",
+   "source": "Bloodline",
+   "desc": "Lines of force arrange themselves to your convenience.",
+   "mods": [
+    {
+     "stat": "int",
+     "value": 4
+    },
+    {
+     "stat": "cult_speed_pct",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "passive.beast_taming_instinct",
+   "name": "Beast Taming Instinct",
+   "category": "Social",
+   "source": "Rare encounter",
+   "desc": "Beasts read your intent and choose not to test it.",
+   "mods": [
+    {
+     "stat": "char",
+     "value": 5
+    },
+    {
+     "stat": "move_speed_pct",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "id": "passive.swift_steps",
+   "name": "Swift Steps",
+   "category": "Exploration",
+   "source": "Training",
+   "desc": "Years on mountain paths, never once slipping.",
+   "mods": [
+    {
+     "stat": "move_speed_pct",
+     "value": 10
+    },
+    {
+     "stat": "agi",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "passive.void_affinity",
+   "name": "Void Affinity",
+   "category": "Special",
+   "source": "Hidden realm",
+   "desc": "Distance is a suggestion you have learned to decline.",
+   "mods": [
+    {
+     "stat": "attack_speed_pct",
+     "value": 8
+    },
+    {
+     "stat": "qi_regen_pct",
+     "value": 15
+    }
+   ]
+  },
+  {
+   "id": "passive.bloodline_suppression",
+   "name": "Bloodline Suppression",
+   "category": "Spiritual",
+   "source": "Bloodline",
+   "desc": "Lesser bloodlines lower their eyes before yours.",
+   "mods": [
+    {
+     "stat": "physical_damage_pct",
+     "value": 8
+    },
+    {
+     "stat": "mental_resist",
+     "value": 0
+    }
+   ]
+  },
+  {
+   "id": "passive.jade_skin",
+   "name": "Jade Skin",
+   "category": "Physical",
+   "source": "Manual",
+   "desc": "Qi hardens under the skin until steel slides rather than cuts.",
+   "requires": {
+    "min_attr": {
+     "str": 14
+    }
+   },
+   "conflicts": [
+    "passive.iron_bone"
+   ],
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 14
+    },
+    {
+     "stat": "physical_resist",
+     "value": 6
+    }
+   ]
+  },
+  {
+   "id": "passive.battle_trance",
+   "name": "Battle Trance",
+   "category": "Combat",
+   "source": "Manual",
+   "desc": "Pain narrows the world to the next strike, and the next.",
+   "condition": {
+    "wounded": true
+   },
+   "mods": [
+    {
+     "stat": "physical_damage_pct",
+     "value": 10
+    },
+    {
+     "stat": "attack_speed_pct",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "passive.flowing_water",
+   "name": "Flowing Water",
+   "category": "Movement",
+   "source": "Manual",
+   "desc": "Step where the ground is not; the body follows the water's argument.",
+   "requires": {
+    "min_attr": {
+     "agi": 12
+    }
+   },
+   "synergy": {
+    "with": "passive.swift_steps",
+    "mods": [
+     {
+      "stat": "attack_speed_pct",
+      "value": 4
+     }
+    ]
+   },
+   "mods": [
+    {
+     "stat": "move_speed_pct",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "passive.bone_tempering",
+   "name": "Bone Tempering",
+   "category": "Physical",
+   "source": "Physique",
+   "desc": "The skeleton learns its second lesson.",
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 6
+    }
+   ]
+  },
+  {
+   "id": "passive.yang_wellspring",
+   "name": "Yang Wellspring",
+   "category": "Cultivation",
+   "source": "Physique",
+   "desc": "The dantian boils and never empties.",
+   "mods": [
+    {
+     "stat": "qi_regen_flat",
+     "value": 2
+    }
+   ]
+  },
+  {
+   "id": "passive.gale_tread",
+   "name": "Gale Tread",
+   "category": "Movement",
+   "source": "Physique",
+   "desc": "The awakened wind-stepper borrows the gale's road.",
+   "mods": [
+    {
+     "stat": "move_speed_pct",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "id": "passive.yin_sight",
+   "name": "Yin Sight",
+   "category": "Spiritual",
+   "source": "Physique",
+   "desc": "Cold eyes find the seam in all things.",
+   "mods": [
+    {
+     "stat": "crit_chance",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "id": "passive.sword_resonance",
+   "name": "Sword Resonance",
+   "category": "Combat",
+   "source": "Physique",
+   "desc": "The bone hums when a blade is drawn.",
+   "mods": [
+    {
+     "stat": "crit_damage",
+     "value": 10
+    }
+   ]
+  },
+  {
+   "id": "passive.chaos_heart",
+   "name": "Chaos Heart",
+   "category": "Special",
+   "source": "Physique",
+   "desc": "Disorder, given a rhythm, becomes a method.",
+   "mods": [
+    {
+     "stat": "cult_speed_pct",
+     "value": 8
+    }
+   ]
+  },
+  {
+   "id": "passive.verdant_renewal",
+   "name": "Verdant Renewal",
+   "category": "Cultivation",
+   "source": "Physique",
+   "desc": "What the forest loses, it grows back.",
+   "mods": [
+    {
+     "stat": "health_regen",
+     "value": 0.4
+    }
+   ]
+  }
+ ]
 }

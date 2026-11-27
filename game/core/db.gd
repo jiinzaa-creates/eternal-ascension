@@ -938,6 +938,9 @@ func validate() -> Array:
 				if not (float((stages[1] as Dictionary).get("scale", 0.0)) > 1.0
 						and float((stages[2] as Dictionary).get("scale", 0.0)) > float((stages[1] as Dictionary).get("scale", 0.0))):
 					problems.append("physique %s awakening scales must deepen" % id)
+		var passive_ref := String(p.get("passive", ""))
+		if passive_ref != "" and DB.by_id("passive", passive_ref).is_empty():
+			problems.append("physique %s grants unknown passive %s" % [id, passive_ref])
 		var evolves_to := String(p.get("evolves_to", ""))
 		if evolves_to != "":
 			var target: Dictionary = {}
