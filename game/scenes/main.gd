@@ -25,6 +25,7 @@ var hud: Hud
 ## Floating damage numbers live in the world layer so they sit over bodies.
 var damage_numbers: DamageNumbers
 var ground_loot: GroundLoot
+var companion_beast: Dummy = null
 ## Combat sound. Streams are synthesized; the pool is played from bus signals.
 var combat_audio: CombatAudio
 var chunks: ChunkManager
@@ -254,6 +255,7 @@ func _ready() -> void:
 	Bus.enemy_died.connect(_on_enemy_died)
 	Bus.elite_died.connect(_on_elite_died)
 	Bus.beast_slain.connect(_on_beast_slain)
+	Bus.beast_companion_died.connect(_on_companion_died)
 	Bus.boss_phase_changed.connect(_on_boss_phase_changed)
 	Bus.boss_defeated.connect(_on_boss_defeated)
 	Bus.tribulation_finished.connect(_on_tribulation_finished)
@@ -942,6 +944,7 @@ func refund_attribute() -> bool:
 
 func _begin_run() -> void:
 	_apply_origin()
+	_spawn_companion()
 	Game.born_day = Clock.day
 	_captive_day = Clock.day
 	_progress_day = Clock.day
@@ -1281,7 +1284,8 @@ func _spawn_wild_dummy() -> void:
 	var elite_share: RandomNumberGenerator = Rng.stream("wild_elite", Game.kills + 1, _wild_dummy_count())
 	var species := Beasts.roll(DB.spirit_beasts, String(biome.get("id", "")), r)
 	if not species.is_empty() and share.randf() < BEAST_SHARE:
-		dummy.become_beast(species, player.cultivation.realm)
+		var rank := Beasts.rank_roll(r, maxi(1, player.cultivation.realm))
+		dummy.become_beast(species, player.cultivation.realm, rank, Beasts.bloodline_roll(r))
 	else:
 		var enemy := Biome.pick_enemy(biome, r)
 		dummy.apply_biome_enemy(enemy, player.cultivation.realm)
@@ -5744,13 +5748,123 @@ func _beaten_body_near() -> Dummy:
 	return best
 
 
+## The nearest beaten beast within reach: hurt past a quarter of
+## its strength, wild, and still willing to refuse.
+func _beaten_beast_near() -> Dummy:
+	if player == null or realm_instance != null:
+		return null
+	var best: Dummy = null
+	var best_dist := Captivity.bind_reach()
+	for value in get_tree().get_nodes_in_group("enemy"):
+		if not is_instance_valid(value):
+			continue
+		var body := value as Dummy
+		if body == null or not body.beast_weakened():
+			continue
+		var dist := body.global_position.distance_to(player.global_position)
+		if dist <= best_dist:
+			best_dist = dist
+			best = body
+	return best
+
+
+func _tame_chance_for(body: Dummy) -> float:
+	return Beasts.tame_chance(
+		player.passives.has("passive.beast_taming_instinct"),
+		player.cultivation.method_id == "method.beast",
+		player.stats.get_attr("char"), body.beast_rank, body.bloodline)
+
+
+## H near a beaten beast: win it or be refused. A refusal mends
+## and enrages it; three refusals close the door for that body.
+func _attempt_tame(body: Dummy) -> void:
+	if not Game.tamed_beast.is_empty():
+		Bus.toast.emit("You already walk with %s. One bond is all a heart holds." % String(Game.tamed_beast.get("name", "a beast")))
+		return
+	var chance := _tame_chance_for(body)
+	var rng := Rng.stream("taming", Clock.day, Game.kills * 31 + body.tame_attempts * 131 + hash(body.species_id))
+	if rng.randf() < chance:
+		_adopt_beast(body)
+		return
+	body.tame_enrage()
+	Bus.toast.emit("%s refuses the bond and comes at you, mended and furious." % body.display_name)
+
+
+## The bond takes: the body leaves the enemy host and walks as
+## a companion - following, fighting at your side, saved.
+func _adopt_beast(body: Dummy) -> void:
+	Game.tamed_beast = {
+		"species": body.species_id, "rank": body.beast_rank,
+		"bloodline": body.bloodline, "ilvl": body.ilvl,
+		"name": body.display_name,
+	}
+	body.tamed = true
+	body.remove_from_group("enemy")
+	body.add_to_group("beast_companion")
+	body.home = player.global_position
+	companion_beast = body
+	Bus.toast.emit("%s lowers its head. It walks with you now." % body.display_name)
+	Bus.player_stats_changed.emit()
+
+
+func _release_companion() -> void:
+	if companion_beast == null or not is_instance_valid(companion_beast):
+		return
+	var name := companion_beast.display_name
+	companion_beast.queue_free()
+	companion_beast = null
+	Game.tamed_beast = {}
+	Bus.toast.emit("%s bounds away into the wilds, free." % name)
+	Bus.player_stats_changed.emit()
+
+
+func _on_companion_died(species_id: String) -> void:
+	var name := String(Game.tamed_beast.get("name", "Your companion"))
+	Game.tamed_beast = {}
+	companion_beast = null
+	Bus.toast.emit("%s has fallen. The wilds keep what they lend." % name)
+	Bus.player_stats_changed.emit()
+
+
+## (Re)build the companion body from its record - on run start and
+## on leaving a hidden realm, whose rifts it will not cross.
+func _spawn_companion() -> void:
+	if Game.tamed_beast.is_empty() or player == null or realm_instance != null:
+		return
+	if companion_beast != null and is_instance_valid(companion_beast):
+		return
+	var entry: Dictionary = DB.spirit_beast(String(Game.tamed_beast.get("species", "")))
+	if entry.is_empty():
+		Game.tamed_beast = {}
+		return
+	var body := Dummy.new()
+	body.global_position = player.global_position + Vector2(56, 24)
+	world.add_child(body)
+	body.become_beast(entry, maxi(1, int(Game.tamed_beast.get("ilvl", 1))),
+		int(Game.tamed_beast.get("rank", 1)), bool(Game.tamed_beast.get("bloodline", false)))
+	body.tamed = true
+	body.remove_from_group("enemy")
+	body.add_to_group("beast_companion")
+	body.home = player.global_position
+	body.hp = body.hp_max
+	companion_beast = body
+
+
 ## H: bind the beaten cultivator at your feet. The body leaves the world alive:
 ## no kill, no loot, and a record in the yard that the market will remember.
 func _bind_captive() -> void:
 	if player == null or String(phase) != "play" or realm_instance != null:
 		return
+	var wild := _beaten_beast_near()
+	if wild != null:
+		_attempt_tame(wild)
+		return
 	var body := _beaten_body_near()
 	if body == null:
+		if companion_beast != null and is_instance_valid(companion_beast) \
+				and companion_beast.global_position.distance_to(player.global_position) <= Captivity.bind_reach():
+			_release_companion()
+			return
 		Bus.toast.emit("No beaten cultivator is close enough to bind.")
 		return
 	var verdict := Captivity.can_bind(Game.captives)
@@ -5958,6 +6072,12 @@ func interaction_prompt() -> String:
 				beaten.display_name, Game.captives.size(), Captivity.max_held()]
 		var health := roundi(beaten.hp / maxf(1.0, beaten.hp_max) * 100.0)
 		return "H  Subdue %s (%d%% health)  ·  L captives" % [beaten.display_name, health]
+	var wild := _beaten_beast_near()
+	if wild != null:
+		return "H  Tame %s (%d%%)" % [wild.display_name, roundi(_tame_chance_for(wild) * 100.0)]
+	if companion_beast != null and is_instance_valid(companion_beast) \
+			and companion_beast.global_position.distance_to(player.global_position) <= Captivity.bind_reach():
+		return "H  Release %s" % companion_beast.display_name
 	var best := _nearest_interactable()
 	if best == null:
 		return ""
@@ -7047,6 +7167,9 @@ func _enter_realm(site_id: String = "") -> void:
 	active_realm_id = id
 	portal_position = realm_portal_positions.get(id, portal_position)
 	_set_overworld_active(false)
+	if companion_beast != null and is_instance_valid(companion_beast):
+		companion_beast.queue_free()
+		companion_beast = null
 	realm_instance = HiddenRealm.new()
 	realm_instance.name = "HiddenRealm"
 	realm_instance.entity_parent = world
@@ -7085,6 +7208,7 @@ func _exit_realm() -> void:
 	realm_instance.cleanup()
 	realm_instance.queue_free()
 	realm_instance = null
+	_spawn_companion()
 	_set_overworld_active(true)
 	phase = "play"
 	player.global_position = portal_position + Vector2(-80, 40)
@@ -7131,12 +7255,13 @@ func _boss_entry_of(boss: Node) -> Dictionary:
 
 ## A spirit beast leaves a core wherever it fell. The ordinary loot roll still
 ## happens through `enemy_died`; this is the part that is particular to beasts.
-func _on_beast_slain(at: Vector2, species_id: String, ilvl: int) -> void:
+func _on_beast_slain(at: Vector2, species_id: String, ilvl: int, rank: int = 1, bloodline: bool = false) -> void:
 	var entry: Dictionary = DB.spirit_beast(species_id)
 	if entry.is_empty() or player == null:
 		return
 	var species := Beasts.profile(entry)
-	var core := Beasts.core_item(species, ilvl, ground_items.size())
+	var bonus := int(Beasts.rank_of(rank).get("core_bonus", 0)) + (1 if bloodline else 0)
+	var core := Beasts.core_item(species, ilvl, ground_items.size(), bonus)
 	ground_items.append({"x": at.x - 18.0, "y": at.y + 10.0, "item": core})
 	Bus.item_dropped.emit(core, at)
 	Bus.toast.emit("The %s leaves a %s." % [String(species.get("name", "beast")), String(core.get("name", "core"))])

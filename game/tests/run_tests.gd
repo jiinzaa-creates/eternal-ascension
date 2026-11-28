@@ -1522,6 +1522,38 @@ func _realm_tests() -> void:
 	var before_requip := holder.passives.size()
 	holder.equip(spear_held)
 	check(holder.passives.size() == before_requip, "holding the same kind twice teaches once")
+	check(Beasts.rank_count() == 4, "four beast ranks stand")
+	check(float(Beasts.rank_of(3).get("hp_mult", 0.0)) > float(Beasts.rank_of(0).get("hp_mult", 0.0)),
+		"an Ancient outweighs a Young of its kind")
+	var rank_rng := RandomNumberGenerator.new()
+	rank_rng.seed = 4242
+	var ranks_ok := true
+	for i in 60:
+		var rolled := Beasts.rank_roll(rank_rng, 3)
+		if rolled < 0 or rolled >= Beasts.rank_count():
+			ranks_ok = false
+	check(ranks_ok, "rank rolls stay on the table")
+	var young := Dummy.new()
+	young.become_beast(DB.spirit_beast("beast.moonfang"), 3, 0, false)
+	var ancient := Dummy.new()
+	ancient.become_beast(DB.spirit_beast("beast.moonfang"), 3, 3, false)
+	check(ancient.hp_max > young.hp_max * 1.8, "rank moves a beast's body, not just its name")
+	var awakened := Dummy.new()
+	awakened.become_beast(DB.spirit_beast("beast.moonfang"), 3, 1, true)
+	check(awakened.display_name.begins_with("Bloodline-Awakened"), "an awakened beast announces its blood")
+	check(int(Beasts.core_item(DB.spirit_beast("beast.moonfang"), 3, 0, 2).get("rarity", 0)) > 2,
+		"a ranked beast's core pays above the common grade")
+	check(Beasts.tame_chance(true, true, 30, 1, false) > Beasts.tame_chance(false, false, 10, 1, false),
+		"the tamer's kit - instinct, method, manner - moves the odds")
+	check(Beasts.tame_chance(false, false, 10, 3, true) < Beasts.tame_chance(false, false, 10, 1, false),
+		"rank and awakened blood refuse more often")
+	var tame_body := Dummy.new()
+	tame_body.become_beast(DB.spirit_beast("beast.moonfang"), 3, 1, false)
+	tame_body.hp = tame_body.hp_max * 0.2
+	check(tame_body.beast_weakened(), "a beast at a fifth of its strength can be won")
+	tame_body.tame_enrage()
+	check(not tame_body.beast_weakened() and tame_body.tame_attempts == 1,
+		"a refusal mends the beast and counts the attempt")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

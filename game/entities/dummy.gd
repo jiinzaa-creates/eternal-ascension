@@ -89,6 +89,12 @@ var _dead := false
 ## A beaten humanoid is not necessarily dead. It goes down, cannot act, and
 ## stays bindable for a short window before the wounds finish what the fight
 ## started. Captivity is a status, so nothing here registers a kill or a drop.
+var beast_rank := 1
+var bloodline := false
+var rank_hp_mult := 1.0
+var rank_damage_mult := 1.0
+var tamed := false
+var tame_attempts := 0
 var subdued := false
 var _subdued_left := 0.0
 var _strikes := 0
@@ -117,13 +123,13 @@ func _recompute_stats() -> void:
 	var hp_mult := float(_entry.get("hp_mult", 1.0))
 	var dmg_mult := float(_entry.get("damage_mult", 1.0))
 	var spawn_speed := float(_entry.get("speed", 60.0))
-	hp_max = (70.0 + ilvl * 18.0) * hp_mult * float(profile.get("hp_mult", 1.0)) * boss_hp_mult * elite_hp_mult
+	hp_max = (70.0 + ilvl * 18.0) * hp_mult * float(profile.get("hp_mult", 1.0)) * boss_hp_mult * elite_hp_mult * rank_hp_mult
 	hp = hp_max
 	poise.set_maximum(
 		(40.0 + ilvl * 6.0) * float(_entry.get("poise_mult", 1.0)) * float(profile.get("poise_mult", 1.0)) \
 		* boss_poise_mult * elite_poise_mult,
 		true)
-	damage = (6.0 + ilvl * 2.0) * dmg_mult * float(profile.get("damage_mult", 1.0)) * boss_damage_mult * elite_damage_mult
+	damage = (6.0 + ilvl * 2.0) * dmg_mult * float(profile.get("damage_mult", 1.0)) * boss_damage_mult * elite_damage_mult * rank_damage_mult
 	strike_poise = (8.0 + float(ilvl) * 2.0) * dmg_mult * float(profile.get("poise_mult", 1.0))
 	knockback = 140.0 + float(ilvl) * 10.0
 	armor_value = 8.0 + float(ilvl) * 5.0
@@ -147,11 +153,20 @@ func apply_biome_enemy(entry: Dictionary, realm: int) -> void:
 ## Turns this body into a spirit beast of a species from
 ## `data/spirit_beasts.json`. The species supplies its numbers and habitat; the
 ## behaviour still comes from its archetype, so a wolf circles and a boar holds.
-func become_beast(species: Dictionary, realm: int) -> void:
+func become_beast(species: Dictionary, realm: int, rank: int = 1, awakened: bool = false) -> void:
 	var normalised := Beasts.profile(species)
 	is_beast = true
 	species_id = String(normalised.get("id", ""))
+	beast_rank = clampi(rank, 0, Beasts.rank_count() - 1)
+	bloodline = awakened
+	var rdata := Beasts.rank_of(beast_rank)
+	rank_hp_mult = float(rdata.get("hp_mult", 1.0)) * (Beasts.BLOODLINE_HP_MULT if bloodline else 1.0)
+	rank_damage_mult = float(rdata.get("damage_mult", 1.0)) * (Beasts.BLOODLINE_DAMAGE_MULT if bloodline else 1.0)
 	apply_biome_enemy(Beasts.enemy_entry(normalised), realm)
+	if bloodline:
+		display_name = "Bloodline-Awakened " + display_name
+	elif beast_rank != 1:
+		display_name = Beasts.rank_name(beast_rank) + " " + display_name
 	queue_redraw()
 
 
@@ -274,6 +289,10 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 
+	if tamed:
+		var tamer := Game.player as Node2D
+		if tamer != null and is_instance_valid(tamer):
+			home = tamer.global_position
 	var target := _combat_target()
 	if target == null:
 		velocity = _knock
@@ -381,6 +400,8 @@ func _physics_process(delta: float) -> void:
 			_facing = intent.normalized()
 
 	var move_speed := speed * Status.speed_multiplier(statuses) * _phase_mult("speed_mult")
+	if tamed and home_dist > 300.0:
+		move_speed *= 1.5
 	var steer := intent.normalized() * move_speed if intent.length_squared() > 0.0001 else Vector2.ZERO
 	steer += EnemyAI.separation(global_position, _ally_positions(), EnemyAI.SEPARATION_RADIUS) * speed * 0.8
 	velocity = steer + _knock
@@ -389,6 +410,25 @@ func _physics_process(delta: float) -> void:
 		_circle_time = 0.0
 	move_and_slide()
 	queue_redraw()
+
+
+## A tamed beast fights what threatens its tamer: the nearest
+## hostile body within reach of the player's side.
+func _tamed_target() -> Node2D:
+	var anchor := Game.player as Node2D
+	if anchor == null or not is_instance_valid(anchor):
+		return null
+	var best: Node2D = null
+	var best_dist := 700.0
+	for value in get_tree().get_nodes_in_group("enemy"):
+		var body := value as Dummy
+		if body == null or body == self or body.tamed or body._dead:
+			continue
+		var dist := body.global_position.distance_to(anchor.global_position)
+		if dist < best_dist:
+			best_dist = dist
+			best = body
+	return best
 
 
 ## A patrolling body walks one leg of a deterministic circuit around its home.
@@ -423,6 +463,8 @@ func _arrive_home() -> void:
 ## is the player, unchanged; with companions the closest one draws the fight,
 ## which is what makes a follower a target rather than a decoration.
 func _combat_target() -> Node2D:
+	if tamed:
+		return _tamed_target()
 	var best: Node2D = Game.player as Node2D
 	var best_dist := INF
 	if best != null and is_instance_valid(best):
@@ -477,7 +519,14 @@ func _release_attack(target: Node2D) -> void:
 			var box := EnemyAI.strike_hitbox(profile)
 			if Combat.in_hitbox(global_position, _facing, box, target.global_position, 18.0):
 				var dealt := 0.0
-				if target.has_method("take_hit"):
+				if target is Dummy:
+					# A body striking a body speaks the body's own
+					# take_hit dialect: knock as a vector, no evasion roll.
+					var foe := target as Dummy
+					dealt = foe.take_hit(outgoing,
+						(foe.global_position - global_position).normalized() * knockback,
+						strike_poise, 0.0, status_payload)
+				elif target.has_method("take_hit"):
 					dealt = float(target.take_hit(outgoing, global_position, true, strike_poise,
 						knockback, self, status_payload))
 				if dealt > 0.0:
@@ -593,6 +642,26 @@ func weakened() -> bool:
 	return hp <= hp_max * Captivity.weakened_ratio()
 
 
+## A beast's own beaten window: hurt past fighting well, not yet
+## dead. Captivity is for people - this is the tamer's door, and it
+## closes for good after three refusals.
+func beast_weakened() -> bool:
+	if _dead or not is_beast or is_boss or tamed:
+		return false
+	if tame_attempts >= Beasts.TAME_MAX_ATTEMPTS:
+		return false
+	return hp > 0.0 and hp <= hp_max * Beasts.TAME_WEAKENED_RATIO
+
+
+## A refused tame is answered with everything the beast has left:
+## it mends a measure, re-engages, and remembers the insult.
+func tame_enrage() -> void:
+	tame_attempts += 1
+	hp = minf(hp_max, hp + hp_max * 0.4)
+	aggressive = true
+	_provoked = true
+
+
 ## Down, not dead: the body drops its guard and waits to be bound or finished.
 ## There is no kill here, so no kill count, no loot and no death channel — a
 ## person who is taken is still alive.
@@ -641,10 +710,14 @@ func _die() -> void:
 	_dead = true
 	state = "dead"
 	statuses.clear()
+	if tamed:
+		Bus.beast_companion_died.emit(species_id)
+		queue_free()
+		return
 	if is_boss and boss_id != "":
 		Bus.boss_defeated.emit(boss_id, global_position)
 	elif is_beast and species_id != "":
-		Bus.beast_slain.emit(global_position, species_id, ilvl)
+		Bus.beast_slain.emit(global_position, species_id, ilvl, beast_rank, bloodline)
 	Game.register_kill()
 	# An elite reports on its own channel: the scene pays its table and never the
 	# wild one as well, so rank can never roll twice.
@@ -664,18 +737,20 @@ func _refresh_sprite() -> void:
 		_sprite = ActorSprite.new()
 		add_child(_sprite)
 	var root := "res://assets/art-studio/assets/"
+	var beast_scale := float(Beasts.rank_of(beast_rank).get("scale", 1.0)) if is_beast else 1.0
+	var beast_tint := Color("#ffb36b") if bloodline else Color.WHITE
 	match species_id:
 		"beast.moonfang":
-			_sprite.configure(root + "characters/companions/companion_spirit_wolf", 64.0, ["a", "b"])
+			_sprite.configure(root + "characters/companions/companion_spirit_wolf", 64.0, ["a", "b"], beast_scale, beast_tint)
 			return
 		"beast.stoneback":
-			_sprite.configure(root + "enemies/beasts/enemy_iron_tusk_boar", 64.0, ["a", "b"])
+			_sprite.configure(root + "enemies/beasts/enemy_iron_tusk_boar", 64.0, ["a", "b"], beast_scale, beast_tint)
 			return
 		"beast.thundercrane":
-			_sprite.configure(root + "enemies/beasts/enemy_storm_crane", 64.0, ["left", "right"])
+			_sprite.configure(root + "enemies/beasts/enemy_storm_crane", 64.0, ["left", "right"], beast_scale, beast_tint)
 			return
 		"beast.gloomserpent":
-			_sprite.configure(root + "enemies/beasts/enemy_gloom_serpent", 64.0, ["a", "b"], 1.0, Color.WHITE, true)
+			_sprite.configure(root + "enemies/beasts/enemy_gloom_serpent", 64.0, ["a", "b"], beast_scale, beast_tint, true)
 			return
 	if is_boss:
 		_sprite.configure(_human_base(root), 64.0, ["left", "right"], 1.7,
