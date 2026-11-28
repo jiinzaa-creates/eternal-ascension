@@ -1402,11 +1402,12 @@ func _sell_index(index: int) -> void:
 	var price := maxi(1, int(floor(float(Economy.sell_value(item)) * _world_event_mult("shop_sell"))))
 	player.inventory.remove_at(index)
 	# Selling worn gear must not leave the stat pipeline holding a ghost.
-	var slot := String(item.get("slot", ""))
-	var worn: Dictionary = player.equipment.get(slot, {})
-	if not worn.is_empty() and String(worn.get("id", "")) == String(item.get("id", "")):
-		player.equipment.erase(slot)
-		player.rebuild_stats()
+	for worn_key in Equipment.WORN_KEYS:
+		var worn: Dictionary = player.equipment.get(worn_key, {})
+		if not worn.is_empty() and String(worn.get("id", "")) == String(item.get("id", "")):
+			player.equipment.erase(worn_key)
+			player.rebuild_stats()
+			break
 	Game.spirit_stones += price
 	Bus.player_stats_changed.emit()
 	Bus.toast.emit("Sold %s for %d spirit stones." % [Items.label(item), price])
@@ -1450,8 +1451,13 @@ func gear_candidates() -> Array:
 		var slot := String(item.get("slot", ""))
 		if not Items.is_equipment(slot):
 			continue
-		var worn: Dictionary = player.equipment.get(slot, {})
-		if not worn.is_empty() and String(worn.get("id", "")) == String(item.get("id", "")):
+		var is_worn := false
+		for worn_key in Equipment.WORN_KEYS:
+			var worn: Dictionary = player.equipment.get(worn_key, {})
+			if not worn.is_empty() and String(worn.get("id", "")) == String(item.get("id", "")):
+				is_worn = true
+				break
+		if is_worn:
 			continue
 		out.append(item)
 	return out
@@ -1460,10 +1466,10 @@ func gear_candidates() -> Array:
 ## Comparison plus the equip gate, computed once per panel redraw.
 func gear_compare(item: Dictionary) -> Dictionary:
 	var rules := Equipment.new(DB)
-	var slot := String(item.get("slot", ""))
-	var worn: Dictionary = player.equipment.get(slot, {})
+	var key := rules.equip_key_for(item, player.equipment)
+	var worn: Dictionary = player.equipment.get(key, {})
 	var out := rules.compare(item, worn)
-	out["check"] = rules.can_equip(item, player.equipment, player.attrs, player.cultivation.realm)
+	out["check"] = rules.can_equip(item, player.equipment, player.attrs, player.cultivation.realm, key)
 	return out
 
 
@@ -5290,11 +5296,11 @@ func character_sections() -> Array:
 	arts.append(passive_line)
 
 	var gear: Array[String] = []
-	for slot in ["weapon", "armor", "ring", "talisman"]:
+	for slot in Equipment.WORN_KEYS:
 		var item_value: Variant = player.equipment.get(slot, {})
 		if typeof(item_value) == TYPE_DICTIONARY and not (item_value as Dictionary).is_empty():
 			var item: Dictionary = item_value
-			gear.append("%s: %s" % [String(slot).capitalize(), String(item.get("name", "?"))])
+			gear.append("%s: %s" % [String(Equipment.SLOT_LABELS.get(slot, slot)), String(item.get("name", "?"))])
 	if gear.is_empty():
 		gear.append("Nothing worn.")
 	for entry in DB.professions:

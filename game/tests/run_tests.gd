@@ -1554,6 +1554,43 @@ func _realm_tests() -> void:
 	tame_body.tame_enrage()
 	check(not tame_body.beast_weakened() and tame_body.tame_attempts == 1,
 		"a refusal mends the beast and counts the attempt")
+	var kit := Equipment.new(DB)
+	var ring_a := {"id": "item.test.ring_a", "name": "Ring A", "slot": "ring", "base_damage": 0.0,
+		"damage": 0, "mods": [], "rarity": 0, "ilvl": 1, "count": 1}
+	var ring_b := {"id": "item.test.ring_b", "name": "Ring B", "slot": "ring", "base_damage": 0.0,
+		"damage": 0, "mods": [], "rarity": 0, "ilvl": 1, "count": 1}
+	check(kit.equip_key_for(ring_a, {}) == "ring", "the first ring takes the first finger")
+	check(kit.equip_key_for(ring_b, {"ring": ring_a}) == "ring2", "the second ring finds the second finger")
+	check(kit.equip_key_for(ring_b, {"ring": ring_a, "ring2": ring_b}) == "ring",
+		"a third ring replaces the first")
+	var wearer := Player.new()
+	wearer.attrs = Attributes.new()
+	wearer.stats = StatBlock.new(wearer.attrs)
+	wearer.cultivation = Cultivation.new()
+	wearer.appearance = Appearance.new()
+	check(bool(wearer.equip(ring_a).get("ok", false)), "ring A equips")
+	check(bool(wearer.equip(ring_b).get("ok", false)), "ring B equips beside it")
+	check(wearer.equipment.has("ring") and wearer.equipment.has("ring2"),
+		"two rings are worn at once, on two keys")
+	var gen := ItemGen.new(DB, Rng)
+	var pendant: Dictionary = gen.generate(4, 777, 1, 2, "", "base.necklace.jade_pendant")
+	check(String(pendant.get("slot", "")) == "necklace" and (pendant.get("mods", []) as Array).size() > 0,
+		"a generated necklace rolls real affixes")
+	check(bool(wearer.equip(pendant).get("ok", false)) and wearer.equipment.has("necklace"),
+		"the necklace takes its own place")
+	var seal: Dictionary = gen.generate(6, 778, 1, 1, "", "base.artifact.jade_seal")
+	check(not bool(wearer.equip(seal).get("ok", false)), "the Jade Seal refuses a realm-1 body")
+	wearer.cultivation.realm = 3
+	check(bool(wearer.equip(seal).get("ok", false)) and wearer.equipment.has("artifact"),
+		"at realm 3 the seal accepts its bearer")
+	var round_trip := Player.new()
+	round_trip.attrs = Attributes.new()
+	round_trip.stats = StatBlock.new(round_trip.attrs)
+	round_trip.cultivation = Cultivation.new()
+	round_trip.appearance = Appearance.new()
+	round_trip.from_dict(wearer.to_dict())
+	check(round_trip.equipment.has("ring2") and round_trip.equipment.has("necklace")
+		and round_trip.equipment.has("artifact"), "the full worn set survives a save round-trip")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

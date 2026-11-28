@@ -1557,7 +1557,7 @@ func draw_gear(player: Player) -> void:
 	var worn_y := origin.y + 64.0
 	_text(Vector2(worn_x, worn_y), "WORN", 11, MUTED)
 	worn_y += 20.0
-	for slot in ["weapon", "armor", "ring", "talisman"]:
+	for slot in Equipment.WORN_KEYS:
 		var worn: Dictionary = player.equipment.get(slot, {})
 		_text(Vector2(worn_x, worn_y), String(Equipment.SLOT_LABELS.get(slot, slot)), 11, MUTED)
 		var label := "—"
@@ -1931,7 +1931,7 @@ func draw_npc_dossier(_player: Player) -> void:
 	_text(Vector2(x, y), _fit("Arts: " + (", ".join(arts) if not arts.is_empty() else "none"), 11, 408.0), 11, Color("#8fd8e8"))
 	y += 17.0
 	var worn: Array[String] = []
-	for slot in ["weapon", "armor", "ring", "talisman"]:
+	for slot in ["weapon", "armor", "ring", "necklace", "talisman", "artifact"]:
 		var piece: Variant = npc.gear.get(slot, {})
 		if typeof(piece) == TYPE_DICTIONARY and not (piece as Dictionary).is_empty():
 			worn.append(String((piece as Dictionary).get("name", String(slot))))

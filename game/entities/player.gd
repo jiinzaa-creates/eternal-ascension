@@ -1935,10 +1935,12 @@ func equip(item: Dictionary) -> Dictionary:
 	var slot := String(normalised.get("slot", ""))
 	if not Items.is_equipment(slot) or not Items.is_valid_item(normalised):
 		return {"ok": false, "reason": "cannot be worn"}
-	var check := Equipment.new(DB).can_equip(normalised, equipment, attrs, cultivation.realm)
+	var kit := Equipment.new(DB)
+	var key := kit.equip_key_for(normalised, equipment)
+	var check := kit.can_equip(normalised, equipment, attrs, cultivation.realm, key)
 	if not bool(check["ok"]):
 		return check
-	equipment[slot] = normalised
+	equipment[key] = normalised
 	if slot == "weapon":
 		# A new weapon opens its own chain; the old one's cursor is meaningless.
 		_combo_index = -1
@@ -1965,7 +1967,8 @@ func pick_up(item: Dictionary) -> void:
 	inventory = Items.add_to_inventory(inventory, normalised)
 	var slot := String(normalised.get("slot", ""))
 	if Items.is_equipment(slot):
-		var current: Dictionary = equipment.get(slot, {})
+		var key := Equipment.new(DB).equip_key_for(normalised, equipment)
+		var current: Dictionary = equipment.get(key, {})
 		if current.is_empty() or int(normalised.get("ilvl", 1)) >= int(current.get("ilvl", 1)):
 			equip(normalised)
 	Bus.item_picked.emit(normalised)
