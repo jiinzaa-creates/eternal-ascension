@@ -805,7 +805,7 @@ func validate() -> Array:
 			problems.append("enchant %s has no tiers" % enchant_id)
 	# Every equipment slot must be able to roll both halves, or a treasure item
 	# would come up short of the affix count its rarity promises.
-	for slot in ["weapon", "armor", "ring", "talisman"]:
+	for slot in ["weapon", "armor", "ring", "necklace", "talisman", "artifact"]:
 		for kind in ["prefix", "suffix"]:
 			var usable := false
 			for a in (prefixes if kind == "prefix" else suffixes):
@@ -1490,7 +1490,7 @@ func _validate_affix(affix: Dictionary, seen: Dictionary, problems: Array) -> vo
 		problems.append("affix %s has a negative weight" % affix_id)
 	var slot_weights: Dictionary = affix.get("slot_weights", {})
 	for slot_key in slot_weights.keys():
-		if not ["weapon", "armor", "ring", "talisman"].has(String(slot_key)):
+		if not ["weapon", "armor", "ring", "necklace", "talisman", "artifact"].has(String(slot_key)):
 			problems.append("affix %s weights an unknown slot %s" % [affix_id, String(slot_key)])
 		if int(slot_weights[slot_key]) < 0:
 			problems.append("affix %s has a negative slot weight" % affix_id)

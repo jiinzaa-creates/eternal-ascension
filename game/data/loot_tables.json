@@ -21,6 +21,8 @@
 				"armor": 17,
 				"ring": 12,
 				"talisman": 12,
+				"necklace": 8,
+				"artifact": 6,
 				"consumable": 41
 			},
 			"stones": [
@@ -49,6 +51,8 @@
 				"armor": 24,
 				"ring": 20,
 				"talisman": 20,
+				"necklace": 8,
+				"artifact": 6,
 				"consumable": 10
 			},
 			"stones": [
@@ -76,7 +80,9 @@
 				"weapon": 30,
 				"armor": 26,
 				"ring": 22,
-				"talisman": 22
+				"talisman": 22,
+				"necklace": 8,
+				"artifact": 6
 			},
 			"stones": [
 				0,
@@ -104,6 +110,8 @@
 				"armor": 18,
 				"ring": 12,
 				"talisman": 12,
+				"necklace": 8,
+				"artifact": 6,
 				"consumable": 40
 			},
 			"stones": [
@@ -132,6 +140,8 @@
 				"armor": 32,
 				"ring": 25,
 				"talisman": 25,
+				"necklace": 8,
+				"artifact": 6,
 				"consumable": 6
 			},
 			"stones": [
@@ -160,6 +170,8 @@
 				"armor": 24,
 				"ring": 15,
 				"talisman": 15,
+				"necklace": 8,
+				"artifact": 6,
 				"consumable": 22
 			},
 			"stones": [
@@ -187,7 +199,9 @@
 				"weapon": 25,
 				"armor": 25,
 				"ring": 25,
-				"talisman": 25
+				"talisman": 25,
+				"necklace": 8,
+				"artifact": 6
 			},
 			"stones": [
 				0,
@@ -215,6 +229,8 @@
 				"armor": 20,
 				"ring": 14,
 				"talisman": 14,
+				"necklace": 8,
+				"artifact": 6,
 				"consumable": 32
 			},
 			"stones": [
@@ -243,6 +259,8 @@
 				"armor": 30,
 				"ring": 12,
 				"talisman": 12,
+				"necklace": 8,
+				"artifact": 6,
 				"consumable": 8
 			},
 			"stones": [

@@ -7,7 +7,12 @@ extends RefCounted
 ## and are read by base id, so an instance carries no rules of its own and a
 ## save never has to store them. An item without a known base is unrestricted.
 
-const SLOT_LABELS := {"weapon": "Weapon", "armor": "Armour", "ring": "Ring", "talisman": "Talisman"}
+const SLOT_LABELS := {"weapon": "Weapon", "armor": "Armour", "ring": "Ring", "ring2": "Ring (second)", "necklace": "Necklace", "talisman": "Talisman", "artifact": "Artifact"}
+
+## The keys a body's worn set is stored under. Item slots and worn
+## keys are the same list but for one finger: a ring item resolves
+## to "ring", then "ring2", so two rings can be worn at once.
+const WORN_KEYS: Array[String] = Items.WORN_KEYS
 
 const STAT_LABELS := {
 	"weapon_damage": "damage",
@@ -93,11 +98,26 @@ func missing_requirements(item: Dictionary, attrs: Attributes, realm: int) -> Ar
 	return out
 
 
+## The worn key this item would occupy: its own slot, except a
+## ring, which takes the free finger before it replaces one.
+func equip_key_for(item: Dictionary, equipment: Dictionary) -> String:
+	var slot := String(item.get("slot", ""))
+	if slot != "ring":
+		return slot
+	var first: Variant = equipment.get("ring", {})
+	if typeof(first) != TYPE_DICTIONARY or (first as Dictionary).is_empty():
+		return "ring"
+	var second: Variant = equipment.get("ring2", {})
+	if typeof(second) != TYPE_DICTIONARY or (second as Dictionary).is_empty():
+		return "ring2"
+	return "ring"
+
+
 ## The worn piece this one cannot coexist with, or an empty dictionary.
-func conflict_with(item: Dictionary, equipment: Dictionary) -> Dictionary:
+func conflict_with(item: Dictionary, equipment: Dictionary, target_key: String = "") -> Dictionary:
 	var mine := tags(item)
 	var mine_conflicts := conflicts(item)
-	var slot := String(item.get("slot", ""))
+	var slot := target_key if target_key != "" else String(item.get("slot", ""))
 	for other_slot in equipment.keys():
 		if String(other_slot) == slot:
 			continue
@@ -118,13 +138,13 @@ func conflict_with(item: Dictionary, equipment: Dictionary) -> Dictionary:
 
 
 ## The single gate every equip route goes through, auto-equip included.
-func can_equip(item: Dictionary, equipment: Dictionary, attrs: Attributes, realm: int) -> Dictionary:
+func can_equip(item: Dictionary, equipment: Dictionary, attrs: Attributes, realm: int, target_key: String = "") -> Dictionary:
 	if not Items.is_equipment(String(item.get("slot", ""))):
 		return {"ok": false, "reason": "not a piece of equipment"}
 	var missing := missing_requirements(item, attrs, realm)
 	if not missing.is_empty():
 		return {"ok": false, "reason": "Requires " + ", ".join(missing)}
-	var clash := conflict_with(item, equipment)
+	var clash := conflict_with(item, equipment, target_key)
 	if not clash.is_empty():
 		return {"ok": false, "reason": "Conflicts with %s" % String(clash.get("name", "worn gear"))}
 	return {"ok": true, "reason": ""}

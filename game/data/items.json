@@ -338,6 +338,63 @@
         "int": 17
       },
       "implicit": "+14% lightning damage"
+    },
+    {
+      "id": "base.necklace.jade_pendant",
+      "name": "Jade Pendant",
+      "slot": "necklace",
+      "ilvl": 2,
+      "weight": 12,
+      "value": 22,
+      "tags": [
+        "jade"
+      ],
+      "implicit": "+6% maximum Qi"
+    },
+    {
+      "id": "base.necklace.spirit_chain",
+      "name": "Spirit Chain",
+      "slot": "necklace",
+      "ilvl": 4,
+      "weight": 7,
+      "value": 40,
+      "tags": [
+        "spirit"
+      ],
+      "requires": {
+        "wis": 14
+      },
+      "implicit": "+8% cultivation speed"
+    },
+    {
+      "id": "base.artifact.bronze_mirror",
+      "name": "Bronze Mirror",
+      "slot": "artifact",
+      "ilvl": 3,
+      "weight": 9,
+      "value": 36,
+      "tags": [
+        "mirror"
+      ],
+      "requires": {
+        "int": 13
+      },
+      "implicit": "+5% cooldown reduction"
+    },
+    {
+      "id": "base.artifact.jade_seal",
+      "name": "Jade Seal",
+      "slot": "artifact",
+      "ilvl": 5,
+      "weight": 5,
+      "value": 55,
+      "tags": [
+        "jade"
+      ],
+      "requires": {
+        "realm": 3
+      },
+      "implicit": "+5 years lifespan"
     }
   ],
   "prefixes": [
@@ -416,7 +473,9 @@
       "slots": [
         "weapon",
         "ring",
-        "talisman"
+        "talisman",
+        "necklace",
+        "artifact"
       ],
       "weight": 8,
       "min": 0.5,
@@ -548,7 +607,9 @@
       "ilvl": 3,
       "slots": [
         "ring",
-        "talisman"
+        "talisman",
+        "necklace",
+        "artifact"
       ],
       "weight": 5,
       "min": 4,
@@ -581,7 +642,8 @@
       "ilvl": 2,
       "slots": [
         "armor",
-        "ring"
+        "ring",
+        "necklace"
       ],
       "weight": 6,
       "min": 5,
@@ -648,7 +710,9 @@
       "slots": [
         "weapon",
         "ring",
-        "talisman"
+        "talisman",
+        "necklace",
+        "artifact"
       ],
       "weight": 8,
       "min": 3,
@@ -823,7 +887,9 @@
       "ilvl": 2,
       "slots": [
         "ring",
-        "talisman"
+        "talisman",
+        "necklace",
+        "artifact"
       ],
       "weight": 8,
       "min": 1,
@@ -857,7 +923,9 @@
       "slots": [
         "ring",
         "talisman",
-        "armor"
+        "armor",
+        "necklace",
+        "artifact"
       ],
       "weight": 9,
       "min": 1,
@@ -890,7 +958,8 @@
       "ilvl": 3,
       "slots": [
         "ring",
-        "talisman"
+        "talisman",
+        "necklace"
       ],
       "weight": 4,
       "min": 1,
@@ -924,7 +993,8 @@
       "slots": [
         "ring",
         "armor",
-        "talisman"
+        "talisman",
+        "necklace"
       ],
       "weight": 10,
       "min": 8,
@@ -957,7 +1027,8 @@
       "ilvl": 3,
       "slots": [
         "weapon",
-        "ring"
+        "ring",
+        "artifact"
       ],
       "weight": 6,
       "min": 6,
@@ -1058,7 +1129,9 @@
       "ilvl": 3,
       "slots": [
         "talisman",
-        "ring"
+        "ring",
+        "necklace",
+        "artifact"
       ],
       "weight": 4,
       "min": 5,

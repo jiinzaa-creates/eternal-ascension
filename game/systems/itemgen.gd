@@ -22,7 +22,7 @@ func _init(database: Node, rng_node: Node) -> void:
 
 ## Non-equipment items never roll affixes: a pill is a payload, not a build.
 static func is_equipment_slot(slot: String) -> bool:
-	return slot == "weapon" or slot == "armor" or slot == "ring" or slot == "talisman"
+	return slot == "weapon" or slot == "armor" or slot == "ring" or slot == "necklace" or slot == "talisman" or slot == "artifact"
 
 
 ## `force_base` pins the authored base a recipe names; loot leaves it empty and

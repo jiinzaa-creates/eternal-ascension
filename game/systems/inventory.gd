@@ -24,10 +24,10 @@ const SORT_LABELS := {
 }
 ## Left to right in the grid: what a body can wear first, then what it carries.
 const SLOT_ORDER := {
-	"weapon": 0, "armor": 1, "ring": 2, "talisman": 3, "consumable": 4, "material": 5,
+	"weapon": 0, "armor": 1, "ring": 2, "necklace": 3, "talisman": 4, "artifact": 5, "consumable": 6, "material": 7,
 }
 const SLOT_LABELS := {
-	"weapon": "Weapon", "armor": "Armour", "ring": "Ring", "talisman": "Talisman",
+	"weapon": "Weapon", "armor": "Armour", "ring": "Ring", "necklace": "Necklace", "talisman": "Talisman", "artifact": "Artifact",
 	"material": "Material", "consumable": "Consumable",
 }
 

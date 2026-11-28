@@ -16,8 +16,11 @@ extends RefCounted
 ## Stacking is by `(slot, base, name)` and only for materials and consumables.
 ## Equipment never stacks: two swords are two swords even with the same name.
 
-const SLOTS: Array[String] = ["weapon", "armor", "ring", "talisman", "material", "consumable"]
-const EQUIP_SLOTS: Array[String] = ["weapon", "armor", "ring", "talisman"]
+const SLOTS: Array[String] = ["weapon", "armor", "ring", "necklace", "talisman", "artifact", "material", "consumable"]
+const EQUIP_SLOTS: Array[String] = ["weapon", "armor", "ring", "necklace", "talisman", "artifact"]
+## Worn keys: where pieces live on the body. One more than the
+## item slots - a ring item may sit on either of two fingers.
+const WORN_KEYS: Array[String] = ["weapon", "armor", "ring", "ring2", "necklace", "talisman", "artifact"]
 const DURABLE_SLOTS: Array[String] = ["weapon", "armor"]
 const MAX_DURABILITY := {"weapon": 300.0, "armor": 400.0}
 const STACK_LIMITS := {"material": 20, "consumable": 10}
@@ -286,12 +289,13 @@ static func normalize_equipment(value: Variant) -> Dictionary:
 	if typeof(value) != TYPE_DICTIONARY:
 		return out
 	var data: Dictionary = value
-	for slot in EQUIP_SLOTS:
+	for slot in WORN_KEYS:
 		var item_value: Variant = data.get(slot, {})
 		if typeof(item_value) != TYPE_DICTIONARY:
 			continue
 		var item := normalize_item(item_value)
-		if not is_valid_item(item) or String(item["slot"]) != slot:
+		var item_slot := "ring" if slot == "ring2" else slot
+		if not is_valid_item(item) or String(item["slot"]) != item_slot:
 			continue
 		out[slot] = item
 	return out
