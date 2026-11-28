@@ -76,6 +76,14 @@ static func spec_for(region: Dictionary, seed_value: int) -> Dictionary:
 		copy["size"] = (building["size"] as Vector2) * scale
 		buildings.append(copy)
 
+	# Lawless country keeps a second market: marsh and desert
+	# towns, and any town on the far rim, run a black stall
+	# beside the honest one.
+	var services: Array = (size_def["services"] as Array).duplicate()
+	var terrain := String(region.get("terrain", ""))
+	if (terrain == "marsh" or terrain == "desert" or int(region.get("tier", 1)) >= 4) \
+			and not services.has("black_market"):
+		services.append("black_market")
 	return {
 		"region_index": index,
 		"region_name": String(region.get("name", "")),
@@ -84,6 +92,6 @@ static func spec_for(region: Dictionary, seed_value: int) -> Dictionary:
 		"centre": centre,
 		"locations": locations,
 		"buildings": buildings,
-		"services": (size_def["services"] as Array).duplicate(),
+		"services": services,
 		"residents": (size_def["residents"] as Array).duplicate(),
 	}

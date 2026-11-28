@@ -1,220 +1,299 @@
 {
- "stations": [
-  {
-   "id": "station.forge",
-   "name": "Azure Forge",
-   "location": "forge",
-   "verb": "forge"
-  }
- ],
- "recipes": [
-  {
-   "id": "recipe.forge.iron_jian",
-   "name": "Iron Jian",
-   "station": "station.forge",
-   "profession": "profession.smith",
-   "level": 0,
-   "output": {
-    "base": "base.sword.iron_jian",
-    "rarity": 1
-   },
-   "materials": [
+  "stations": [
     {
-     "material": "ore",
-     "count": 3
+      "id": "station.forge",
+      "name": "Azure Forge",
+      "location": "forge",
+      "verb": "forge"
     }
-   ],
-   "stones": 60,
-   "realm": 1,
-   "failure_chance": 0.0,
-   "desc": "A plain straight sword, folded from spirit ore. The first thing every smith makes."
-  },
-  {
-   "id": "recipe.forge.cloud_robe",
-   "name": "Cloud Silk Robe",
-   "station": "station.forge",
-   "profession": "profession.smith",
-   "level": 0,
-   "output": {
-    "base": "base.robe.cloud_silk",
-    "rarity": 1
-   },
-   "materials": [
+  ],
+  "recipes": [
     {
-     "material": "ore",
-     "count": 2
+      "id": "recipe.forge.iron_jian",
+      "name": "Iron Jian",
+      "station": "station.forge",
+      "profession": "profession.smith",
+      "level": 0,
+      "output": {
+        "base": "base.sword.iron_jian",
+        "rarity": 1
+      },
+      "materials": [
+        {
+          "material": "ore",
+          "count": 3
+        }
+      ],
+      "stones": 60,
+      "realm": 1,
+      "failure_chance": 0.0,
+      "desc": "A plain straight sword, folded from spirit ore. The first thing every smith makes."
     },
     {
-     "material": "herb",
-     "count": 1
-    }
-   ],
-   "stones": 50,
-   "realm": 1,
-   "failure_chance": 0.0,
-   "desc": "Spirit ore drawn fine and woven with herb fibre, so the cloth remembers Qi."
-  },
-  {
-   "id": "recipe.forge.jade_ring",
-   "name": "Jade Ring",
-   "station": "station.forge",
-   "profession": "profession.smith",
-   "level": 1,
-   "output": {
-    "base": "base.ring.jade",
-    "rarity": 2
-   },
-   "materials": [
-    {
-     "material": "ore",
-     "count": 2
+      "id": "recipe.forge.cloud_robe",
+      "name": "Cloud Silk Robe",
+      "station": "station.forge",
+      "profession": "profession.smith",
+      "level": 0,
+      "output": {
+        "base": "base.robe.cloud_silk",
+        "rarity": 1
+      },
+      "materials": [
+        {
+          "material": "ore",
+          "count": 2
+        },
+        {
+          "material": "herb",
+          "count": 1
+        }
+      ],
+      "stones": 50,
+      "realm": 1,
+      "failure_chance": 0.0,
+      "desc": "Spirit ore drawn fine and woven with herb fibre, so the cloth remembers Qi."
     },
     {
-     "material": "core",
-     "count": 1
-    }
-   ],
-   "stones": 80,
-   "realm": 2,
-   "failure_chance": 0.1,
-   "desc": "A beast core set in a jade band: the ring feeds on the beast's last breath."
-  },
-  {
-   "id": "recipe.forge.wind_charm",
-   "name": "Wind Charm",
-   "station": "station.forge",
-   "profession": "profession.smith",
-   "level": 1,
-   "output": {
-    "base": "base.talisman.wind_charm",
-    "rarity": 2
-   },
-   "materials": [
-    {
-     "material": "herb",
-     "count": 2
+      "id": "recipe.forge.jade_ring",
+      "name": "Jade Ring",
+      "station": "station.forge",
+      "profession": "profession.smith",
+      "level": 1,
+      "output": {
+        "base": "base.ring.jade",
+        "rarity": 2
+      },
+      "materials": [
+        {
+          "material": "ore",
+          "count": 2
+        },
+        {
+          "material": "core",
+          "count": 1
+        }
+      ],
+      "stones": 80,
+      "realm": 2,
+      "failure_chance": 0.1,
+      "desc": "A beast core set in a jade band: the ring feeds on the beast's last breath."
     },
     {
-     "material": "core",
-     "count": 1
-    }
-   ],
-   "stones": 90,
-   "realm": 2,
-   "failure_chance": 0.1,
-   "desc": "Two herbs and a core bound to a slip of wood. Light enough to walk on."
-  },
-  {
-   "id": "recipe.forge.spirit_iron_ring",
-   "name": "Spirit Iron Ring",
-   "station": "station.forge",
-   "profession": "profession.smith",
-   "level": 2,
-   "output": {
-    "base": "base.ring.spirit_iron",
-    "rarity": 2
-   },
-   "materials": [
-    {
-     "material": "ore",
-     "count": 4
+      "id": "recipe.forge.wind_charm",
+      "name": "Wind Charm",
+      "station": "station.forge",
+      "profession": "profession.smith",
+      "level": 1,
+      "output": {
+        "base": "base.talisman.wind_charm",
+        "rarity": 2
+      },
+      "materials": [
+        {
+          "material": "herb",
+          "count": 2
+        },
+        {
+          "material": "core",
+          "count": 1
+        }
+      ],
+      "stones": 90,
+      "realm": 2,
+      "failure_chance": 0.1,
+      "desc": "Two herbs and a core bound to a slip of wood. Light enough to walk on."
     },
     {
-     "material": "core",
-     "count": 2
-    }
-   ],
-   "stones": 160,
-   "realm": 3,
-   "failure_chance": 0.15,
-   "desc": "Iron quenched in three cores. The band rings faintly when danger is near."
-  }
- ],
- "actions": [
-  {
-   "id": "refine",
-   "name": "Refine",
-   "stones": 40,
-   "materials": [
-    {
-     "material": "ore",
-     "count": 2
-    }
-   ],
-   "failure_chance": 0.15,
-   "desc": "Reroll every affix on a piece, keeping its base, level and rarity."
-  },
-  {
-   "id": "disassemble",
-   "name": "Disassemble",
-   "stones": 0,
-   "materials": [],
-   "failure_chance": 0.0,
-   "desc": "Break a piece back into spirit ore. The rarer and higher it was, the more you get."
-  },
-  {
-   "id": "upgrade",
-   "name": "Upgrade",
-   "stones": 50,
-   "materials": [
-    {
-     "material": "ore",
-     "count": 2
-    }
-   ],
-   "failure_chance": 0.08,
-   "desc": "Raise a piece one item level; its affixes re-roll in the new tier. Failure strains the piece. Cost and risk grow with level."
-  },
-  {
-   "id": "enchant",
-   "name": "Enchant",
-   "stones": 120,
-   "materials": [
-    {
-     "material": "core",
-     "count": 2
+      "id": "recipe.forge.spirit_iron_ring",
+      "name": "Spirit Iron Ring",
+      "station": "station.forge",
+      "profession": "profession.smith",
+      "level": 2,
+      "output": {
+        "base": "base.ring.spirit_iron",
+        "rarity": 2
+      },
+      "materials": [
+        {
+          "material": "ore",
+          "count": 4
+        },
+        {
+          "material": "core",
+          "count": 2
+        }
+      ],
+      "stones": 160,
+      "realm": 3,
+      "failure_chance": 0.15,
+      "desc": "Iron quenched in three cores. The band rings faintly when danger is near."
     },
     {
-     "material": "marrow",
-     "count": 1
-    }
-   ],
-   "failure_chance": 0.2,
-   "desc": "Lay one lasting enchantment on a piece of gear. One per piece; a new one replaces the old. Failure spends the materials and leaves the piece as it was."
-  },
-  {
-   "id": "fuse",
-   "name": "Fuse",
-   "stones": 150,
-   "materials": [
+      "id": "recipe.formation.gathering_disc",
+      "name": "Gathering Formation Disc",
+      "station": "station.forge",
+      "profession": "profession.formationist",
+      "level": 0,
+      "output": {
+        "base": "base.artifact.bronze_mirror",
+        "rarity": 1
+      },
+      "materials": [
+        {
+          "material": "ore",
+          "count": 3
+        },
+        {
+          "material": "core",
+          "count": 1
+        }
+      ],
+      "stones": 80,
+      "realm": 1,
+      "failure_chance": 0.05,
+      "desc": "A mirror seated in a gathering array: it pulls the world's qi into a pattern and holds it there."
+    },
     {
-     "material": "core",
-     "count": 1
-    }
-   ],
-   "failure_chance": 0.25,
-   "desc": "Feed one piece into another of the same slot. The fed piece is gone either way; on success the survivor takes in the affixes it lacks, past its natural count. Enchantments never transfer."
-  },
-  {
-   "id": "personalize",
-   "name": "Personalize",
-   "stones": 50,
-   "materials": [],
-   "failure_chance": 0.0,
-   "desc": "Give a piece a name of your own. The name endures: refinement, upgrading and fusion all keep it."
-  },
-  {
-   "id": "reforge",
-   "name": "Reforge",
-   "stones": 60,
-   "materials": [
+      "id": "recipe.formation.warding_charm",
+      "name": "Warding Formation Charm",
+      "station": "station.forge",
+      "profession": "profession.formationist",
+      "level": 1,
+      "output": {
+        "base": "base.talisman.wind_charm",
+        "rarity": 2
+      },
+      "materials": [
+        {
+          "material": "ore",
+          "count": 2
+        },
+        {
+          "material": "marrow",
+          "count": 1
+        }
+      ],
+      "stones": 120,
+      "realm": 2,
+      "failure_chance": 0.08,
+      "desc": "A charm whose cord is knotted into a standing ward; the wind itself checks at the border."
+    },
     {
-     "material": "ore",
-     "count": 1
+      "id": "recipe.formation.spirit_seal",
+      "name": "Spirit-Sealing Formation Seal",
+      "station": "station.forge",
+      "profession": "profession.formationist",
+      "level": 2,
+      "output": {
+        "base": "base.artifact.jade_seal",
+        "rarity": 2
+      },
+      "materials": [
+        {
+          "material": "ore",
+          "count": 4
+        },
+        {
+          "material": "core",
+          "count": 2
+        },
+        {
+          "material": "essence",
+          "count": 1
+        }
+      ],
+      "stones": 200,
+      "realm": 3,
+      "failure_chance": 0.1,
+      "desc": "A seal that is a formation folded small enough to carry: what it stamps, stays."
     }
-   ],
-   "failure_chance": 0.15,
-   "desc": "Reforge a single affix on a piece: that one line is struck out and rolled anew from its own kind. The rest of the piece is untouched. An enchantment is not a rolled affix and cannot be reforged."
-  }
- ]
+  ],
+  "actions": [
+    {
+      "id": "refine",
+      "name": "Refine",
+      "stones": 40,
+      "materials": [
+        {
+          "material": "ore",
+          "count": 2
+        }
+      ],
+      "failure_chance": 0.15,
+      "desc": "Reroll every affix on a piece, keeping its base, level and rarity."
+    },
+    {
+      "id": "disassemble",
+      "name": "Disassemble",
+      "stones": 0,
+      "materials": [],
+      "failure_chance": 0.0,
+      "desc": "Break a piece back into spirit ore. The rarer and higher it was, the more you get."
+    },
+    {
+      "id": "upgrade",
+      "name": "Upgrade",
+      "stones": 50,
+      "materials": [
+        {
+          "material": "ore",
+          "count": 2
+        }
+      ],
+      "failure_chance": 0.08,
+      "desc": "Raise a piece one item level; its affixes re-roll in the new tier. Failure strains the piece. Cost and risk grow with level."
+    },
+    {
+      "id": "enchant",
+      "name": "Enchant",
+      "stones": 120,
+      "materials": [
+        {
+          "material": "core",
+          "count": 2
+        },
+        {
+          "material": "marrow",
+          "count": 1
+        }
+      ],
+      "failure_chance": 0.2,
+      "desc": "Lay one lasting enchantment on a piece of gear. One per piece; a new one replaces the old. Failure spends the materials and leaves the piece as it was."
+    },
+    {
+      "id": "fuse",
+      "name": "Fuse",
+      "stones": 150,
+      "materials": [
+        {
+          "material": "core",
+          "count": 1
+        }
+      ],
+      "failure_chance": 0.25,
+      "desc": "Feed one piece into another of the same slot. The fed piece is gone either way; on success the survivor takes in the affixes it lacks, past its natural count. Enchantments never transfer."
+    },
+    {
+      "id": "personalize",
+      "name": "Personalize",
+      "stones": 50,
+      "materials": [],
+      "failure_chance": 0.0,
+      "desc": "Give a piece a name of your own. The name endures: refinement, upgrading and fusion all keep it."
+    },
+    {
+      "id": "reforge",
+      "name": "Reforge",
+      "stones": 60,
+      "materials": [
+        {
+          "material": "ore",
+          "count": 1
+        }
+      ],
+      "failure_chance": 0.15,
+      "desc": "Reforge a single affix on a piece: that one line is struck out and rolled anew from its own kind. The rest of the piece is untouched. An enchantment is not a rolled affix and cannot be reforged."
+    }
+  ]
 }

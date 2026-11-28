@@ -1,20 +1,52 @@
 {
-	"professions": [
-		{
-			"id": "profession.smith",
-			"name": "Smith",
-			"station": "station.forge",
-			"quality_bonus": 0.08,
-			"failure_reduction": 0.06,
-			"desc": "The anvil teaches patience: every piece finished makes the next cleaner and less likely to spoil."
-		},
-		{
-			"id": "profession.alchemist",
-			"name": "Alchemist",
-			"station": "station.alchemy",
-			"quality_bonus": 0.1,
-			"failure_reduction": 0.05,
-			"desc": "A steady hand at the cauldron wastes fewer herbs and draws more out of every root."
-		}
-	]
+  "professions": [
+    {
+      "id": "profession.smith",
+      "name": "Smith",
+      "station": "station.forge",
+      "quality_bonus": 0.08,
+      "failure_reduction": 0.06,
+      "desc": "The anvil teaches patience: every piece finished makes the next cleaner and less likely to spoil."
+    },
+    {
+      "id": "profession.alchemist",
+      "name": "Alchemist",
+      "station": "station.alchemy",
+      "quality_bonus": 0.1,
+      "failure_reduction": 0.05,
+      "desc": "A steady hand at the cauldron wastes fewer herbs and draws more out of every root."
+    },
+    {
+      "id": "profession.miner",
+      "name": "Miner",
+      "station": "station.forge",
+      "quality_bonus": 0.0,
+      "failure_reduction": 0.0,
+      "desc": "The vein teaches the eye: a practiced miner reads richer stone, and rank fills the sack faster."
+    },
+    {
+      "id": "profession.herbalist",
+      "name": "Herbalist",
+      "station": "station.alchemy",
+      "quality_bonus": 0.0,
+      "failure_reduction": 0.0,
+      "desc": "The garden teaches the hand: a practiced herbalist cuts without bruising, and rank fills the basket faster."
+    },
+    {
+      "id": "profession.formationist",
+      "name": "Formationist",
+      "station": "station.forge",
+      "quality_bonus": 0.08,
+      "failure_reduction": 0.06,
+      "desc": "Arrays are arguments made of jade and wire: every disc seated makes the next pattern truer."
+    },
+    {
+      "id": "profession.processor",
+      "name": "Processor",
+      "station": "station.alchemy",
+      "quality_bonus": 0.0,
+      "failure_reduction": 0.0,
+      "desc": "Raw is a promise, not a product: the processor's craft is turning harvest and kill into what brewers actually need."
+    }
+  ]
 }

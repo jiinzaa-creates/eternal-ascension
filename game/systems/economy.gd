@@ -36,6 +36,25 @@ static func social_multiplier(score: float) -> float:
 	return 1.0 - clampf(score * 0.004, 0.0, 0.25)
 
 
+## Where a market sits moves what it charges: a deterministic
+## factor per region, 0.85-1.20, rolled from the region's index
+## so the same town always prices the same way. Buy side only -
+## selling stays on the one curve, per the doctrine above.
+static func region_factor(region_index: int) -> float:
+	if region_index < 0:
+		return 1.0
+	return 0.85 + float(abs(hash(region_index * 7919)) % 36) / 100.0
+
+
+static func region_price_note(region_index: int) -> String:
+	var factor := region_factor(region_index)
+	if factor > 1.05:
+		return "prices run high here"
+	if factor < 0.95:
+		return "prices run low here"
+	return "prices are fair here"
+
+
 static func rest_cost() -> int:
 	return REST_COST
 

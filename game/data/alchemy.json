@@ -336,7 +336,30 @@
         "name": "Spirit Essence",
         "material": "essence"
       },
-      "desc": "Three herbs, pressed and steamed down to the part of them that was ever alive."
+      "desc": "Three herbs, pressed and steamed down to the part of them that was ever alive.",
+      "profession": "profession.processor",
+      "level": 0
+    },
+    {
+      "id": "refine.core_essence",
+      "name": "Render Core Essence",
+      "kind": "refine",
+      "profession": "profession.processor",
+      "level": 1,
+      "materials": [
+        {
+          "material": "core",
+          "count": 2
+        }
+      ],
+      "stones": 25,
+      "realm": 2,
+      "product": {
+        "id": "item.essence.refined",
+        "name": "Spirit Essence",
+        "material": "essence"
+      },
+      "desc": "Two beast cores, cracked and rendered down to what the beast was keeping."
     }
   ]
 }

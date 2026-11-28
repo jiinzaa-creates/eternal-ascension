@@ -16,7 +16,7 @@ var sold: Array = []
 
 
 ## Rebuilds stock for a new day, or fills an empty one (after a load).
-func refresh(db: Node, rng: Node, today: int) -> void:
+func refresh(db: Node, rng: Node, today: int, min_rarity: int = 0, ilvl_bonus: int = 0) -> void:
 	if today == day and not stock.is_empty():
 		return
 	if today != day:
@@ -28,9 +28,11 @@ func refresh(db: Node, rng: Node, today: int) -> void:
 		return
 
 	var generator := ItemGen.new(db, rng)
-	var ilvl := maxi(1, 2 + int(float(today) / 10.0))
+	var ilvl := maxi(1, 2 + int(float(today) / 10.0)) + ilvl_bonus
 	for i in STOCK_SIZE:
 		var item := generator.generate(ilvl, hash(id) + i, today * 31 + i)
+		if not item.is_empty() and min_rarity > 0 and int(item.get("rarity", 0)) < min_rarity:
+			item = generator.generate(ilvl, hash(id) + i, today * 31 + i, min_rarity)
 		if item.is_empty():
 			continue
 		if sold.has(String(item.get("id", ""))):
