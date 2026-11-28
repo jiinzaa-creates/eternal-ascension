@@ -191,7 +191,7 @@ func rebuild_stats() -> void:
 		TechniqueCombat.buff_mods(active_buffs) + TechniqueCombat.passive_mods(_passive_techs())
 		+ ([{"stat": "lifespan", "value": Game.lifespan_years_bonus}] if Game.lifespan_years_bonus > 0 else [])
 		+ ([{"stat": "qi_max_pct", "value": -5.0 * float(Game.death_wounds)}] if Game.death_wounds > 0 else [])
-		+ Daos.mods(dao_progress, cultivation.realm), physique_stage)
+		+ Daos.mods(dao_progress, cultivation.realm) + Uniques.set_mods(equipment, DB), physique_stage)
 	# Condition is applied after the pipeline has summed every source, so a
 	# rebuild can never compound it: a broken piece simply contributes nothing.
 	for slot in Items.DURABLE_SLOTS:
@@ -1951,6 +1951,12 @@ func equip(item: Dictionary) -> Dictionary:
 		if type_passive != "" and add_passive(type_passive):
 			Bus.toast.emit("The %s leaves its mark — %s." % [
 				weapon_type_name(), String(DB.passive(type_passive).get("name", "a new art"))])
+	var worn_set := String(normalised.get("set", ""))
+	if worn_set != "":
+		var set_count := Uniques.set_count(equipment, worn_set)
+		if set_count >= 2:
+			Bus.toast.emit("The %s walks together — %d pieces worn." % [
+				String(DB.by_id("set", worn_set).get("name", "set")), set_count])
 	rebuild_stats()
 	Bus.player_stats_changed.emit()
 	return {"ok": true, "reason": ""}

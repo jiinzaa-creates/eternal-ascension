@@ -1591,6 +1591,30 @@ func _realm_tests() -> void:
 	round_trip.from_dict(wearer.to_dict())
 	check(round_trip.equipment.has("ring2") and round_trip.equipment.has("necklace")
 		and round_trip.equipment.has("artifact"), "the full worn set survives a save round-trip")
+	var relic_maker := Uniques.new(DB)
+	var pilgrim_a: Dictionary = relic_maker.make("item.unique.pilgrim_staff")
+	var pilgrim_b: Dictionary = relic_maker.make("item.unique.pilgrim_pendant")
+	var pilgrim_c: Dictionary = relic_maker.make("item.unique.pilgrim_ring")
+	check(String(pilgrim_a.get("set", "")) == "set.ashen_pilgrim", "a set piece keeps its mark through making")
+	var two_worn := {"weapon": pilgrim_a, "necklace": pilgrim_b}
+	check(Uniques.set_count(two_worn, "set.ashen_pilgrim") == 2, "two pilgrim pieces count as two")
+	var two_mods := Uniques.set_mods(two_worn, DB)
+	var two_stats: Array = []
+	for m in two_mods:
+		two_stats.append(String((m as Dictionary).get("stat", "")))
+	check(two_stats.has("physical_damage_pct") and not two_stats.has("cult_speed_pct"),
+		"two pieces pay the first threshold only")
+	var three_mods := Uniques.set_mods({"weapon": pilgrim_a, "necklace": pilgrim_b, "ring2": pilgrim_c}, DB)
+	var three_stats: Array = []
+	for m in three_mods:
+		three_stats.append(String((m as Dictionary).get("stat", "")))
+	check(three_stats.has("cult_speed_pct"), "the third piece, worn on the second finger, completes the set")
+	var manual: Dictionary = relic_maker.make("item.unique.manual_still_river")
+	check(String(manual.get("teaches_passive", "")) == "passive.still_mind",
+		"the named manual carries its teaching")
+	var heirloom: Dictionary = relic_maker.make("item.unique.azure_heirloom")
+	check(not heirloom.is_empty() and String(heirloom.get("slot", "")) == "artifact",
+		"the Azure heirloom is an artifact with a sect source")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

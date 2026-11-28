@@ -2068,6 +2068,21 @@ func close_alchemy() -> void:
 
 ## Drinks the selected satchel stack. The pill is spent even at full health or
 ## Qi: a cultivator who swallows one at the wrong moment has still swallowed it.
+## Removes one of an inventory item by id, stack-aware.
+func _consume_inventory_item(item_id: String) -> void:
+	for i in player.inventory.size():
+		var entry: Dictionary = player.inventory[i]
+		if String(entry.get("id", "")) != item_id:
+			continue
+		var left := int(entry.get("count", 1)) - 1
+		if left <= 0:
+			player.inventory.remove_at(i)
+		else:
+			entry["count"] = left
+			player.inventory[i] = entry
+		return
+
+
 func use_selected_item() -> void:
 	if player == null or alchemy == null:
 		return
@@ -2077,6 +2092,17 @@ func use_selected_item() -> void:
 	var item: Dictionary = rows[gear_index]
 	if String(item.get("slot", "")) != "consumable":
 		Bus.toast.emit("%s is not a pill." % String(item.get("name", "item")))
+		return
+	var teaches := String(item.get("teaches_passive", ""))
+	if teaches != "":
+		var verdict := player.try_learn_passive(teaches)
+		if not bool(verdict.get("ok", false)):
+			Bus.toast.emit("The manual has nothing left to teach you: %s." % String(verdict.get("reason", "already learned")))
+			return
+		_consume_inventory_item(String(item.get("id", "")))
+		Bus.toast.emit("You study %s — %s takes root." % [
+			Items.label(item), String(DB.passive(teaches).get("name", "a new art"))])
+		Bus.player_stats_changed.emit()
 		return
 	var effect: Dictionary = alchemy.effect_for(item)
 	if effect.is_empty():
@@ -2097,18 +2123,7 @@ func use_selected_item() -> void:
 		"lifespan":
 			Game.lifespan_years_bonus += int(amount)
 			player.rebuild_stats()
-	var item_id := String(item.get("id", ""))
-	for i in player.inventory.size():
-		var entry: Dictionary = player.inventory[i]
-		if String(entry.get("id", "")) != item_id:
-			continue
-		var left := int(entry.get("count", 1)) - 1
-		if left <= 0:
-			player.inventory.remove_at(i)
-		else:
-			entry["count"] = left
-			player.inventory[i] = entry
-		break
+	_consume_inventory_item(String(item.get("id", "")))
 	gear_index = clampi(gear_index, 0, maxi(0, inventory_rows().size() - 1))
 	var label := String(Alchemy.EFFECT_LABELS.get(effect_id, effect_id))
 	var line := ("purged %.0f contamination" % amount) if effect_id == "cleanse" \
@@ -3645,6 +3660,16 @@ func sect_seat_rows() -> Array:
 			"label": "Attune to %s" % String((sect.get("method", {}) as Dictionary).get("name", method_id)),
 			"detail": "The seat's stele turns a core disciple's circulation to the house method.",
 			"reason": "Your circulation already follows it." if current else ("" if rank_ok else "Core disciples and above only.")})
+	var heirlooms := Uniques.new(DB).for_source(current_sect_id)
+	if not heirlooms.is_empty():
+		var heirloom: Dictionary = heirlooms[0]
+		var heirloom_id := String(heirloom.get("id", ""))
+		var heirloom_owned := Uniques.owned_ids(player.equipment, player.inventory).has(heirloom_id)
+		var heirloom_rank_ok := _sect_rank_level(current_sect_id) >= 3
+		rows.append({"kind": "heirloom", "enabled": heirloom_rank_ok and not heirloom_owned, "id": heirloom_id,
+			"label": "Receive %s" % String(heirloom.get("name", "the house heirloom")),
+			"detail": "The house heirloom, carried by its trusted core disciples.",
+			"reason": "Already in your keeping." if heirloom_owned else ("" if heirloom_rank_ok else "Core disciples and above only.")})
 	for donation in SectEconomy.donations():
 		rows.append({"kind": "donate", "enabled": Game.spirit_stones >= int(donation.get("stones", 0)),
 			"id": String(donation.get("id", "")),
@@ -3710,6 +3735,8 @@ func _sect_seat_activate(index: int) -> void:
 				player.gain_comprehension(10.0, "teachers")
 			else:
 				Bus.toast.emit("The masters refuse: %s." % String(learned.get("reason", "")))
+		"heirloom":
+			_grant_unique_item(String(row.get("id", "")))
 		"method":
 			var method_id := String(row.get("id", ""))
 			var check := Methods.qualifies(method_id, player.method_state())
