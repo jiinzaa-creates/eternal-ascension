@@ -407,6 +407,42 @@
         "manual"
       ],
       "implicit": "A teaching, bound in silk"
+    },
+    {
+      "id": "base.pill.blood_mending",
+      "name": "Blood Mending Pill",
+      "slot": "consumable",
+      "ilvl": 4,
+      "weight": 2,
+      "value": 60,
+      "tags": [
+        "pill"
+      ],
+      "implicit": "Restores 120 health"
+    },
+    {
+      "id": "base.pill.storm_qi",
+      "name": "Storm Qi Pill",
+      "slot": "consumable",
+      "ilvl": 6,
+      "weight": 2,
+      "value": 85,
+      "tags": [
+        "pill"
+      ],
+      "implicit": "Restores 110 Qi"
+    },
+    {
+      "id": "base.pill.essence_longevity",
+      "name": "Essence Longevity Pill",
+      "slot": "consumable",
+      "ilvl": 5,
+      "weight": 2,
+      "value": 120,
+      "tags": [
+        "pill"
+      ],
+      "implicit": "Extends life by 25 years"
     }
   ],
   "prefixes": [

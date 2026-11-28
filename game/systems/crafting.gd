@@ -14,12 +14,13 @@ extends RefCounted
 ## ore and stones. Quality is the smith's INT: a high `crafting_quality_mult()`
 ## gives a chance to lift the result one rarity step.
 
-const MATERIALS: Array[String] = ["ore", "herb", "core", "marrow"]
+const MATERIALS: Array[String] = ["ore", "herb", "core", "marrow", "essence"]
 const MATERIAL_LABELS := {
 	"ore": "Spirit Ore",
 	"herb": "Spirit Herb",
 	"core": "Spirit Core",
 	"marrow": "Spirit Root Marrow",
+	"essence": "Spirit Essence",
 }
 ## Chance to lift a result by one rarity per point of quality above 1.0.
 const QUALITY_CHANCE_SCALE := 0.5

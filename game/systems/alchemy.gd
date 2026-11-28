@@ -33,6 +33,27 @@ func recipes() -> Array:
 	return db.potions if db != null else []
 
 
+## The cauldron of a tier, or the earthen pot for any tier the
+## ladder does not name.
+func cauldron(tier: int) -> Dictionary:
+	if db == null:
+		return {}
+	for entry in db.cauldrons:
+		if int((entry as Dictionary).get("tier", 0)) == tier:
+			return entry
+	return db.by_id("cauldron", "cauldron.earthen")
+
+
+## The next cauldron above a tier, or {} at the top of the ladder.
+func next_cauldron(tier: int) -> Dictionary:
+	if db == null:
+		return {}
+	for entry in db.cauldrons:
+		if int((entry as Dictionary).get("tier", 0)) == tier + 1:
+			return entry
+	return {}
+
+
 func recipe(id: String) -> Dictionary:
 	return db.potion(id) if db != null else {}
 
@@ -93,8 +114,8 @@ static func potency_for(quality_mult: float, exceptional: bool) -> float:
 ## Brews one recipe. Pure in `(recipe, ilvl, key, counter, quality_mult)`; the
 ## caller advances its attempt counter on every try, failures included.
 func brew(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: float = 1.0,
-		failure_mult: float = 1.0) -> Dictionary:
-	var out := {"ok": false, "failed": false, "quality": false, "item": {}, "reason": ""}
+		failure_mult: float = 1.0, potency_bonus: float = 0.0) -> Dictionary:
+	var out := {"ok": false, "failed": false, "quality": false, "item": {}, "reason": "", "event": ""}
 	if recipe.is_empty():
 		out["reason"] = "unknown potion"
 		return out
@@ -102,6 +123,9 @@ func brew(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: f
 	if r.randf() < clampf(float(recipe.get("failure_chance", 0.0)) * clampf(failure_mult, 0.0, 1.0), 0.0, 1.0):
 		out["failed"] = true
 		out["reason"] = "the brew spoils"
+		# A spoiled brew sometimes bites back: the furnace event.
+		if r.randf() < 0.20:
+			out["event"] = "backfire"
 		return out
 	var exceptional := r.randf() < Crafting.quality_chance(quality_mult)
 	var generator := ItemGen.new(db, Rng)
@@ -110,7 +134,15 @@ func brew(recipe: Dictionary, ilvl: int, key: int, counter: int, quality_mult: f
 	if item.is_empty():
 		out["reason"] = "that base cannot be brewed"
 		return out
-	item["potency"] = potency_for(quality_mult, exceptional)
+	var potency := potency_for(quality_mult, exceptional) + potency_bonus
+	# The furnace has moods of its own, rolled on the same stream.
+	var event_roll := r.randf()
+	if event_roll < 0.10:
+		out["event"] = "resonance"
+	elif event_roll < 0.20:
+		out["event"] = "flare"
+		potency += 0.4
+	item["potency"] = clampf(potency, MIN_POTENCY, MAX_POTENCY)
 	out["ok"] = true
 	out["quality"] = exceptional
 	out["item"] = item

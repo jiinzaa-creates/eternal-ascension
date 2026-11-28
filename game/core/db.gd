@@ -42,6 +42,8 @@ var crafting_stations: Array = []
 var recipes: Array = []
 var crafting_actions: Array = []
 var potions: Array = []
+var cauldrons: Array = []
+var refines: Array = []
 var alchemy_station: Dictionary = {}
 var professions: Array = []
 var bonds: Array = []
@@ -133,6 +135,8 @@ func load_all() -> void:
 	crafting_actions = crafting.get("actions", [])
 	var alchemy := _read("alchemy.json")
 	potions = alchemy.get("potions", [])
+	cauldrons = alchemy.get("cauldrons", [])
+	refines = alchemy.get("refines", [])
 	var station_value: Variant = alchemy.get("station", {})
 	alchemy_station = station_value if typeof(station_value) == TYPE_DICTIONARY else {}
 	var profession_data := _read("professions.json")
@@ -190,6 +194,8 @@ func load_all() -> void:
 	_index("recipe", recipes)
 	_index("action", crafting_actions)
 	_index("potion", potions)
+	_index("cauldron", cauldrons)
+	_index("refine", refines)
 	_index("profession", professions)
 	_index("bond", bonds)
 	_index("bond_tie", bond_ties)
@@ -814,6 +820,26 @@ func validate() -> Array:
 				var bstat := String((mod as Dictionary).get("stat", ""))
 				if not (Attributes.KEYS.has(bstat) or StatBlock.PERCENT_STATS.has(bstat) or StatBlock.FLAT_STATS.has(bstat)):
 					problems.append("item set %s uses unknown stat %s" % [set_id, bstat])
+	# Cauldrons climb in order; recipes may lean on them and on
+	# ingredient synergies, and a refine must yield a real material.
+	var tiers_seen: Dictionary = {}
+	for c in cauldrons:
+		tiers_seen[int(c.get("tier", 0))] = true
+	for tier in range(1, cauldrons.size() + 1):
+		if not tiers_seen.has(tier):
+			problems.append("cauldron tiers are not a ladder from 1")
+			break
+	for entry in potions:
+		var syn: Dictionary = entry.get("synergy", {})
+		if not syn.is_empty() and not Crafting.is_material_key(String(syn.get("material", ""))):
+			problems.append("potion %s synergises with an unknown material" % String(entry.get("id", "")))
+		var need_tier := int(entry.get("cauldron", 1))
+		if need_tier < 1 or need_tier > cauldrons.size():
+			problems.append("potion %s asks for cauldron tier %d" % [String(entry.get("id", "")), need_tier])
+	for entry in refines:
+		var product: Dictionary = entry.get("product", {})
+		if not Crafting.is_material_key(String(product.get("material", ""))):
+			problems.append("refine %s yields an unknown material" % String(entry.get("id", "")))
 	var affix_ids: Dictionary = {}
 	for pool in [prefixes, suffixes]:
 		for a in pool:

@@ -38,6 +38,8 @@ var age_warning_stage: int = 0
 ## player's stat pipeline reads it as a lifespan mod so every lifespan
 ## figure in the game agrees.
 var lifespan_years_bonus: int = 0
+var cauldron_tier: int = 1
+var discovered_recipes: Array = []
 ## Death, counted (M29). Combat deaths leave wounds: each wound is -5%
 ## max HP and Qi until a week of living closes it. Wounds cap so a bad
 ## season cannot make the game unplayable.
@@ -160,6 +162,8 @@ func new_run(seed_value: int = 0) -> void:
 	dead = false
 	age_warning_stage = 0
 	lifespan_years_bonus = 0
+	cauldron_tier = 1
+	discovered_recipes = []
 	deaths = 0
 	death_wounds = 0
 	death_wound_day = 0
@@ -236,6 +240,8 @@ func to_dict() -> Dictionary:
 		"dead": dead,
 		"age_warning_stage": age_warning_stage,
 		"lifespan_years_bonus": lifespan_years_bonus,
+		"cauldron_tier": cauldron_tier,
+		"discovered_recipes": discovered_recipes.duplicate(),
 		"deaths": deaths,
 		"death_wounds": death_wounds,
 		"death_wound_day": death_wound_day,
@@ -290,6 +296,12 @@ func from_dict(data: Dictionary) -> void:
 	dead = bool(data.get("dead", false))
 	age_warning_stage = int(data.get("age_warning_stage", 0))
 	lifespan_years_bonus = maxi(0, int(data.get("lifespan_years_bonus", 0)))
+	cauldron_tier = clampi(int(data.get("cauldron_tier", 1)), 1, 3)
+	discovered_recipes = []
+	var saved_recipes: Variant = data.get("discovered_recipes", [])
+	if typeof(saved_recipes) == TYPE_ARRAY:
+		for entry in (saved_recipes as Array):
+			discovered_recipes.append(String(entry))
 	deaths = maxi(0, int(data.get("deaths", 0)))
 	death_wounds = clampi(int(data.get("death_wounds", 0)), 0, MAX_DEATH_WOUNDS)
 	death_wound_day = maxi(0, int(data.get("death_wound_day", 0)))

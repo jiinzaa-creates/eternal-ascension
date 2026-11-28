@@ -352,6 +352,8 @@ static func material_key(item: Dictionary) -> String:
 		return "marrow"
 	if id.begins_with("item.core."):
 		return "core"
+	if id.begins_with("item.essence."):
+		return "essence"
 	return ""
 
 

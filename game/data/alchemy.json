@@ -1,100 +1,342 @@
 {
-	"station": {
-		"id": "station.alchemy",
-		"name": "Herb-Garden Cauldron",
-		"location": "herb_garden"
-	},
-	"potions": [
-		{
-			"id": "potion.qi_gathering",
-			"name": "Qi Gathering Pill",
-			"profession": "profession.alchemist",
-			"level": 0,
-			"base": "base.pill.qi_gathering",
-			"materials": [{"material": "herb", "count": 2}],
-			"stones": 30,
-			"realm": 1,
-			"failure_chance": 0.0,
-			"effect": {"id": "qi", "amount": 45},
-			"desc": "Two spirit herbs steeped until the Qi in them can be drunk."
-		},
-		{
-			"id": "potion.mending",
-			"name": "Mending Pill",
-			"profession": "profession.alchemist",
-			"level": 1,
-			"base": "base.pill.mending",
-			"materials": [{"material": "herb", "count": 2}, {"material": "core", "count": 1}],
-			"stones": 40,
-			"realm": 1,
-			"failure_chance": 0.05,
-			"effect": {"id": "heal", "amount": 50},
-			"desc": "Herb fibre bound with a beast core, so the body remembers how to close."
-		},
-		{
-			"id": "potion.cleansing",
-			"name": "Cleansing Pill",
-			"profession": "profession.alchemist",
-			"level": 2,
-			"base": "base.pill.cleansing",
-			"materials": [{"material": "herb", "count": 3}, {"material": "marrow", "count": 1}],
-			"stones": 80,
-			"realm": 2,
-			"failure_chance": 0.1,
-			"effect": {"id": "cleanse", "amount": 35},
-			"desc": "Marrow draws the impurity out; the herb carries it away."
-		},
-		{
-			"id": "potion.longevity",
-			"name": "Longevity Pill",
-			"profession": "profession.alchemist",
-			"level": 3,
-			"base": "base.pill.longevity",
-			"materials": [{"material": "herb", "count": 4}, {"material": "marrow", "count": 2}],
-			"stones": 200,
-			"realm": 3,
-			"failure_chance": 0.15,
-			"effect": {"id": "lifespan", "amount": 10},
-			"desc": "Years, steeped out of marrow and leaf. Swallow them before you need them."
-		},
-		{
-			"id": "potion.peach",
-			"name": "Immortal Peach Pill",
-			"profession": "profession.alchemist",
-			"level": 4,
-			"base": "base.pill.peach",
-			"materials": [{"material": "herb", "count": 6}, {"material": "core", "count": 3}, {"material": "marrow", "count": 2}],
-			"stones": 500,
-			"realm": 5,
-			"failure_chance": 0.2,
-			"effect": {"id": "lifespan", "amount": 40},
-			"desc": "The peach of the old stories, reduced to a pill. Forty years, if the brew holds."
-		},
-		{
-			"id": "potion.phoenix",
-			"name": "Phoenix Rebirth Pill",
-			"profession": "profession.alchemist",
-			"level": 4,
-			"base": "base.pill.phoenix",
-			"materials": [{"material": "core", "count": 3}, {"material": "marrow", "count": 2}],
-			"stones": 400,
-			"realm": 4,
-			"failure_chance": 0.2,
-			"effect": {"id": "resurrect", "amount": 0},
-			"desc": "Not drunk. Carried. When the body fails, the pill burns in its place."
-		},
-		{
-			"id": "potion.soul_vessel",
-			"name": "Soul Vessel",
-			"profession": "profession.alchemist",
-			"level": 4,
-			"base": "base.soul_vessel",
-			"materials": [{"material": "core", "count": 4}, {"material": "marrow", "count": 3}],
-			"stones": 800,
-			"realm": 6,
-			"failure_chance": 0.25,
-			"effect": {"id": "vessel", "amount": 0},
-			"desc": "A body prepared the slow way, emptied and waiting. A soul with somewhere to go does not have to leave."
-		}
-	]
+  "station": {
+    "id": "station.alchemy",
+    "name": "Herb-Garden Cauldron",
+    "location": "herb_garden"
+  },
+  "potions": [
+    {
+      "id": "potion.qi_gathering",
+      "name": "Qi Gathering Pill",
+      "profession": "profession.alchemist",
+      "level": 0,
+      "base": "base.pill.qi_gathering",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 2
+        }
+      ],
+      "stones": 30,
+      "realm": 1,
+      "failure_chance": 0.0,
+      "effect": {
+        "id": "qi",
+        "amount": 45
+      },
+      "desc": "Two spirit herbs steeped until the Qi in them can be drunk.",
+      "synergy": {
+        "material": "core",
+        "count": 1,
+        "potency": 0.25,
+        "text": "A beast core steadies the gathering"
+      }
+    },
+    {
+      "id": "potion.mending",
+      "name": "Mending Pill",
+      "profession": "profession.alchemist",
+      "level": 1,
+      "base": "base.pill.mending",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 2
+        },
+        {
+          "material": "core",
+          "count": 1
+        }
+      ],
+      "stones": 40,
+      "realm": 1,
+      "failure_chance": 0.05,
+      "effect": {
+        "id": "heal",
+        "amount": 50
+      },
+      "desc": "Herb fibre bound with a beast core, so the body remembers how to close.",
+      "synergy": {
+        "material": "marrow",
+        "count": 1,
+        "potency": 0.3,
+        "text": "Marrow teaches the flesh its shape"
+      }
+    },
+    {
+      "id": "potion.cleansing",
+      "name": "Cleansing Pill",
+      "profession": "profession.alchemist",
+      "level": 2,
+      "base": "base.pill.cleansing",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 3
+        },
+        {
+          "material": "marrow",
+          "count": 1
+        }
+      ],
+      "stones": 80,
+      "realm": 2,
+      "failure_chance": 0.1,
+      "effect": {
+        "id": "cleanse",
+        "amount": 35
+      },
+      "desc": "Marrow draws the impurity out; the herb carries it away.",
+      "synergy": {
+        "material": "marrow",
+        "count": 1,
+        "potency": 0.3,
+        "text": "Marrow carries the filth out"
+      }
+    },
+    {
+      "id": "potion.longevity",
+      "name": "Longevity Pill",
+      "profession": "profession.alchemist",
+      "level": 3,
+      "base": "base.pill.longevity",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 4
+        },
+        {
+          "material": "marrow",
+          "count": 2
+        }
+      ],
+      "stones": 200,
+      "realm": 3,
+      "failure_chance": 0.15,
+      "effect": {
+        "id": "lifespan",
+        "amount": 10
+      },
+      "desc": "Years, steeped out of marrow and leaf. Swallow them before you need them.",
+      "synergy": {
+        "material": "core",
+        "count": 2,
+        "potency": 0.4,
+        "text": "Twin cores anchor the years"
+      }
+    },
+    {
+      "id": "potion.peach",
+      "name": "Immortal Peach Pill",
+      "profession": "profession.alchemist",
+      "level": 4,
+      "base": "base.pill.peach",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 6
+        },
+        {
+          "material": "core",
+          "count": 3
+        },
+        {
+          "material": "marrow",
+          "count": 2
+        }
+      ],
+      "stones": 500,
+      "realm": 5,
+      "failure_chance": 0.2,
+      "effect": {
+        "id": "lifespan",
+        "amount": 40
+      },
+      "desc": "The peach of the old stories, reduced to a pill. Forty years, if the brew holds."
+    },
+    {
+      "id": "potion.phoenix",
+      "name": "Phoenix Rebirth Pill",
+      "profession": "profession.alchemist",
+      "level": 4,
+      "base": "base.pill.phoenix",
+      "materials": [
+        {
+          "material": "core",
+          "count": 3
+        },
+        {
+          "material": "marrow",
+          "count": 2
+        }
+      ],
+      "stones": 400,
+      "realm": 4,
+      "failure_chance": 0.2,
+      "effect": {
+        "id": "resurrect",
+        "amount": 0
+      },
+      "desc": "Not drunk. Carried. When the body fails, the pill burns in its place."
+    },
+    {
+      "id": "potion.soul_vessel",
+      "name": "Soul Vessel",
+      "profession": "profession.alchemist",
+      "level": 4,
+      "base": "base.soul_vessel",
+      "materials": [
+        {
+          "material": "core",
+          "count": 4
+        },
+        {
+          "material": "marrow",
+          "count": 3
+        }
+      ],
+      "stones": 800,
+      "realm": 6,
+      "failure_chance": 0.25,
+      "effect": {
+        "id": "vessel",
+        "amount": 0
+      },
+      "desc": "A body prepared the slow way, emptied and waiting. A soul with somewhere to go does not have to leave."
+    },
+    {
+      "id": "potion.blood_mending",
+      "name": "Blood Mending Pill",
+      "profession": "profession.alchemist",
+      "level": 2,
+      "base": "base.pill.blood_mending",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 3
+        },
+        {
+          "material": "essence",
+          "count": 1
+        }
+      ],
+      "stones": 90,
+      "realm": 3,
+      "failure_chance": 0.12,
+      "hidden": true,
+      "effect": {
+        "id": "heal",
+        "amount": 120
+      },
+      "desc": "A battlefield recipe, lost with the medics who wrote it. Essence carries the herbs into the blood."
+    },
+    {
+      "id": "potion.storm_qi",
+      "name": "Storm Qi Pill",
+      "profession": "profession.alchemist",
+      "level": 3,
+      "base": "base.pill.storm_qi",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 4
+        },
+        {
+          "material": "core",
+          "count": 2
+        },
+        {
+          "material": "essence",
+          "count": 1
+        }
+      ],
+      "stones": 140,
+      "realm": 5,
+      "failure_chance": 0.18,
+      "hidden": true,
+      "cauldron": 2,
+      "effect": {
+        "id": "qi",
+        "amount": 110
+      },
+      "desc": "It fizzes like weather. The Bronze cauldron is the least that can hold it."
+    },
+    {
+      "id": "potion.essence_longevity",
+      "name": "Essence Longevity Pill",
+      "profession": "profession.alchemist",
+      "level": 3,
+      "base": "base.pill.essence_longevity",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 5
+        },
+        {
+          "material": "essence",
+          "count": 2
+        }
+      ],
+      "stones": 220,
+      "realm": 4,
+      "failure_chance": 0.2,
+      "hidden": true,
+      "cauldron": 2,
+      "effect": {
+        "id": "lifespan",
+        "amount": 25
+      },
+      "desc": "Years, distilled. Nobody remembers who first dared it; the steam remembers."
+    }
+  ],
+  "cauldrons": [
+    {
+      "id": "cauldron.earthen",
+      "tier": 1,
+      "name": "Earthen Cauldron",
+      "cost": 0,
+      "realm": 1,
+      "failure_mult": 1.0,
+      "potency_bonus": 0.0
+    },
+    {
+      "id": "cauldron.bronze",
+      "tier": 2,
+      "name": "Bronze Cauldron",
+      "cost": 400,
+      "realm": 2,
+      "failure_mult": 0.7,
+      "potency_bonus": 0.15
+    },
+    {
+      "id": "cauldron.jade",
+      "tier": 3,
+      "name": "Jade Cauldron",
+      "cost": 1200,
+      "realm": 4,
+      "failure_mult": 0.45,
+      "potency_bonus": 0.3
+    }
+  ],
+  "refines": [
+    {
+      "id": "refine.essence",
+      "name": "Refine Spirit Essence",
+      "kind": "refine",
+      "materials": [
+        {
+          "material": "herb",
+          "count": 3
+        }
+      ],
+      "stones": 10,
+      "realm": 1,
+      "product": {
+        "id": "item.essence.refined",
+        "name": "Spirit Essence",
+        "material": "essence"
+      },
+      "desc": "Three herbs, pressed and steamed down to the part of them that was ever alive."
+    }
+  ]
 }
