@@ -54,6 +54,8 @@ var _town_tick := 0.0
 var world_map: WorldMap
 ## Settlement services: the merchant's stock and the shop overlay.
 var merchant := Merchant.new()
+var black_merchant := Merchant.new()
+var shop_kind := "market"
 var shop_panel: ShopPanel
 var shop_open := false
 var _shop_mode := "buy"
@@ -232,6 +234,7 @@ var _physique_rolls := 0
 
 
 func _ready() -> void:
+	black_merchant.id = "merchant.black"
 	Game.new_run()
 	crafting = Crafting.new(DB)
 	alchemy = Alchemy.new(DB)
@@ -372,6 +375,23 @@ func _spawn_town(spec: Dictionary) -> void:
 		world.add_child(shrine)
 		interactables.append(shrine)
 		(owned["items"] as Array).append(shrine)
+
+	if (spec["services"] as Array).has("merchant"):
+		var stall := Interactable.new()
+		stall.setup(Interactable.Kind.SHOP, "shop.town.%d" % index,
+			"%s Merchant — trade" % String(spec["name"]))
+		stall.position = node.position_for("market") + Vector2(74, 42)
+		world.add_child(stall)
+		interactables.append(stall)
+		(owned["items"] as Array).append(stall)
+	if (spec["services"] as Array).has("black_market"):
+		var black_stall := Interactable.new()
+		black_stall.setup(Interactable.Kind.SHOP, "shop.black.%d" % index,
+			"Black market — no questions asked")
+		black_stall.position = node.position_for("market") + Vector2(-74, 42)
+		world.add_child(black_stall)
+		interactables.append(black_stall)
+		(owned["items"] as Array).append(black_stall)
 
 	# Residents: the market's plan pattern, homed to this town. Ids are
 	# stable per (region, archetype, slot), so the same people return
@@ -1308,13 +1328,17 @@ func _on_window_resized() -> void:
 
 # --------------------------------------------------------------- services ----
 
-func _open_shop() -> void:
+func _open_shop(site_id: String = "shop.market") -> void:
 	if shop_panel == null or player == null:
 		return
-	if Captivity.wanted(Game.notoriety):
+	shop_kind = "black" if site_id.begins_with("shop.black") else "market"
+	if shop_kind == "market" and Captivity.wanted(Game.notoriety):
 		Bus.toast.emit("The merchant will not deal with a wanted slaver.")
 		return
-	merchant.refresh(DB, Rng, Clock.day)
+	if shop_kind == "black":
+		black_merchant.refresh(DB, Rng, Clock.day, 1, 3)
+	else:
+		merchant.refresh(DB, Rng, Clock.day)
 	shop_open = true
 	player.set_physics_process(false)
 	player.set_process(false)
@@ -1336,7 +1360,7 @@ func _show_shop(mode: String) -> void:
 	_shop_mode = mode
 	var rows: Array = []
 	if mode == "buy":
-		for item in merchant.stock:
+		for item in _active_merchant().stock:
 			rows.append({
 				"name": String(item.get("name", "?")),
 				"price": _shop_price(item),
@@ -1349,10 +1373,33 @@ func _show_shop(mode: String) -> void:
 			var item: Dictionary = player.inventory[i]
 			rows.append({
 				"name": Items.label(item),
-				"price": Economy.sell_value(item),
+				"price": _sell_value(item),
 				"color": ItemGen.RARITY_COLORS[int(item.get("rarity", 0))],
 			})
-	shop_panel.setup(mode, "Azure Cloud Market — Merchant", rows, Game.spirit_stones)
+	shop_panel.setup(mode, _shop_title(), rows, Game.spirit_stones)
+
+
+func _active_merchant() -> Merchant:
+	return black_merchant if shop_kind == "black" else merchant
+
+
+func _shop_title() -> String:
+	if shop_kind == "black":
+		return "Black Market — the fence pays a premium, and asks nothing"
+	var region := Continent.region_by_index(continent, _region_now)
+	if bool(region.get("capital", false)):
+		return "Azure Cloud Market — Merchant · %s" % Economy.region_price_note(_region_now)
+	var place := String(region.get("name", "Nameless"))
+	return "%s Market — Merchant · %s" % [place, Economy.region_price_note(_region_now)]
+
+
+## What the open merchant pays for a stack: the one sell curve,
+## the day's tiding, and - at the black stall only - the fence's
+## premium (45% against the standard 40; still below any single
+## discount a buyer can stack, so the loop stays closed).
+func _sell_value(item: Dictionary) -> int:
+	var fence := 1.125 if shop_kind == "black" else 1.0
+	return maxi(1, int(floor(float(Economy.sell_value(item)) * _world_event_mult("shop_sell") * fence)))
 
 
 ## A trusted name buys cheaper at the stall. Selling stays on the one value
@@ -1361,6 +1408,11 @@ func _shop_price(item: Dictionary) -> int:
 	var mult := Factions.price_multiplier("faction.market_league", Game.faction_standing, Game.notoriety)
 	# A market tiding moves the same price the faction memory does.
 	mult *= _world_event_mult("shop_buy")
+	# Where the stall stands moves it too (M46): the same goods
+	# cost what the region asks, and the black stall asks more.
+	mult *= Economy.region_factor(_region_now)
+	if shop_kind == "black":
+		mult *= 1.35
 	# And presence moves it too (R5): CHAR's social score - the
 	# player's Azure rank standing in for the rank term - finally
 	# has a consumer. Reputation tier has no source system yet, so
@@ -1378,15 +1430,15 @@ func _shop_price(item: Dictionary) -> int:
 
 
 func _buy_index(index: int) -> void:
-	if index < 0 or index >= merchant.stock.size():
+	if index < 0 or index >= _active_merchant().stock.size():
 		return
-	var item: Dictionary = merchant.stock[index]
+	var item: Dictionary = _active_merchant().stock[index]
 	var price := _shop_price(item)
 	if not Economy.can_afford(Game.spirit_stones, price):
 		Bus.toast.emit("Not enough spirit stones: %d needed." % price)
 		return
 	Game.spirit_stones -= price
-	merchant.take(index)
+	_active_merchant().take(index)
 	_record_world_event("trade", 1)
 	_report_quests("trade", "market", 1)
 	player.pick_up(item)
@@ -1398,8 +1450,8 @@ func _sell_index(index: int) -> void:
 	if index < 0 or index >= player.inventory.size():
 		return
 	var item: Dictionary = player.inventory[index]
-	# A stack is sold whole, so the price is the whole stack's, moved by the day's tiding.
-	var price := maxi(1, int(floor(float(Economy.sell_value(item)) * _world_event_mult("shop_sell"))))
+	# A stack is sold whole, so the price is the whole stack's, at the open merchant's rate.
+	var price := _sell_value(item)
 	player.inventory.remove_at(index)
 	# Selling worn gear must not leave the stat pipeline holding a ghost.
 	for worn_key in Equipment.WORN_KEYS:
@@ -1726,9 +1778,11 @@ func _forge_make(recipe: Dictionary) -> void:
 	_report_quests("craft", "forge", 1)
 	var flourish := " (exceptional work)" if bool(result.get("quality", false)) else ""
 	Bus.toast.emit("Forged %s%s." % [String(item.get("name", "a piece")), flourish])
-	var practice := Professions.award(Game.professions, "profession.smith")
+	var profession_id := String(recipe.get("profession", "profession.smith"))
+	var practice := Professions.award(Game.professions, profession_id)
 	if bool(practice.get("leveled", false)):
-		Bus.toast.emit("Smith rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
+		Bus.toast.emit("%s rank: %s." % [String(DB.profession(profession_id).get("name", "Craft")),
+			Professions.rank_name(int(practice.get("level", 0)))])
 
 
 func _forge_refine(item: Dictionary) -> void:
@@ -2053,6 +2107,10 @@ func _upgrade_cauldron(row: Dictionary) -> void:
 
 ## The processing chain: raw herbs in, a refined material out.
 func _refine(row: Dictionary) -> void:
+	var gate := Professions.gate(row, Game.professions, DB)
+	if not bool(gate.get("ok", false)):
+		Bus.toast.emit("The work refuses: %s." % String(gate.get("reason", "your rank is too low")))
+		return
 	var check := Crafting.check(row, player.inventory, Game.spirit_stones, player.cultivation.realm)
 	if not bool(check.get("ok", false)):
 		Bus.toast.emit("The cauldron refuses: %s." % String(check.get("reason", "not enough")))
@@ -2064,6 +2122,9 @@ func _refine(row: Dictionary) -> void:
 		"rarity": 0, "ilvl": 1, "value": 15}
 	player.pick_up(item)
 	Bus.toast.emit("Refined %s." % String(product.get("name", "an essence")))
+	var practice := Professions.award(Game.professions, "profession.processor")
+	if bool(practice.get("leveled", false)):
+		Bus.toast.emit("Processor rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
 
 
 ## Brewing shares the forge's attempt counter and its spend path: a failed brew
@@ -6508,7 +6569,15 @@ func _use_interactable(node: Interactable) -> void:
 				var extra_herb := _make_herb()
 				player.inventory = Items.add_to_inventory(player.inventory, extra_herb)
 				Bus.item_picked.emit(extra_herb)
+			var herb_rank := Professions.level_of(Game.professions, "profession.herbalist")
+			for i in (1 if herb_rank >= 4 else 0) + (1 if herb_rank >= 2 else 0):
+				var bonus_herb := _make_herb()
+				player.inventory = Items.add_to_inventory(player.inventory, bonus_herb)
+				Bus.item_picked.emit(bonus_herb)
 			Bus.toast.emit("Gathered a spirit herb.")
+			var herb_practice := Professions.award(Game.professions, "profession.herbalist")
+			if bool(herb_practice.get("leveled", false)):
+				Bus.toast.emit("Herbalist rank: %s." % Professions.rank_name(int(herb_practice.get("level", 0))))
 			_report_quests("collect", "spirit_herb", 1)
 		Interactable.Kind.SHRINE:
 			var advanced := _report_quests("channel", "shrine")
@@ -6615,7 +6684,7 @@ func _use_interactable(node: Interactable) -> void:
 		Interactable.Kind.HERALD:
 			_read_world_event()
 		Interactable.Kind.SHOP:
-			_open_shop()
+			_open_shop(node.id)
 		Interactable.Kind.INN:
 			_rest_at_inn()
 		Interactable.Kind.STORAGE:
@@ -6637,7 +6706,13 @@ func _use_interactable(node: Interactable) -> void:
 				return
 			_mark_spent(node)
 			player.pick_up(_make_ore())
+			var mine_rank := Professions.level_of(Game.professions, "profession.miner")
+			for i in (1 if mine_rank >= 4 else 0) + (1 if mine_rank >= 2 else 0):
+				player.pick_up(_make_ore())
 			Bus.toast.emit("Mined spirit ore from the vein.")
+			var mine_practice := Professions.award(Game.professions, "profession.miner")
+			if bool(mine_practice.get("leveled", false)):
+				Bus.toast.emit("Miner rank: %s." % Professions.rank_name(int(mine_practice.get("level", 0))))
 			if Roots.marrow_found(node.chunk_coord, "mine"):
 				player.pick_up(_make_marrow())
 				Bus.toast.emit("A knot of root marrow comes loose from the rock.")
@@ -7682,6 +7757,7 @@ func _save(slot: int) -> void:
 		"used_interactables": used_interactables.duplicate(),
 		"chunk_deltas": world_delta.to_dict(),
 		"shop": merchant.to_dict(),
+		"black_shop": black_merchant.to_dict(),
 		"storage": storage.to_dict(),
 		"travel_sites": travel_sites.duplicate(true),
 		"waypoint": {"name": waypoint_name, "x": waypoint_position.x, "y": waypoint_position.y},
@@ -7787,6 +7863,7 @@ func _load_game(slot: int) -> void:
 	world_delta = WorldDelta.from_dict(data.get("chunk_deltas", {}))
 	chunks.delta = world_delta
 	merchant.from_dict(data.get("shop", {}))
+	black_merchant.from_dict(data.get("black_shop", {}))
 	storage.from_dict(data.get("storage", {}))
 	travel_sites = data.get("travel_sites", {}).duplicate(true)
 	_realm_access_day = -1

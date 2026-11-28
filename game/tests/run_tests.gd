@@ -1649,6 +1649,31 @@ func _realm_tests() -> void:
 		"cauldron tier and discovered recipes survive a save round-trip")
 	Game.cauldron_tier = 1
 	Game.discovered_recipes = []
+	check(DB.professions.size() == 6, "six professions are authored")
+	for pid in ["profession.miner", "profession.herbalist", "profession.formationist", "profession.processor"]:
+		check(not DB.profession(pid).is_empty(), "the %s profession exists" % pid)
+	var formation_recipes := 0
+	for entry in DB.recipes:
+		if String((entry as Dictionary).get("profession", "")) == "profession.formationist":
+			formation_recipes += 1
+	check(formation_recipes == 3, "the formationist works three recipes at the forge")
+	var low_factor := 2.0
+	var high_factor := 0.0
+	for i in range(0, 20):
+		var f := Economy.region_factor(i)
+		low_factor = minf(low_factor, f)
+		high_factor = maxf(high_factor, f)
+	check(low_factor >= 0.85 and high_factor <= 1.20 and high_factor > low_factor,
+		"regional prices vary inside their band")
+	check(Economy.region_factor(7) == Economy.region_factor(7), "a region's prices are stable")
+	var fence := Merchant.new()
+	fence.id = "merchant.black"
+	fence.refresh(DB, Rng, 40, 1, 3)
+	var fence_floor_ok := not fence.stock.is_empty()
+	for entry in fence.stock:
+		if int((entry as Dictionary).get("rarity", 0)) < 1:
+			fence_floor_ok = false
+	check(fence_floor_ok, "the black market stocks nothing common")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)
@@ -9127,7 +9152,7 @@ func _alchemy_tests() -> void:
 ## Professions: ranks derived from practice, bonuses that grow with rank, and
 ## recipe gates that mean what they say.
 func _professions_tests() -> void:
-	check(DB.professions.size() == 2, "two professions are authored")
+	check(DB.professions.size() == 6, "six professions are authored")
 	var smith: Dictionary = DB.profession("profession.smith")
 	check(String(smith.get("station", "")) == "station.forge", "the smith works the forge")
 	check(String(DB.profession("profession.alchemist").get("station", "")) == "station.alchemy",
