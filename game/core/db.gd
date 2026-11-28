@@ -666,8 +666,8 @@ func validate() -> Array:
 		_validate_technique_kind(t, problems)
 		_validate_status_payload(t.get("status", {}), "technique %s" % String(t.get("id", "?")), problems)
 
-	if weapon_types.size() < 7:
-		problems.append("expected at least 7 weapon categories, found %d" % weapon_types.size())
+	if weapon_types.size() < 8:
+		problems.append("expected at least 8 weapon categories, found %d" % weapon_types.size())
 	var based_types: Dictionary = {}
 	for base_entry in bases:
 		if String(base_entry.get("slot", "")) == "weapon":

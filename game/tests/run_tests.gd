@@ -1437,6 +1437,12 @@ func _realm_tests() -> void:
 	var gen2 := ItemGen.new(DB, Rng)
 	var spear_item := gen2.generate(3, 777, 1, -1, "weapon", "base.spear.jade_pike")
 	check(String(spear_item.get("weapon_type", "")) == "spear", "loot can be a spear")
+	var bow_payload := Weapons.attack_payload(Weapons.find("bow"), 0)
+	check(String(bow_payload.get("delivery", "")) == "projectile"
+		and float((bow_payload.get("projectile", {}) as Dictionary).get("range", 0.0)) > 400.0,
+		"a bow's strike is delivered by arrow, at range")
+	var sword_payload2 := Weapons.attack_payload(Weapons.find("sword"), 0)
+	check(String(sword_payload2.get("delivery", "")) == "", "a sword still answers in the arc")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

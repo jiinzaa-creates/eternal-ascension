@@ -111,4 +111,8 @@ static func attack_payload(type: Dictionary, index: int) -> Dictionary:
 		"combo_window": maxf(0.0, float(type.get("combo_window", 0.75))),
 		"lifesteal": 0.0,
 		"tags": move_data.get("tags", []),
+		# A ranged category delivers its resolved strike by arrow, not
+		# by arc: the payload carries the type's own projectile spec.
+		"delivery": String(type.get("delivery", "")),
+		"projectile": (type.get("projectile", {}) as Dictionary).duplicate(true),
 	}

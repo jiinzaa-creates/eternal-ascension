@@ -270,6 +270,40 @@
         "str": 18
       },
       "implicit": "+24 poise damage"
+    },
+    {
+      "id": "base.bow.hunting_bow",
+      "name": "Hunting Bow",
+      "slot": "weapon",
+      "weapon_type": "bow",
+      "damage": 9,
+      "ilvl": 1,
+      "weight": 15,
+      "value": 15,
+      "tags": [
+        "ranged"
+      ],
+      "requires": {
+        "dex": 11
+      },
+      "implicit": "+6% attack speed"
+    },
+    {
+      "id": "base.bow.cloudpiercer",
+      "name": "Cloudpiercer Bow",
+      "slot": "weapon",
+      "weapon_type": "bow",
+      "damage": 15,
+      "ilvl": 3,
+      "weight": 8,
+      "value": 34,
+      "tags": [
+        "ranged"
+      ],
+      "requires": {
+        "dex": 15
+      },
+      "implicit": "+10 penetration"
     }
   ],
   "prefixes": [

@@ -394,6 +394,76 @@
           "knockback": 320
         }
       ]
+    },
+    {
+      "id": "bow",
+      "name": "Bow",
+      "school": "bow",
+      "reach_mult": 1.0,
+      "speed_mult": 0.9,
+      "poise_mult": 0.6,
+      "knock_mult": 0.7,
+      "combo_window": 0.8,
+      "delivery": "projectile",
+      "projectile": {
+        "speed": 620.0,
+        "radius": 8.0,
+        "range": 540.0,
+        "pierce": 0
+      },
+      "moves": [
+        {
+          "name": "Drawn Shot",
+          "frames": {
+            "startup": 9,
+            "active": 2,
+            "recovery": 11
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 60,
+            "angle": 60
+          },
+          "base_damage": 0,
+          "damage_mult": 1.0,
+          "poise_damage": 5,
+          "knockback": 50
+        },
+        {
+          "name": "Swift Shot",
+          "frames": {
+            "startup": 7,
+            "active": 2,
+            "recovery": 9
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 60,
+            "angle": 60
+          },
+          "base_damage": 0,
+          "damage_mult": 0.9,
+          "poise_damage": 5,
+          "knockback": 50
+        },
+        {
+          "name": "Sky-Piercing Arrow",
+          "frames": {
+            "startup": 12,
+            "active": 2,
+            "recovery": 14
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 60,
+            "angle": 60
+          },
+          "base_damage": 0,
+          "damage_mult": 1.5,
+          "poise_damage": 8,
+          "knockback": 80
+        }
+      ]
     }
   ]
 }

@@ -1073,6 +1073,11 @@ func _strike() -> void:
 	_arc_radius = float(box.get("radius", 70.0))
 	_arc_angle = deg_to_rad(float(box.get("angle", 120.0)))
 	var tint := Color(String(attack.get("color", "#7fd3e0")))
+	if is_light and String(attack.get("delivery", "")) == "projectile":
+		var arrow := Projectile.new()
+		arrow.setup(_facing, TechniqueCombat.projectile_of(attack), strike, tint)
+		_spawn_effect(arrow, global_position)
+		return
 	match kind:
 		"projectile":
 			var bolt_spec := TechniqueCombat.projectile_of(attack)
