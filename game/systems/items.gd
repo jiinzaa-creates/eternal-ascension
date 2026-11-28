@@ -38,6 +38,7 @@ const FIELDS: Array[String] = [
 	"id", "seed", "base", "base_name", "slot", "weapon_type", "ilvl", "rarity",
 	"rarity_name", "name", "implicit", "base_damage", "armor", "mods", "value",
 	"unique", "lore", "material", "potency", "count", "durability", "enchant", "named",
+	"set", "teaches_passive",
 ]
 
 
@@ -169,6 +170,8 @@ static func normalize_item(value: Variant) -> Dictionary:
 	out["unique"] = bool(data.get("unique", false))
 	out["named"] = bool(data.get("named", false))
 	out["lore"] = String(data.get("lore", ""))
+	out["set"] = String(data.get("set", ""))
+	out["teaches_passive"] = String(data.get("teaches_passive", ""))
 	out["material"] = String(data.get("material", ""))
 	out["potency"] = clampf(float(data.get("potency", 1.0)), 0.1, 5.0)
 	out["count"] = clampi(int(data.get("count", 1)), 1, 999)

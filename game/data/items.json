@@ -395,6 +395,18 @@
         "realm": 3
       },
       "implicit": "+5 years lifespan"
+    },
+    {
+      "id": "base.manual.ancient_scroll",
+      "name": "Ancient Scroll",
+      "slot": "consumable",
+      "ilvl": 5,
+      "weight": 0,
+      "value": 300,
+      "tags": [
+        "manual"
+      ],
+      "implicit": "A teaching, bound in silk"
     }
   ],
   "prefixes": [

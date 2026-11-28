@@ -33,6 +33,7 @@ var enemy_archetypes: Array = []
 var spirit_beasts: Array = []
 var bosses: Array = []
 var uniques: Array = []
+var item_sets: Array = []
 var loot_tables: Array = []
 var origins: Array = []
 var physiques: Array = []
@@ -121,6 +122,7 @@ func load_all() -> void:
 	spirit_beasts = _read("spirit_beasts.json").get("beasts", [])
 	bosses = _read("bosses.json").get("bosses", [])
 	uniques = _read("uniques.json").get("uniques", [])
+	item_sets = _read("uniques.json").get("sets", [])
 	loot_tables = _read("loot_tables.json").get("tables", [])
 	origins = _read("origins.json").get("origins", [])
 	physiques = _read("physiques.json").get("physiques", [])
@@ -178,6 +180,7 @@ func load_all() -> void:
 	_index("spirit_beast", spirit_beasts)
 	_index("boss", bosses)
 	_index("unique", uniques)
+	_index("set", item_sets)
 	_index("loot", loot_tables)
 	_index("origin", origins)
 	_index("npc_goal", npc_goals)
@@ -761,16 +764,24 @@ func validate() -> Array:
 			problems.append("unique %s slot disagrees with its base" % unique_id)
 		var source := String(u.get("source", ""))
 		var source_ok := source == Uniques.ALTAR_SOURCE \
-			or (source.begins_with("boss.") and not by_id("boss", source).is_empty())
+			or (source.begins_with("boss.") and not by_id("boss", source).is_empty()) \
+			or (source.begins_with("sect.") and not by_id("sect", source).is_empty())
 		if not source_ok:
 			problems.append("unique %s has unknown source %s" % [unique_id, source])
+		var teaches := String(u.get("teaches_passive", ""))
+		var is_manual := teaches != ""
+		if is_manual and by_id("passive", teaches).is_empty():
+			problems.append("unique %s teaches unknown passive %s" % [unique_id, teaches])
+		var set_ref := String(u.get("set", ""))
+		if set_ref != "" and by_id("set", set_ref).is_empty():
+			problems.append("unique %s names unknown set %s" % [unique_id, set_ref])
 		var effect: Dictionary = u.get("effect", {})
 		if not Uniques.EFFECTS.has(String(effect.get("id", ""))):
 			problems.append("unique %s has no known effect" % unique_id)
 		elif float(effect.get("amount", 0.0)) <= 0.0:
 			problems.append("unique %s effect has no amount" % unique_id)
 		var unique_mods: Array = u.get("mods", [])
-		if unique_mods.is_empty():
+		if not is_manual and unique_mods.is_empty():
 			problems.append("unique %s has no mods" % unique_id)
 		for mod in unique_mods:
 			if typeof(mod) != TYPE_DICTIONARY:
@@ -781,6 +792,28 @@ func validate() -> Array:
 				problems.append("unique %s uses unknown stat %s" % [unique_id, mod_stat])
 		if int(u.get("value", 0)) <= 0:
 			problems.append("unique %s has no value" % unique_id)
+	# Item sets: named, at least two authored pieces wearing the
+	# set's mark, thresholds inside the piece count, real stats.
+	for set_entry in item_sets:
+		var set_id := String(set_entry.get("id", ""))
+		if not set_id.begins_with("set.") or String(set_entry.get("name", "")) == "":
+			problems.append("item set %s is malformed" % set_id)
+			continue
+		var pieces := 0
+		for u in uniques:
+			if String(u.get("set", "")) == set_id:
+				pieces += 1
+		if pieces < 2:
+			problems.append("item set %s has fewer than two pieces" % set_id)
+			continue
+		for bonus in set_entry.get("bonuses", []):
+			var need := int((bonus as Dictionary).get("count", 0))
+			if need < 2 or need > pieces:
+				problems.append("item set %s asks for %d of %d pieces" % [set_id, need, pieces])
+			for mod in (bonus as Dictionary).get("mods", []):
+				var bstat := String((mod as Dictionary).get("stat", ""))
+				if not (Attributes.KEYS.has(bstat) or StatBlock.PERCENT_STATS.has(bstat) or StatBlock.FLAT_STATS.has(bstat)):
+					problems.append("item set %s uses unknown stat %s" % [set_id, bstat])
 	var affix_ids: Dictionary = {}
 	for pool in [prefixes, suffixes]:
 		for a in pool:

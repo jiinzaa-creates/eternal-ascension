@@ -10,11 +10,30 @@
       "value": 480,
       "source": "boss.tomb_warden",
       "lore": "Ground from the warden's shadow, it remembers every oath the tomb broke.",
-      "effect": {"id": "qi_on_kill", "amount": 12.0, "text": "Restores 12 Qi for every kill"},
+      "effect": {
+        "id": "qi_on_kill",
+        "amount": 12.0,
+        "text": "Restores 12 Qi for every kill"
+      },
       "mods": [
-        {"id": "prefix.sharpened", "stat": "physical_damage_pct", "value": 38.0, "text": "+38% physical damage"},
-        {"id": "prefix.ruinous", "stat": "crit_damage", "value": 45.0, "text": "+45% critical damage"},
-        {"id": "suffix.tiger", "stat": "str", "value": 6.0, "text": "+6 STR"}
+        {
+          "id": "prefix.sharpened",
+          "stat": "physical_damage_pct",
+          "value": 38.0,
+          "text": "+38% physical damage"
+        },
+        {
+          "id": "prefix.ruinous",
+          "stat": "crit_damage",
+          "value": 45.0,
+          "text": "+45% critical damage"
+        },
+        {
+          "id": "suffix.tiger",
+          "stat": "str",
+          "value": 6.0,
+          "text": "+6 STR"
+        }
       ]
     },
     {
@@ -27,11 +46,300 @@
       "value": 380,
       "source": "site.inheritance_altar",
       "lore": "Woven by a body that never touched the floor of the tomb it died in.",
-      "effect": {"id": "mend_on_kill", "amount": 5.0, "text": "Restores 5 health for every kill"},
+      "effect": {
+        "id": "mend_on_kill",
+        "amount": 5.0,
+        "text": "Restores 5 health for every kill"
+      },
       "mods": [
-        {"id": "prefix.flowing", "stat": "move_speed_pct", "value": 16.0, "text": "+16% movement speed"},
-        {"id": "suffix.evasion", "stat": "evasion", "value": 14.0, "text": "+14% evasion"},
-        {"id": "suffix.cloud", "stat": "agi", "value": 4.0, "text": "+4 AGI"}
+        {
+          "id": "prefix.flowing",
+          "stat": "move_speed_pct",
+          "value": 16.0,
+          "text": "+16% movement speed"
+        },
+        {
+          "id": "suffix.evasion",
+          "stat": "evasion",
+          "value": 14.0,
+          "text": "+14% evasion"
+        },
+        {
+          "id": "suffix.cloud",
+          "stat": "agi",
+          "value": 4.0,
+          "text": "+4 AGI"
+        }
+      ]
+    },
+    {
+      "id": "item.unique.pilgrim_staff",
+      "name": "Ashen Pilgrim's Staff",
+      "base": "base.staff.azure_rod",
+      "slot": "weapon",
+      "ilvl": 7,
+      "rarity": 3,
+      "value": 420,
+      "source": "boss.beast_realm",
+      "set": "set.ashen_pilgrim",
+      "lore": "The pilgrim walked out of the beast realm leaning on this. The realm let him.",
+      "effect": {
+        "id": "mend_on_kill",
+        "amount": 4.0,
+        "text": "Restores 4 health for every kill"
+      },
+      "mods": [
+        {
+          "id": "prefix.azure",
+          "stat": "qi_regen_flat",
+          "value": 2.0,
+          "text": "+2 Qi regeneration"
+        },
+        {
+          "id": "prefix.heavenly",
+          "stat": "qi_max_pct",
+          "value": 12.0,
+          "text": "+12% maximum Qi"
+        },
+        {
+          "id": "suffix.stillness",
+          "stat": "wis",
+          "value": 5.0,
+          "text": "+5 WIS"
+        }
+      ]
+    },
+    {
+      "id": "item.unique.pilgrim_pendant",
+      "name": "Pilgrim's Road Pendant",
+      "base": "base.necklace.jade_pendant",
+      "slot": "necklace",
+      "ilvl": 7,
+      "rarity": 3,
+      "value": 400,
+      "source": "boss.heavenly_garden",
+      "set": "set.ashen_pilgrim",
+      "lore": "One bead for every year of the road. There are more beads than years anyone admits to.",
+      "effect": {
+        "id": "qi_on_kill",
+        "amount": 8.0,
+        "text": "Restores 8 Qi for every kill"
+      },
+      "mods": [
+        {
+          "id": "prefix.heavenly",
+          "stat": "qi_max_pct",
+          "value": 14.0,
+          "text": "+14% maximum Qi"
+        },
+        {
+          "id": "prefix.spirit_bound",
+          "stat": "cult_speed_pct",
+          "value": 10.0,
+          "text": "+10% cultivation speed"
+        },
+        {
+          "id": "suffix.command",
+          "stat": "char",
+          "value": 4.0,
+          "text": "+4 CHA"
+        }
+      ]
+    },
+    {
+      "id": "item.unique.pilgrim_ring",
+      "name": "Pilgrim's Ash Ring",
+      "base": "base.ring.jade",
+      "slot": "ring",
+      "ilvl": 7,
+      "rarity": 3,
+      "value": 390,
+      "source": "boss.battlefield",
+      "set": "set.ashen_pilgrim",
+      "lore": "Set with ash from a battlefield that has not cooled in three hundred years. It is warm.",
+      "effect": {
+        "id": "mend_on_kill",
+        "amount": 3.0,
+        "text": "Restores 3 health for every kill"
+      },
+      "mods": [
+        {
+          "id": "prefix.gleaming",
+          "stat": "physical_damage_pct",
+          "value": 18.0,
+          "text": "+18% physical damage"
+        },
+        {
+          "id": "suffix.evasion",
+          "stat": "evasion",
+          "value": 8.0,
+          "text": "+8% evasion"
+        },
+        {
+          "id": "suffix.cloud",
+          "stat": "agi",
+          "value": 4.0,
+          "text": "+4 AGI"
+        }
+      ]
+    },
+    {
+      "id": "item.unique.forbidden_eye",
+      "name": "Eye of the Forbidden Deep",
+      "base": "base.artifact.bronze_mirror",
+      "slot": "artifact",
+      "ilvl": 9,
+      "rarity": 3,
+      "value": 640,
+      "source": "boss.forbidden_domain",
+      "lore": "It does not reflect the room you stand in. It reflects the room you are avoiding.",
+      "effect": {
+        "id": "qi_on_kill",
+        "amount": 15.0,
+        "text": "Restores 15 Qi for every kill"
+      },
+      "mods": [
+        {
+          "id": "suffix.thunder",
+          "stat": "lightning_damage_pct",
+          "value": 22.0,
+          "text": "+22% lightning damage"
+        },
+        {
+          "id": "prefix.hasty",
+          "stat": "cooldown_reduction",
+          "value": 8.0,
+          "text": "+8% cooldown reduction"
+        },
+        {
+          "id": "suffix.insight",
+          "stat": "int",
+          "value": 6.0,
+          "text": "+6 INT"
+        }
+      ]
+    },
+    {
+      "id": "item.unique.stormheart",
+      "name": "Stormheart Talisman",
+      "base": "base.talisman.wind_charm",
+      "slot": "talisman",
+      "ilvl": 8,
+      "rarity": 3,
+      "value": 520,
+      "source": "boss.spatial_fracture",
+      "lore": "A crane's heart, stopped mid-beat by the storm it flew into. It has not finished the beat.",
+      "effect": {
+        "id": "mend_on_kill",
+        "amount": 6.0,
+        "text": "Restores 6 health for every kill"
+      },
+      "mods": [
+        {
+          "id": "prefix.swift",
+          "stat": "attack_speed_pct",
+          "value": 14.0,
+          "text": "+14% attack speed"
+        },
+        {
+          "id": "prefix.flowing",
+          "stat": "move_speed_pct",
+          "value": 10.0,
+          "text": "+10% movement speed"
+        },
+        {
+          "id": "suffix.swallow",
+          "stat": "dex",
+          "value": 5.0,
+          "text": "+5 DEX"
+        }
+      ]
+    },
+    {
+      "id": "item.unique.azure_heirloom",
+      "name": "Azure Heirloom Seal",
+      "base": "base.artifact.jade_seal",
+      "slot": "artifact",
+      "ilvl": 8,
+      "rarity": 3,
+      "value": 560,
+      "source": "sect.azure_cloud",
+      "lore": "Cut for the first Azure Cloud master and carried by every core disciple the house has trusted since.",
+      "effect": {
+        "id": "qi_on_kill",
+        "amount": 6.0,
+        "text": "Restores 6 Qi for every kill"
+      },
+      "mods": [
+        {
+          "id": "prefix.spirit_bound",
+          "stat": "cult_speed_pct",
+          "value": 16.0,
+          "text": "+16% cultivation speed"
+        },
+        {
+          "id": "prefix.azure",
+          "stat": "qi_regen_flat",
+          "value": 2.0,
+          "text": "+2 Qi regeneration"
+        },
+        {
+          "id": "suffix.stillness",
+          "stat": "wis",
+          "value": 5.0,
+          "text": "+5 WIS"
+        }
+      ]
+    },
+    {
+      "id": "item.unique.manual_still_river",
+      "name": "Manual of the Still River",
+      "base": "base.manual.ancient_scroll",
+      "slot": "consumable",
+      "ilvl": 6,
+      "rarity": 3,
+      "value": 300,
+      "source": "boss.abandoned_sect",
+      "teaches_passive": "passive.still_mind",
+      "lore": "Written by a formation master who outlived her sect. The last page is blank, on purpose.",
+      "effect": {
+        "id": "qi_on_kill",
+        "amount": 5.0,
+        "text": "Restores 5 Qi for every kill - the lesson, applied"
+      }
+    }
+  ],
+  "sets": [
+    {
+      "id": "set.ashen_pilgrim",
+      "name": "Ashen Pilgrim",
+      "bonuses": [
+        {
+          "count": 2,
+          "mods": [
+            {
+              "stat": "physical_damage_pct",
+              "value": 6.0
+            },
+            {
+              "stat": "move_speed_pct",
+              "value": 4.0
+            }
+          ]
+        },
+        {
+          "count": 3,
+          "mods": [
+            {
+              "stat": "cult_speed_pct",
+              "value": 10.0
+            },
+            {
+              "stat": "health_regen",
+              "value": 0.4
+            }
+          ]
+        }
       ]
     }
   ]
