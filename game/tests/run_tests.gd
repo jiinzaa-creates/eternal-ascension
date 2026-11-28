@@ -1615,6 +1615,40 @@ func _realm_tests() -> void:
 	var heirloom: Dictionary = relic_maker.make("item.unique.azure_heirloom")
 	check(not heirloom.is_empty() and String(heirloom.get("slot", "")) == "artifact",
 		"the Azure heirloom is an artifact with a sect source")
+	var alch := Alchemy.new(DB)
+	check(DB.cauldrons.size() == 3, "the cauldron ladder has three rungs")
+	check(String(alch.cauldron(2).get("name", "")) == "Bronze Cauldron", "tier two is bronze")
+	check(alch.next_cauldron(3).is_empty(), "nothing stands above jade")
+	check(Items.material_key({"id": "item.essence.refined"}) == "essence", "essence is its own material")
+	var hidden_count := 0
+	for entry in DB.potions:
+		if bool((entry as Dictionary).get("hidden", false)):
+			hidden_count += 1
+	check(hidden_count == 3, "three recipes are lost until discovered")
+	var blood_pill := {"id": "item.test.blood", "name": "Blood Mending Pill", "slot": "consumable",
+		"base": "base.pill.blood_mending", "count": 1, "rarity": 0, "ilvl": 4}
+	check(String(alch.recipe_for_item(blood_pill).get("id", "")) == "potion.blood_mending",
+		"a discovered recipe's pill drinks like any other")
+	var qi_recipe := alch.recipe("potion.qi_gathering")
+	var saw_resonance := false
+	var saw_flare := false
+	for counter in range(0, 80):
+		var brewed := alch.brew(qi_recipe, 3, 4242, counter, 1.0, 1.0, 0.0)
+		if String(brewed.get("event", "")) == "resonance":
+			saw_resonance = true
+		if String(brewed.get("event", "")) == "flare":
+			saw_flare = true
+	check(saw_resonance and saw_flare, "the furnace has moods: resonance and flare both occur")
+	Game.cauldron_tier = 2
+	Game.discovered_recipes = ["potion.blood_mending"]
+	var game_rt := Game.to_dict()
+	Game.cauldron_tier = 1
+	Game.discovered_recipes = []
+	Game.from_dict(game_rt)
+	check(Game.cauldron_tier == 2 and Game.discovered_recipes.has("potion.blood_mending"),
+		"cauldron tier and discovered recipes survive a save round-trip")
+	Game.cauldron_tier = 1
+	Game.discovered_recipes = []
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)
@@ -9028,13 +9062,13 @@ func _combat_polish_tests() -> void:
 
 
 
-## Alchemy: one station, seven potions, every potion a consumable whose effect
+## Alchemy: one station, ten potions (three of them lost until discovered), every potion a consumable whose effect
 ## is known, a brew that is pure in its stream, and potency that carries quality.
 func _alchemy_tests() -> void:
 	var station: Dictionary = DB.alchemy_brewery()
 	check(String(station.get("id", "")) == Alchemy.STATION, "the cauldron is a real station")
 	check(Settlement.LOCATIONS.has(String(station.get("location", ""))), "the cauldron stands somewhere real")
-	check(DB.potions.size() == 7, "seven potions are authored")
+	check(DB.potions.size() == 10, "ten potions are authored")
 	var rules := Alchemy.new(DB)
 	for entry in DB.potions:
 		var potion: Dictionary = entry

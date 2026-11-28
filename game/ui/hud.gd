@@ -1830,7 +1830,7 @@ func draw_alchemy(player: Player) -> void:
 	var panel := Rect2(view * 0.5 - Vector2(370.0, 215.0), Vector2(740.0, 430.0))
 	UiFrame.page(self, panel, Color("#0b1014", 0.97), Color("#8fd8a0", 0.45))
 	var origin := panel.position
-	_text(origin + Vector2(22.0, 32.0), "HERB-GARDEN CAULDRON", 18, Color("#9fe0a8"))
+	_text(origin + Vector2(22.0, 32.0), "HERB-GARDEN — %s" % host.cauldron_name().to_upper(), 18, Color("#9fe0a8"))
 	_text(origin + Vector2(272.0, 32.0), "↑/↓ choose    ENTER brew    E — close", 11, MUTED)
 	_text(origin + Vector2(22.0, 52.0), Professions.progress_text(Game.professions, "profession.alchemist", DB), 11, Color("#d8c070"))
 
@@ -1853,6 +1853,21 @@ func draw_alchemy(player: Player) -> void:
 		list_y += 22.0
 
 	var chosen: Dictionary = rows[selected]
+	if String(chosen.get("kind", "")) != "":
+		var kx := origin.x + 360.0
+		var ky := origin.y + 66.0
+		_text(Vector2(kx, ky), String(chosen.get("name", "?")), 14, ACCENT)
+		ky += 22.0
+		_text(Vector2(kx, ky), _fit(String(chosen.get("desc", "")), 11, 350.0), 11, Color("#7f9098"))
+		ky += 24.0
+		_text(Vector2(kx, ky), _fit("Costs: " + Crafting.requirement_text(chosen), 11, 350.0), 11, Color("#d8c070"))
+		ky += 26.0
+		var kind_check: Dictionary = Crafting.check(chosen, player.inventory, Game.spirit_stones, player.cultivation.realm)
+		if bool(kind_check.get("ok", false)):
+			_text(Vector2(kx, ky), "Ready.  ENTER works it.", 12, ACCENT)
+		else:
+			_text(Vector2(kx, ky), _fit("Refused — %s" % String(kind_check.get("reason", "not enough")), 11, 350.0), 11, Color("#e08f8f"))
+		return
 	var base: Dictionary = DB.base_item(String(chosen.get("base", "")))
 	var rules_check: Dictionary = Crafting.check(chosen, player.inventory, Game.spirit_stones, player.cultivation.realm)
 	var cx := origin.x + 360.0
@@ -1868,6 +1883,15 @@ func draw_alchemy(player: Player) -> void:
 	cy += 20.0
 	_text(Vector2(cx, cy), _fit("Costs: " + Crafting.requirement_text(chosen), 11, 350.0), 11, Color("#d8c070"))
 	cy += 20.0
+	var synergy: Dictionary = chosen.get("synergy", {})
+	if not synergy.is_empty():
+		_text(Vector2(cx, cy), _fit("Synergy: %s ×%d in the satchel joins the pot — %s." % [
+			Crafting.material_label(String(synergy.get("material", ""))), int(synergy.get("count", 1)),
+			String(synergy.get("text", "a stronger brew"))], 11, 350.0), 11, Color("#8fd8a0"))
+		cy += 20.0
+	if int(chosen.get("cauldron", 1)) > Game.cauldron_tier:
+		_text(Vector2(cx, cy), "Asks for a finer cauldron than the garden keeps.", 11, Color("#e08f8f"))
+		cy += 20.0
 	_text(Vector2(cx, cy), _fit(String(chosen.get("desc", "")), 11, 350.0), 11, Color("#7f9098"))
 	cy += 34.0
 	var gate: Dictionary = Professions.gate(chosen, Game.professions, DB)

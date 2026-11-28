@@ -1994,7 +1994,30 @@ func close_forge() -> void:
 # ---------------------------------------------------------------- alchemy ----
 
 func alchemy_rows() -> Array:
-	return alchemy.recipes() if alchemy != null else []
+	if alchemy == null:
+		return []
+	var out: Array = []
+	for entry in alchemy.recipes():
+		var recipe: Dictionary = entry
+		if bool(recipe.get("hidden", false)) and not Game.discovered_recipes.has(String(recipe.get("id", ""))):
+			continue
+		out.append(recipe)
+	for entry in DB.refines:
+		out.append(entry)
+	var next := alchemy.next_cauldron(Game.cauldron_tier)
+	if not next.is_empty():
+		out.append({"kind": "upgrade", "id": String(next.get("id", "")),
+			"name": "Raise the %s" % String(next.get("name", "cauldron")),
+			"materials": [], "stones": int(next.get("cost", 0)), "realm": int(next.get("realm", 1)),
+			"desc": "A better vessel: brews fail less and finish stronger. The garden keeps the old pot."})
+	return out
+
+
+## The cauldron the garden currently keeps, for the panel title.
+func cauldron_name() -> String:
+	if alchemy == null:
+		return "Earthen Cauldron"
+	return String(alchemy.cauldron(Game.cauldron_tier).get("name", "Earthen Cauldron"))
 
 
 func alchemy_selected() -> Dictionary:
@@ -2005,7 +2028,42 @@ func alchemy_selected() -> Dictionary:
 
 
 func alchemy_act() -> void:
-	_brew(alchemy_selected())
+	var row := alchemy_selected()
+	match String(row.get("kind", "")):
+		"upgrade":
+			_upgrade_cauldron(row)
+		"refine":
+			_refine(row)
+		_:
+			_brew(row)
+
+
+## Buys the next cauldron tier with stones. The check is the same
+## shape as a recipe's, so the panel's own refusal text stays true.
+func _upgrade_cauldron(row: Dictionary) -> void:
+	var check := Crafting.check(row, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("The garden refuses: %s." % String(check.get("reason", "not enough")))
+		return
+	Game.spirit_stones -= int(row.get("stones", 0))
+	Game.cauldron_tier += 1
+	Bus.toast.emit("The %s is set over the fire." % cauldron_name())
+	Bus.player_stats_changed.emit()
+
+
+## The processing chain: raw herbs in, a refined material out.
+func _refine(row: Dictionary) -> void:
+	var check := Crafting.check(row, player.inventory, Game.spirit_stones, player.cultivation.realm)
+	if not bool(check.get("ok", false)):
+		Bus.toast.emit("The cauldron refuses: %s." % String(check.get("reason", "not enough")))
+		return
+	_spend_craft(row)
+	var product: Dictionary = row.get("product", {})
+	var item := {"id": String(product.get("id", "")), "name": String(product.get("name", "Essence")),
+		"slot": "material", "material": String(product.get("material", "")), "count": 1,
+		"rarity": 0, "ilvl": 1, "value": 15}
+	player.pick_up(item)
+	Bus.toast.emit("Refined %s." % String(product.get("name", "an essence")))
 
 
 ## Brewing shares the forge's attempt counter and its spend path: a failed brew
@@ -2021,6 +2079,10 @@ func _brew(recipe: Dictionary) -> void:
 	if not bool(check.get("ok", false)):
 		Bus.toast.emit("The cauldron refuses: %s." % String(check.get("reason", "not enough")))
 		return
+	var needed_tier := int(recipe.get("cauldron", 1))
+	if Game.cauldron_tier < needed_tier:
+		Bus.toast.emit("The %s cannot hold that brew; it asks for a finer cauldron." % cauldron_name())
+		return
 	var base: Dictionary = DB.base_item(String(recipe.get("base", "")))
 	var ilvl := maxi(int(base.get("ilvl", 1)), player.cultivation.realm)
 	var attempt := Game.crafts_made
@@ -2028,24 +2090,77 @@ func _brew(recipe: Dictionary) -> void:
 	var alchemist: Dictionary = DB.profession("profession.alchemist")
 	var rank := Professions.level_of(Game.professions, "profession.alchemist")
 	var quality := player.stats.crafting_quality_mult() + Professions.quality_bonus(alchemist, rank)
+	var vessel := alchemy.cauldron(Game.cauldron_tier)
+	# Ingredient synergy: when the named partner material is in the
+	# satchel it joins the pot, spent like any ingredient, and the
+	# brew finishes stronger for the pairing.
+	var spend: Dictionary = recipe
+	var bonus := float(vessel.get("potency_bonus", 0.0))
+	var synergy: Dictionary = recipe.get("synergy", {})
+	var synergy_text := ""
+	if not synergy.is_empty():
+		var counts := Crafting.material_counts(player.inventory)
+		if int(counts.get(String(synergy.get("material", "")), 0)) >= int(synergy.get("count", 1)):
+			spend = recipe.duplicate(true)
+			var mats: Array = spend.get("materials", [])
+			mats.append({"material": String(synergy.get("material", "")), "count": int(synergy.get("count", 1))})
+			spend["materials"] = mats
+			bonus += float(synergy.get("potency", 0.0))
+			synergy_text = String(synergy.get("text", ""))
 	var result := alchemy.brew(
-		recipe, ilvl, 70000 + attempt, 0, quality, Professions.failure_mult(alchemist, rank))
+		recipe, ilvl, 70000 + attempt, 0, quality,
+		Professions.failure_mult(alchemist, rank) * float(vessel.get("failure_mult", 1.0)), bonus)
 	if not bool(result.get("ok", false)) and not bool(result.get("failed", false)):
 		Bus.toast.emit(String(result.get("reason", "the cauldron cannot make that")).capitalize() + ".")
 		return
-	_spend_craft(recipe)
+	_spend_craft(spend)
 	if bool(result.get("failed", false)):
-		Bus.toast.emit("The brew spoils; the herbs are lost.")
+		if String(result.get("event", "")) == "backfire":
+			player.cultivation.contamination = minf(player.cultivation.contamination + 8.0, Meridians.MAX_CONTAMINATION)
+			Bus.toast.emit("The brew spoils and spits back — contamination rises. Wash it out soon.")
+		else:
+			Bus.toast.emit("The brew spoils; the herbs are lost.")
 		return
 	var pill: Dictionary = result["item"]
 	player.pick_up(pill)
+	var event := String(result.get("event", ""))
+	if event == "resonance":
+		player.pick_up(pill.duplicate(true))
 	_record_world_event("crafts", 1)
 	_report_quests("craft", "alchemy", 1)
 	var flourish := " (exceptional brew)" if bool(result.get("quality", false)) else ""
+	if event == "resonance":
+		flourish += " — the cauldron resonates, and the brew doubles"
+	elif event == "flare":
+		flourish += " — the flame flares, and the brew sharpens"
+	if synergy_text != "":
+		flourish += " · " + synergy_text
 	Bus.toast.emit("Brewed %s at potency x%.2f%s." % [String(pill.get("name", "a pill")), Alchemy.potency_of(pill), flourish])
+	_discover_recipe()
 	var practice := Professions.award(Game.professions, "profession.alchemist")
 	if bool(practice.get("leveled", false)):
 		Bus.toast.emit("Alchemist rank: %s." % Professions.rank_name(int(practice.get("level", 0))))
+
+
+## Brewing teaches: now and then the steam shows a recipe nobody
+## wrote down for you. Only lost recipes at or below the brewer's
+## realm surface this way.
+func _discover_recipe() -> void:
+	var roll := Rng.stream("recipe.discovery", Game.crafts_made, 7).randf()
+	if roll >= 0.15:
+		return
+	for entry in alchemy.recipes():
+		var recipe: Dictionary = entry
+		if not bool(recipe.get("hidden", false)):
+			continue
+		var id := String(recipe.get("id", ""))
+		if Game.discovered_recipes.has(id):
+			continue
+		if int(recipe.get("realm", 1)) > player.cultivation.realm:
+			continue
+		Game.discovered_recipes.append(id)
+		Bus.toast.emit("The steam shows you something new — recipe discovered: %s." % String(recipe.get("name", id)))
+		return
 
 
 func _open_alchemy() -> void:
