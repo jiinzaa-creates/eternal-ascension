@@ -97,6 +97,15 @@ func generate(seed_value: int, wanted_template: String = "", wanted_family: Stri
 		enemies_per_room = clampi(int(family.get("enemies_per_room", enemies_per_room)), 1, 6)
 		enemy_roster = (family.get("enemy_roster", enemy_roster) as Array).duplicate()
 		warden_id = String(family.get("warden", warden_id))
+	_biome_id = String(FAMILY_BIOMES.get(family_id, "biome.ashen"))
+	_floor_tex = null
+	_floor_tex2 = null
+	var tile_dir := "res://assets/art-studio/assets/environments/terrain/biome_" \
+		+ _biome_id.trim_prefix("biome.") + "/"
+	if ResourceLoader.exists(tile_dir + "tile_dirt_v1.png"):
+		_floor_tex = load(tile_dir + "tile_dirt_v1.png") as Texture2D
+	if ResourceLoader.exists(tile_dir + "tile_dirt_v2.png"):
+		_floor_tex2 = load(tile_dir + "tile_dirt_v2.png") as Texture2D
 	var stream_index := maxi(0, HiddenRealms.index_of(template_id))
 	var r: RandomNumberGenerator = Rng.stream("hidden_realm", seed_value, stream_index)
 	cells.clear()
@@ -120,6 +129,7 @@ func generate(seed_value: int, wanted_template: String = "", wanted_family: Stri
 	_build_interactables()
 	_spawn_enemies(r)
 	_spawn_warden()
+	_dress_rooms(r)
 	queue_redraw()
 
 
@@ -177,6 +187,24 @@ func are_linked(a: Vector2i, b: Vector2i) -> bool:
 
 
 ## The world rectangle the room grid occupies, used for camera bounds.
+## True when a world position stands on the realm's floor: inside a
+## room (shrunk by a body's margin) or within a corridor's walkable
+## width of a link segment. The walls are drawn shapes; this is what
+## makes them walls.
+func is_floor(pos: Vector2, margin: float = 10.0) -> bool:
+	for cell in cells:
+		var rect := Rect2(cell_center(cell) - Vector2(ROOM_W, ROOM_H) * 0.5,
+			Vector2(ROOM_W, ROOM_H)).grow(-margin)
+		if rect.has_point(pos):
+			return true
+	for link in links:
+		var a: Vector2 = cell_center(link[0])
+		var b: Vector2 = cell_center(link[1])
+		if Geometry2D.get_closest_point_to_segment(pos, a, b).distance_to(pos) <= 20.0:
+			return true
+	return false
+
+
 func world_bounds() -> Rect2:
 	var width := float(cols - 1) * (ROOM_W + GAP) + ROOM_W
 	var height := float(rows - 1) * (ROOM_H + GAP) + ROOM_H
@@ -276,6 +304,25 @@ func _build_interactables() -> void:
 ## is the same on every visit to a given realm.
 const ENEMY_ROSTER: Array[String] = ["sentinel", "skirmisher", "archer", "brawler"]
 
+## Each family borrows a terrain's floor tiles and prop grading, so a
+## tomb reads as a tomb and a garden as a garden instead of nine
+## palettes of flat rectangle.
+const FAMILY_BIOMES := {
+	"family.ancient_tomb": "biome.ashen",
+	"family.immortal_ruin": "biome.sacred",
+	"family.beast_realm": "biome.forest",
+	"family.forgotten_battlefield": "biome.ashen",
+	"family.heavenly_garden": "biome.sacred",
+	"family.abandoned_sect": "biome.valley",
+	"family.trial_realm": "biome.desert",
+	"family.spatial_fracture": "biome.corrupted",
+	"family.forbidden_domain": "biome.forbidden",
+}
+
+var _floor_tex: Texture2D = null
+var _floor_tex2: Texture2D = null
+var _biome_id := ""
+
 
 func _spawn_enemies(r: RandomNumberGenerator) -> void:
 	var roster: Array = enemy_roster
@@ -293,9 +340,14 @@ func _spawn_enemies(r: RandomNumberGenerator) -> void:
 			var dummy := Dummy.new()
 			dummy.ilvl = enemy_ilvl
 			dummy.position = pos
-			var slot := (absi(cell.x) * 3 + absi(cell.y) * 5 + i) % roster.size()
-			dummy.archetype = String(roster[slot])
 			_attach(dummy)
+			var slot := (absi(cell.x) * 3 + absi(cell.y) * 5 + i) % roster.size()
+			var archetype_id := String(roster[slot])
+			# Through set_archetype, with a name: setting the archetype
+			# var directly left the sprite unconfigured (no entry, the
+			# default name), so realm guards drew as bare diamonds.
+			dummy.set_archetype(archetype_id)
+			dummy.display_name = String(DB.enemy_archetype(archetype_id).get("name", "Realm Guardian"))
 
 
 ## The warden stands between the entry hall and the altar. It is placed before
@@ -378,6 +430,32 @@ func hazard_dps_at(world_position: Vector2) -> float:
 	return 0.0
 
 
+## Rubble and growth, seeded like everything else in the realm: two
+## rocks near a room's corners, tufts where the family is a living
+## place. Props keep clear of room centres, where the fighting and
+## the altar work happen.
+func _dress_rooms(r: RandomNumberGenerator) -> void:
+	for cell in cells:
+		var center: Vector2 = cell_center(cell)
+		for i in 2:
+			if r.randf() < 0.35:
+				continue
+			var corner := Vector2(signf(float((i + cell.x + cell.y) % 2) - 0.5),
+				signf(float((i * 2 + cell.x) % 2) - 0.5))
+			var at: Vector2 = center + Vector2(corner.x * (ROOM_W * 0.5 - 52.0),
+				corner.y * (ROOM_H * 0.5 - 48.0)) + Vector2(r.randf_range(-14.0, 14.0), r.randf_range(-10.0, 10.0))
+			var rock := Prop.new()
+			rock.position = at
+			_attach(rock)
+			rock.setup("rock", r.randf_range(0.8, 1.3), _biome_id)
+		if _biome_id == "biome.forest" or _biome_id == "biome.sacred":
+			for i in 2:
+				var tuft := Prop.new()
+				tuft.position = center + Vector2(r.randf_range(-170.0, 170.0), r.randf_range(-130.0, 130.0))
+				_attach(tuft)
+				tuft.setup("tuft", r.randf_range(0.9, 1.4), _biome_id)
+
+
 func _draw() -> void:
 	# Corridors first, rooms on top: openings read as doorways.
 	var border := Color(String(palette.get("border", "#3b3350")))
@@ -398,8 +476,30 @@ func _draw() -> void:
 			floor_color = Color(String(palette.get("inheritance", "#2b2440")))
 		elif kind == "treasure":
 			floor_color = Color(String(palette.get("treasure", "#2a2620")))
-		draw_rect(rect, floor_color)
+		if _floor_tex != null:
+			# Real tile art under the family's colour wash.
+			var step := 64.0
+			var gx := int(rect.position.x / step)
+			var gy := int(rect.position.y / step)
+			var tiles_x := int(ceil(rect.size.x / step))
+			var tiles_y := int(ceil(rect.size.y / step))
+			for ty in tiles_y:
+				for tx in tiles_x:
+					var tex := _floor_tex
+					if _floor_tex2 != null and (tx + ty + gx + gy) % 2 == 1:
+						tex = _floor_tex2
+					draw_texture_rect(tex, Rect2(rect.position + Vector2(tx * step, ty * step),
+						Vector2(step, step)), false, Color(0.62, 0.62, 0.68))
+			draw_rect(rect, Color(floor_color, 0.42))
+		else:
+			draw_rect(rect, floor_color)
 		draw_rect(rect, border, false, 6.0)
+		# Wall trim and corner posts: the room reads as built, not stamped.
+		draw_rect(rect.grow(-11.0), Color(border, 0.5), false, 2.0)
+		for cx in [-1.0, 1.0]:
+			for cy in [-1.0, 1.0]:
+				var post := Rect2(center + Vector2(cx * ROOM_W * 0.5, cy * ROOM_H * 0.5) - Vector2(9, 9), Vector2(18, 18))
+				draw_rect(post, border.lightened(0.25))
 
 	var hazard_color := Color(String(palette.get("hazard", "#5a2030")))
 	var hazard_edge := Color(String(palette.get("hazard_edge", "#c06070")))

@@ -24,6 +24,7 @@ var player: Player
 var hud: Hud
 ## Floating damage numbers live in the world layer so they sit over bodies.
 var damage_numbers: DamageNumbers
+var ground_loot: GroundLoot
 ## Combat sound. Streams are synthesized; the pool is played from bus signals.
 var combat_audio: CombatAudio
 var chunks: ChunkManager
@@ -175,6 +176,7 @@ var interactables: Array = []
 var ground_items: Array = []
 var quests: QuestLog
 var realm_instance: HiddenRealm = null
+var _realm_floor := Vector2.ZERO
 ## The active playable tribulation, if any. Never saved: a load abandons it.
 var tribulation_arena: TribulationArena = null
 var realm_seed := 0
@@ -598,6 +600,10 @@ func _build_feedback() -> void:
 	damage_numbers = DamageNumbers.new()
 	damage_numbers.name = "DamageNumbers"
 	world.add_child(damage_numbers)
+	ground_loot = GroundLoot.new()
+	ground_loot.name = "GroundLoot"
+	ground_loot.host = self
+	world.add_child(ground_loot)
 	combat_audio = CombatAudio.new()
 	combat_audio.name = "CombatAudio"
 	add_child(combat_audio)
@@ -1122,6 +1128,29 @@ func _process(delta: float) -> void:
 	# coasts, and this clamp closes the landward edges of rim regions.
 	var rim := ChunkManager.world_bounds().grow(-40.0)
 	player.global_position = player.global_position.clamp(rim.position, rim.end)
+
+	# Realm walls: inside a tomb the rooms and corridors are the whole
+	# world. The player has no collision shape, so the walls hold the
+	# same way the shores do - a step off the floor is returned, axis
+	# by axis so the body slides along the wall instead of sticking.
+	if realm_instance != null and phase != "creation":
+		var rpos := player.global_position
+		if realm_instance.is_floor(rpos):
+			_realm_floor = rpos
+		elif rpos.distance_to(_realm_floor) > 600.0:
+			_realm_floor = rpos
+		else:
+			var slid := Vector2(rpos.x, _realm_floor.y)
+			if realm_instance.is_floor(slid):
+				player.global_position = slid
+				_realm_floor = slid
+			else:
+				slid = Vector2(_realm_floor.x, rpos.y)
+				if realm_instance.is_floor(slid):
+					player.global_position = slid
+					_realm_floor = slid
+				else:
+					player.global_position = _realm_floor
 
 	# Shores: the player has no collision shape, so water is kept out
 	# by sampling the ground — step into a water cell and the step is
@@ -6204,12 +6233,12 @@ func _use_interactable(node: Interactable) -> void:
 				return
 			_mark_spent(node)
 			var herb := _make_herb()
-			player.inventory.append(herb)
+			player.inventory = Items.add_to_inventory(player.inventory, herb)
 			Bus.item_picked.emit(herb)
 			# A Qi surge fills every gathering the tiding touches.
 			for i in _world_event_int("harvest_extra"):
 				var extra_herb := _make_herb()
-				player.inventory.append(extra_herb)
+				player.inventory = Items.add_to_inventory(player.inventory, extra_herb)
 				Bus.item_picked.emit(extra_herb)
 			Bus.toast.emit("Gathered a spirit herb.")
 			_report_quests("collect", "spirit_herb", 1)
@@ -7034,6 +7063,7 @@ func _enter_realm(site_id: String = "") -> void:
 	elif realm_cleared and id == RealmAccess.default_id():
 		realm_instance.mark_cleared()
 	player.global_position = realm_instance.entry_position() + Vector2(0, 60)
+	_realm_floor = player.global_position
 	player.spawn_point = player.global_position
 	phase = "realm"
 	camera_rig.set_bounds(realm_instance.world_bounds())

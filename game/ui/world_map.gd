@@ -59,10 +59,20 @@ var _font: Font
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sync_view_size()
+	get_viewport().size_changed.connect(_sync_view_size)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_font = ThemeDB.fallback_font
 	visible = false
 
+
+
+func _sync_view_size() -> void:
+	var view := get_viewport_rect().size
+	if size != view:
+		size = view
+		position = Vector2.ZERO
+		queue_redraw()
 
 func setup(data: Dictionary, current: int, marks: Array = [], extras: Dictionary = {}) -> void:
 	continent = data

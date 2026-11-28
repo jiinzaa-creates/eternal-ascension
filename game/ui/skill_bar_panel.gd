@@ -37,12 +37,27 @@ var _press_pos := Vector2.ZERO
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sync_view_size()
+	# A panel created in code after the scene exists inherits no
+	# resize: anchors alone left it at size zero, and a zero-size
+	# control is never hit-tested - every drag silently missed.
+	# The HUD learned this first; the panel now sizes itself too.
+	get_viewport().size_changed.connect(_sync_view_size)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_font = ThemeDB.fallback_font
 	visible = false
 
 
+func _sync_view_size() -> void:
+	var view := get_viewport_rect().size
+	if size != view:
+		size = view
+		position = Vector2.ZERO
+		queue_redraw()
+
+
 func open(target: Player) -> void:
+	_sync_view_size()
 	player = target
 	_drag = {}
 	visible = true
