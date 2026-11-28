@@ -1029,7 +1029,9 @@ func _resolve_strike(attack: Dictionary) -> Dictionary:
 	var is_crit := crit_roll < stats.crit_chance()
 	var tech_id := String(attack.get("id", ""))
 	var raw := 0.0
-	if is_light:
+	if is_light and bool(attack.get("spiritual", false)):
+		raw = Damage.spirit_strike(attack, stats, stats.weapon_damage())
+	elif is_light:
 		raw = Damage.weapon_strike(attack, stats, stats.weapon_damage())
 	else:
 		raw = Damage.technique_damage(attack, stats, stats.weapon_damage(),
@@ -1037,6 +1039,8 @@ func _resolve_strike(attack: Dictionary) -> Dictionary:
 	if is_crit:
 		raw *= stats.crit_multiplier()
 	var split := Damage.convert_split(raw, stats.pct("lightning_damage_pct"), cultivation.realm)
+	if is_light and bool(attack.get("spiritual", false)):
+		split = Damage.spirit_split(raw, stats.pct("lightning_damage_pct"))
 	return {
 		"amount": float(split["physical"]),
 		"lightning": float(split["lightning"]),
@@ -1939,6 +1943,12 @@ func equip(item: Dictionary) -> Dictionary:
 		# A new weapon opens its own chain; the old one's cursor is meaningless.
 		_combo_index = -1
 		_combo_elapsed = 100.0
+		# A category teaches by being held: the first weapon of a kind
+		# grants its training passive, the way a practiced method does.
+		var type_passive := String(weapon_type().get("passive", ""))
+		if type_passive != "" and add_passive(type_passive):
+			Bus.toast.emit("The %s leaves its mark — %s." % [
+				weapon_type_name(), String(DB.passive(type_passive).get("name", "a new art"))])
 	rebuild_stats()
 	Bus.player_stats_changed.emit()
 	return {"ok": true, "reason": ""}

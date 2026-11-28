@@ -50,6 +50,24 @@ static func weapon_strike(move: Dictionary, stats: StatBlock, weapon_damage: flo
 	return base * stats.physical_mult() * maxf(0.0, float(move.get("damage_mult", 1.0)))
 
 
+## A spiritual weapon is swung by understanding, not muscle: the
+## INT comprehension curve where a mundane blade uses physical_mult,
+## over the same realm scalar both paths share.
+static func spirit_strike(move: Dictionary, stats: StatBlock, weapon_damage: float = 0.0) -> float:
+	var base := maxf(0.0, weapon_damage) + maxf(0.0, float(move.get("base_damage", 0.0)))
+	return base * stats.comprehension_mult() * maxf(0.0, stats.realm_mult) * maxf(0.0, float(move.get("damage_mult", 1.0)))
+
+
+## Half of a spiritual strike was never physical: it lands as
+## lightning at any realm, because that is the weapon's nature,
+## not a realm art. Total is conserved at 0% lightning bonus.
+static func spirit_split(raw: float, lightning_pct: float) -> Dictionary:
+	if raw <= 0.0:
+		return {"physical": 0.0, "lightning": 0.0}
+	var lightning := raw * 0.5 * (1.0 + maxf(0.0, lightning_pct) / 100.0)
+	return {"physical": raw * 0.5, "lightning": lightning}
+
+
 static func poise_damage(technique: Dictionary, stats: StatBlock) -> float:
 	var base := float(technique.get("poise_damage", 10.0))
 	return base * (0.7 + Attributes.soft(float(stats.get_attr("str")), 22.0) / 30.0)

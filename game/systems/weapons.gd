@@ -114,5 +114,6 @@ static func attack_payload(type: Dictionary, index: int) -> Dictionary:
 		# A ranged category delivers its resolved strike by arrow, not
 		# by arc: the payload carries the type's own projectile spec.
 		"delivery": String(type.get("delivery", "")),
+		"spiritual": bool(type.get("spiritual", false)),
 		"projectile": (type.get("projectile", {}) as Dictionary).duplicate(true),
 	}

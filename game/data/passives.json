@@ -1,608 +1,761 @@
 {
- "passives": [
-  {
-   "id": "passive.heavenly_qi_absorption",
-   "name": "Heavenly Qi Absorption",
-   "category": "Cultivation",
-   "source": "Manual",
-   "desc": "Your meridians pull at the world's Qi without being asked.",
-   "mods": [
+  "passives": [
     {
-     "stat": "cult_speed_pct",
-     "value": 15
+      "id": "passive.heavenly_qi_absorption",
+      "name": "Heavenly Qi Absorption",
+      "category": "Cultivation",
+      "source": "Manual",
+      "desc": "Your meridians pull at the world's Qi without being asked.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 15
+        },
+        {
+          "stat": "qi_regen_flat",
+          "value": 0.8
+        }
+      ]
     },
     {
-     "stat": "qi_regen_flat",
-     "value": 0.8
-    }
-   ]
-  },
-  {
-   "id": "passive.iron_bone",
-   "name": "Iron Bone Constitution",
-   "category": "Physical",
-   "source": "Training",
-   "desc": "Bones like poured iron. Blows land softer.",
-   "mods": [
-    {
-     "stat": "physical_resist",
-     "value": 8
+      "id": "passive.iron_bone",
+      "name": "Iron Bone Constitution",
+      "category": "Physical",
+      "source": "Training",
+      "desc": "Bones like poured iron. Blows land softer.",
+      "mods": [
+        {
+          "stat": "physical_resist",
+          "value": 8
+        },
+        {
+          "stat": "str",
+          "value": 3
+        }
+      ]
     },
     {
-     "stat": "str",
-     "value": 3
-    }
-   ]
-  },
-  {
-   "id": "passive.spiritual_perception",
-   "name": "Spiritual Perception",
-   "category": "Spiritual",
-   "source": "Enlightenment",
-   "desc": "You see the shape of Qi before it moves.",
-   "mods": [
-    {
-     "stat": "crit_chance",
-     "value": 4
+      "id": "passive.spiritual_perception",
+      "name": "Spiritual Perception",
+      "category": "Spiritual",
+      "source": "Enlightenment",
+      "desc": "You see the shape of Qi before it moves.",
+      "mods": [
+        {
+          "stat": "crit_chance",
+          "value": 4
+        },
+        {
+          "stat": "wis",
+          "value": 2
+        }
+      ]
     },
     {
-     "stat": "wis",
-     "value": 2
-    }
-   ]
-  },
-  {
-   "id": "passive.sword_heart",
-   "name": "Sword Heart",
-   "category": "Combat",
-   "source": "Inheritance",
-   "desc": "The blade is an extension of intent, not of the arm.",
-   "mods": [
-    {
-     "stat": "physical_damage_pct",
-     "value": 12
+      "id": "passive.sword_heart",
+      "name": "Sword Heart",
+      "category": "Combat",
+      "source": "Inheritance",
+      "desc": "The blade is an extension of intent, not of the arm.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 12
+        },
+        {
+          "stat": "attack_speed_pct",
+          "value": 5
+        }
+      ]
     },
     {
-     "stat": "attack_speed_pct",
-     "value": 5
-    }
-   ]
-  },
-  {
-   "id": "passive.regenerative_meridian",
-   "name": "Regenerative Meridian",
-   "category": "Cultivation",
-   "source": "Physique",
-   "desc": "Torn channels knit themselves shut.",
-   "mods": [
-    {
-     "stat": "qi_max_pct",
-     "value": 10
+      "id": "passive.regenerative_meridian",
+      "name": "Regenerative Meridian",
+      "category": "Cultivation",
+      "source": "Physique",
+      "desc": "Torn channels knit themselves shut.",
+      "mods": [
+        {
+          "stat": "qi_max_pct",
+          "value": 10
+        },
+        {
+          "stat": "qi_regen_pct",
+          "value": 20
+        }
+      ]
     },
     {
-     "stat": "qi_regen_pct",
-     "value": 20
-    }
-   ]
-  },
-  {
-   "id": "passive.natural_formation_affinity",
-   "name": "Natural Formation Affinity",
-   "category": "Crafting",
-   "source": "Bloodline",
-   "desc": "Lines of force arrange themselves to your convenience.",
-   "mods": [
-    {
-     "stat": "int",
-     "value": 4
+      "id": "passive.natural_formation_affinity",
+      "name": "Natural Formation Affinity",
+      "category": "Crafting",
+      "source": "Bloodline",
+      "desc": "Lines of force arrange themselves to your convenience.",
+      "mods": [
+        {
+          "stat": "int",
+          "value": 4
+        },
+        {
+          "stat": "cult_speed_pct",
+          "value": 5
+        }
+      ]
     },
     {
-     "stat": "cult_speed_pct",
-     "value": 5
-    }
-   ]
-  },
-  {
-   "id": "passive.beast_taming_instinct",
-   "name": "Beast Taming Instinct",
-   "category": "Social",
-   "source": "Rare encounter",
-   "desc": "Beasts read your intent and choose not to test it.",
-   "mods": [
-    {
-     "stat": "char",
-     "value": 5
+      "id": "passive.beast_taming_instinct",
+      "name": "Beast Taming Instinct",
+      "category": "Social",
+      "source": "Rare encounter",
+      "desc": "Beasts read your intent and choose not to test it.",
+      "mods": [
+        {
+          "stat": "char",
+          "value": 5
+        },
+        {
+          "stat": "move_speed_pct",
+          "value": 4
+        }
+      ]
     },
     {
-     "stat": "move_speed_pct",
-     "value": 4
-    }
-   ]
-  },
-  {
-   "id": "passive.swift_steps",
-   "name": "Swift Steps",
-   "category": "Exploration",
-   "source": "Training",
-   "desc": "Years on mountain paths, never once slipping.",
-   "mods": [
-    {
-     "stat": "move_speed_pct",
-     "value": 10
+      "id": "passive.swift_steps",
+      "name": "Swift Steps",
+      "category": "Exploration",
+      "source": "Training",
+      "desc": "Years on mountain paths, never once slipping.",
+      "mods": [
+        {
+          "stat": "move_speed_pct",
+          "value": 10
+        },
+        {
+          "stat": "agi",
+          "value": 3
+        }
+      ]
     },
     {
-     "stat": "agi",
-     "value": 3
-    }
-   ]
-  },
-  {
-   "id": "passive.void_affinity",
-   "name": "Void Affinity",
-   "category": "Special",
-   "source": "Hidden realm",
-   "desc": "Distance is a suggestion you have learned to decline.",
-   "mods": [
-    {
-     "stat": "attack_speed_pct",
-     "value": 8
+      "id": "passive.void_affinity",
+      "name": "Void Affinity",
+      "category": "Special",
+      "source": "Hidden realm",
+      "desc": "Distance is a suggestion you have learned to decline.",
+      "mods": [
+        {
+          "stat": "attack_speed_pct",
+          "value": 8
+        },
+        {
+          "stat": "qi_regen_pct",
+          "value": 15
+        }
+      ]
     },
     {
-     "stat": "qi_regen_pct",
-     "value": 15
-    }
-   ]
-  },
-  {
-   "id": "passive.bloodline_suppression",
-   "name": "Bloodline Suppression",
-   "category": "Spiritual",
-   "source": "Bloodline",
-   "desc": "Lesser bloodlines lower their eyes before yours.",
-   "mods": [
-    {
-     "stat": "physical_damage_pct",
-     "value": 8
+      "id": "passive.bloodline_suppression",
+      "name": "Bloodline Suppression",
+      "category": "Spiritual",
+      "source": "Bloodline",
+      "desc": "Lesser bloodlines lower their eyes before yours.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 8
+        },
+        {
+          "stat": "mental_resist",
+          "value": 0
+        }
+      ]
     },
     {
-     "stat": "mental_resist",
-     "value": 0
-    }
-   ]
-  },
-  {
-   "id": "passive.jade_skin",
-   "name": "Jade Skin",
-   "category": "Physical",
-   "source": "Manual",
-   "desc": "Qi hardens under the skin until steel slides rather than cuts.",
-   "requires": {
-    "min_attr": {
-     "str": 14
-    }
-   },
-   "conflicts": [
-    "passive.iron_bone"
-   ],
-   "mods": [
-    {
-     "stat": "armor",
-     "value": 14
+      "id": "passive.jade_skin",
+      "name": "Jade Skin",
+      "category": "Physical",
+      "source": "Manual",
+      "desc": "Qi hardens under the skin until steel slides rather than cuts.",
+      "requires": {
+        "min_attr": {
+          "str": 14
+        }
+      },
+      "conflicts": [
+        "passive.iron_bone"
+      ],
+      "mods": [
+        {
+          "stat": "armor",
+          "value": 14
+        },
+        {
+          "stat": "physical_resist",
+          "value": 6
+        }
+      ]
     },
     {
-     "stat": "physical_resist",
-     "value": 6
-    }
-   ]
-  },
-  {
-   "id": "passive.battle_trance",
-   "name": "Battle Trance",
-   "category": "Combat",
-   "source": "Manual",
-   "desc": "Pain narrows the world to the next strike, and the next.",
-   "condition": {
-    "wounded": true
-   },
-   "mods": [
-    {
-     "stat": "physical_damage_pct",
-     "value": 10
+      "id": "passive.battle_trance",
+      "name": "Battle Trance",
+      "category": "Combat",
+      "source": "Manual",
+      "desc": "Pain narrows the world to the next strike, and the next.",
+      "condition": {
+        "wounded": true
+      },
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 10
+        },
+        {
+          "stat": "attack_speed_pct",
+          "value": 5
+        }
+      ]
     },
     {
-     "stat": "attack_speed_pct",
-     "value": 5
-    }
-   ]
-  },
-  {
-   "id": "passive.flowing_water",
-   "name": "Flowing Water",
-   "category": "Movement",
-   "source": "Manual",
-   "desc": "Step where the ground is not; the body follows the water's argument.",
-   "requires": {
-    "min_attr": {
-     "agi": 12
-    }
-   },
-   "synergy": {
-    "with": "passive.swift_steps",
-    "mods": [
-     {
-      "stat": "attack_speed_pct",
-      "value": 4
-     }
-    ]
-   },
-   "mods": [
-    {
-     "stat": "move_speed_pct",
-     "value": 5
-    }
-   ]
-  },
-  {
-   "id": "passive.bone_tempering",
-   "name": "Bone Tempering",
-   "category": "Physical",
-   "source": "Physique",
-   "desc": "The skeleton learns its second lesson.",
-   "mods": [
-    {
-     "stat": "armor",
-     "value": 6
-    }
-   ]
-  },
-  {
-   "id": "passive.yang_wellspring",
-   "name": "Yang Wellspring",
-   "category": "Cultivation",
-   "source": "Physique",
-   "desc": "The dantian boils and never empties.",
-   "mods": [
-    {
-     "stat": "qi_regen_flat",
-     "value": 2
-    }
-   ]
-  },
-  {
-   "id": "passive.gale_tread",
-   "name": "Gale Tread",
-   "category": "Movement",
-   "source": "Physique",
-   "desc": "The awakened wind-stepper borrows the gale's road.",
-   "mods": [
-    {
-     "stat": "move_speed_pct",
-     "value": 5
-    }
-   ]
-  },
-  {
-   "id": "passive.yin_sight",
-   "name": "Yin Sight",
-   "category": "Spiritual",
-   "source": "Physique",
-   "desc": "Cold eyes find the seam in all things.",
-   "mods": [
-    {
-     "stat": "crit_chance",
-     "value": 3
-    }
-   ]
-  },
-  {
-   "id": "passive.sword_resonance",
-   "name": "Sword Resonance",
-   "category": "Combat",
-   "source": "Physique",
-   "desc": "The bone hums when a blade is drawn.",
-   "mods": [
-    {
-     "stat": "crit_damage",
-     "value": 10
-    }
-   ]
-  },
-  {
-   "id": "passive.chaos_heart",
-   "name": "Chaos Heart",
-   "category": "Special",
-   "source": "Physique",
-   "desc": "Disorder, given a rhythm, becomes a method.",
-   "mods": [
-    {
-     "stat": "cult_speed_pct",
-     "value": 8
-    }
-   ]
-  },
-  {
-   "id": "passive.verdant_renewal",
-   "name": "Verdant Renewal",
-   "category": "Cultivation",
-   "source": "Physique",
-   "desc": "What the forest loses, it grows back.",
-   "mods": [
-    {
-     "stat": "health_regen",
-     "value": 0.4
-    }
-   ]
-  },
-  {
-   "id": "passive.ember_heart",
-   "name": "Ember Heart",
-   "category": "Elemental",
-   "source": "Root",
-   "desc": "A coal that answers yang with fire.",
-   "mods": [
-    {
-     "stat": "cult_speed_pct",
-     "value": 6
+      "id": "passive.flowing_water",
+      "name": "Flowing Water",
+      "category": "Movement",
+      "source": "Manual",
+      "desc": "Step where the ground is not; the body follows the water's argument.",
+      "requires": {
+        "min_attr": {
+          "agi": 12
+        }
+      },
+      "synergy": {
+        "with": "passive.swift_steps",
+        "mods": [
+          {
+            "stat": "attack_speed_pct",
+            "value": 4
+          }
+        ]
+      },
+      "mods": [
+        {
+          "stat": "move_speed_pct",
+          "value": 5
+        }
+      ]
     },
     {
-     "stat": "qi_regen_pct",
-     "value": 10
-    }
-   ]
-  },
-  {
-   "id": "passive.storm_soul",
-   "name": "Storm Soul",
-   "category": "Elemental",
-   "source": "Root",
-   "desc": "The thunder keeps a room in this chest.",
-   "mods": [
-    {
-     "stat": "lightning_damage_pct",
-     "value": 12
-    }
-   ]
-  },
-  {
-   "id": "passive.tide_affinity",
-   "name": "Tide Affinity",
-   "category": "Elemental",
-   "source": "Root",
-   "desc": "Qi comes and goes like water, and is never lost.",
-   "mods": [
-    {
-     "stat": "qi_max_pct",
-     "value": 8
+      "id": "passive.bone_tempering",
+      "name": "Bone Tempering",
+      "category": "Physical",
+      "source": "Physique",
+      "desc": "The skeleton learns its second lesson.",
+      "mods": [
+        {
+          "stat": "armor",
+          "value": 6
+        }
+      ]
     },
     {
-     "stat": "health_regen",
-     "value": 0.3
-    }
-   ]
-  },
-  {
-   "id": "passive.five_phases_attunement",
-   "name": "Five Phases Attunement",
-   "category": "Elemental",
-   "source": "Method",
-   "desc": "Each element hands its strength to the next.",
-   "mods": [
-    {
-     "stat": "lightning_damage_pct",
-     "value": 6
+      "id": "passive.yang_wellspring",
+      "name": "Yang Wellspring",
+      "category": "Cultivation",
+      "source": "Physique",
+      "desc": "The dantian boils and never empties.",
+      "mods": [
+        {
+          "stat": "qi_regen_flat",
+          "value": 2
+        }
+      ]
     },
     {
-     "stat": "qi_max_pct",
-     "value": 6
-    }
-   ],
-   "synergy": {
-    "with": "passive.storm_soul",
-    "mods": [
-     {
-      "stat": "lightning_damage_pct",
-      "value": 6
-     }
-    ]
-   }
-  },
-  {
-   "id": "passive.iron_will",
-   "name": "Iron Will",
-   "category": "Mental",
-   "source": "Method",
-   "desc": "The mind is a held position.",
-   "mods": [
-    {
-     "stat": "int",
-     "value": 2
+      "id": "passive.gale_tread",
+      "name": "Gale Tread",
+      "category": "Movement",
+      "source": "Physique",
+      "desc": "The awakened wind-stepper borrows the gale's road.",
+      "mods": [
+        {
+          "stat": "move_speed_pct",
+          "value": 5
+        }
+      ]
     },
     {
-     "stat": "qi_max_pct",
-     "value": 6
-    }
-   ],
-   "conflicts": [
-    "passive.battle_trance"
-   ]
-  },
-  {
-   "id": "passive.keen_awareness",
-   "name": "Keen Awareness",
-   "category": "Mental",
-   "source": "Method",
-   "desc": "Attention is a blade that never leaves the hand.",
-   "mods": [
-    {
-     "stat": "crit_chance",
-     "value": 2
+      "id": "passive.yin_sight",
+      "name": "Yin Sight",
+      "category": "Spiritual",
+      "source": "Physique",
+      "desc": "Cold eyes find the seam in all things.",
+      "mods": [
+        {
+          "stat": "crit_chance",
+          "value": 3
+        }
+      ]
     },
     {
-     "stat": "wis",
-     "value": 2
-    }
-   ]
-  },
-  {
-   "id": "passive.still_mind",
-   "name": "Still Mind",
-   "category": "Mental",
-   "source": "Method",
-   "desc": "A formation drawn inside the skull.",
-   "mods": [
-    {
-     "stat": "wis",
-     "value": 3
+      "id": "passive.sword_resonance",
+      "name": "Sword Resonance",
+      "category": "Combat",
+      "source": "Physique",
+      "desc": "The bone hums when a blade is drawn.",
+      "mods": [
+        {
+          "stat": "crit_damage",
+          "value": 10
+        }
+      ]
     },
     {
-     "stat": "cult_speed_pct",
-     "value": 5
-    }
-   ]
-  },
-  {
-   "id": "passive.primordial_awareness",
-   "name": "Primordial Awareness",
-   "category": "Mental",
-   "source": "Root",
-   "desc": "Something in the blood remembers before names.",
-   "mods": [
-    {
-     "stat": "wis",
-     "value": 4
+      "id": "passive.chaos_heart",
+      "name": "Chaos Heart",
+      "category": "Special",
+      "source": "Physique",
+      "desc": "Disorder, given a rhythm, becomes a method.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 8
+        }
+      ]
     },
     {
-     "stat": "int",
-     "value": 2
-    }
-   ]
-  },
-  {
-   "id": "passive.steady_breath",
-   "name": "Steady Breath",
-   "category": "Cultivation",
-   "source": "Method",
-   "desc": "The first method's gift is rhythm.",
-   "mods": [
-    {
-     "stat": "qi_regen_pct",
-     "value": 10
-    }
-   ]
-  },
-  {
-   "id": "passive.sanguine_vigor",
-   "name": "Sanguine Vigor",
-   "category": "Physical",
-   "source": "Method",
-   "desc": "Blood spent is blood invested.",
-   "mods": [
-    {
-     "stat": "health_regen",
-     "value": 0.3
+      "id": "passive.verdant_renewal",
+      "name": "Verdant Renewal",
+      "category": "Cultivation",
+      "source": "Physique",
+      "desc": "What the forest loses, it grows back.",
+      "mods": [
+        {
+          "stat": "health_regen",
+          "value": 0.4
+        }
+      ]
     },
     {
-     "stat": "lifesteal",
-     "value": 2
-    }
-   ]
-  },
-  {
-   "id": "passive.killing_intent",
-   "name": "Killing Intent",
-   "category": "Combat",
-   "source": "Method",
-   "desc": "The decision lands before the blow.",
-   "mods": [
-    {
-     "stat": "physical_damage_pct",
-     "value": 6
+      "id": "passive.ember_heart",
+      "name": "Ember Heart",
+      "category": "Elemental",
+      "source": "Root",
+      "desc": "A coal that answers yang with fire.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 6
+        },
+        {
+          "stat": "qi_regen_pct",
+          "value": 10
+        }
+      ]
     },
     {
-     "stat": "crit_damage",
-     "value": 8
-    }
-   ]
-  },
-  {
-   "id": "passive.harmonious_union",
-   "name": "Harmonious Union",
-   "category": "Social",
-   "source": "Method",
-   "desc": "Two circulations, one conversation.",
-   "mods": [
-    {
-     "stat": "char",
-     "value": 4
+      "id": "passive.storm_soul",
+      "name": "Storm Soul",
+      "category": "Elemental",
+      "source": "Root",
+      "desc": "The thunder keeps a room in this chest.",
+      "mods": [
+        {
+          "stat": "lightning_damage_pct",
+          "value": 12
+        }
+      ]
     },
     {
-     "stat": "cult_speed_pct",
-     "value": 5
-    }
-   ]
-  },
-  {
-   "id": "passive.star_drinker",
-   "name": "Star Drinker",
-   "category": "Cultivation",
-   "source": "Method",
-   "desc": "The night sky is a slow river, and it flows downhill.",
-   "mods": [
-    {
-     "stat": "cult_speed_pct",
-     "value": 8
-    }
-   ]
-  },
-  {
-   "id": "passive.pack_sense",
-   "name": "Pack Sense",
-   "category": "Exploration",
-   "source": "Method",
-   "desc": "You move as the pack moves: together, and warned.",
-   "mods": [
-    {
-     "stat": "move_speed_pct",
-     "value": 4
+      "id": "passive.tide_affinity",
+      "name": "Tide Affinity",
+      "category": "Elemental",
+      "source": "Root",
+      "desc": "Qi comes and goes like water, and is never lost.",
+      "mods": [
+        {
+          "stat": "qi_max_pct",
+          "value": 8
+        },
+        {
+          "stat": "health_regen",
+          "value": 0.3
+        }
+      ]
     },
     {
-     "stat": "evasion",
-     "value": 2
-    }
-   ]
-  },
-  {
-   "id": "passive.pill_sense",
-   "name": "Pill Sense",
-   "category": "Crafting",
-   "source": "Method",
-   "desc": "The nose learns what the furnace knows.",
-   "mods": [
-    {
-     "stat": "int",
-     "value": 3
+      "id": "passive.five_phases_attunement",
+      "name": "Five Phases Attunement",
+      "category": "Elemental",
+      "source": "Method",
+      "desc": "Each element hands its strength to the next.",
+      "mods": [
+        {
+          "stat": "lightning_damage_pct",
+          "value": 6
+        },
+        {
+          "stat": "qi_max_pct",
+          "value": 6
+        }
+      ],
+      "synergy": {
+        "with": "passive.storm_soul",
+        "mods": [
+          {
+            "stat": "lightning_damage_pct",
+            "value": 6
+          }
+        ]
+      }
     },
     {
-     "stat": "qi_regen_flat",
-     "value": 1
-    }
-   ]
-  },
-  {
-   "id": "passive.defiant_soul",
-   "name": "Defiant Soul",
-   "category": "Special",
-   "source": "Method",
-   "desc": "Heaven's disapproval, worn as a cloak.",
-   "mods": [
+      "id": "passive.iron_will",
+      "name": "Iron Will",
+      "category": "Mental",
+      "source": "Method",
+      "desc": "The mind is a held position.",
+      "mods": [
+        {
+          "stat": "int",
+          "value": 2
+        },
+        {
+          "stat": "qi_max_pct",
+          "value": 6
+        }
+      ],
+      "conflicts": [
+        "passive.battle_trance"
+      ]
+    },
     {
-     "stat": "cult_speed_pct",
-     "value": 10
+      "id": "passive.keen_awareness",
+      "name": "Keen Awareness",
+      "category": "Mental",
+      "source": "Method",
+      "desc": "Attention is a blade that never leaves the hand.",
+      "mods": [
+        {
+          "stat": "crit_chance",
+          "value": 2
+        },
+        {
+          "stat": "wis",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "passive.still_mind",
+      "name": "Still Mind",
+      "category": "Mental",
+      "source": "Method",
+      "desc": "A formation drawn inside the skull.",
+      "mods": [
+        {
+          "stat": "wis",
+          "value": 3
+        },
+        {
+          "stat": "cult_speed_pct",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "passive.primordial_awareness",
+      "name": "Primordial Awareness",
+      "category": "Mental",
+      "source": "Root",
+      "desc": "Something in the blood remembers before names.",
+      "mods": [
+        {
+          "stat": "wis",
+          "value": 4
+        },
+        {
+          "stat": "int",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "passive.steady_breath",
+      "name": "Steady Breath",
+      "category": "Cultivation",
+      "source": "Method",
+      "desc": "The first method's gift is rhythm.",
+      "mods": [
+        {
+          "stat": "qi_regen_pct",
+          "value": 10
+        }
+      ]
+    },
+    {
+      "id": "passive.sanguine_vigor",
+      "name": "Sanguine Vigor",
+      "category": "Physical",
+      "source": "Method",
+      "desc": "Blood spent is blood invested.",
+      "mods": [
+        {
+          "stat": "health_regen",
+          "value": 0.3
+        },
+        {
+          "stat": "lifesteal",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "passive.killing_intent",
+      "name": "Killing Intent",
+      "category": "Combat",
+      "source": "Method",
+      "desc": "The decision lands before the blow.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 6
+        },
+        {
+          "stat": "crit_damage",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "id": "passive.harmonious_union",
+      "name": "Harmonious Union",
+      "category": "Social",
+      "source": "Method",
+      "desc": "Two circulations, one conversation.",
+      "mods": [
+        {
+          "stat": "char",
+          "value": 4
+        },
+        {
+          "stat": "cult_speed_pct",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "passive.star_drinker",
+      "name": "Star Drinker",
+      "category": "Cultivation",
+      "source": "Method",
+      "desc": "The night sky is a slow river, and it flows downhill.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "id": "passive.pack_sense",
+      "name": "Pack Sense",
+      "category": "Exploration",
+      "source": "Method",
+      "desc": "You move as the pack moves: together, and warned.",
+      "mods": [
+        {
+          "stat": "move_speed_pct",
+          "value": 4
+        },
+        {
+          "stat": "evasion",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "passive.pill_sense",
+      "name": "Pill Sense",
+      "category": "Crafting",
+      "source": "Method",
+      "desc": "The nose learns what the furnace knows.",
+      "mods": [
+        {
+          "stat": "int",
+          "value": 3
+        },
+        {
+          "stat": "qi_regen_flat",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "passive.defiant_soul",
+      "name": "Defiant Soul",
+      "category": "Special",
+      "source": "Method",
+      "desc": "Heaven's disapproval, worn as a cloak.",
+      "mods": [
+        {
+          "stat": "cult_speed_pct",
+          "value": 10
+        }
+      ],
+      "condition": {
+        "karma_below": -1
+      }
+    },
+    {
+      "id": "passive.edge_discipline",
+      "name": "Edge Discipline",
+      "category": "Combat",
+      "source": "Training",
+      "desc": "A sword is answered with the whole body, or not at all.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 4
+        },
+        {
+          "stat": "crit_chance",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "passive.blade_weight",
+      "name": "Blade Weight",
+      "category": "Combat",
+      "source": "Training",
+      "desc": "Let the saber fall; your work is only to aim the falling.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 5
+        },
+        {
+          "stat": "crit_damage",
+          "value": 6
+        }
+      ]
+    },
+    {
+      "id": "passive.spear_reach",
+      "name": "Spear Reach",
+      "category": "Combat",
+      "source": "Training",
+      "desc": "The fight ends at the spear's point, long before it reaches you.",
+      "mods": [
+        {
+          "stat": "penetration",
+          "value": 3
+        },
+        {
+          "stat": "attack_speed_pct",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "passive.staff_channel",
+      "name": "Staff Channel",
+      "category": "Cultivation",
+      "source": "Training",
+      "desc": "Wood remembers rivers; Qi runs where the grain points.",
+      "mods": [
+        {
+          "stat": "qi_regen_pct",
+          "value": 8
+        },
+        {
+          "stat": "cult_speed_pct",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "passive.whip_dancer",
+      "name": "Whip Dancer",
+      "category": "Exploration",
+      "source": "Training",
+      "desc": "Never where the crack lands, never where they look.",
+      "mods": [
+        {
+          "stat": "evasion",
+          "value": 3
+        },
+        {
+          "stat": "move_speed_pct",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "passive.empty_hand",
+      "name": "Empty Hand",
+      "category": "Physical",
+      "source": "Training",
+      "desc": "Nothing to drop, nothing to break, nothing to forgive.",
+      "mods": [
+        {
+          "stat": "physical_damage_pct",
+          "value": 4
+        },
+        {
+          "stat": "armor",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "passive.mountain_shoulders",
+      "name": "Mountain Shoulders",
+      "category": "Physical",
+      "source": "Training",
+      "desc": "Carry the weight long enough and the weight carries you.",
+      "mods": [
+        {
+          "stat": "str",
+          "value": 3
+        },
+        {
+          "stat": "physical_resist",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "passive.archers_eye",
+      "name": "Archer's Eye",
+      "category": "Combat",
+      "source": "Training",
+      "desc": "The target is decided before the string is drawn.",
+      "mods": [
+        {
+          "stat": "crit_chance",
+          "value": 3
+        },
+        {
+          "stat": "penetration",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "passive.spirit_attunement",
+      "name": "Spirit Attunement",
+      "category": "Elemental",
+      "source": "Training",
+      "desc": "The weapon is awake; the hand merely agrees.",
+      "mods": [
+        {
+          "stat": "lightning_damage_pct",
+          "value": 8
+        },
+        {
+          "stat": "qi_max_pct",
+          "value": 5
+        }
+      ]
     }
-   ],
-   "condition": {
-    "karma_below": -1
-   }
-  }
- ]
+  ]
 }

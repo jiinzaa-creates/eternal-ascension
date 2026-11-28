@@ -62,7 +62,8 @@
           "poise_damage": 12,
           "knockback": 170
         }
-      ]
+      ],
+      "passive": "passive.edge_discipline"
     },
     {
       "id": "saber",
@@ -109,7 +110,8 @@
           "poise_damage": 18,
           "knockback": 230
         }
-      ]
+      ],
+      "passive": "passive.blade_weight"
     },
     {
       "id": "staff",
@@ -173,7 +175,8 @@
           "poise_damage": 16,
           "knockback": 160
         }
-      ]
+      ],
+      "passive": "passive.staff_channel"
     },
     {
       "id": "whip",
@@ -220,7 +223,8 @@
           "poise_damage": 6,
           "knockback": 60
         }
-      ]
+      ],
+      "passive": "passive.whip_dancer"
     },
     {
       "id": "fist",
@@ -284,7 +288,8 @@
           "poise_damage": 10,
           "knockback": 90
         }
-      ]
+      ],
+      "passive": "passive.empty_hand"
     },
     {
       "id": "spear",
@@ -347,7 +352,8 @@
           "poise_damage": 14,
           "knockback": 130
         }
-      ]
+      ],
+      "passive": "passive.spear_reach"
     },
     {
       "id": "heavy",
@@ -393,7 +399,8 @@
           "poise_damage": 28,
           "knockback": 320
         }
-      ]
+      ],
+      "passive": "passive.mountain_shoulders"
     },
     {
       "id": "bow",
@@ -463,7 +470,73 @@
           "poise_damage": 8,
           "knockback": 80
         }
-      ]
+      ],
+      "passive": "passive.archers_eye"
+    },
+    {
+      "id": "spirit",
+      "name": "Spirit Weapon",
+      "school": "spirit",
+      "reach_mult": 1.1,
+      "speed_mult": 1.0,
+      "poise_mult": 0.8,
+      "knock_mult": 0.8,
+      "combo_window": 0.8,
+      "spiritual": true,
+      "moves": [
+        {
+          "name": "Spirit Arc",
+          "frames": {
+            "startup": 6,
+            "active": 3,
+            "recovery": 9
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 84,
+            "angle": 120
+          },
+          "base_damage": 0,
+          "damage_mult": 1.0,
+          "poise_damage": 6,
+          "knockback": 70
+        },
+        {
+          "name": "Soul Cleave",
+          "frames": {
+            "startup": 8,
+            "active": 3,
+            "recovery": 11
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 88,
+            "angle": 140
+          },
+          "base_damage": 0,
+          "damage_mult": 1.15,
+          "poise_damage": 7,
+          "knockback": 80
+        },
+        {
+          "name": "Heaven's Rebuke",
+          "frames": {
+            "startup": 11,
+            "active": 4,
+            "recovery": 13
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 96,
+            "angle": 160
+          },
+          "base_damage": 0,
+          "damage_mult": 1.4,
+          "poise_damage": 10,
+          "knockback": 110
+        }
+      ],
+      "passive": "passive.spirit_attunement"
     }
   ]
 }

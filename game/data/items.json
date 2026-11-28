@@ -304,6 +304,40 @@
         "dex": 15
       },
       "implicit": "+10 penetration"
+    },
+    {
+      "id": "base.spirit.wraith_fang",
+      "name": "Wraith Fang",
+      "slot": "weapon",
+      "weapon_type": "spirit",
+      "damage": 11,
+      "ilvl": 2,
+      "weight": 11,
+      "value": 24,
+      "tags": [
+        "spirit"
+      ],
+      "requires": {
+        "int": 13
+      },
+      "implicit": "+8% lightning damage"
+    },
+    {
+      "id": "base.spirit.heaven_brand",
+      "name": "Heaven Brand",
+      "slot": "weapon",
+      "weapon_type": "spirit",
+      "damage": 17,
+      "ilvl": 4,
+      "weight": 6,
+      "value": 42,
+      "tags": [
+        "spirit"
+      ],
+      "requires": {
+        "int": 17
+      },
+      "implicit": "+14% lightning damage"
     }
   ],
   "prefixes": [

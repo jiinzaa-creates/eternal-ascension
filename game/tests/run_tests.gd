@@ -1443,6 +1443,85 @@ func _realm_tests() -> void:
 		"a bow's strike is delivered by arrow, at range")
 	var sword_payload2 := Weapons.attack_payload(Weapons.find("sword"), 0)
 	check(String(sword_payload2.get("delivery", "")) == "", "a sword still answers in the arc")
+	var spirit_payload := Weapons.attack_payload(Weapons.find("spirit"), 0)
+	check(bool(spirit_payload.get("spiritual", false)), "a spirit weapon's payload carries its nature")
+	var mind := StatBlock.new(Attributes.new())
+	mind.base.add("int", 40)
+	mind.rebuild({}, [], 1, 1.0)
+	var muscle := StatBlock.new(Attributes.new())
+	muscle.base.add("str", 40)
+	muscle.rebuild({}, [], 1, 1.0)
+	var probe_move := {"base_damage": 0.0, "damage_mult": 1.0}
+	check(Damage.spirit_strike(probe_move, mind, 10.0) > Damage.spirit_strike(probe_move, muscle, 10.0),
+		"a spiritual strike answers to INT, not STR")
+	check(Damage.weapon_strike(probe_move, muscle, 10.0) > Damage.weapon_strike(probe_move, mind, 10.0),
+		"a mundane strike still answers to STR")
+	var halves := Damage.spirit_split(100.0, 0.0)
+	check(approx(float(halves["physical"]), 50.0) and approx(float(halves["lightning"]), 50.0),
+		"half of a spiritual strike was never physical")
+	# --- Fix pass 2026-11-27: slots, realm bodies, walls, stacking ---
+	var slot_player := Player.new()
+	slot_player.attrs = Attributes.new()
+	slot_player.stats = StatBlock.new(slot_player.attrs)
+	slot_player.cultivation = Cultivation.new()
+	slot_player.appearance = Appearance.new()
+	slot_player.learn_technique("tech.sword.azure_cleave")
+	slot_player.learn_technique("tech.palm.thousand_petals")
+	for i in SkillBar.BAR_COUNT * SkillBar.SLOTS_PER_BAR:
+		slot_player.clear_slot(i)
+	var off_bar: Array = slot_player.known_off_bar()
+	check(not off_bar.is_empty(), "a learned art waits off the bar for the slot test")
+	if not off_bar.is_empty():
+		var panel := SkillBarPanel.new()
+		add_child(panel)
+		panel.open(slot_player)
+		check(panel.size == panel.get_viewport_rect().size,
+			"the bars panel sizes itself to the viewport (a zero-size panel takes no drags)")
+		var drag_tech := String(off_bar[0])
+		panel._begin_drag(panel._roster_rect(0).get_center())
+		panel._finish_drag(panel._slot_rect(0, 0).get_center())
+		check(slot_player.bar_slot(0) == drag_tech,
+			"dragging a roster art onto a slot assigns it (the missing branch)")
+		panel.close()
+		panel.queue_free()
+	var fix_realm := HiddenRealm.new()
+	add_child(fix_realm)
+	fix_realm.generate(4242)
+	check(fix_realm.is_floor(fix_realm.entry_position()), "the entry floor holds")
+	check(not fix_realm.is_floor(fix_realm.entry_position() + Vector2(5000, 5000)),
+		"outside the rooms is not floor")
+	var room_centre: Vector2 = fix_realm.cell_center(fix_realm.entry_cell)
+	check(not fix_realm.is_floor(room_centre + Vector2(205, 165)),
+		"a room's corner is wall, not floor")
+	var guard_named := false
+	for child in fix_realm.get_children():
+		var body := child as Dummy
+		if body != null and body.display_name != "Cultivator Dummy":
+			guard_named = true
+			body._refresh_sprite()
+			check(body.get("_sprite") != null and (body.get("_sprite") as ActorSprite).is_active(),
+				"a realm guard carries a real sprite, not the placeholder")
+			break
+	check(guard_named, "realm guards spawn with names from their archetypes")
+	fix_realm.queue_free()
+	var herb_a := {"id": "item.herb.spirit.0", "name": "Spirit Herb", "slot": "material", "count": 1}
+	var herb_b := {"id": "item.herb.spirit.1", "name": "Spirit Herb", "slot": "material", "count": 1}
+	var herb_bag := Items.add_to_inventory([], herb_a)
+	herb_bag = Items.add_to_inventory(herb_bag, herb_b)
+	check(herb_bag.size() == 1 and int((herb_bag[0] as Dictionary).get("count", 0)) == 2,
+		"gathered herbs stack into one pile")
+	var holder := Player.new()
+	holder.attrs = Attributes.new()
+	holder.stats = StatBlock.new(holder.attrs)
+	holder.cultivation = Cultivation.new()
+	holder.appearance = Appearance.new()
+	var spear_held := {"id": "item.test.spear", "name": "Test Spear", "slot": "weapon",
+		"weapon_type": "spear", "base_damage": 10.0, "damage": 10, "mods": [], "rarity": 0, "ilvl": 1, "count": 1}
+	check(bool(holder.equip(spear_held).get("ok", false)), "a spear can be held")
+	check(holder.passives.has("passive.spear_reach"), "the first spear teaches Spear Reach")
+	var before_requip := holder.passives.size()
+	holder.equip(spear_held)
+	check(holder.passives.size() == before_requip, "holding the same kind twice teaches once")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)
