@@ -1427,6 +1427,16 @@ func _realm_tests() -> void:
 	check(approx(float((body_high[0] as Dictionary).get("value", 0.0)),
 		float((body_low[0] as Dictionary).get("value", 0.0)) * 2.0),
 		"physique mods scale with realm beside their awakening stage")
+	check(DB.weapon_type("spear") != {} and DB.weapon_type("heavy") != {},
+		"spears and heavy weapons join the roster")
+	var spear_payload := Weapons.attack_payload(Weapons.find("spear"), 0)
+	var heavy_payload := Weapons.attack_payload(Weapons.find("heavy"), 0)
+	check(float(spear_payload.get("poise_damage", 0.0)) > 0.0
+		and float(heavy_payload.get("poise_damage", 0.0)) > float(spear_payload.get("poise_damage", 0.0)) * 2.0,
+		"a heavy weapon's weight is in its poise, not just its numbers")
+	var gen2 := ItemGen.new(DB, Rng)
+	var spear_item := gen2.generate(3, 777, 1, -1, "weapon", "base.spear.jade_pike")
+	check(String(spear_item.get("weapon_type", "")) == "spear", "loot can be a spear")
 	var sitter := Player.new()
 	sitter.attrs = Attributes.new()
 	sitter.stats = StatBlock.new(sitter.attrs)

@@ -11,9 +11,57 @@
       "knock_mult": 1.0,
       "combo_window": 0.75,
       "moves": [
-        {"name": "Rising Cut", "frames": {"startup": 6, "active": 3, "recovery": 9}, "hitbox": {"shape": "arc", "radius": 76, "angle": 110}, "base_damage": 0, "damage_mult": 1.0, "poise_damage": 8, "knockback": 90},
-        {"name": "Parting Cut", "frames": {"startup": 5, "active": 3, "recovery": 9}, "hitbox": {"shape": "arc", "radius": 80, "angle": 130}, "base_damage": 0, "damage_mult": 1.05, "poise_damage": 8, "knockback": 100},
-        {"name": "Cloud-Piercing Thrust", "frames": {"startup": 8, "active": 3, "recovery": 12}, "hitbox": {"shape": "arc", "radius": 104, "angle": 40}, "base_damage": 0, "damage_mult": 1.35, "poise_damage": 12, "knockback": 170}
+        {
+          "name": "Rising Cut",
+          "frames": {
+            "startup": 6,
+            "active": 3,
+            "recovery": 9
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 76,
+            "angle": 110
+          },
+          "base_damage": 0,
+          "damage_mult": 1.0,
+          "poise_damage": 8,
+          "knockback": 90
+        },
+        {
+          "name": "Parting Cut",
+          "frames": {
+            "startup": 5,
+            "active": 3,
+            "recovery": 9
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 80,
+            "angle": 130
+          },
+          "base_damage": 0,
+          "damage_mult": 1.05,
+          "poise_damage": 8,
+          "knockback": 100
+        },
+        {
+          "name": "Cloud-Piercing Thrust",
+          "frames": {
+            "startup": 8,
+            "active": 3,
+            "recovery": 12
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 104,
+            "angle": 40
+          },
+          "base_damage": 0,
+          "damage_mult": 1.35,
+          "poise_damage": 12,
+          "knockback": 170
+        }
       ]
     },
     {
@@ -27,8 +75,40 @@
       "knock_mult": 1.5,
       "combo_window": 0.85,
       "moves": [
-        {"name": "Mountain Fall", "frames": {"startup": 11, "active": 4, "recovery": 14}, "hitbox": {"shape": "arc", "radius": 74, "angle": 120}, "base_damage": 0, "damage_mult": 1.25, "poise_damage": 14, "knockback": 180},
-        {"name": "Sundering Arc", "frames": {"startup": 12, "active": 5, "recovery": 17}, "hitbox": {"shape": "arc", "radius": 82, "angle": 170}, "base_damage": 0, "damage_mult": 1.55, "poise_damage": 18, "knockback": 230}
+        {
+          "name": "Mountain Fall",
+          "frames": {
+            "startup": 11,
+            "active": 4,
+            "recovery": 14
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 74,
+            "angle": 120
+          },
+          "base_damage": 0,
+          "damage_mult": 1.25,
+          "poise_damage": 14,
+          "knockback": 180
+        },
+        {
+          "name": "Sundering Arc",
+          "frames": {
+            "startup": 12,
+            "active": 5,
+            "recovery": 17
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 82,
+            "angle": 170
+          },
+          "base_damage": 0,
+          "damage_mult": 1.55,
+          "poise_damage": 18,
+          "knockback": 230
+        }
       ]
     },
     {
@@ -42,9 +122,57 @@
       "knock_mult": 1.1,
       "combo_window": 0.8,
       "moves": [
-        {"name": "Sweeping Rod", "frames": {"startup": 8, "active": 4, "recovery": 10}, "hitbox": {"shape": "arc", "radius": 96, "angle": 200}, "base_damage": 0, "damage_mult": 0.85, "poise_damage": 10, "knockback": 110},
-        {"name": "Rising Wind", "frames": {"startup": 7, "active": 4, "recovery": 10}, "hitbox": {"shape": "arc", "radius": 100, "angle": 160}, "base_damage": 0, "damage_mult": 0.9, "poise_damage": 10, "knockback": 120},
-        {"name": "Dragon's Tail", "frames": {"startup": 10, "active": 4, "recovery": 13}, "hitbox": {"shape": "circle", "radius": 110, "angle": 360}, "base_damage": 0, "damage_mult": 1.0, "poise_damage": 16, "knockback": 160}
+        {
+          "name": "Sweeping Rod",
+          "frames": {
+            "startup": 8,
+            "active": 4,
+            "recovery": 10
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 96,
+            "angle": 200
+          },
+          "base_damage": 0,
+          "damage_mult": 0.85,
+          "poise_damage": 10,
+          "knockback": 110
+        },
+        {
+          "name": "Rising Wind",
+          "frames": {
+            "startup": 7,
+            "active": 4,
+            "recovery": 10
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 100,
+            "angle": 160
+          },
+          "base_damage": 0,
+          "damage_mult": 0.9,
+          "poise_damage": 10,
+          "knockback": 120
+        },
+        {
+          "name": "Dragon's Tail",
+          "frames": {
+            "startup": 10,
+            "active": 4,
+            "recovery": 13
+          },
+          "hitbox": {
+            "shape": "circle",
+            "radius": 110,
+            "angle": 360
+          },
+          "base_damage": 0,
+          "damage_mult": 1.0,
+          "poise_damage": 16,
+          "knockback": 160
+        }
       ]
     },
     {
@@ -58,8 +186,40 @@
       "knock_mult": 0.8,
       "combo_window": 0.8,
       "moves": [
-        {"name": "Silk Lash", "frames": {"startup": 6, "active": 3, "recovery": 9}, "hitbox": {"shape": "arc", "radius": 118, "angle": 30}, "base_damage": 0, "damage_mult": 0.8, "poise_damage": 4, "knockback": 40},
-        {"name": "Entangling Arc", "frames": {"startup": 8, "active": 4, "recovery": 12}, "hitbox": {"shape": "arc", "radius": 126, "angle": 160}, "base_damage": 0, "damage_mult": 0.95, "poise_damage": 6, "knockback": 60}
+        {
+          "name": "Silk Lash",
+          "frames": {
+            "startup": 6,
+            "active": 3,
+            "recovery": 9
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 118,
+            "angle": 30
+          },
+          "base_damage": 0,
+          "damage_mult": 0.8,
+          "poise_damage": 4,
+          "knockback": 40
+        },
+        {
+          "name": "Entangling Arc",
+          "frames": {
+            "startup": 8,
+            "active": 4,
+            "recovery": 12
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 126,
+            "angle": 160
+          },
+          "base_damage": 0,
+          "damage_mult": 0.95,
+          "poise_damage": 6,
+          "knockback": 60
+        }
       ]
     },
     {
@@ -73,9 +233,166 @@
       "knock_mult": 0.9,
       "combo_window": 0.7,
       "moves": [
-        {"name": "Straight Palm", "frames": {"startup": 4, "active": 3, "recovery": 6}, "hitbox": {"shape": "arc", "radius": 52, "angle": 80}, "base_damage": 5, "damage_mult": 1.0, "poise_damage": 6, "knockback": 60},
-        {"name": "Elbow Follow", "frames": {"startup": 4, "active": 3, "recovery": 6}, "hitbox": {"shape": "arc", "radius": 50, "angle": 90}, "base_damage": 5, "damage_mult": 1.0, "poise_damage": 6, "knockback": 60},
-        {"name": "Iron Knuckle", "frames": {"startup": 6, "active": 3, "recovery": 9}, "hitbox": {"shape": "arc", "radius": 56, "angle": 70}, "base_damage": 5, "damage_mult": 1.2, "poise_damage": 10, "knockback": 90}
+        {
+          "name": "Straight Palm",
+          "frames": {
+            "startup": 4,
+            "active": 3,
+            "recovery": 6
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 52,
+            "angle": 80
+          },
+          "base_damage": 5,
+          "damage_mult": 1.0,
+          "poise_damage": 6,
+          "knockback": 60
+        },
+        {
+          "name": "Elbow Follow",
+          "frames": {
+            "startup": 4,
+            "active": 3,
+            "recovery": 6
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 50,
+            "angle": 90
+          },
+          "base_damage": 5,
+          "damage_mult": 1.0,
+          "poise_damage": 6,
+          "knockback": 60
+        },
+        {
+          "name": "Iron Knuckle",
+          "frames": {
+            "startup": 6,
+            "active": 3,
+            "recovery": 9
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 56,
+            "angle": 70
+          },
+          "base_damage": 5,
+          "damage_mult": 1.2,
+          "poise_damage": 10,
+          "knockback": 90
+        }
+      ]
+    },
+    {
+      "id": "spear",
+      "name": "Spear",
+      "school": "spear",
+      "reach_mult": 1.6,
+      "speed_mult": 0.95,
+      "poise_mult": 1.1,
+      "knock_mult": 0.9,
+      "combo_window": 0.8,
+      "moves": [
+        {
+          "name": "Serpent Thrust",
+          "frames": {
+            "startup": 7,
+            "active": 3,
+            "recovery": 10
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 120,
+            "angle": 36
+          },
+          "base_damage": 0,
+          "damage_mult": 1.0,
+          "poise_damage": 9,
+          "knockback": 70
+        },
+        {
+          "name": "Rain of Points",
+          "frames": {
+            "startup": 6,
+            "active": 4,
+            "recovery": 10
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 124,
+            "angle": 44
+          },
+          "base_damage": 0,
+          "damage_mult": 1.1,
+          "poise_damage": 10,
+          "knockback": 80
+        },
+        {
+          "name": "Dragon's Descent",
+          "frames": {
+            "startup": 10,
+            "active": 3,
+            "recovery": 14
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 132,
+            "angle": 30
+          },
+          "base_damage": 0,
+          "damage_mult": 1.45,
+          "poise_damage": 14,
+          "knockback": 130
+        }
+      ]
+    },
+    {
+      "id": "heavy",
+      "name": "Heavy Weapon",
+      "school": "heavy",
+      "reach_mult": 1.05,
+      "speed_mult": 0.7,
+      "poise_mult": 2.0,
+      "knock_mult": 2.0,
+      "combo_window": 0.9,
+      "moves": [
+        {
+          "name": "Mountain Cleave",
+          "frames": {
+            "startup": 14,
+            "active": 4,
+            "recovery": 18
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 88,
+            "angle": 130
+          },
+          "base_damage": 0,
+          "damage_mult": 1.5,
+          "poise_damage": 22,
+          "knockback": 260
+        },
+        {
+          "name": "Earth Sunder",
+          "frames": {
+            "startup": 16,
+            "active": 5,
+            "recovery": 20
+          },
+          "hitbox": {
+            "shape": "arc",
+            "radius": 96,
+            "angle": 160
+          },
+          "base_damage": 0,
+          "damage_mult": 1.8,
+          "poise_damage": 28,
+          "knockback": 320
+        }
       ]
     }
   ]

@@ -666,8 +666,12 @@ func validate() -> Array:
 		_validate_technique_kind(t, problems)
 		_validate_status_payload(t.get("status", {}), "technique %s" % String(t.get("id", "?")), problems)
 
-	if weapon_types.size() < 4:
-		problems.append("expected at least 4 weapon categories, found %d" % weapon_types.size())
+	if weapon_types.size() < 7:
+		problems.append("expected at least 7 weapon categories, found %d" % weapon_types.size())
+	var based_types: Dictionary = {}
+	for base_entry in bases:
+		if String(base_entry.get("slot", "")) == "weapon":
+			based_types[String(base_entry.get("weapon_type", ""))] = true
 	var weapon_type_ids: Dictionary = {}
 	for w in weapon_types:
 		var w_id := String(w.get("id", ""))
@@ -679,6 +683,8 @@ func validate() -> Array:
 		weapon_type_ids[w_id] = true
 		if String(w.get("name", "")) == "":
 			problems.append("weapon category %s has no name" % w_id)
+		if w_id != "fist" and not based_types.has(w_id):
+			problems.append("weapon category %s has no item base" % w_id)
 		if float(w.get("reach_mult", 0.0)) <= 0.0 or float(w.get("speed_mult", 0.0)) <= 0.0:
 			problems.append("weapon category %s has an invalid reach or speed" % w_id)
 		var weapon_moves: Array = w.get("moves", [])
