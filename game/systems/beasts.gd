@@ -30,6 +30,64 @@ const DEFAULTS := {
 }
 
 
+## Beast ranks: the same species is not the same fight. Rank is
+## rolled at spawn, weighted by the body's tier - an Ancient is a
+## rumour at ilvl 1 and a real risk at ilvl 8. A bloodline
+## awakening (6% of spawns) is rarer still and pays in the core.
+const RANKS := [
+	{"name": "Young", "hp_mult": 0.8, "damage_mult": 0.85, "scale": 0.9, "core_bonus": 0},
+	{"name": "Adult", "hp_mult": 1.0, "damage_mult": 1.0, "scale": 1.0, "core_bonus": 0},
+	{"name": "Alpha", "hp_mult": 1.5, "damage_mult": 1.3, "scale": 1.18, "core_bonus": 1},
+	{"name": "Ancient", "hp_mult": 2.1, "damage_mult": 1.6, "scale": 1.38, "core_bonus": 2},
+]
+const BLOODLINE_CHANCE := 0.06
+const BLOODLINE_HP_MULT := 1.5
+const BLOODLINE_DAMAGE_MULT := 1.35
+
+
+static func rank_count() -> int:
+	return RANKS.size()
+
+
+static func rank_of(index: int) -> Dictionary:
+	return RANKS[clampi(index, 0, RANKS.size() - 1)]
+
+
+static func rank_name(index: int) -> String:
+	return String(rank_of(index).get("name", "Adult"))
+
+
+static func rank_roll(r: RandomNumberGenerator, ilvl: int) -> int:
+	var weights := [30.0, 55.0, 12.0 + float(maxi(0, ilvl)), 2.0 + float(maxi(0, ilvl - 2)) * 1.5]
+	return int(Rng.pick_weighted(weights, r))
+
+
+static func bloodline_roll(r: RandomNumberGenerator) -> bool:
+	return r.randf() < BLOODLINE_CHANCE
+
+
+## Taming: a beast beaten to a quarter of its strength can be
+## won instead of killed. The odds are the tamer's whole kit -
+## the Instinct passive, the Beast method, a winning manner -
+## against the body's rank and any awakened blood.
+const TAME_BASE := 0.35
+const TAME_WEAKENED_RATIO := 0.25
+const TAME_MAX_ATTEMPTS := 3
+
+
+static func tame_chance(instinct: bool, beast_method: bool, char_value: int, rank: int, awakened: bool) -> float:
+	var chance := TAME_BASE
+	if instinct:
+		chance += 0.25
+	if beast_method:
+		chance += 0.15
+	chance += minf(0.15, float(maxi(0, char_value)) * 0.004)
+	chance -= 0.08 * float(maxi(0, rank - 1))
+	if awakened:
+		chance -= 0.15
+	return clampf(chance, 0.05, 0.95)
+
+
 static func defaults() -> Dictionary:
 	return (DEFAULTS as Dictionary).duplicate(true)
 
@@ -132,7 +190,7 @@ static func enemy_entry(species: Dictionary) -> Dictionary:
 
 ## The material a beast leaves behind. A core is not equipment: it rolls no
 ## affixes and carries no slot, it is simply a valuable the market will buy.
-static func core_item(species: Dictionary, ilvl: int, counter: int) -> Dictionary:
+static func core_item(species: Dictionary, ilvl: int, counter: int, bonus: int = 0) -> Dictionary:
 	var core: Dictionary = species.get("core", {})
 	var species_id := String(species.get("id", "beast.unknown"))
 	var name := String(core.get("name", "Spirit Core"))
@@ -142,9 +200,9 @@ static func core_item(species: Dictionary, ilvl: int, counter: int) -> Dictionar
 		"base_name": name,
 		"slot": "material",
 		"material": "core",
-		"ilvl": maxi(1, ilvl),
-		"rarity": 2,
-		"rarity_name": ItemGen.RARITY_NAMES[2],
+		"ilvl": maxi(1, ilvl + bonus),
+		"rarity": clampi(2 + bonus, 0, ItemGen.RARITY_NAMES.size() - 1),
+		"rarity_name": ItemGen.RARITY_NAMES[clampi(2 + bonus, 0, ItemGen.RARITY_NAMES.size() - 1)],
 		"implicit": "Spirit beast core",
 		"base_damage": 0.0,
 		"armor": 0.0,

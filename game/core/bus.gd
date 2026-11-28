@@ -21,7 +21,8 @@ signal enemy_died(at: Vector2, ilvl: int)
 signal elite_died(at: Vector2, ilvl: int)
 ## A spirit beast fell. The scene root pays its core; the ordinary loot path
 ## still runs through `enemy_died`.
-signal beast_slain(at: Vector2, species_id: String, ilvl: int)
+signal beast_slain(at: Vector2, species_id: String, ilvl: int, rank: int, bloodline: bool)
+signal beast_companion_died(species_id: String)
 ## A boss moved into a new health phase. The body announces, the scene decides.
 signal boss_phase_changed(boss: Node, index: int, phase_name: String)
 ## A boss was killed, once. Rewards are paid here, keyed by a stable id so a

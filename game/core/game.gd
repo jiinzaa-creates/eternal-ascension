@@ -92,6 +92,7 @@ var party_ids: Array = []
 ## People held against their will. Unlike a bond, loyalty is the player's doing,
 ## so the roster is saved whole; `Captivity.sanitize()` cleans it on load.
 var captives: Array = []
+var tamed_beast: Dictionary = {}
 ## The terms the whole holding yard is kept under (fair or harsh).
 var captive_policy := "captivity.fair"
 ## Advanced once per binding, so two people taken on one day cannot share an id.
@@ -248,6 +249,7 @@ func to_dict() -> Dictionary:
 		"npc_memory": npc_memory.duplicate(true),
 		"party": party_ids.duplicate(),
 		"captives": captives.duplicate(true),
+		"tamed_beast": tamed_beast.duplicate(true),
 		"captive_policy": captive_policy,
 		"captive_seq": captive_seq,
 		"notoriety": notoriety,
@@ -301,6 +303,8 @@ func from_dict(data: Dictionary) -> void:
 	npc_memory = NpcDb.sanitize_memory(data.get("npc_memory", {}))
 	party_ids = Party.sanitize(data.get("party", []))
 	captives = Captivity.sanitize(data.get("captives", []))
+	var saved_beast: Variant = data.get("tamed_beast", {})
+	tamed_beast = (saved_beast as Dictionary).duplicate(true) if typeof(saved_beast) == TYPE_DICTIONARY else {}
 	captive_policy = Captivity.policy_id_or_default(String(data.get("captive_policy", "")))
 	captive_seq = maxi(0, int(data.get("captive_seq", 0)))
 	notoriety = clampi(int(data.get("notoriety", 0)), 0, Captivity.notoriety_cap())
